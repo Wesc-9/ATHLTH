@@ -6,17 +6,15 @@ ATHLTH is an Apple Health–first training app. V0.1 is intentionally local-firs
 
 ## V0.1
 
-The first milestone focuses on a real, testable Apple experience:
-
 - iPhone + iPad SwiftUI app
 - Apple Health authorization
 - Running, walking, and strength workouts
-- Outdoor workout GPS routes when HealthKit provides them
+- Outdoor GPS routes when HealthKit provides them
 - Duration, distance, pace, calories, average/max heart rate
 - Sleep duration and stages
 - Heart rate, resting heart rate, and HRV
 - Train screen for Run, Walk, or Strength
-- Strength split selection: Full Body, Push, Pull, Legs, Upper, Lower, Custom
+- Strength splits: Full Body, Push, Pull, Legs, Upper, Lower, Custom
 - English-first localization structure
 - Privacy-first, on-device architecture
 
@@ -28,7 +26,7 @@ Future cloud/AI features must be explicit opt-in and designed so the user unders
 
 ## Generate the Xcode project
 
-The repository uses XcodeGen so the generated Xcode project does not need to be committed.
+The repository uses XcodeGen:
 
 ```bash
 brew install xcodegen
@@ -36,7 +34,7 @@ xcodegen generate
 open ATHLTH.xcodeproj
 ```
 
-Then select your Apple Developer team under **Signing & Capabilities** and run on a physical iPhone for real HealthKit data.
+Select your Apple Developer team under **Signing & Capabilities** and run on a physical iPhone for real HealthKit data.
 
 ## Roadmap
 

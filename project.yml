@@ -1,0 +1,29 @@
+name: ATHLTH
+options:
+  bundleIdPrefix: com.athlth
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  ATHLTH:
+    type: application
+    platform: iOS
+    sources:
+      - path: ATHLTH
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.athlth.app
+        PRODUCT_NAME: ATHLTH
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: ATHLTH
+        INFOPLIST_KEY_NSHealthShareUsageDescription: "ATHLTH reads workouts, sleep, and heart data to give you private training insights on your device."
+        CODE_SIGN_ENTITLEMENTS: ATHLTH/Resources/ATHLTH.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+    scheme:
+      testTargets: []
