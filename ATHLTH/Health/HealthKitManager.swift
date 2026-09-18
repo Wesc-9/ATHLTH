@@ -10,6 +10,8 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var heart: HeartSummary = .empty
     @Published private(set) var isRefreshing = false
     @Published var authorizationError: String?
+    @Published private(set) var backgroundDeliveryTestResult: String?
+    @Published private(set) var routeCapabilityTestResult: String?
 
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
@@ -84,6 +86,70 @@ final class HealthKitManager: ObservableObject {
         } catch {
             authorizationError = error.localizedDescription
         }
+    }
+
+    func authorizationRequestStatusDescription() async -> String {
+        await withCheckedContinuation { continuation in
+            healthStore.getRequestStatusForAuthorization(toShare: [], read: readTypes) { status, error in
+                if let error {
+                    continuation.resume(returning: "Error: \(error.localizedDescription)")
+                    return
+                }
+
+                switch status {
+                case .shouldRequest:
+                    continuation.resume(returning: "Apple Health permission sheet should be shown.")
+                case .unnecessary:
+                    continuation.resume(returning: "Authorization has already been requested for this data set.")
+                case .unknown:
+                    continuation.resume(returning: "Authorization status is unknown.")
+                @unknown default:
+                    continuation.resume(returning: "Authorization returned a newer status.")
+                }
+            }
+        }
+    }
+
+    func testBackgroundDelivery() async {
+        backgroundDeliveryTestResult = "Testing…"
+
+        let type = HKObjectType.workoutType()
+        let result: String = await withCheckedContinuation { continuation in
+            healthStore.enableBackgroundDelivery(for: type, frequency: .immediate) { success, error in
+                if success {
+                    continuation.resume(returning: "Success: HealthKit accepted background delivery for workouts.")
+                } else if let error {
+                    continuation.resume(returning: "Not available in this signed build: \(error.localizedDescription)")
+                } else {
+                    continuation.resume(returning: "Background delivery was not enabled.")
+                }
+            }
+        }
+
+        backgroundDeliveryTestResult = result
+    }
+
+    func testWorkoutRouteCapability() async {
+        routeCapabilityTestResult = "Searching recent run/walk workouts…"
+
+        let candidates = workouts
+            .filter { $0.activity == .running || $0.activity == .walking }
+            .prefix(10)
+
+        guard !candidates.isEmpty else {
+            routeCapabilityTestResult = "No recent running or walking workout is loaded yet."
+            return
+        }
+
+        for workout in candidates {
+            let detail = await workoutDetail(for: workout)
+            if !detail.route.isEmpty {
+                routeCapabilityTestResult = "Route read succeeded: \(detail.route.count) GPS points found."
+                return
+            }
+        }
+
+        routeCapabilityTestResult = "HealthKit access works, but no GPS route was found in the recent run/walk workouts checked."
     }
 
     func workoutDetail(for summary: WorkoutSummary) async -> WorkoutDetail {

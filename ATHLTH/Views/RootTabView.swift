@@ -19,6 +19,9 @@ struct RootTabView: View {
 
             HeartView()
                 .tabItem { Label("Heart", systemImage: "heart.fill") }
+
+            CapabilityLabView()
+                .tabItem { Label("Lab", systemImage: "testtube.2") }
         }
     }
 }
