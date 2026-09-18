@@ -314,12 +314,12 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
 
-        var locations: [CLLocation] = []
+        var allLocations: [CLLocation] = []
         for route in routes {
-            locations.append(contentsOf: try await locations(for: route))
+            allLocations.append(contentsOf: try await locations(for: route))
         }
 
-        return locations.sorted { $0.timestamp < $1.timestamp }
+        return allLocations.sorted { $0.timestamp < $1.timestamp }
     }
 
     private func locations(for route: HKWorkoutRoute) async throws -> [CLLocation] {
