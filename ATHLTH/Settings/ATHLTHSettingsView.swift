@@ -196,7 +196,7 @@ struct ATHLTHSettingsView: View {
                 }
             }
 
-            if session.currentRole == .admin {
+            if session.currentRole.canAccessControlCenter {
                 Section("Admin") {
                     NavigationLink {
                         AdminCenterView()
