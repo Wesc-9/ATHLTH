@@ -211,9 +211,7 @@ private struct AdminCampaignDetailView: View {
     private var result: MarketingEligibilityResult {
         MarketingEligibilityEngine.evaluate(
             profile: session.onboardingProfile,
-            accountCreatedAt: session.profile.userID == session.profile.userID
-                ? Date()
-                : Date(),
+            accountCreatedAt: session.accountCreatedAt,
             draft: draft
         )
     }
