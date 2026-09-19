@@ -156,7 +156,7 @@ struct WorkoutStartOptionsView: View {
             HStack(spacing: 14) {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundStyle(disabled ? .secondary : .green)
+                    .foregroundStyle(disabled ? Color.secondary : Color.green)
                     .frame(width: 36)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -171,7 +171,7 @@ struct WorkoutStartOptionsView: View {
                 Spacer()
 
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected ? .green : .secondary)
+                    .foregroundStyle(selected ? Color.green : Color.secondary)
             }
             .padding(12)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
