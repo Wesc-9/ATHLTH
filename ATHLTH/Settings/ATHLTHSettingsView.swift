@@ -184,6 +184,14 @@ struct ATHLTHSettingsView: View {
                     Label("Capability Lab", systemImage: "testtube.2")
                 }
 
+                #if DEBUG
+                NavigationLink {
+                    AdminCenterView()
+                } label: {
+                    Label("Admin Center", systemImage: "lock.rectangle.stack.fill")
+                }
+                #endif
+
                 LabeledContent("Preview mode", value: "Enabled")
                 LabeledContent("App version", value: "0.1.0")
             }
