@@ -162,10 +162,12 @@ final class AppSettingsStore: ObservableObject {
     @Published var challengeNotificationsEnabled: Bool { didSet { persist() } }
     @Published var messageNotificationsEnabled: Bool { didSet { persist() } }
 
+    @Published var spotifyAutoplayLinkedPlaylists: Bool { didSet { persist() } }
+
     @Published var healthConnected: Bool = false
-    @Published var watchConnected: Bool = false
-    @Published var spotifyConnected: Bool = false
-    @Published var homeAssistantConnected: Bool = false
+    @Published var watchConnected: Bool { didSet { persist() } }
+    @Published var spotifyConnected: Bool { didSet { persist() } }
+    @Published var homeAssistantConnected: Bool { didSet { persist() } }
 
     private let defaults: UserDefaults
     private var isInitializing = true
@@ -195,6 +197,11 @@ final class AppSettingsStore: ObservableObject {
         challengeNotificationsEnabled = defaults.object(forKey: "settings.challengeNotifications") as? Bool ?? true
         messageNotificationsEnabled = defaults.object(forKey: "settings.messageNotifications") as? Bool ?? true
 
+        spotifyAutoplayLinkedPlaylists = defaults.object(forKey: "settings.spotifyAutoplayLinkedPlaylists") as? Bool ?? true
+        watchConnected = defaults.object(forKey: "settings.watchConnected") as? Bool ?? false
+        spotifyConnected = defaults.object(forKey: "settings.spotifyConnected") as? Bool ?? false
+        homeAssistantConnected = defaults.object(forKey: "settings.homeAssistantConnected") as? Bool ?? false
+
         isInitializing = false
     }
 
@@ -222,6 +229,11 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
         defaults.set(challengeNotificationsEnabled, forKey: "settings.challengeNotifications")
         defaults.set(messageNotificationsEnabled, forKey: "settings.messageNotifications")
+
+        defaults.set(spotifyAutoplayLinkedPlaylists, forKey: "settings.spotifyAutoplayLinkedPlaylists")
+        defaults.set(watchConnected, forKey: "settings.watchConnected")
+        defaults.set(spotifyConnected, forKey: "settings.spotifyConnected")
+        defaults.set(homeAssistantConnected, forKey: "settings.homeAssistantConnected")
     }
 
     func connectionState(for integration: IntegrationKind) -> Bool {
