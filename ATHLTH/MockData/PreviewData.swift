@@ -87,9 +87,32 @@ enum PreviewData {
                 notes: nil
             )
         ],
-        notes: "Keep the last set challenging, but controlled.",
-        spotifyPlaylistURI: nil
+        notes: "Keep the last set challenging, but controlled."
     )
+
+    static let spotifyPlaylists: [SpotifyPlaylistReference] = [
+        SpotifyPlaylistReference(
+            id: "gym-power-mix",
+            name: "Gym Power Mix",
+            uri: "spotify:playlist:gym-power-mix",
+            artworkURL: nil,
+            ownerName: "Stian"
+        ),
+        SpotifyPlaylistReference(
+            id: "run-focus",
+            name: "Run Focus",
+            uri: "spotify:playlist:run-focus",
+            artworkURL: nil,
+            ownerName: "Stian"
+        ),
+        SpotifyPlaylistReference(
+            id: "recovery-flow",
+            name: "Recovery Flow",
+            uri: "spotify:playlist:recovery-flow",
+            artworkURL: nil,
+            ownerName: "Stian"
+        )
+    ]
 
     static let trainingPlan = TrainingPlan(
         id: UUID(uuidString: "66666666-6666-6666-6666-666666666666")!,
@@ -125,8 +148,7 @@ enum PreviewData {
                                 targetPaceSecondsPerKilometer: nil,
                                 routeID: nil,
                                 exercises: [],
-                                notes: "Conversational pace.",
-                                spotifyPlaylistURI: nil
+                                notes: "Conversational pace."
                             )
                         ]
                     )
@@ -134,6 +156,8 @@ enum PreviewData {
             )
         ],
         tags: ["strength", "running", "balanced"],
+        spotifyPlaylist: spotifyPlaylists.first,
+        spotifyAutoplayOnWorkoutStart: true,
         createdAt: Date(),
         updatedAt: Date()
     )
