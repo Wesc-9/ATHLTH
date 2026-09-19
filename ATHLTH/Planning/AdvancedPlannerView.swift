@@ -139,6 +139,7 @@ struct AdvancedPlannerView: View {
 
 struct TrainingPlanManagerView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     var body: some View {
         VStack(spacing: 16) {
@@ -155,11 +156,85 @@ struct TrainingPlanManagerView: View {
                 }
 
                 ATHLTHCard {
+                    ATHLTHSectionHeader(title: "Spotify", actionTitle: "Training plan only")
+
+                    if settings.spotifyConnected {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "music.note")
+                                    .font(.title2)
+                                    .foregroundStyle(.green)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(plan.spotifyPlaylist?.name ?? "No playlist linked")
+                                        .font(.headline)
+                                    Text(
+                                        plan.spotifyPlaylist == nil
+                                            ? "Choose a Spotify playlist for this plan."
+                                            : "Starts with workouts from this plan."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+                            }
+
+                            Menu {
+                                Button("No playlist") {
+                                    session.setActivePlanSpotifyPlaylist(nil)
+                                }
+
+                                ForEach(PreviewData.spotifyPlaylists) { playlist in
+                                    Button(playlist.name) {
+                                        session.setActivePlanSpotifyPlaylist(playlist)
+                                    }
+                                }
+                            } label: {
+                                Label(
+                                    plan.spotifyPlaylist == nil ? "Choose playlist" : "Change playlist",
+                                    systemImage: "music.note.list"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+
+                            Toggle(
+                                "Autoplay when workout starts",
+                                isOn: Binding(
+                                    get: { plan.spotifyAutoplayOnWorkoutStart },
+                                    set: { session.setActivePlanSpotifyAutoplay($0) }
+                                )
+                            )
+                            .disabled(plan.spotifyPlaylist == nil)
+
+                            Text("Spotify is not attached to your whole ATHLTH profile. It is only used when a training plan has a linked playlist.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 10)
+                    } else {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Connect Spotify in Settings before choosing a playlist for this plan.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+
+                            NavigationLink {
+                                SpotifySettingsView()
+                            } label: {
+                                Label("Open Spotify Settings", systemImage: "gearshape")
+                            }
+                        }
+                        .padding(.top, 10)
+                    }
+                }
+
+                ATHLTHCard {
                     ATHLTHSectionHeader(title: "Advanced planning")
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Multiple sessions per day", systemImage: "square.stack.3d.up.fill")
                         Label("Strength, run, walk, mobility and recovery", systemImage: "figure.mixed.cardio")
-                        Label("Routes and playlists per session", systemImage: "map.fill")
+                        Label("Routes can attach to planned run/walk sessions", systemImage: "map.fill")
+                        Label("Spotify playlist can attach to the training plan", systemImage: "music.note")
                         Label("Sets, reps, load, RPE and rest", systemImage: "dumbbell.fill")
                         Label("Nutrition can attach to the same calendar later", systemImage: "fork.knife")
                     }
