@@ -37,11 +37,7 @@ final class AppSessionStore: ObservableObject {
            let role = AccountRole(rawValue: storedRole) {
             self.currentRole = role
         } else {
-            #if DEBUG
-            self.currentRole = profile.userID == PreviewData.userID ? .admin : .user
-            #else
             self.currentRole = .user
-            #endif
         }
 
         if let storedDate = defaults.object(forKey: "session.accountCreatedAt") as? Date {
@@ -92,6 +88,11 @@ final class AppSessionStore: ObservableObject {
             .lowercased()
 
         profile.username = cleaned
+
+        #if DEBUG
+        currentRole = cleaned == "stian" ? .admin : .user
+        defaults.set(currentRole.rawValue, forKey: "session.accountRole")
+        #endif
     }
 
     func saveOnboardingProfile(_ data: OnboardingProfileData) {
@@ -147,11 +148,7 @@ final class AppSessionStore: ObservableObject {
         defaults.removeObject(forKey: "session.accountRole")
         usernameSeed = profile.displayName
         accountCreatedAt = Date()
-        #if DEBUG
-        currentRole = profile.userID == PreviewData.userID ? .admin : .user
-        #else
         currentRole = .user
-        #endif
     }
 
     func beginTrainingStatus(for session: PlannedSession) {
