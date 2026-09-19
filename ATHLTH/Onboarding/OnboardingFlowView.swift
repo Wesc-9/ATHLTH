@@ -7,14 +7,10 @@ struct OnboardingFlowView: View {
 
     @State private var step: OnboardingStep = .account
     @State private var username = ""
-    @State private var dateOfBirth = Calendar.current.date(byAdding: .year, value: -30, to: Date()) ?? Date()
-    @State private var healthSex: HealthSex = .preferNotToSay
-    @State private var weightKilograms = 75.0
-    @State private var heightCentimeters = 180.0
     @State private var goals: Set<ATHLTHGoal> = []
     @State private var primaryGoal: ATHLTHGoal?
+    @State private var importedHealthDetails: HealthProfileBasics = .empty
     @State private var healthRequestInProgress = false
-    @State private var healthRequestError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,13 +34,10 @@ struct OnboardingFlowView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .alert("Apple Health", isPresented: Binding(
-            get: { healthRequestError != nil },
-            set: { if !$0 { healthRequestError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(healthRequestError ?? "")
+        .task {
+            guard health.hasRequestedAuthorization else { return }
+            await health.refreshPersonalDetails()
+            importedHealthDetails = health.personalDetails
         }
     }
 
@@ -88,8 +81,6 @@ struct OnboardingFlowView: View {
             accountStep
         case .username:
             usernameStep
-        case .personal:
-            personalStep
         case .goals:
             goalsStep
         case .connections:
@@ -159,63 +150,13 @@ struct OnboardingFlowView: View {
                 .padding(16)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
 
-            Text("You can change your display name later. Your username is your unique ATHLTH identity.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var personalStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            onboardingTitle(
-                "About you",
-                subtitle: "These details help ATHLTH present training and health data in a useful way. They stay private unless you explicitly share them."
-            )
-
-            ATHLTHCard {
-                DatePicker(
-                    "Date of birth",
-                    selection: $dateOfBirth,
-                    in: ...Date(),
-                    displayedComponents: .date
-                )
-
-                Divider()
-
-                Picker("Sex for health calculations", selection: $healthSex) {
-                    ForEach(HealthSex.allCases) { value in
-                        Text(value.title).tag(value)
-                    }
-                }
+            VStack(alignment: .leading, spacing: 8) {
+                Label("3–20 characters", systemImage: "checkmark.circle")
+                Label("Letters, numbers and underscores", systemImage: "checkmark.circle")
+                Label("Can be changed later", systemImage: "checkmark.circle")
             }
-
-            ATHLTHCard {
-                VStack(spacing: 14) {
-                    HStack {
-                        Text("Weight")
-                        Spacer()
-                        Text(String(format: "%.1f kg", weightKilograms))
-                            .font(.headline.monospacedDigit())
-                    }
-
-                    Slider(value: $weightKilograms, in: 30...250, step: 0.5)
-
-                    Divider()
-
-                    HStack {
-                        Text("Height")
-                        Spacer()
-                        Text("\(Int(heightCentimeters)) cm")
-                            .font(.headline.monospacedDigit())
-                    }
-
-                    Slider(value: $heightCentimeters, in: 120...230, step: 1)
-                }
-            }
-
-            Text("Later, Apple Health can be used as the source for weight and height instead of manual values.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -223,23 +164,13 @@ struct OnboardingFlowView: View {
         VStack(alignment: .leading, spacing: 18) {
             onboardingTitle(
                 "What do you want from ATHLTH?",
-                subtitle: "Choose as many as you like, then mark one as your main goal."
+                subtitle: "Choose the areas that matter to you, then select one main goal."
             )
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(ATHLTHGoal.allCases) { goal in
                     Button {
-                        if goals.contains(goal) {
-                            goals.remove(goal)
-                            if primaryGoal == goal {
-                                primaryGoal = goals.first
-                            }
-                        } else {
-                            goals.insert(goal)
-                            if primaryGoal == nil {
-                                primaryGoal = goal
-                            }
-                        }
+                        toggleGoal(goal)
                     } label: {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -247,7 +178,7 @@ struct OnboardingFlowView: View {
                                     .foregroundStyle(.green)
                                 Spacer()
                                 Image(systemName: goals.contains(goal) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(goals.contains(goal) ? .green : .secondary)
+                                    .foregroundStyle(goals.contains(goal) ? Color.green : Color.secondary)
                             }
 
                             Text(goal.title)
@@ -286,27 +217,59 @@ struct OnboardingFlowView: View {
         VStack(alignment: .leading, spacing: 18) {
             onboardingTitle(
                 "Connect your health",
-                subtitle: "Apple Health improves ATHLTH with workouts, heart rate, sleep, recovery and activity data. Apple Watch is optional."
+                subtitle: "Apple Health can fill in available profile basics and add workouts, heart rate, sleep, recovery and activity data. Everything here is optional."
             )
 
             ATHLTHCard {
                 connectionRow(
                     title: "Apple Health",
                     subtitle: health.hasRequestedAuthorization
-                        ? "Authorization requested"
-                        : "Connect health and workout data",
+                        ? "Connected — use available Health data"
+                        : "Import available health and profile data",
                     icon: "heart.fill",
                     connected: health.hasRequestedAuthorization
                 ) {
                     Task {
                         healthRequestInProgress = true
-                        defer { healthRequestInProgress = false }
-
                         await health.requestAuthorization()
-                        await health.configureBackgroundSync()
-                        await health.refreshAll()
+                        await health.refreshPersonalDetails()
+                        importedHealthDetails = health.personalDetails
+                        healthRequestInProgress = false
                     }
                 }
+
+                if importedHealthDetails.hasAnyValue {
+                    Divider()
+                        .padding(.vertical, 10)
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Available from Apple Health")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        if let birthDate = importedHealthDetails.dateOfBirth {
+                            LabeledContent("Date of birth", value: birthDate.formatted(date: .abbreviated, time: .omitted))
+                        }
+
+                        if let sex = importedHealthDetails.healthSex {
+                            LabeledContent("Sex", value: sex.title)
+                        }
+
+                        if let weight = importedHealthDetails.weightKilograms {
+                            LabeledContent("Weight", value: String(format: "%.1f kg", weight))
+                        }
+
+                        if let height = importedHealthDetails.heightCentimeters {
+                            LabeledContent("Height", value: "\(Int(height)) cm")
+                        }
+                    }
+                    .font(.subheadline)
+                }
+
+                Text("Missing profile details can be added later in Settings. ATHLTH never requires them to finish onboarding.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
             }
 
             ATHLTHCard {
@@ -314,7 +277,7 @@ struct OnboardingFlowView: View {
                     title: "Apple Watch",
                     subtitle: settings.watchConnected
                         ? "Connected"
-                        : "Optional — you can use ATHLTH fully without a Watch",
+                        : "Optional — ATHLTH works fully from iPhone",
                     icon: "applewatch",
                     connected: settings.watchConnected
                 ) {
@@ -328,11 +291,11 @@ struct OnboardingFlowView: View {
             }
 
             ATHLTHCard {
-                Label("Your health data stays private by default", systemImage: "lock.shield.fill")
+                Label("Private by default", systemImage: "lock.shield.fill")
                     .font(.headline)
                     .foregroundStyle(.green)
 
-                Text("Connecting Apple Health does not make health metrics public. Social sharing is controlled separately.")
+                Text("Connecting Apple Health does not publish health data. Social sharing is controlled separately.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 6)
@@ -351,7 +314,7 @@ struct OnboardingFlowView: View {
             Text("You’re ready")
                 .font(.largeTitle.weight(.bold))
 
-            Text("ATHLTH is set up around your goals. You can change profile details, privacy, Apple Health, Apple Watch and integrations later in Settings.")
+            Text("ATHLTH is set up around your goals. Health connections, personal details, privacy, Spotify and other integrations can be changed later in Settings.")
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -367,20 +330,40 @@ struct OnboardingFlowView: View {
                         .padding(.top, 4)
                 }
             }
+
+            HStack(spacing: 12) {
+                readinessChip(
+                    title: "Apple Health",
+                    connected: health.hasRequestedAuthorization,
+                    icon: "heart.fill"
+                )
+                readinessChip(
+                    title: "Apple Watch",
+                    connected: settings.watchConnected,
+                    icon: "applewatch"
+                )
+            }
+
+            Text("Spotify and Home Assistant are configured later in Settings.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
     @ViewBuilder
-    private func footerButton(title: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func readinessChip(title: String, connected: Bool, icon: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundStyle(connected ? Color.green : Color.secondary)
             Text(title)
-                .font(.headline)
-                .frame(maxWidth: .infinity)
+                .font(.caption.weight(.semibold))
+            Text(connected ? "Connected" : "Add later")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .tint(.green)
-        .disabled(disabled)
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var footer: some View {
@@ -392,14 +375,9 @@ struct OnboardingFlowView: View {
             case .username:
                 footerButton(
                     title: "Continue",
-                    disabled: username.trimmingCharacters(in: .whitespacesAndNewlines).count < 3
+                    disabled: !validUsername
                 ) {
                     session.setPendingUsername(username)
-                    step = .personal
-                }
-
-            case .personal:
-                footerButton(title: "Continue") {
                     step = .goals
                 }
 
@@ -415,6 +393,7 @@ struct OnboardingFlowView: View {
                 }
 
                 Button("Skip for now") {
+                    importedHealthDetails = .empty
                     saveProfileData()
                     step = .ready
                 }
@@ -428,6 +407,32 @@ struct OnboardingFlowView: View {
         }
         .padding(20)
         .background(.ultraThinMaterial)
+    }
+
+    private var validUsername: Bool {
+        let cleaned = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (3...20).contains(cleaned.count) else { return false }
+
+        return cleaned.allSatisfy { character in
+            character.isLetter || character.isNumber || character == "_"
+        }
+    }
+
+    @ViewBuilder
+    private func footerButton(
+        title: String,
+        disabled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(.green)
+        .disabled(disabled)
     }
 
     @ViewBuilder
@@ -474,6 +479,20 @@ struct OnboardingFlowView: View {
         }
     }
 
+    private func toggleGoal(_ goal: ATHLTHGoal) {
+        if goals.contains(goal) {
+            goals.remove(goal)
+            if primaryGoal == goal {
+                primaryGoal = goals.first
+            }
+        } else {
+            goals.insert(goal)
+            if primaryGoal == nil {
+                primaryGoal = goal
+            }
+        }
+    }
+
     private func goBack() {
         guard let previous = OnboardingStep(rawValue: step.rawValue - 1) else { return }
         step = previous
@@ -482,10 +501,11 @@ struct OnboardingFlowView: View {
     private func saveProfileData() {
         session.saveOnboardingProfile(
             OnboardingProfileData(
-                dateOfBirth: dateOfBirth,
-                healthSex: healthSex,
-                weightKilograms: weightKilograms,
-                heightCentimeters: heightCentimeters,
+                dateOfBirth: importedHealthDetails.dateOfBirth,
+                healthSex: importedHealthDetails.healthSex,
+                weightKilograms: importedHealthDetails.weightKilograms,
+                heightCentimeters: importedHealthDetails.heightCentimeters,
+                personalDetailsSource: importedHealthDetails.hasAnyValue ? .appleHealth : .none,
                 goals: goals,
                 primaryGoal: primaryGoal
             )
