@@ -1,15 +1,25 @@
 import CoreLocation
 import Foundation
 
-enum AccountRole: String, Codable, Hashable {
+enum AccountRole: String, Codable, Hashable, CaseIterable {
     case user
     case admin
+    case owner
 
     var title: String {
         switch self {
         case .user: return "User"
         case .admin: return "Admin"
+        case .owner: return "Owner"
         }
+    }
+
+    var canAccessControlCenter: Bool {
+        self == .admin || self == .owner
+    }
+
+    var canManageAdmins: Bool {
+        self == .owner
     }
 }
 
