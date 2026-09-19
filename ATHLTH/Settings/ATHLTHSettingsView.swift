@@ -47,6 +47,7 @@ struct ATHLTHSettingsView: View {
 
                 Toggle("Show “Training now” status", isOn: $settings.shareTrainingPresence)
                 Toggle("Share routes by default", isOn: $settings.shareRoutesByDefault)
+                Toggle("Hide route start/end when sharing", isOn: $settings.hideRouteStartAndEnd)
                 Toggle("Share heart rate by default", isOn: $settings.shareHeartRateByDefault)
 
                 Text("Health data is private by default. Social sharing should always be explicit.")
@@ -78,6 +79,12 @@ struct ATHLTHSettingsView: View {
                     subtitle: settings.homeAssistantConnected ? "Connected" : "Optional integration",
                     connected: settings.homeAssistantConnected
                 )
+            }
+
+            Section("Training") {
+                Toggle("Auto-pause outdoor workouts", isOn: $settings.autoPauseOutdoorWorkouts)
+                Toggle("Audio cues", isOn: $settings.audioCuesEnabled)
+                Toggle("Haptic cues on Apple Watch", isOn: $settings.hapticCuesEnabled)
             }
 
             Section("Notifications") {
