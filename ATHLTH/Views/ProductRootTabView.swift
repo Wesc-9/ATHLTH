@@ -196,11 +196,13 @@ struct ATHLTHHomeView: View {
 struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var selectedSection = 0
     @State private var showingFileImporter = false
     @State private var importMessage: String?
     @State private var importError: String?
+    @State private var selectedStrengthSession: PlannedSession?
     @State private var showingStrengthWorkout = false
 
     private let gpxImporter = GPXRouteImporter()
@@ -231,7 +233,24 @@ struct ATHLTHTrainView: View {
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
-            .sheet(isPresented: $showingStrengthWorkout) {
+            .sheet(item: $selectedStrengthSession) { workout in
+                WorkoutStartOptionsView(
+                    session: workout,
+                    watchConnected: settings.watchConnected,
+                    defaultCapture: settings.preferredWorkoutCapture,
+                    defaultTracking: settings.defaultStrengthTracking
+                ) { captureDevice, trackingMode in
+                    session.beginTrainingStatus(for: workout)
+                    strengthWorkout.start(
+                        session: workout,
+                        watchSessionID: captureDevice == .appleWatch ? UUID() : nil,
+                        trackingMode: trackingMode,
+                        captureDevice: captureDevice
+                    )
+                    showingStrengthWorkout = true
+                }
+            }
+            .fullScreenCover(isPresented: $showingStrengthWorkout) {
                 ActiveStrengthWorkoutView()
                     .environmentObject(strengthWorkout)
                     .environmentObject(session)
@@ -367,19 +386,15 @@ struct ATHLTHTrainView: View {
 
         if let workout = session.activePlan?.weeks.first?.days.first?.sessions.first {
             Button {
-                session.beginTrainingStatus(for: workout)
-
                 if workout.kind == .strength {
-                    strengthWorkout.start(
-                        session: workout,
-                        watchSessionID: UUID()
-                    )
-                    showingStrengthWorkout = true
+                    selectedStrengthSession = workout
+                } else {
+                    session.beginTrainingStatus(for: workout)
                 }
             } label: {
                 Label(
-                    workout.kind == .strength ? "Start Strength Workout" : "Start on Apple Watch",
-                    systemImage: workout.kind == .strength ? "dumbbell.fill" : "applewatch"
+                    "Start Workout",
+                    systemImage: "play.fill"
                 )
                 .font(.headline)
                 .frame(maxWidth: .infinity)
