@@ -140,6 +140,22 @@ struct AdminCenterView: View {
     ]
 
     var body: some View {
+        Group {
+            if session.currentRole == .admin {
+                adminContent
+            } else {
+                ContentUnavailableView(
+                    "Admin access required",
+                    systemImage: "lock.shield.fill",
+                    description: Text("This account does not have access to ATHLTH Control Center.")
+                )
+            }
+        }
+        .navigationTitle("Control Center")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var adminContent: some View {
         List {
             Section("System status") {
                 LabeledContent("Marketing delivery", value: "Disabled")
@@ -214,8 +230,6 @@ struct AdminCenterView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Admin Center")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
