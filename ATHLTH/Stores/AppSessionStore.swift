@@ -13,6 +13,7 @@ final class AppSessionStore: ObservableObject {
     @Published var onboardingProfile: OnboardingProfileData?
     @Published var usernameSeed: String
     @Published var accountCreatedAt: Date
+    @Published private(set) var currentRole: AccountRole
 
     private let defaults: UserDefaults
 
@@ -32,6 +33,17 @@ final class AppSessionStore: ObservableObject {
         self.defaults = defaults
         self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? profile.displayName
 
+        if let storedRole = defaults.string(forKey: "session.accountRole"),
+           let role = AccountRole(rawValue: storedRole) {
+            self.currentRole = role
+        } else {
+            #if DEBUG
+            self.currentRole = profile.userID == PreviewData.userID ? .admin : .user
+            #else
+            self.currentRole = .user
+            #endif
+        }
+
         if let storedDate = defaults.object(forKey: "session.accountCreatedAt") as? Date {
             self.accountCreatedAt = storedDate
         } else {
@@ -48,6 +60,16 @@ final class AppSessionStore: ObservableObject {
         } else {
             self.onboardingProfile = nil
         }
+    }
+
+    func applyAuthenticatedRole(_ role: AccountRole) {
+        currentRole = role
+        defaults.set(role.rawValue, forKey: "session.accountRole")
+    }
+
+    func resetRoleToUser() {
+        currentRole = .user
+        defaults.set(AccountRole.user.rawValue, forKey: "session.accountRole")
     }
 
     func setUsernameSeed(_ value: String) {
@@ -116,8 +138,14 @@ final class AppSessionStore: ObservableObject {
         defaults.removeObject(forKey: "session.onboardingProfile")
         defaults.removeObject(forKey: "session.usernameSeed")
         defaults.removeObject(forKey: "session.accountCreatedAt")
+        defaults.removeObject(forKey: "session.accountRole")
         usernameSeed = profile.displayName
         accountCreatedAt = Date()
+        #if DEBUG
+        currentRole = profile.userID == PreviewData.userID ? .admin : .user
+        #else
+        currentRole = .user
+        #endif
     }
 
     func beginTrainingStatus(for session: PlannedSession) {
