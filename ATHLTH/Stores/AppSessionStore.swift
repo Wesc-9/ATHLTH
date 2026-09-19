@@ -62,6 +62,25 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+    func updatePersonalDetails(
+        _ basics: HealthProfileBasics,
+        source: PersonalDetailsSource
+    ) {
+        let existing = onboardingProfile
+
+        saveOnboardingProfile(
+            OnboardingProfileData(
+                dateOfBirth: basics.dateOfBirth,
+                healthSex: basics.healthSex,
+                weightKilograms: basics.weightKilograms,
+                heightCentimeters: basics.heightCentimeters,
+                personalDetailsSource: source,
+                goals: existing?.goals ?? [],
+                primaryGoal: existing?.primaryGoal
+            )
+        )
+    }
+
     func completeOnboarding() {
         onboardingCompleted = true
         defaults.set(true, forKey: "session.onboardingCompleted")
@@ -165,8 +184,7 @@ final class AppSessionStore: ObservableObject {
     func duplicateActivePlan() {
         guard let source = activePlan else { return }
 
-        var duplicate = source
-        duplicate = TrainingPlan(
+        let duplicate = TrainingPlan(
             id: UUID(),
             ownerID: source.ownerID,
             title: "\(source.title) Copy",
@@ -175,10 +193,28 @@ final class AppSessionStore: ObservableObject {
             version: 1,
             weeks: source.weeks,
             tags: source.tags,
+            spotifyPlaylist: source.spotifyPlaylist,
+            spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
             createdAt: Date(),
             updatedAt: Date()
         )
         activePlan = duplicate
+    }
+
+    func setActivePlanSpotifyPlaylist(_ playlist: SpotifyPlaylistReference?) {
+        guard var plan = activePlan else { return }
+        plan.spotifyPlaylist = playlist
+        plan.updatedAt = Date()
+        plan.version += 1
+        activePlan = plan
+    }
+
+    func setActivePlanSpotifyAutoplay(_ enabled: Bool) {
+        guard var plan = activePlan else { return }
+        plan.spotifyAutoplayOnWorkoutStart = enabled
+        plan.updatedAt = Date()
+        plan.version += 1
+        activePlan = plan
     }
 
     func setPlanVisibility(_ visibility: ProfileVisibility) {
