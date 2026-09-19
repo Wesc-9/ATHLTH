@@ -15,8 +15,8 @@ enum EmailAuthMode: String, CaseIterable, Identifiable {
 }
 
 enum EmailAuthResult {
-    case existingUser
-    case newUser
+    case existingUser(email: String)
+    case newUser(email: String)
 }
 
 struct EmailAuthView: View {
@@ -190,9 +190,9 @@ struct EmailAuthView: View {
                 return
             }
 
-            onAuthenticated(.newUser)
+            onAuthenticated(.newUser(email: cleanEmail))
         } else {
-            onAuthenticated(.existingUser)
+            onAuthenticated(.existingUser(email: cleanEmail))
         }
 
         dismiss()
