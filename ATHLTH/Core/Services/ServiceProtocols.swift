@@ -8,6 +8,16 @@ protocol HealthDataProviding {
     func loadRecentWorkouts() async throws -> [WorkoutSummary]
 }
 
+protocol WorkoutSessionRecording {
+    func start(
+        session: PlannedSession,
+        route: TrainingRoute?,
+        captureDevice: WorkoutCaptureDevice
+    ) async throws -> UUID?
+
+    func finish(recordingID: UUID?) async throws -> LinkedHealthWorkoutMetrics
+}
+
 protocol WorkoutLaunching {
     func startOnWatch(
         session: PlannedSession,
@@ -72,5 +82,26 @@ actor MockWorkoutLauncher: WorkoutLaunching {
     ) async throws -> UUID {
         lastLaunchedSessionID = session.id
         return session.id
+    }
+}
+
+
+actor MockWorkoutSessionRecorder: WorkoutSessionRecording {
+    func start(
+        session: PlannedSession,
+        route: TrainingRoute?,
+        captureDevice: WorkoutCaptureDevice
+    ) async throws -> UUID? {
+        captureDevice == .appleWatch ? UUID() : nil
+    }
+
+    func finish(recordingID: UUID?) async throws -> LinkedHealthWorkoutMetrics {
+        LinkedHealthWorkoutMetrics(
+            healthKitWorkoutUUID: nil,
+            duration: nil,
+            activeCalories: nil,
+            averageHeartRate: nil,
+            maxHeartRate: nil
+        )
     }
 }
