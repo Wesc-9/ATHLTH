@@ -18,7 +18,7 @@ struct ATHLTHApp: App {
                 .environmentObject(settings)
                 .environmentObject(strengthWorkout)
                 .environmentObject(spotifyPlayback)
-                .environment(\.locale, Locale(identifier: settings.language.rawValue))
+                .environment(\.locale, settings.language.locale)
                 .preferredColorScheme(settings.appearance.colorScheme)
         }
     }
