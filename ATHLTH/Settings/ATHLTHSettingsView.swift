@@ -3,6 +3,7 @@ import SwiftUI
 struct ATHLTHSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var session: AppSessionStore
 
     var body: some View {
         List {
@@ -184,13 +185,13 @@ struct ATHLTHSettingsView: View {
                     Label("Capability Lab", systemImage: "testtube.2")
                 }
 
-                #if DEBUG
-                NavigationLink {
-                    AdminCenterView()
-                } label: {
-                    Label("Admin Center", systemImage: "lock.rectangle.stack.fill")
+                if session.currentRole == .admin {
+                    NavigationLink {
+                        AdminCenterView()
+                    } label: {
+                        Label("Control Center", systemImage: "lock.rectangle.stack.fill")
+                    }
                 }
-                #endif
 
                 LabeledContent("Preview mode", value: "Enabled")
                 LabeledContent("App version", value: "0.1.0")
