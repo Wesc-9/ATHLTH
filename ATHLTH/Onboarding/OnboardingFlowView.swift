@@ -220,43 +220,42 @@ struct OnboardingFlowView: View {
                 subtitle: "This is how friends will find you. Every ATHLTH username is unique."
             )
 
-            if !usernameSuggestions.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Suggestions for you")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Username")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
-                    VStack(spacing: 9) {
-                        ForEach(usernameSuggestions, id: \.self) { suggestion in
-                            Button {
-                                username = suggestion
-                            } label: {
-                                HStack {
-                                    Text("@\(suggestion)")
-                                        .font(.subheadline.weight(.semibold))
-                                    Spacer()
-                                    Image(systemName: username == suggestion ? "checkmark.circle.fill" : "plus.circle")
-                                        .foregroundStyle(.green)
-                                }
-                                .padding(.horizontal, 14)
-                                .frame(height: 46)
-                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
-                            }
-                            .buttonStyle(.plain)
-                        }
+                TextField("@username", text: $username)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.title2.weight(.semibold))
+                    .padding(16)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                    .onChange(of: username) {
+                        username = UsernameGenerator.normalizedTypedUsername(username)
                     }
+
+                if let title = usernameValidation.title, !username.isEmpty {
+                    Label(title, systemImage: usernameValidation.systemImage)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(
+                            usernameValidation == .available
+                                ? Color.green
+                                : usernameValidation == .checking
+                                    ? Color.secondary
+                                    : Color.red
+                        )
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            usernameValidation == .available
+                                ? Color.green.opacity(0.10)
+                                : Color.secondary.opacity(0.08),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
                 }
             }
-
-            TextField("@username", text: $username)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .font(.title2.weight(.semibold))
-                .padding(16)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
-                .onChange(of: username) {
-                    username = UsernameGenerator.normalizedTypedUsername(username)
-                }
 
             VStack(alignment: .leading, spacing: 8) {
                 validationRule(
@@ -267,23 +266,46 @@ struct OnboardingFlowView: View {
                     "Only a–z, 0–9 and _",
                     passed: username.isEmpty ? false : UsernameGenerator.hasValidCharacters(username)
                 )
-                validationRule(
-                    "Can be changed later",
-                    passed: true
-                )
+
+                Text("Can be changed later")
+                    .font(.caption.italic())
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 36)
             }
             .font(.caption)
 
-            if let title = usernameValidation.title, !username.isEmpty {
-                Label(title, systemImage: usernameValidation.systemImage)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(
-                        usernameValidation == .available
-                            ? Color.green
-                            : usernameValidation == .checking
-                                ? Color.secondary
-                                : Color.red
-                    )
+            if !usernameSuggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Suggestions for you")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    VStack(spacing: 9) {
+                        ForEach(usernameSuggestions, id: \.self) { suggestion in
+                            Button {
+                                username = suggestion
+                            } label: {
+                                HStack {
+                                    Text("@\(suggestion)")
+                                        .font(.callout.weight(.medium))
+
+                                    Spacer()
+
+                                    Image(systemName: username == suggestion ? "checkmark.circle.fill" : "plus")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 34, height: 34)
+                                        .background(.ultraThinMaterial, in: Circle())
+                                }
+                                .padding(.horizontal, 14)
+                                .frame(height: 46)
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.top, 2)
             }
 
             if let usernameClaimError {
