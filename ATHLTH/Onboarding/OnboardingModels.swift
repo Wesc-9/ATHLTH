@@ -29,6 +29,8 @@ enum ATHLTHGoal: String, CaseIterable, Identifiable, Codable, Hashable {
     case walking
     case endurance
     case recovery
+    case mobility
+    case bodyComposition
     case consistency
     case event
     case tracking
@@ -44,6 +46,8 @@ enum ATHLTHGoal: String, CaseIterable, Identifiable, Codable, Hashable {
         case .walking: return "Walking & daily movement"
         case .endurance: return "Fitness & endurance"
         case .recovery: return "Recovery & sleep"
+        case .mobility: return "Mobility & flexibility"
+        case .bodyComposition: return "Body composition"
         case .consistency: return "Build consistency"
         case .event: return "Train for an event"
         case .tracking: return "Track health & progress"
@@ -59,6 +63,8 @@ enum ATHLTHGoal: String, CaseIterable, Identifiable, Codable, Hashable {
         case .walking: return "Move more and stay active every day."
         case .endurance: return "Improve general conditioning and stamina."
         case .recovery: return "Use sleep and recovery signals to train smarter."
+        case .mobility: return "Move better and improve flexibility and mobility."
+        case .bodyComposition: return "Support body-composition goals through training and progress tracking."
         case .consistency: return "Create habits and keep a steady routine."
         case .event: return "Prepare for a race, challenge or goal date."
         case .tracking: return "Bring workouts and health trends into one place."
@@ -74,6 +80,8 @@ enum ATHLTHGoal: String, CaseIterable, Identifiable, Codable, Hashable {
         case .walking: return "figure.walk"
         case .endurance: return "heart.circle.fill"
         case .recovery: return "moon.stars.fill"
+        case .mobility: return "figure.flexibility"
+        case .bodyComposition: return "scalemass.fill"
         case .consistency: return "calendar.badge.checkmark"
         case .event: return "flag.checkered"
         case .tracking: return "chart.xyaxis.line"
