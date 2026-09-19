@@ -41,7 +41,9 @@ final class AppSessionStore: ObservableObject {
     }
 
     func addImportedRoute(_ route: TrainingRoute) {
-        savedRoutes.insert(route, at: 0)
+        var ownedRoute = route
+        ownedRoute.ownerID = profile.userID
+        savedRoutes.insert(ownedRoute, at: 0)
     }
 
     func createStarterPlan() {
