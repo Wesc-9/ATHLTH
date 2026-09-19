@@ -8,6 +8,7 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var workouts: [WorkoutSummary] = []
     @Published private(set) var sleep: SleepSummary = .empty
     @Published private(set) var heart: HeartSummary = .empty
+    @Published private(set) var personalDetails: HealthProfileBasics = .empty
     @Published private(set) var isRefreshing = false
     @Published var authorizationError: String?
     @Published private(set) var backgroundDeliveryTestResult: String?
@@ -37,7 +38,9 @@ final class HealthKitManager: ObservableObject {
             .restingHeartRate,
             .heartRateVariabilitySDNN,
             .activeEnergyBurned,
-            .distanceWalkingRunning
+            .distanceWalkingRunning,
+            .height,
+            .bodyMass
         ]
 
         for identifier in quantityIdentifiers {
@@ -48,6 +51,17 @@ final class HealthKitManager: ObservableObject {
 
         if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
             types.insert(sleep)
+        }
+
+        let characteristicIdentifiers: [HKCharacteristicTypeIdentifier] = [
+            .dateOfBirth,
+            .biologicalSex
+        ]
+
+        for identifier in characteristicIdentifiers {
+            if let type = HKObjectType.characteristicType(forIdentifier: identifier) {
+                types.insert(type)
+            }
         }
 
         return types
@@ -66,6 +80,7 @@ final class HealthKitManager: ObservableObject {
             UserDefaults.standard.set(true, forKey: authorizationFlagKey)
             objectWillChange.send()
             await configureBackgroundSync()
+            await refreshPersonalDetails()
             await refreshAll()
         } catch {
             authorizationError = error.localizedDescription
@@ -141,9 +156,50 @@ final class HealthKitManager: ObservableObject {
             workoutObjects = Dictionary(uniqueKeysWithValues: fetched.map { ($0.uuid, $0) })
             sleep = try await fetchLatestSleep()
             heart = try await fetchHeartSummary()
+            await refreshPersonalDetails()
         } catch {
             authorizationError = error.localizedDescription
         }
+    }
+
+    func refreshPersonalDetails() async {
+        guard healthDataAvailable else {
+            personalDetails = .empty
+            return
+        }
+
+        var details = HealthProfileBasics.empty
+
+        if let components = try? healthStore.dateOfBirthComponents() {
+            details.dateOfBirth = Calendar.current.date(from: components)
+        }
+
+        if let biologicalSex = try? healthStore.biologicalSex().biologicalSex {
+            switch biologicalSex {
+            case .female:
+                details.healthSex = .female
+            case .male:
+                details.healthSex = .male
+            case .other:
+                details.healthSex = .other
+            case .notSet:
+                details.healthSex = nil
+            @unknown default:
+                details.healthSex = nil
+            }
+        }
+
+        details.heightCentimeters = try? await latestQuantity(
+            identifier: .height,
+            unit: HKUnit.meterUnit(with: .centi)
+        )?.0
+
+        details.weightKilograms = try? await latestQuantity(
+            identifier: .bodyMass,
+            unit: HKUnit.gramUnit(with: .kilo)
+        )?.0
+
+        personalDetails = details
     }
 
     func authorizationRequestStatusDescription() async -> String {
