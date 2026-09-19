@@ -150,7 +150,7 @@ struct ATHLTHSettingsView: View {
             Spacer()
 
             Image(systemName: connected ? "checkmark.circle.fill" : "chevron.right")
-                .foregroundStyle(connected ? .green : .tertiary)
+                .foregroundStyle(connected ? Color.green : Color.secondary)
         }
     }
 }
