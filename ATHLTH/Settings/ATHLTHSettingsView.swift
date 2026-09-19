@@ -59,6 +59,24 @@ struct ATHLTHSettingsView: View {
                 Toggle("Hide route start/end when sharing", isOn: $settings.hideRouteStartAndEnd)
                 Toggle("Share heart rate by default", isOn: $settings.shareHeartRateByDefault)
 
+                Toggle(
+                    "Personalized ATHLTH offers",
+                    isOn: Binding(
+                        get: {
+                            session.onboardingProfile?.personalizedOfferConsent == .granted
+                        },
+                        set: { enabled in
+                            session.setPersonalizedOfferConsent(
+                                enabled ? .granted : .declined
+                            )
+                        }
+                    )
+                )
+
+                Text("Uses only goals and interests you choose in ATHLTH. Apple Health / HealthKit data is excluded from offer targeting.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Text("Health data is private by default. Social sharing should always be explicit.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -193,7 +211,11 @@ struct ATHLTHSettingsView: View {
                     }
                 }
 
-                LabeledContent("Preview mode", value: "Enabled")
+                if session.currentRole == .admin {
+                    LabeledContent("Account role", value: session.currentRole.title)
+                }
+
+                LabeledContent("Preview mode", value: session.previewModeEnabled ? "Enabled" : "Disabled")
                 LabeledContent("App version", value: "0.1.0")
             }
         }
