@@ -1,37 +1,91 @@
 # ATHLTH
 
-**Your private training companion.**
+**Move better. Live longer.**
 
-ATHLTH is an Apple Health–first training app. V0.1 is intentionally local-first: no ATHLTH account, no cloud backend, no analytics SDK, and no Home Assistant dependency.
+ATHLTH is an Apple Health–first training platform for iPhone and Apple Watch. The product combines health context, workout planning, routes, strength training, progress, recovery and a social layer without making private Apple Health data public by default.
 
-## V0.1
+## Current foundation
 
-- iPhone + iPad SwiftUI app
-- Apple Health authorization
-- Running, walking, and strength workouts
-- Outdoor GPS routes when HealthKit provides them
-- Duration, distance, pace, calories, average/max heart rate
-- Sleep duration and stages
-- Heart rate, resting heart rate, and HRV
-- Train screen for Run, Walk, or Strength
-- Strength splits: Full Body, Push, Pull, Legs, Upper, Lower, Custom
-- **Capability Lab** for Personal Team device testing
-- English-first localization structure
-- Privacy-first, on-device architecture
+The repository now contains the V0.1 product foundation:
 
-## First device test: free Personal Team
+- SwiftUI iPhone/iPad app
+- Home, Train, Recovery, Progress and Profile tabs
+- HealthKit workout, sleep, heart-rate and route reading
+- HealthKit background-delivery foundation
+- Demo/preview mode so product UI can be developed before Apple signing is complete
+- Training-plan domain model
+- Public-catalog and private custom exercise models
+- Planned workout sessions with sets, reps, load, RPE and rest
+- Planned/imported route model
+- Route challenge model
+- Social profile, friendship, presence and messaging models
+- Privacy levels: private, friends and public
+- Apple Watch workout-launching service boundary
+- Authentication, social, GPX import and music service boundaries
 
-We are using free direct-to-device development before paying for TestFlight.
+## Product tabs
 
-See **[PERSONAL_TEAM.md](PERSONAL_TEAM.md)** for the Mac/iPhone installation steps and the in-app capability test order.
+### Home
+Daily activity, recovery, sleep, health metrics, next workout and insights.
 
-## Privacy
+### Train
+Quick-start workouts, advanced plans/calendar, strength exercises, routes/challenges and Apple Watch launch.
 
-V0.1 has no ATHLTH account, cloud backend, advertising, third-party analytics, or Home Assistant connection. Health data is read directly from HealthKit and remains on the device.
+### Recovery
+Sleep, HRV, resting heart rate, recovery trends and training-readiness guidance.
 
-Future cloud/AI features must be explicit opt-in and designed so the user understands what leaves the device and why.
+### Progress
+Training consistency, trends, personal records and achievements.
 
-## Generate the Xcode project
+### Profile
+Unique username, social profile, friends, public/shared plans, routes, activities and optional live “Training now” presence.
+
+## Accounts and social
+
+ATHLTH is designed for:
+
+- email sign-in
+- Sign in with Apple
+- unique usernames
+- friends/following
+- optional live training presence
+- shareable training plans and routes
+- comments/reactions first, messaging later
+- private/friends/public visibility per shared object
+
+Health metrics remain private by default. Sharing an ATHLTH activity must be explicit and separate from HealthKit authorization.
+
+## Training plans
+
+The plan model is designed for advanced scheduling rather than a simple workout list. It supports multiple weeks, days and sessions, with running, walking, strength, mobility, recovery and custom workouts.
+
+Strength sessions support embedded exercise snapshots. This allows a custom exercise to remain visible inside a shared plan even when the recipient has not saved that exercise to their own library.
+
+Nutrition/meal planning is planned as a later calendar layer rather than being tightly coupled to workout records.
+
+## Routes and challenges
+
+Routes are first-class ATHLTH objects:
+
+- create a route
+- import GPX
+- save/share a route
+- attach a route to a planned workout
+- send the planned workout to the ATHLTH Apple Watch app
+- record the completed route
+- challenge friends or public participants on the same route
+
+## Apple Watch
+
+ATHLTH will include a real watchOS companion app. The service boundary for launching a workout from iPhone is already represented in the codebase. The production implementation will start/wake the paired Watch app, run the workout session, and sync duration, heart rate, calories, distance and route back into HealthKit/ATHLTH.
+
+## Music
+
+Spotify is planned as an optional connection. A workout or training plan can reference a playlist, while Spotify remains responsible for playback.
+
+## Build
+
+The project uses XcodeGen:
 
 ```bash
 brew install xcodegen
@@ -39,15 +93,23 @@ xcodegen generate
 open ATHLTH.xcodeproj
 ```
 
-Select your Apple ID's **Personal Team** under Signing & Capabilities and run on a physical iPhone.
+The GitHub Actions workflow also generates and builds the Xcode project for the iOS Simulator.
 
-## Roadmap
+## Apple capabilities
 
-- **V0.1** — workouts, routes, sleep, heart, training choice, capability testing
-- **V0.2** — splits, pace/HR charts, personal records, full strength logging
-- **V0.3** — recovery and trends
-- **V0.4** — Apple Watch + WorkoutKit planning
-- **V0.5** — optional Home Assistant webhook integration
-- **V0.6+** — privacy-aware ATHLTH Coach / AI
+The current code prepares for HealthKit background delivery. Device verification still requires the correct Apple Developer capabilities, signing and a physical device.
+
+## Next implementation milestones
+
+1. Stabilize and visually refine the five-tab V0.1 shell.
+2. Connect the new Home/Recovery UI to live HealthKit data.
+3. Add account backend and unique-username onboarding.
+4. Implement full training-plan persistence/editor.
+5. Add exercise catalog adapter and custom exercise creation.
+6. Implement GPX route import and route editor.
+7. Add the watchOS target and real “Start on Apple Watch”.
+8. Add route challenges and social activity sharing.
+9. Add Spotify connection.
+10. Add nutrition planning after the core training experience is stable.
 
 > ATHLTH is a working product name and has not yet been represented as a completed trademark clearance.
