@@ -75,9 +75,22 @@ Routes are first-class ATHLTH objects:
 - record the completed route
 - challenge friends or public participants on the same route
 
-## Apple Watch
+## Workout recording: iPhone or Apple Watch
 
-ATHLTH will include a real watchOS companion app. The service boundary for launching a workout from iPhone is already represented in the codebase. The production implementation will start/wake the paired Watch app, run the workout session, and sync duration, heart rate, calories, distance and route back into HealthKit/ATHLTH.
+Apple Watch is optional. ATHLTH is designed so every workout can be started and completed from iPhone even when the user does not own or wear an Apple Watch.
+
+For strength training the start flow separates two independent choices:
+
+- **Workout device:** iPhone or Apple Watch, when a Watch is connected.
+- **Tracking detail:** Simple or Advanced.
+
+Simple strength tracking only requires Start and Finish. Sets, reps, weight, RPE and rest timers are not required.
+
+Advanced strength tracking can log each exercise and set with optional reps, load, RPE and rest. A set can also be marked complete without entering details. Rest timers and the Next Exercise flow never pause the underlying workout timer.
+
+When Apple Watch is used, the watchOS workout runs continuously from workout Start to Finish. ATHLTH's strength details remain a separate log that is linked to the resulting HealthKit workout by session/workout identifiers. After completion ATHLTH can therefore present the strength log together with HealthKit metrics such as duration, calories and heart rate.
+
+When iPhone is used without Apple Watch, the same ATHLTH workout log remains valid; HealthKit metrics are attached only when they are available from the recording source.
 
 ## Music
 
