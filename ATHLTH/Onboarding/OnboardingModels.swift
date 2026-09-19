@@ -1,5 +1,10 @@
 import Foundation
 
+enum SignInMethod: String, Codable {
+    case apple
+    case email
+}
+
 enum HealthSex: String, CaseIterable, Identifiable, Codable {
     case female
     case male
