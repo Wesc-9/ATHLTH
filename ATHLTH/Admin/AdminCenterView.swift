@@ -965,7 +965,7 @@ private struct AdminUsersView: View {
             Section("Directory preview") {
                 ForEach(filteredUsers) { user in
                     NavigationLink {
-                        AdminUserDetailView(userID: user.id, store: store)
+                        AdminUserDetailView(store: store, userID: user.id)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
