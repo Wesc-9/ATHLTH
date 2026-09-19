@@ -90,7 +90,7 @@ final class AppSessionStore: ObservableObject {
         profile.username = cleaned
 
         #if DEBUG
-        currentRole = cleaned == "stian" ? .admin : .user
+        currentRole = cleaned == "stian" ? .owner : .user
         defaults.set(currentRole.rawValue, forKey: "session.accountRole")
         #endif
     }
