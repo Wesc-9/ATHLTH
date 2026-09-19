@@ -302,13 +302,9 @@ struct OnboardingFlowView: View {
                         healthRequestInProgress = true
                         defer { healthRequestInProgress = false }
 
-                        do {
-                            try await health.requestAuthorization()
-                            await health.configureBackgroundSync()
-                            await health.refreshAll()
-                        } catch {
-                            healthRequestError = error.localizedDescription
-                        }
+                        await health.requestAuthorization()
+                        await health.configureBackgroundSync()
+                        await health.refreshAll()
                     }
                 }
             }
