@@ -42,20 +42,19 @@ Unique username, social profile, friends, public/shared plans, routes, activitie
 
 ## First-run onboarding
 
-ATHLTH uses an account-first onboarding flow:
+ATHLTH uses a short account-first onboarding flow:
 
 1. Sign in / register with Apple or email.
 2. Choose a unique ATHLTH username.
-3. Enter private profile basics: date of birth, sex for health calculations, height and weight.
-4. Choose one or more goals and select one primary goal.
-5. Optionally connect Apple Health and Apple Watch.
-6. Enter ATHLTH.
+3. Choose one or more goals and select one primary goal.
+4. Optionally connect Apple Health and Apple Watch.
+5. Enter ATHLTH.
 
-Current onboarding goals include strength/muscle, running, walking/daily movement, fitness/endurance, recovery/sleep, consistency, event training, health/progress tracking, structured plans and friends/challenges.
+Current goals include strength/muscle, running, walking/daily movement, fitness/endurance, recovery/sleep, mobility, body composition, consistency, event training, health/progress tracking, structured plans and friends/challenges.
 
-Apple Health and Apple Watch are optional. Home Assistant is intentionally not part of onboarding and remains a Settings-only integration.
+Personal details such as date of birth, sex for health calculations, height and weight are **not required onboarding fields**. When Apple Health is connected, ATHLTH imports whichever of those values Health makes available. Missing values may be added or edited later under Settings → Personal & Health.
 
-Later, if Apple Health contains height/weight, ATHLTH should offer to use Apple Health as the source of truth rather than maintaining conflicting values.
+Apple Health and Apple Watch remain optional. ATHLTH can be used without either. Home Assistant is intentionally excluded from onboarding and remains a Settings-only integration.
 
 ## Accounts and social
 
@@ -109,9 +108,19 @@ When Apple Watch is used, the watchOS workout runs continuously from workout Sta
 
 When iPhone is used without Apple Watch, the same ATHLTH workout log remains valid; HealthKit metrics are attached only when they are available from the recording source.
 
-## Music
+## Spotify
 
-Spotify is planned as an optional connection. A workout or training plan can reference a playlist, while Spotify remains responsible for playback.
+Spotify is an optional Settings connection, not a general music player inside ATHLTH.
+
+The product rule is:
+
+- connect Spotify under Settings
+- link one Spotify playlist to a training plan
+- optionally enable autoplay for that plan
+- when a workout belonging to the plan starts, ATHLTH launches the linked playlist
+- quick-start workouts that are not part of a plan have no Spotify binding
+
+The current code contains the plan-level playlist model, Settings controls and preview playback state. Production authorization/playback will use the Spotify integration when credentials and app registration are configured.
 
 ## Build
 
