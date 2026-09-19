@@ -47,7 +47,9 @@ final class StrengthWorkoutStore: ObservableObject {
 
     func start(
         session: PlannedSession,
-        watchSessionID: UUID?
+        watchSessionID: UUID?,
+        trackingMode: StrengthTrackingMode,
+        captureDevice: WorkoutCaptureDevice
     ) {
         let exerciseLogs = session.exercises.map { planned in
             let setCount = max(planned.sets, 1)
@@ -77,6 +79,8 @@ final class StrengthWorkoutStore: ObservableObject {
             id: UUID(),
             plannedSessionID: session.id,
             watchSessionID: watchSessionID,
+            captureDevice: captureDevice,
+            trackingMode: trackingMode,
             title: session.title,
             startedAt: Date(),
             endedAt: nil,
@@ -96,8 +100,8 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func completeCurrentSet(
-        reps: Int,
-        weightKilograms: Double,
+        reps: Int?,
+        weightKilograms: Double?,
         rpe: Double?
     ) {
         guard
@@ -109,8 +113,8 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         var set = workout.exercises[currentExerciseIndex].sets[currentSetIndex]
-        set.completedReps = max(reps, 0)
-        set.completedWeightKilograms = max(weightKilograms, 0)
+        set.completedReps = reps.map { max($0, 0) }
+        set.completedWeightKilograms = weightKilograms.map { max($0, 0) }
         set.rpe = rpe
         set.completedAt = Date()
 
@@ -128,6 +132,20 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         activeWorkout = workout
+    }
+
+    func enableAdvancedTracking() {
+        guard var workout = activeWorkout else { return }
+        workout.trackingMode = .advanced
+        activeWorkout = workout
+    }
+
+    func completeCurrentSetWithoutDetails() {
+        completeCurrentSet(
+            reps: nil,
+            weightKilograms: nil,
+            rpe: nil
+        )
     }
 
     func skipRest() {
