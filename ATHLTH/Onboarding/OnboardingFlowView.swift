@@ -13,6 +13,11 @@ struct OnboardingFlowView: View {
     @State private var healthRequestInProgress = false
     @State private var showingEmailAuth = false
     @State private var legalDocument: LegalDocumentKind?
+    @State private var usernameSuggestions: [String] = []
+    @State private var usernameValidation: UsernameValidationState = .idle
+    @State private var usernameClaimError: String?
+
+    private let usernameService = MockUsernameAvailabilityService()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,12 +51,22 @@ struct OnboardingFlowView: View {
                 session.beginMockSignIn(method: .email)
 
                 switch result {
-                case .newUser:
+                case .newUser(let email):
+                    let seed = email.split(separator: "@").first.map(String.init) ?? "athlete"
+                    session.setUsernameSeed(seed)
                     step = .username
                 case .existingUser:
                     session.completeOnboarding()
                 }
             }
+        }
+        .task(id: step) {
+            guard step == .username else { return }
+            await loadUsernameSuggestions()
+        }
+        .task(id: username) {
+            guard step == .username else { return }
+            await validateUsernameAfterTyping()
         }
         .sheet(item: $legalDocument) { document in
             NavigationStack {
@@ -155,6 +170,7 @@ struct OnboardingFlowView: View {
             VStack(spacing: 12) {
                 Button {
                     session.beginMockSignIn(method: .apple)
+                    session.setUsernameSeed(session.profile.displayName)
                     step = .username
                 } label: {
                     Label("Continue with Apple", systemImage: "apple.logo")
@@ -204,20 +220,77 @@ struct OnboardingFlowView: View {
                 subtitle: "This is how friends will find you. Every ATHLTH username is unique."
             )
 
+            if !usernameSuggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Suggestions for you")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    VStack(spacing: 9) {
+                        ForEach(usernameSuggestions, id: \.self) { suggestion in
+                            Button {
+                                username = suggestion
+                            } label: {
+                                HStack {
+                                    Text("@\(suggestion)")
+                                        .font(.subheadline.weight(.semibold))
+                                    Spacer()
+                                    Image(systemName: username == suggestion ? "checkmark.circle.fill" : "plus.circle")
+                                        .foregroundStyle(.green)
+                                }
+                                .padding(.horizontal, 14)
+                                .frame(height: 46)
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
             TextField("@username", text: $username)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.title2.weight(.semibold))
                 .padding(16)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                .onChange(of: username) {
+                    username = UsernameGenerator.normalizedTypedUsername(username)
+                }
 
             VStack(alignment: .leading, spacing: 8) {
-                Label("3–20 characters", systemImage: "checkmark.circle")
-                Label("Letters, numbers and underscores", systemImage: "checkmark.circle")
-                Label("Can be changed later", systemImage: "checkmark.circle")
+                validationRule(
+                    "3–20 characters",
+                    passed: (3...20).contains(username.count)
+                )
+                validationRule(
+                    "Only a–z, 0–9 and _",
+                    passed: username.isEmpty ? false : UsernameGenerator.hasValidCharacters(username)
+                )
+                validationRule(
+                    "Can be changed later",
+                    passed: true
+                )
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+
+            if let title = usernameValidation.title, !username.isEmpty {
+                Label(title, systemImage: usernameValidation.systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(
+                        usernameValidation == .available
+                            ? Color.green
+                            : usernameValidation == .checking
+                                ? Color.secondary
+                                : Color.red
+                    )
+            }
+
+            if let usernameClaimError {
+                Label(usernameClaimError, systemImage: "exclamationmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
     }
 
@@ -436,10 +509,9 @@ struct OnboardingFlowView: View {
             case .username:
                 footerButton(
                     title: "Continue",
-                    disabled: !validUsername
+                    disabled: usernameValidation != .available
                 ) {
-                    session.setPendingUsername(username)
-                    step = .goals
+                    claimUsernameAndContinue()
                 }
 
             case .goals:
@@ -470,12 +542,59 @@ struct OnboardingFlowView: View {
         .background(.ultraThinMaterial)
     }
 
-    private var validUsername: Bool {
-        let cleaned = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (3...20).contains(cleaned.count) else { return false }
+    @ViewBuilder
+    private func validationRule(_ title: String, passed: Bool) -> some View {
+        Label(
+            title,
+            systemImage: passed ? "checkmark.circle.fill" : "circle"
+        )
+        .foregroundStyle(passed ? Color.green : Color.secondary)
+    }
 
-        return cleaned.allSatisfy { character in
-            character.isLetter || character.isNumber || character == "_"
+    private func loadUsernameSuggestions() async {
+        usernameSuggestions = await usernameService.suggestions(
+            for: session.usernameSeed
+        )
+    }
+
+    private func validateUsernameAfterTyping() async {
+        usernameClaimError = nil
+
+        guard !username.isEmpty else {
+            usernameValidation = .idle
+            return
+        }
+
+        guard UsernameGenerator.isValid(username) else {
+            usernameValidation = .invalid
+            return
+        }
+
+        usernameValidation = .checking
+
+        do {
+            try await Task.sleep(for: .milliseconds(350))
+        } catch {
+            return
+        }
+
+        guard !Task.isCancelled else { return }
+
+        let available = await usernameService.isAvailable(username)
+        usernameValidation = available ? .available : .taken
+    }
+
+    private func claimUsernameAndContinue() {
+        Task {
+            do {
+                try await usernameService.claim(username)
+                session.setPendingUsername(username)
+                step = .goals
+            } catch {
+                usernameValidation = .taken
+                usernameClaimError = error.localizedDescription
+                await loadUsernameSuggestions()
+            }
         }
     }
 
