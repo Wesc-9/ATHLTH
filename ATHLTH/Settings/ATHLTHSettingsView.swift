@@ -196,23 +196,23 @@ struct ATHLTHSettingsView: View {
                 }
             }
 
-            Section("Diagnostics") {
-                NavigationLink {
-                    CapabilityLabView()
-                } label: {
-                    Label("Capability Lab", systemImage: "testtube.2")
-                }
-
-                if session.currentRole == .admin {
+            if session.currentRole == .admin {
+                Section("Admin") {
                     NavigationLink {
                         AdminCenterView()
                     } label: {
                         Label("Control Center", systemImage: "lock.rectangle.stack.fill")
                     }
-                }
 
-                if session.currentRole == .admin {
                     LabeledContent("Account role", value: session.currentRole.title)
+                }
+            }
+
+            Section("Diagnostics") {
+                NavigationLink {
+                    CapabilityLabView()
+                } label: {
+                    Label("Capability Lab", systemImage: "testtube.2")
                 }
 
                 LabeledContent("Preview mode", value: session.previewModeEnabled ? "Enabled" : "Disabled")
