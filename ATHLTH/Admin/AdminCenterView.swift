@@ -43,7 +43,8 @@ struct OfferCampaignDraft: Identifiable, Hashable {
 }
 
 struct MarketingEligibilityResult {
-    var eligible: Bool
+    var segmentMatches: Bool
+    var sendEligible: Bool
     var reasons: [String]
 }
 
@@ -53,30 +54,26 @@ enum MarketingEligibilityEngine {
         accountCreatedAt: Date,
         draft: OfferCampaignDraft
     ) -> MarketingEligibilityResult {
-        var reasons: [String] = []
-
-        guard draft.deliveryState != .enabled else {
-            reasons.append("Campaign sending is not enabled in V0.1.")
-            return MarketingEligibilityResult(eligible: false, reasons: reasons)
-        }
+        var segmentReasons: [String] = []
 
         guard let profile else {
-            reasons.append("No onboarding personalization data is available.")
-            return MarketingEligibilityResult(eligible: false, reasons: reasons)
-        }
-
-        guard profile.personalizedOfferConsent == .granted else {
-            reasons.append("Personalized-offer consent has not been granted.")
-            return MarketingEligibilityResult(eligible: false, reasons: reasons)
+            return MarketingEligibilityResult(
+                segmentMatches: false,
+                sendEligible: false,
+                reasons: [
+                    "No onboarding personalization data is available.",
+                    "Campaign sending is disabled in V0.1."
+                ]
+            )
         }
 
         if let targetGoal = draft.targetGoal,
            profile.currentGoal?.type != targetGoal {
-            reasons.append("Current self-declared goal does not match this draft.")
+            segmentReasons.append("Current self-declared goal does not match this draft.")
         }
 
         if !draft.requiredInterests.isSubset(of: profile.interests) {
-            reasons.append("Required self-declared interests are missing.")
+            segmentReasons.append("Required self-declared interests are missing.")
         }
 
         let accountAgeDays = Calendar.current.dateComponents(
@@ -86,12 +83,31 @@ enum MarketingEligibilityEngine {
         ).day ?? 0
 
         if accountAgeDays < draft.minimumAccountAgeDays {
-            reasons.append("Account is younger than the draft's waiting period.")
+            segmentReasons.append("Account is younger than the draft's waiting period.")
+        }
+
+        let segmentMatches = segmentReasons.isEmpty
+        var reasons = segmentReasons
+
+        if segmentMatches {
+            reasons.append("Self-declared goal/interests match this draft's preview segment.")
+        }
+
+        if profile.personalizedOfferConsent != .granted {
+            reasons.append("Personalized-offer consent has not been granted.")
+        }
+
+        if draft.deliveryState != .enabled {
+            reasons.append("Campaign sending is disabled in V0.1.")
         }
 
         return MarketingEligibilityResult(
-            eligible: reasons.isEmpty,
-            reasons: reasons.isEmpty ? ["Eligible under preview rules."] : reasons
+            segmentMatches: segmentMatches,
+            sendEligible:
+                segmentMatches &&
+                profile.personalizedOfferConsent == .granted &&
+                draft.deliveryState == .enabled,
+            reasons: reasons
         )
     }
 }
@@ -238,11 +254,16 @@ private struct AdminCampaignDetailView: View {
             }
 
             Section("Current-user preview") {
-                Label(
-                    result.eligible ? "Eligible" : "Not eligible",
-                    systemImage: result.eligible ? "checkmark.circle.fill" : "xmark.circle.fill"
+                LabeledContent(
+                    "Segment preview",
+                    value: result.segmentMatches ? "Match" : "No match"
                 )
-                .foregroundStyle(result.eligible ? .green : .secondary)
+
+                Label(
+                    result.sendEligible ? "Send eligible" : "Sending blocked",
+                    systemImage: result.sendEligible ? "checkmark.circle.fill" : "lock.circle.fill"
+                )
+                .foregroundStyle(result.sendEligible ? .green : .secondary)
 
                 ForEach(result.reasons, id: \.self) { reason in
                     Text(reason)
