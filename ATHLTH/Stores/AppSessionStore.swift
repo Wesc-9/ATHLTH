@@ -12,6 +12,7 @@ final class AppSessionStore: ObservableObject {
     @Published var signInMethod: SignInMethod?
     @Published var onboardingProfile: OnboardingProfileData?
     @Published var usernameSeed: String
+    @Published var accountCreatedAt: Date
 
     private let defaults: UserDefaults
 
@@ -30,6 +31,14 @@ final class AppSessionStore: ObservableObject {
         self.previewModeEnabled = previewModeEnabled
         self.defaults = defaults
         self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? profile.displayName
+
+        if let storedDate = defaults.object(forKey: "session.accountCreatedAt") as? Date {
+            self.accountCreatedAt = storedDate
+        } else {
+            let createdAt = Date()
+            self.accountCreatedAt = createdAt
+            defaults.set(createdAt, forKey: "session.accountCreatedAt")
+        }
         self.signedIn = defaults.bool(forKey: "session.signedIn")
         self.onboardingCompleted = defaults.bool(forKey: "session.onboardingCompleted")
         self.signInMethod = defaults.string(forKey: "session.signInMethod").flatMap(SignInMethod.init(rawValue:))
@@ -106,7 +115,9 @@ final class AppSessionStore: ObservableObject {
         defaults.removeObject(forKey: "session.signInMethod")
         defaults.removeObject(forKey: "session.onboardingProfile")
         defaults.removeObject(forKey: "session.usernameSeed")
+        defaults.removeObject(forKey: "session.accountCreatedAt")
         usernameSeed = profile.displayName
+        accountCreatedAt = Date()
     }
 
     func beginTrainingStatus(for session: PlannedSession) {
