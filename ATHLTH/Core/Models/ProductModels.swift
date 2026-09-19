@@ -1,6 +1,18 @@
 import CoreLocation
 import Foundation
 
+enum AccountRole: String, Codable, Hashable {
+    case user
+    case admin
+
+    var title: String {
+        switch self {
+        case .user: return "User"
+        case .admin: return "Admin"
+        }
+    }
+}
+
 enum ProfileVisibility: String, Codable, CaseIterable, Identifiable {
     case privateOnly = "private"
     case friends
