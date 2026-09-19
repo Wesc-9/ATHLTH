@@ -82,6 +82,22 @@ struct ATHLTHSettingsView: View {
             }
 
             Section("Training") {
+                Picker("Preferred workout device", selection: $settings.preferredWorkoutCapture) {
+                    ForEach(WorkoutCapturePreference.allCases) { preference in
+                        Text(preference.title).tag(preference)
+                    }
+                }
+
+                Picker("Strength tracking", selection: $settings.defaultStrengthTracking) {
+                    ForEach(StrengthTrackingPreference.allCases) { preference in
+                        Text(preference.title).tag(preference)
+                    }
+                }
+
+                Text("Apple Watch and detailed set tracking are optional. Every workout can be started and completed from iPhone.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Toggle("Auto-pause outdoor workouts", isOn: $settings.autoPauseOutdoorWorkouts)
                 Toggle("Audio cues", isOn: $settings.audioCuesEnabled)
                 Toggle("Haptic cues on Apple Watch", isOn: $settings.hapticCuesEnabled)
