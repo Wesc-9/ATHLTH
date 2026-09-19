@@ -1,5 +1,29 @@
 import Foundation
 
+enum WorkoutCaptureDevice: String, Codable, Hashable {
+    case iPhone
+    case appleWatch
+
+    var title: String {
+        switch self {
+        case .iPhone: return "iPhone"
+        case .appleWatch: return "Apple Watch"
+        }
+    }
+}
+
+enum StrengthTrackingMode: String, Codable, Hashable {
+    case simple
+    case advanced
+
+    var title: String {
+        switch self {
+        case .simple: return "Simple"
+        case .advanced: return "Advanced"
+        }
+    }
+}
+
 struct LinkedHealthWorkoutMetrics: Codable, Hashable {
     var healthKitWorkoutUUID: UUID?
     var duration: TimeInterval?
@@ -40,6 +64,8 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     let id: UUID
     var plannedSessionID: UUID?
     var watchSessionID: UUID?
+    var captureDevice: WorkoutCaptureDevice
+    var trackingMode: StrengthTrackingMode
     var title: String
     var startedAt: Date
     var endedAt: Date?
