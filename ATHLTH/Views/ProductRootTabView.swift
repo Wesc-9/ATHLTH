@@ -197,6 +197,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var selectedSection = 0
     @State private var showingFileImporter = false
@@ -238,8 +239,13 @@ struct ATHLTHTrainView: View {
                     session: workout,
                     watchConnected: settings.watchConnected,
                     defaultCapture: settings.preferredWorkoutCapture,
-                    defaultTracking: settings.defaultStrengthTracking
+                    defaultTracking: settings.defaultStrengthTracking,
+                    linkedSpotifyPlaylist: session.activePlan?.spotifyPlaylist,
+                    spotifyAutoplayEnabled:
+                        settings.spotifyAutoplayLinkedPlaylists &&
+                        (session.activePlan?.spotifyAutoplayOnWorkoutStart ?? false)
                 ) { captureDevice, trackingMode in
+                    startPlanSpotifyIfNeeded()
                     session.beginTrainingStatus(for: workout)
                     strengthWorkout.start(
                         session: workout,
@@ -389,6 +395,7 @@ struct ATHLTHTrainView: View {
                 if workout.kind == .strength {
                     selectedStrengthSession = workout
                 } else {
+                    startPlanSpotifyIfNeeded()
                     session.beginTrainingStatus(for: workout)
                 }
             } label: {
@@ -403,6 +410,23 @@ struct ATHLTHTrainView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .tint(.green)
+        }
+    }
+
+    private func startPlanSpotifyIfNeeded() {
+        guard
+            let plan = session.activePlan,
+            plan.spotifyAutoplayOnWorkoutStart,
+            let playlist = plan.spotifyPlaylist
+        else {
+            return
+        }
+
+        Task {
+            await spotifyPlayback.startLinkedPlaylist(
+                playlist,
+                settings: settings
+            )
         }
     }
 
