@@ -265,7 +265,7 @@ struct ActiveStrengthWorkoutView: View {
                             .font(.subheadline.weight(.medium))
                     }
 
-                    Text(set.plannedWeightKilograms.map { "\($0, specifier: "%.1f") kg" } ?? "No weight target")
+                    Text(set.plannedWeightKilograms.map { String(format: "%.1f kg", $0) } ?? "No weight target")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
