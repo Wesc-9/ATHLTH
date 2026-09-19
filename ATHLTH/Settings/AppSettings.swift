@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 enum AppLanguage: String, CaseIterable, Identifiable, Codable {
+    case system = "system"
     case english = "en"
     case norwegian = "nb"
     case spanish = "es"
@@ -12,11 +13,28 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
+        case .system: return "iPhone"
         case .english: return "English"
         case .norwegian: return "Norsk"
         case .spanish: return "Español"
         case .italian: return "Italiano"
         case .chineseSimplified: return "简体中文"
+        }
+    }
+
+    var locale: Locale {
+        switch self {
+        case .system:
+            return .autoupdatingCurrent
+        default:
+            return Locale(identifier: rawValue)
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .system: return "iphone"
+        default: return "globe"
         }
     }
 }
@@ -175,7 +193,7 @@ final class AppSettingsStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        language = AppLanguage(rawValue: defaults.string(forKey: "settings.language") ?? "") ?? .english
+        language = AppLanguage(rawValue: defaults.string(forKey: "settings.language") ?? "") ?? .system
         measurementPreference = MeasurementPreference(rawValue: defaults.string(forKey: "settings.measurement") ?? "") ?? .metric
         appearance = AppAppearance(rawValue: defaults.string(forKey: "settings.appearance") ?? "") ?? .system
 
