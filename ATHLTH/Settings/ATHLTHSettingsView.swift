@@ -32,6 +32,14 @@ struct ATHLTHSettingsView: View {
                 .foregroundStyle(.secondary)
             }
 
+            Section("Profile") {
+                NavigationLink {
+                    PersonalHealthProfileView()
+                } label: {
+                    Label("Personal & health details", systemImage: "person.text.rectangle")
+                }
+            }
+
             Section("Privacy") {
                 Picker("Profile visibility", selection: $settings.profileVisibility) {
                     ForEach(ProfileVisibility.allCases) { visibility in
@@ -68,11 +76,29 @@ struct ATHLTHSettingsView: View {
                     connected: settings.watchConnected
                 )
 
-                integrationRow(
-                    .spotify,
-                    subtitle: settings.spotifyConnected ? "Connected" : "Connect training playlists",
-                    connected: settings.spotifyConnected
-                )
+                NavigationLink {
+                    SpotifySettingsView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: IntegrationKind.spotify.systemImage)
+                            .frame(width: 30)
+                            .foregroundStyle(settings.spotifyConnected ? Color.green : Color.secondary)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Spotify")
+                            Text(settings.spotifyConnected ? "Connected · training plans only" : "Connect training-plan playlists")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        if settings.spotifyConnected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
 
                 integrationRow(
                     .homeAssistant,
