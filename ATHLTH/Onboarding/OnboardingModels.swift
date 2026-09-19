@@ -50,53 +50,88 @@ struct HealthProfileBasics: Codable, Hashable {
     }
 }
 
-enum ATHLTHGoal: String, CaseIterable, Identifiable, Codable, Hashable {
+enum AchievementGoal: String, CaseIterable, Identifiable, Codable, Hashable {
+    case loseWeight
+    case buildMuscle
+    case getStronger
+    case improveEndurance
+    case runBetter
+    case moveMore
+    case recoverySleep
+    case mobility
+    case event
+    case maintainHealth
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .loseWeight: return "Lose weight"
+        case .buildMuscle: return "Build muscle"
+        case .getStronger: return "Get stronger"
+        case .improveEndurance: return "Improve fitness & endurance"
+        case .runBetter: return "Run faster or farther"
+        case .moveMore: return "Move more"
+        case .recoverySleep: return "Improve recovery & sleep"
+        case .mobility: return "Improve mobility & flexibility"
+        case .event: return "Prepare for an event"
+        case .maintainHealth: return "Maintain health & fitness"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .loseWeight: return "Work toward a healthier body-weight goal."
+        case .buildMuscle: return "Prioritize muscle growth and progressive training."
+        case .getStronger: return "Increase strength and track performance over time."
+        case .improveEndurance: return "Build cardiovascular fitness and stamina."
+        case .runBetter: return "Improve pace, distance and running performance."
+        case .moveMore: return "Increase everyday movement and activity."
+        case .recoverySleep: return "Focus on sleep, recovery and readiness."
+        case .mobility: return "Improve movement quality and flexibility."
+        case .event: return "Prepare for a race, challenge or target date."
+        case .maintainHealth: return "Stay active and maintain your current fitness."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .loseWeight: return "scalemass.fill"
+        case .buildMuscle: return "figure.strengthtraining.traditional"
+        case .getStronger: return "dumbbell.fill"
+        case .improveEndurance: return "heart.circle.fill"
+        case .runBetter: return "figure.run"
+        case .moveMore: return "figure.walk"
+        case .recoverySleep: return "moon.stars.fill"
+        case .mobility: return "figure.flexibility"
+        case .event: return "flag.checkered"
+        case .maintainHealth: return "heart.fill"
+        }
+    }
+}
+
+enum ATHLTHInterest: String, CaseIterable, Identifiable, Codable, Hashable {
     case strength
     case running
     case walking
-    case endurance
     case recovery
-    case mobility
-    case bodyComposition
-    case consistency
-    case event
-    case tracking
-    case plans
+    case nutrition
+    case trainingPlans
+    case healthTracking
     case social
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .strength: return "Strength & muscle"
+        case .strength: return "Strength"
         case .running: return "Running"
-        case .walking: return "Walking & daily movement"
-        case .endurance: return "Fitness & endurance"
-        case .recovery: return "Recovery & sleep"
-        case .mobility: return "Mobility & flexibility"
-        case .bodyComposition: return "Body composition"
-        case .consistency: return "Build consistency"
-        case .event: return "Train for an event"
-        case .tracking: return "Track health & progress"
-        case .plans: return "Follow training plans"
+        case .walking: return "Walking"
+        case .recovery: return "Recovery"
+        case .nutrition: return "Nutrition"
+        case .trainingPlans: return "Training plans"
+        case .healthTracking: return "Health tracking"
         case .social: return "Friends & challenges"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .strength: return "Build strength, muscle and gym progress."
-        case .running: return "Improve pace, distance and running fitness."
-        case .walking: return "Move more and stay active every day."
-        case .endurance: return "Improve general conditioning and stamina."
-        case .recovery: return "Use sleep and recovery signals to train smarter."
-        case .mobility: return "Move better and improve flexibility and mobility."
-        case .bodyComposition: return "Support body-composition goals through training and progress tracking."
-        case .consistency: return "Create habits and keep a steady routine."
-        case .event: return "Prepare for a race, challenge or goal date."
-        case .tracking: return "Bring workouts and health trends into one place."
-        case .plans: return "Use structured plans and calendars."
-        case .social: return "Share, compare and train with other people."
         }
     }
 
@@ -105,16 +140,54 @@ enum ATHLTHGoal: String, CaseIterable, Identifiable, Codable, Hashable {
         case .strength: return "dumbbell.fill"
         case .running: return "figure.run"
         case .walking: return "figure.walk"
-        case .endurance: return "heart.circle.fill"
-        case .recovery: return "moon.stars.fill"
-        case .mobility: return "figure.flexibility"
-        case .bodyComposition: return "scalemass.fill"
-        case .consistency: return "calendar.badge.checkmark"
-        case .event: return "flag.checkered"
-        case .tracking: return "chart.xyaxis.line"
-        case .plans: return "list.bullet.clipboard.fill"
+        case .recovery: return "leaf.fill"
+        case .nutrition: return "fork.knife"
+        case .trainingPlans: return "list.bullet.clipboard.fill"
+        case .healthTracking: return "chart.xyaxis.line"
         case .social: return "person.2.fill"
         }
+    }
+}
+
+enum PersonalizedOfferConsent: String, Codable, Hashable {
+    case notAsked
+    case declined
+    case granted
+
+    var title: String {
+        switch self {
+        case .notAsked: return "Not requested"
+        case .declined: return "Declined"
+        case .granted: return "Allowed"
+        }
+    }
+}
+
+struct UserGoalRecord: Identifiable, Codable, Hashable {
+    let id: UUID
+    var type: AchievementGoal
+    var createdAt: Date
+    var targetWeightKilograms: Double?
+    var targetDate: Date?
+    var eventName: String?
+    var completedAt: Date?
+
+    init(
+        id: UUID = UUID(),
+        type: AchievementGoal,
+        createdAt: Date = Date(),
+        targetWeightKilograms: Double? = nil,
+        targetDate: Date? = nil,
+        eventName: String? = nil,
+        completedAt: Date? = nil
+    ) {
+        self.id = id
+        self.type = type
+        self.createdAt = createdAt
+        self.targetWeightKilograms = targetWeightKilograms
+        self.targetDate = targetDate
+        self.eventName = eventName
+        self.completedAt = completedAt
     }
 }
 
@@ -124,8 +197,10 @@ struct OnboardingProfileData: Codable, Hashable {
     var weightKilograms: Double?
     var heightCentimeters: Double?
     var personalDetailsSource: PersonalDetailsSource
-    var goals: Set<ATHLTHGoal>
-    var primaryGoal: ATHLTHGoal?
+
+    var currentGoal: UserGoalRecord?
+    var interests: Set<ATHLTHInterest>
+    var personalizedOfferConsent: PersonalizedOfferConsent
 
     var healthBasics: HealthProfileBasics {
         HealthProfileBasics(
