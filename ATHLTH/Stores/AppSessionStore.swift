@@ -19,7 +19,7 @@ final class AppSessionStore: ObservableObject {
         activePlan: TrainingPlan? = PreviewData.trainingPlan,
         savedRoutes: [TrainingRoute] = [PreviewData.route],
         challenges: [RouteChallenge] = [PreviewData.challenge],
-        previewModeEnabled: Bool = true,
+        previewModeEnabled: Bool = false,
         defaults: UserDefaults = .standard
     ) {
         self.profile = profile
