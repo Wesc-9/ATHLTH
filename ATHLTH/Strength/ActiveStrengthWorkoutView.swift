@@ -13,66 +13,19 @@ struct ActiveStrengthWorkoutView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let workout = strength.activeWorkout,
-                   let exercise = strength.currentExercise {
+                if let workout = strength.activeWorkout {
                     ScrollView {
                         VStack(spacing: 18) {
                             workoutHeader(workout)
 
-                            ATHLTHCard {
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text("Exercise \(strength.currentExerciseIndex + 1) of \(workout.exercises.count)")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                        Text(exercise.exercise.name)
-                                            .font(.title2.weight(.bold))
-                                        Text(exercise.exercise.primaryMuscles.joined(separator: " · "))
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    Image(systemName: "dumbbell.fill")
-                                        .font(.title)
-                                        .foregroundStyle(.green)
-                                }
-                            }
-
-                            ATHLTHCard {
-                                ATHLTHSectionHeader(title: "Sets")
-
-                                VStack(spacing: 10) {
-                                    ForEach(exercise.sets) { set in
-                                        setRow(set)
-                                    }
-                                }
-                                .padding(.top, 10)
-                            }
-
-                            if strength.currentExerciseAllSetsCompleted {
-                                exerciseCompleteControls(workout: workout)
-                            } else if strength.isResting {
-                                restControls
+                            if workout.trackingMode == .advanced,
+                               let exercise = strength.currentExercise {
+                                advancedTrackingContent(workout: workout, exercise: exercise)
                             } else {
-                                setEntry
+                                simpleTrackingContent(workout: workout)
                             }
 
-                            ATHLTHCard {
-                                HStack {
-                                    Label("Apple Watch workout", systemImage: "applewatch")
-                                    Spacer()
-                                    Text("Running continuously")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.green)
-                                }
-
-                                Text("Logging sets or resting here does not pause the HealthKit workout. Watch runs from workout start until you finish the full session.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, 6)
-                            }
+                            recordingStatusCard(workout)
                         }
                         .padding()
                     }
@@ -106,7 +59,7 @@ struct ActiveStrengthWorkoutView: View {
                 }
                 Button("Keep Training", role: .cancel) {}
             } message: {
-                Text("This ends the ATHLTH strength log. The production Watch implementation will end the linked HealthKit workout at the same point.")
+                Text(finishMessage)
             }
             .onAppear {
                 loadDefaultsFromCurrentSet()
@@ -117,6 +70,19 @@ struct ActiveStrengthWorkoutView: View {
             .onChange(of: strength.currentExerciseIndex) {
                 loadDefaultsFromCurrentSet()
             }
+        }
+    }
+
+    private var finishMessage: String {
+        guard let workout = strength.activeWorkout else {
+            return "Finish the ATHLTH workout."
+        }
+
+        switch workout.captureDevice {
+        case .appleWatch:
+            return "This finishes the ATHLTH log. The production Apple Watch integration will end the linked HealthKit workout at the same point."
+        case .iPhone:
+            return "This finishes the ATHLTH workout on iPhone. Apple Watch is not required."
         }
     }
 
@@ -136,17 +102,131 @@ struct ActiveStrengthWorkoutView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 5) {
-                    Text("\(workout.totalCompletedSets)")
-                        .font(.title2.weight(.bold))
-                    Text("sets logged")
+                    Label(workout.captureDevice.title, systemImage: workout.captureDevice == .appleWatch ? "applewatch" : "iphone")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+
+                    Text(workout.trackingMode.title)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text("\(Int(workout.totalVolumeKilograms)) kg")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.green)
+                    if workout.trackingMode == .advanced {
+                        Text("\(workout.totalCompletedSets) sets")
+                            .font(.subheadline.weight(.semibold))
+                    }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func simpleTrackingContent(workout: StrengthWorkoutLog) -> some View {
+        ATHLTHCard {
+            Label("Simple tracking", systemImage: "play.circle.fill")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.green)
+
+            Text("Just train. ATHLTH keeps the workout timer running until you press Finish. Sets, reps, weight and rest are not required.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
+
+            if !workout.exercises.isEmpty {
+                Divider()
+                    .padding(.vertical, 12)
+
+                Text("Planned exercises")
+                    .font(.headline)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(workout.exercises) { exercise in
+                        Label(exercise.exercise.name, systemImage: "dumbbell")
+                            .font(.subheadline)
+                    }
+                }
+                .padding(.top, 8)
+
+                Button {
+                    strength.enableAdvancedTracking()
+                    loadDefaultsFromCurrentSet()
+                } label: {
+                    Label("Enable Advanced Tracking", systemImage: "list.bullet.clipboard.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .padding(.top, 14)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func advancedTrackingContent(
+        workout: StrengthWorkoutLog,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        ATHLTHCard {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Exercise \(strength.currentExerciseIndex + 1) of \(workout.exercises.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(exercise.exercise.name)
+                        .font(.title2.weight(.bold))
+                    Text(exercise.exercise.primaryMuscles.joined(separator: " · "))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "dumbbell.fill")
+                    .font(.title)
+                    .foregroundStyle(.green)
+            }
+        }
+
+        ATHLTHCard {
+            ATHLTHSectionHeader(title: "Sets")
+
+            VStack(spacing: 10) {
+                ForEach(exercise.sets) { set in
+                    setRow(set)
+                }
+            }
+            .padding(.top, 10)
+        }
+
+        if strength.currentExerciseAllSetsCompleted {
+            exerciseCompleteControls(workout: workout)
+        } else if strength.isResting {
+            restControls
+        } else {
+            setEntry
+        }
+    }
+
+    @ViewBuilder
+    private func recordingStatusCard(_ workout: StrengthWorkoutLog) -> some View {
+        ATHLTHCard {
+            HStack {
+                Label(
+                    workout.captureDevice == .appleWatch ? "Apple Watch workout" : "iPhone workout",
+                    systemImage: workout.captureDevice == .appleWatch ? "applewatch" : "iphone"
+                )
+                Spacer()
+                Text("Running continuously")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+            }
+
+            Text(
+                workout.captureDevice == .appleWatch
+                    ? "Logging sets or resting in ATHLTH does not pause the Apple Watch workout. It runs continuously from Start until Finish."
+                    : "Apple Watch is optional. The ATHLTH workout runs continuously on iPhone from Start until Finish."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.top, 6)
         }
     }
 
@@ -163,17 +243,29 @@ struct ActiveStrengthWorkoutView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 if set.isCompleted {
-                    Text("\(set.completedReps ?? 0) reps × \(set.completedWeightKilograms ?? 0, specifier: "%.1f") kg")
-                        .font(.subheadline.weight(.semibold))
+                    if let reps = set.completedReps, let weight = set.completedWeightKilograms {
+                        Text("\(reps) reps × \(weight, specifier: "%.1f") kg")
+                            .font(.subheadline.weight(.semibold))
+                    } else {
+                        Text("Set completed")
+                            .font(.subheadline.weight(.semibold))
+                    }
+
                     if let rpe = set.rpe {
                         Text("RPE \(rpe, specifier: "%.1f")")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("Target: \(set.plannedReps.map(String.init) ?? "—") reps")
-                        .font(.subheadline.weight(.medium))
-                    Text(set.plannedWeightKilograms.map { "\($0, specifier: "%.1f") kg" } ?? "Choose weight")
+                    if let plannedReps = set.plannedReps {
+                        Text("Target: \(plannedReps) reps")
+                            .font(.subheadline.weight(.medium))
+                    } else {
+                        Text("No rep target")
+                            .font(.subheadline.weight(.medium))
+                    }
+
+                    Text(set.plannedWeightKilograms.map { "\($0, specifier: "%.1f") kg" } ?? "No weight target")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -192,7 +284,7 @@ struct ActiveStrengthWorkoutView: View {
         ATHLTHCard {
             ATHLTHSectionHeader(
                 title: "Log Set \((strength.currentSet?.setNumber) ?? 1)",
-                actionTitle: "Watch keeps running"
+                actionTitle: "Optional details"
             )
 
             HStack(spacing: 12) {
@@ -236,12 +328,26 @@ struct ActiveStrengthWorkoutView: View {
             .controlSize(.large)
             .tint(.green)
             .padding(.top, 14)
+
+            Button {
+                strength.completeCurrentSetWithoutDetails()
+            } label: {
+                Text("Complete set without details")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding(.top, 6)
+
+            Text("Weight, reps, RPE and rest are optional even in Advanced mode.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
         }
     }
 
     private var restControls: some View {
         ATHLTHCard {
-            ATHLTHSectionHeader(title: "Rest", actionTitle: "Health workout still running")
+            ATHLTHSectionHeader(title: "Rest", actionTitle: "Workout keeps running")
 
             if let restEndsAt = strength.restEndsAt {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
