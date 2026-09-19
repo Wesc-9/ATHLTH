@@ -170,6 +170,8 @@ struct TrainingPlan: Identifiable, Codable, Hashable {
     var version: Int
     var weeks: [TrainingPlanWeek]
     var tags: [String]
+    var spotifyPlaylist: SpotifyPlaylistReference? = nil
+    var spotifyAutoplayOnWorkoutStart: Bool = true
     var createdAt: Date
     var updatedAt: Date
 }
