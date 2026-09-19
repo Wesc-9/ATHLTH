@@ -95,6 +95,25 @@ open ATHLTH.xcodeproj
 
 The GitHub Actions workflow also generates and builds the Xcode project for the iOS Simulator.
 
+## Settings
+
+The Profile tab includes a Settings control next to Share and Edit Profile. The settings foundation currently covers:
+
+- app language: English, Norwegian, Spanish, Italian and Simplified Chinese
+- metric / imperial measurements
+- system / light / dark appearance
+- profile and default activity visibility
+- optional “Training now” presence
+- route-sharing defaults and start/end privacy
+- heart-rate sharing disabled by default
+- Apple Health, Apple Watch, Spotify and Home Assistant connection surfaces
+- workout reminders, friend activity, challenges and message notifications
+- auto-pause, audio cues and Apple Watch haptics
+- export, blocked users and account deletion surfaces
+- diagnostics / Capability Lab
+
+The language selector already drives the app locale. Translation strings will be filled out as the UI stabilizes so all five languages can be maintained consistently.
+
 ## Apple capabilities
 
 The current code prepares for HealthKit background delivery. Device verification still requires the correct Apple Developer capabilities, signing and a physical device.
