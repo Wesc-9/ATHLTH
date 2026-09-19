@@ -80,14 +80,30 @@ enum UsernameClaimError: LocalizedError {
 }
 
 enum UsernameGenerator {
-    static func isValid(_ username: String) -> Bool {
-        guard (3...20).contains(username.count) else { return false }
-        return username.unicodeScalars.allSatisfy { scalar in
+    static func hasValidCharacters(_ username: String) -> Bool {
+        username.unicodeScalars.allSatisfy { scalar in
             let value = scalar.value
             let isLowercaseASCII = value >= 97 && value <= 122
             let isNumber = value >= 48 && value <= 57
             return isLowercaseASCII || isNumber || scalar == "_"
         }
+    }
+
+    static func normalizedTypedUsername(_ value: String) -> String {
+        let lowered = value.lowercased()
+        let filtered = lowered.unicodeScalars.filter { scalar in
+            let code = scalar.value
+            let isLowercaseASCII = code >= 97 && code <= 122
+            let isNumber = code >= 48 && code <= 57
+            return isLowercaseASCII || isNumber || scalar == "_"
+        }
+
+        return String(String.UnicodeScalarView(filtered).prefix(20))
+    }
+
+    static func isValid(_ username: String) -> Bool {
+        guard (3...20).contains(username.count) else { return false }
+        return hasValidCharacters(username)
     }
 
     static func normalizedBase(from value: String) -> String {
