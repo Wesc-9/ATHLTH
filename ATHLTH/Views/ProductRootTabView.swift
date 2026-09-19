@@ -1,6 +1,7 @@
 import Charts
 import MapKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ProductRootTabView: View {
     var body: some View {
@@ -194,7 +195,13 @@ struct ATHLTHHomeView: View {
 
 struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
+
     @State private var selectedSection = 0
+    @State private var showingFileImporter = false
+    @State private var importMessage: String?
+    @State private var importError: String?
+
+    private let gpxImporter = GPXRouteImporter()
 
     var body: some View {
         NavigationStack {
@@ -209,107 +216,160 @@ struct ATHLTHTrainView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    if let plan = session.activePlan {
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Today's Plan", actionTitle: plan.title)
-                            VStack(spacing: 14) {
-                                ForEach(plan.weeks.first?.days.flatMap(\.sessions).prefix(3) ?? []) { workout in
-                                    HStack {
-                                        Image(systemName: workout.kind.systemImage)
-                                            .foregroundStyle(.green)
-                                            .frame(width: 34)
-                                        VStack(alignment: .leading) {
-                                            Text(workout.title)
-                                                .font(.headline)
-                                            Text("\(workout.durationMinutes ?? 0) min · \(workout.kind.title)")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                            }
-                            .padding(.top, 10)
-                        }
-                    }
-
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Quick Start")
-                        HStack {
-                            ForEach([WorkoutKind.running, .walking, .strength, .custom]) { kind in
-                                VStack(spacing: 7) {
-                                    Image(systemName: kind.systemImage)
-                                        .font(.title2)
-                                        .foregroundStyle(.green)
-                                    Text(kind.title)
-                                        .font(.caption.weight(.semibold))
-                                }
-                                .frame(maxWidth: .infinity, minHeight: 76)
-                            }
-                        }
-                        .padding(.top, 10)
-                    }
-
-                    if let route = session.savedRoutes.first {
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Routes & Challenges", actionTitle: "See All")
-
-                            Map(initialPosition: .region(routeRegion(route))) {
-                                MapPolyline(coordinates: route.coordinates.map(\.coordinate))
-                                    .stroke(.green, lineWidth: 5)
-                            }
-                            .frame(height: 190)
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
-                            .padding(.top, 10)
-
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(route.title)
-                                        .font(.headline)
-                                    Text("\(route.distanceKilometers, specifier: "%.1f") km · \(Int(route.elevationGainMeters ?? 0)) m ascent")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if let challenge = session.challenges.first {
-                                    Label(challenge.title, systemImage: "trophy.fill")
-                                        .font(.caption.weight(.medium))
-                                        .foregroundStyle(.blue)
-                                }
-                            }
-                            .padding(.top, 8)
-                        }
-                    }
-
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Exercises", actionTitle: "Library + Custom")
-                        HStack {
-                            exerciseChip(PreviewData.benchPress)
-                            exerciseChip(PreviewData.customExercise)
-                        }
-                        .padding(.top, 10)
-                    }
-
-                    if let workout = session.activePlan?.weeks.first?.days.first?.sessions.first {
-                        Button {
-                            session.beginTrainingStatus(for: workout)
-                        } label: {
-                            Label("Start on Apple Watch", systemImage: "applewatch")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .tint(.green)
+                    switch selectedSection {
+                    case 1:
+                        AdvancedPlannerView()
+                    case 2:
+                        TrainingPlanManagerView()
+                    default:
+                        todayContent
                     }
                 }
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
+            .fileImporter(
+                isPresented: $showingFileImporter,
+                allowedContentTypes: [.xml, .data],
+                allowsMultipleSelection: false
+            ) { result in
+                Task {
+                    await importGPX(result)
+                }
+            }
+            .alert("Route Import", isPresented: Binding(
+                get: { importMessage != nil || importError != nil },
+                set: { newValue in
+                    if !newValue {
+                        importMessage = nil
+                        importError = nil
+                    }
+                }
+            )) {
+                Button("OK", role: .cancel) {
+                    importMessage = nil
+                    importError = nil
+                }
+            } message: {
+                Text(importError ?? importMessage ?? "")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var todayContent: some View {
+        if let plan = session.activePlan {
+            ATHLTHCard {
+                ATHLTHSectionHeader(title: "Today's Plan", actionTitle: plan.title)
+                VStack(spacing: 14) {
+                    ForEach(Array((plan.weeks.first?.days.flatMap(\.sessions) ?? []).prefix(3))) { workout in
+                        HStack {
+                            Image(systemName: workout.kind.systemImage)
+                                .foregroundStyle(.green)
+                                .frame(width: 34)
+                            VStack(alignment: .leading) {
+                                Text(workout.title)
+                                    .font(.headline)
+                                Text("\(workout.durationMinutes ?? 0) min · \(workout.kind.title)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                .padding(.top, 10)
+            }
+        }
+
+        ATHLTHCard {
+            ATHLTHSectionHeader(title: "Quick Start")
+            HStack {
+                ForEach([WorkoutKind.running, .walking, .strength, .custom]) { kind in
+                    VStack(spacing: 7) {
+                        Image(systemName: kind.systemImage)
+                            .font(.title2)
+                            .foregroundStyle(.green)
+                        Text(kind.title)
+                            .font(.caption.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 76)
+                }
+            }
+            .padding(.top, 10)
+        }
+
+        ATHLTHCard {
+            HStack {
+                ATHLTHSectionHeader(title: "Routes & Challenges", actionTitle: "See All")
+                Spacer()
+                Button {
+                    showingFileImporter = true
+                } label: {
+                    Label("Import GPX", systemImage: "square.and.arrow.down")
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if let route = session.savedRoutes.first {
+                Map(initialPosition: .region(routeRegion(route))) {
+                    MapPolyline(coordinates: route.coordinates.map(\.coordinate))
+                        .stroke(.green, lineWidth: 5)
+                }
+                .frame(height: 190)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .padding(.top, 10)
+
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(route.title)
+                            .font(.headline)
+                        Text("\(route.distanceKilometers, specifier: "%.1f") km · \(Int(route.elevationGainMeters ?? 0)) m ascent")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let challenge = session.challenges.first {
+                        Label(challenge.title, systemImage: "trophy.fill")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.blue)
+                    }
+                }
+                .padding(.top, 8)
+            } else {
+                ContentUnavailableView(
+                    "No routes yet",
+                    systemImage: "map",
+                    description: Text("Import a GPX route or create one later.")
+                )
+                .frame(height: 190)
+            }
+        }
+
+        ATHLTHCard {
+            ATHLTHSectionHeader(title: "Exercises", actionTitle: "Library + Custom")
+            HStack {
+                exerciseChip(PreviewData.benchPress)
+                exerciseChip(PreviewData.customExercise)
+            }
+            .padding(.top, 10)
+        }
+
+        if let workout = session.activePlan?.weeks.first?.days.first?.sessions.first {
+            Button {
+                session.beginTrainingStatus(for: workout)
+            } label: {
+                Label("Start on Apple Watch", systemImage: "applewatch")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.green)
         }
     }
 
@@ -342,6 +402,31 @@ struct ATHLTHTrainView: View {
             center: first.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
         )
+    }
+
+    private func importGPX(_ result: Result<[URL], Error>) async {
+        do {
+            guard let url = try result.get().first else { return }
+
+            let didAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if didAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            let data = try Data(contentsOf: url)
+            let route = try await gpxImporter.importGPX(data: data, filename: url.lastPathComponent)
+
+            await MainActor.run {
+                session.addImportedRoute(route)
+                importMessage = "Imported \(route.title) · \(String(format: "%.1f", route.distanceKilometers)) km"
+            }
+        } catch {
+            await MainActor.run {
+                importError = error.localizedDescription
+            }
+        }
     }
 }
 
@@ -655,6 +740,25 @@ struct ATHLTHProfileView: View {
             }
             .navigationTitle("ATHLTH")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+
+                    Button {
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+
+                    NavigationLink {
+                        ATHLTHSettingsView()
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                    }
+                }
+            }
         }
     }
 
