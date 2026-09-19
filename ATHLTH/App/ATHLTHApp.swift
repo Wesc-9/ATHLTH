@@ -14,6 +14,8 @@ struct ATHLTHApp: App {
                 .environmentObject(trainingPlan)
                 .environmentObject(appSession)
                 .environmentObject(settings)
+                .environment(\.locale, Locale(identifier: settings.language.rawValue))
+                .preferredColorScheme(settings.appearance.colorScheme)
         }
     }
 }
