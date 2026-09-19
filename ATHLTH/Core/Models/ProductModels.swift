@@ -144,7 +144,6 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var routeID: UUID?
     var exercises: [PlannedExercise]
     var notes: String?
-    var spotifyPlaylistURI: String?
 }
 
 struct TrainingPlanDay: Identifiable, Codable, Hashable {
