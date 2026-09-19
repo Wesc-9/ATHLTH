@@ -80,6 +80,37 @@ enum AppAppearance: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+
+enum WorkoutCapturePreference: String, CaseIterable, Identifiable, Codable {
+    case automatic
+    case iPhone
+    case appleWatch
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .automatic: return "Automatic"
+        case .iPhone: return "iPhone"
+        case .appleWatch: return "Apple Watch"
+        }
+    }
+}
+
+enum StrengthTrackingPreference: String, CaseIterable, Identifiable, Codable {
+    case simple
+    case advanced
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .simple: return "Simple"
+        case .advanced: return "Advanced"
+        }
+    }
+}
+
 enum IntegrationKind: String, CaseIterable, Identifiable {
     case appleHealth
     case appleWatch
@@ -120,6 +151,8 @@ final class AppSettingsStore: ObservableObject {
     @Published var hideRouteStartAndEnd: Bool { didSet { persist() } }
     @Published var shareHeartRateByDefault: Bool { didSet { persist() } }
 
+    @Published var preferredWorkoutCapture: WorkoutCapturePreference { didSet { persist() } }
+    @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
@@ -151,6 +184,8 @@ final class AppSettingsStore: ObservableObject {
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
         shareHeartRateByDefault = defaults.object(forKey: "settings.shareHeartRate") as? Bool ?? false
 
+        preferredWorkoutCapture = WorkoutCapturePreference(rawValue: defaults.string(forKey: "settings.preferredWorkoutCapture") ?? "") ?? .automatic
+        defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
         audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
         hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
@@ -177,6 +212,8 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(hideRouteStartAndEnd, forKey: "settings.hideRouteStartAndEnd")
         defaults.set(shareHeartRateByDefault, forKey: "settings.shareHeartRate")
 
+        defaults.set(preferredWorkoutCapture.rawValue, forKey: "settings.preferredWorkoutCapture")
+        defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
         defaults.set(audioCuesEnabled, forKey: "settings.audioCues")
         defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
