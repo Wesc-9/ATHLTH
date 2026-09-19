@@ -30,6 +30,7 @@ struct AppRootView: View {
         }
         .task {
             guard health.hasRequestedAuthorization else { return }
+            await health.configureBackgroundSync()
             await health.refreshAll()
         }
     }
