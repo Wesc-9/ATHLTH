@@ -11,6 +11,7 @@ final class AppSessionStore: ObservableObject {
     @Published var onboardingCompleted: Bool
     @Published var signInMethod: SignInMethod?
     @Published var onboardingProfile: OnboardingProfileData?
+    @Published var usernameSeed: String
 
     private let defaults: UserDefaults
 
@@ -28,6 +29,7 @@ final class AppSessionStore: ObservableObject {
         self.challenges = challenges
         self.previewModeEnabled = previewModeEnabled
         self.defaults = defaults
+        self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? profile.displayName
         self.signedIn = defaults.bool(forKey: "session.signedIn")
         self.onboardingCompleted = defaults.bool(forKey: "session.onboardingCompleted")
         self.signInMethod = defaults.string(forKey: "session.signInMethod").flatMap(SignInMethod.init(rawValue:))
@@ -37,6 +39,13 @@ final class AppSessionStore: ObservableObject {
         } else {
             self.onboardingProfile = nil
         }
+    }
+
+    func setUsernameSeed(_ value: String) {
+        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        usernameSeed = clean
+        defaults.set(clean, forKey: "session.usernameSeed")
     }
 
     func beginMockSignIn(method: SignInMethod) {
@@ -95,6 +104,8 @@ final class AppSessionStore: ObservableObject {
         defaults.removeObject(forKey: "session.onboardingCompleted")
         defaults.removeObject(forKey: "session.signInMethod")
         defaults.removeObject(forKey: "session.onboardingProfile")
+        defaults.removeObject(forKey: "session.usernameSeed")
+        usernameSeed = profile.displayName
     }
 
     func beginTrainingStatus(for session: PlannedSession) {
