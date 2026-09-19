@@ -1,0 +1,156 @@
+import SwiftUI
+
+struct ATHLTHSettingsView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var health: HealthKitManager
+
+    var body: some View {
+        List {
+            Section("App") {
+                Picker("Language", selection: $settings.language) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.title).tag(language)
+                    }
+                }
+
+                Picker("Measurements", selection: $settings.measurementPreference) {
+                    ForEach(MeasurementPreference.allCases) { preference in
+                        Text(preference.title).tag(preference)
+                    }
+                }
+
+                Picker("Appearance", selection: $settings.appearance) {
+                    ForEach(AppAppearance.allCases) { appearance in
+                        Text(appearance.title).tag(appearance)
+                    }
+                }
+
+                LabeledContent(
+                    "Units",
+                    value: "\(settings.measurementPreference.distanceUnit) · \(settings.measurementPreference.weightUnit) · \(settings.measurementPreference.temperatureUnit)"
+                )
+                .foregroundStyle(.secondary)
+            }
+
+            Section("Privacy") {
+                Picker("Profile visibility", selection: $settings.profileVisibility) {
+                    ForEach(ProfileVisibility.allCases) { visibility in
+                        Text(visibility.title).tag(visibility)
+                    }
+                }
+
+                Picker("Default activity visibility", selection: $settings.defaultActivityVisibility) {
+                    ForEach(ProfileVisibility.allCases) { visibility in
+                        Text(visibility.title).tag(visibility)
+                    }
+                }
+
+                Toggle("Show “Training now” status", isOn: $settings.shareTrainingPresence)
+                Toggle("Share routes by default", isOn: $settings.shareRoutesByDefault)
+                Toggle("Share heart rate by default", isOn: $settings.shareHeartRateByDefault)
+
+                Text("Health data is private by default. Social sharing should always be explicit.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Connections") {
+                integrationRow(
+                    .appleHealth,
+                    subtitle: health.hasRequestedAuthorization ? "Connected / authorization requested" : "Not configured",
+                    connected: health.hasRequestedAuthorization
+                )
+
+                integrationRow(
+                    .appleWatch,
+                    subtitle: settings.watchConnected ? "Connected" : "Configure companion app",
+                    connected: settings.watchConnected
+                )
+
+                integrationRow(
+                    .spotify,
+                    subtitle: settings.spotifyConnected ? "Connected" : "Connect training playlists",
+                    connected: settings.spotifyConnected
+                )
+
+                integrationRow(
+                    .homeAssistant,
+                    subtitle: settings.homeAssistantConnected ? "Connected" : "Optional integration",
+                    connected: settings.homeAssistantConnected
+                )
+            }
+
+            Section("Notifications") {
+                Toggle("Workout reminders", isOn: $settings.workoutRemindersEnabled)
+                Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
+                Toggle("Challenges", isOn: $settings.challengeNotificationsEnabled)
+                Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
+            }
+
+            Section("Data & account") {
+                NavigationLink {
+                    Text("Export will package ATHLTH-owned data such as plans, routes and activities. HealthKit export stays under Apple Health controls.")
+                        .padding()
+                        .navigationTitle("Export Data")
+                } label: {
+                    Label("Export ATHLTH data", systemImage: "square.and.arrow.up")
+                }
+
+                NavigationLink {
+                    Text("Blocked users and social safety controls will live here.")
+                        .padding()
+                        .navigationTitle("Blocked Users")
+                } label: {
+                    Label("Blocked users", systemImage: "person.crop.circle.badge.xmark")
+                }
+
+                NavigationLink {
+                    Text("Account deletion will remove ATHLTH cloud data after confirmation. Health data in Apple Health is managed separately.")
+                        .padding()
+                        .navigationTitle("Delete Account")
+                } label: {
+                    Label("Delete account", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Section("Diagnostics") {
+                NavigationLink {
+                    CapabilityLabView()
+                } label: {
+                    Label("Capability Lab", systemImage: "testtube.2")
+                }
+
+                LabeledContent("Preview mode", value: "Enabled")
+                LabeledContent("App version", value: "0.1.0")
+            }
+        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private func integrationRow(
+        _ integration: IntegrationKind,
+        subtitle: String,
+        connected: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: integration.systemImage)
+                .frame(width: 30)
+                .foregroundStyle(connected ? .green : .secondary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(integration.title)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Image(systemName: connected ? "checkmark.circle.fill" : "chevron.right")
+                .foregroundStyle(connected ? .green : .tertiary)
+        }
+    }
+}
