@@ -7,19 +7,75 @@ final class AppSessionStore: ObservableObject {
     @Published var savedRoutes: [TrainingRoute]
     @Published var challenges: [RouteChallenge]
     @Published var previewModeEnabled: Bool
+    @Published var signedIn: Bool
+    @Published var onboardingCompleted: Bool
+    @Published var signInMethod: SignInMethod?
+    @Published var onboardingProfile: OnboardingProfileData?
+
+    private let defaults: UserDefaults
 
     init(
         profile: UserProfile = PreviewData.profile,
         activePlan: TrainingPlan? = PreviewData.trainingPlan,
         savedRoutes: [TrainingRoute] = [PreviewData.route],
         challenges: [RouteChallenge] = [PreviewData.challenge],
-        previewModeEnabled: Bool = true
+        previewModeEnabled: Bool = true,
+        defaults: UserDefaults = .standard
     ) {
         self.profile = profile
         self.activePlan = activePlan
         self.savedRoutes = savedRoutes
         self.challenges = challenges
         self.previewModeEnabled = previewModeEnabled
+        self.defaults = defaults
+        self.signedIn = defaults.bool(forKey: "session.signedIn")
+        self.onboardingCompleted = defaults.bool(forKey: "session.onboardingCompleted")
+        self.signInMethod = defaults.string(forKey: "session.signInMethod").flatMap(SignInMethod.init(rawValue:))
+
+        if let data = defaults.data(forKey: "session.onboardingProfile") {
+            self.onboardingProfile = try? JSONDecoder().decode(OnboardingProfileData.self, from: data)
+        } else {
+            self.onboardingProfile = nil
+        }
+    }
+
+    func beginMockSignIn(method: SignInMethod) {
+        signedIn = true
+        signInMethod = method
+        defaults.set(true, forKey: "session.signedIn")
+        defaults.set(method.rawValue, forKey: "session.signInMethod")
+    }
+
+    func setPendingUsername(_ username: String) {
+        let cleaned = username
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        profile.username = cleaned
+    }
+
+    func saveOnboardingProfile(_ data: OnboardingProfileData) {
+        onboardingProfile = data
+
+        if let encoded = try? JSONEncoder().encode(data) {
+            defaults.set(encoded, forKey: "session.onboardingProfile")
+        }
+    }
+
+    func completeOnboarding() {
+        onboardingCompleted = true
+        defaults.set(true, forKey: "session.onboardingCompleted")
+    }
+
+    func resetOnboardingForPreview() {
+        signedIn = false
+        onboardingCompleted = false
+        signInMethod = nil
+        onboardingProfile = nil
+        defaults.removeObject(forKey: "session.signedIn")
+        defaults.removeObject(forKey: "session.onboardingCompleted")
+        defaults.removeObject(forKey: "session.signInMethod")
+        defaults.removeObject(forKey: "session.onboardingProfile")
     }
 
     func beginTrainingStatus(for session: PlannedSession) {
