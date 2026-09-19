@@ -5,6 +5,7 @@ struct ATHLTHApp: App {
     @StateObject private var health = HealthKitManager()
     @StateObject private var trainingPlan = TrainingPlanStore()
     @StateObject private var appSession = AppSessionStore()
+    @StateObject private var settings = AppSettingsStore()
 
     var body: some Scene {
         WindowGroup {
@@ -12,6 +13,7 @@ struct ATHLTHApp: App {
                 .environmentObject(health)
                 .environmentObject(trainingPlan)
                 .environmentObject(appSession)
+                .environmentObject(settings)
         }
     }
 }
