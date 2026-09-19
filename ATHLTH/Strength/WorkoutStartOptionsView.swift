@@ -5,6 +5,8 @@ struct WorkoutStartOptionsView: View {
 
     let session: PlannedSession
     let watchConnected: Bool
+    let linkedSpotifyPlaylist: SpotifyPlaylistReference?
+    let spotifyAutoplayEnabled: Bool
     let onStart: (WorkoutCaptureDevice, StrengthTrackingMode) -> Void
 
     @State private var captureDevice: WorkoutCaptureDevice
@@ -15,10 +17,14 @@ struct WorkoutStartOptionsView: View {
         watchConnected: Bool,
         defaultCapture: WorkoutCapturePreference,
         defaultTracking: StrengthTrackingPreference,
+        linkedSpotifyPlaylist: SpotifyPlaylistReference?,
+        spotifyAutoplayEnabled: Bool,
         onStart: @escaping (WorkoutCaptureDevice, StrengthTrackingMode) -> Void
     ) {
         self.session = session
         self.watchConnected = watchConnected
+        self.linkedSpotifyPlaylist = linkedSpotifyPlaylist
+        self.spotifyAutoplayEnabled = spotifyAutoplayEnabled
         self.onStart = onStart
 
         let initialDevice: WorkoutCaptureDevice
@@ -101,6 +107,33 @@ struct WorkoutStartOptionsView: View {
                             }
                         }
                         .padding(.top, 12)
+                    }
+
+                    if let playlist = linkedSpotifyPlaylist {
+                        ATHLTHCard {
+                            HStack(spacing: 12) {
+                                Image(systemName: "music.note")
+                                    .font(.title2)
+                                    .foregroundStyle(.green)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Spotify")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                    Text(playlist.name)
+                                        .font(.headline)
+                                    Text(
+                                        spotifyAutoplayEnabled
+                                            ? "Starts automatically with this workout."
+                                            : "Linked to the plan, but autoplay is off."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+                            }
+                        }
                     }
 
                     ATHLTHCard {
