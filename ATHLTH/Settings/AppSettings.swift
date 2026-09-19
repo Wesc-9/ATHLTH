@@ -38,6 +38,22 @@ enum MeasurementPreference: String, CaseIterable, Identifiable, Codable {
     var weightUnit: String { self == .metric ? "kg" : "lb" }
     var heightUnit: String { self == .metric ? "cm" : "ft/in" }
     var temperatureUnit: String { self == .metric ? "°C" : "°F" }
+
+    func distance(fromKilometers kilometers: Double) -> String {
+        if self == .metric {
+            return String(format: "%.1f km", kilometers)
+        }
+
+        return String(format: "%.1f mi", kilometers * 0.621371)
+    }
+
+    func weight(fromKilograms kilograms: Double) -> String {
+        if self == .metric {
+            return String(format: "%.1f kg", kilograms)
+        }
+
+        return String(format: "%.1f lb", kilograms * 2.20462)
+    }
 }
 
 enum AppAppearance: String, CaseIterable, Identifiable, Codable {
@@ -52,6 +68,14 @@ enum AppAppearance: String, CaseIterable, Identifiable, Codable {
         case .system: return "System"
         case .light: return "Light"
         case .dark: return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
         }
     }
 }
