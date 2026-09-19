@@ -6,6 +6,7 @@ struct ATHLTHApp: App {
     @StateObject private var trainingPlan = TrainingPlanStore()
     @StateObject private var appSession = AppSessionStore()
     @StateObject private var settings = AppSettingsStore()
+    @StateObject private var strengthWorkout = StrengthWorkoutStore()
 
     var body: some Scene {
         WindowGroup {
@@ -14,6 +15,7 @@ struct ATHLTHApp: App {
                 .environmentObject(trainingPlan)
                 .environmentObject(appSession)
                 .environmentObject(settings)
+                .environmentObject(strengthWorkout)
                 .environment(\.locale, Locale(identifier: settings.language.rawValue))
                 .preferredColorScheme(settings.appearance.colorScheme)
         }
