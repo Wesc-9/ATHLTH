@@ -23,6 +23,33 @@ enum HealthSex: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum PersonalDetailsSource: String, Codable {
+    case none
+    case appleHealth
+    case manual
+}
+
+struct HealthProfileBasics: Codable, Hashable {
+    var dateOfBirth: Date?
+    var healthSex: HealthSex?
+    var weightKilograms: Double?
+    var heightCentimeters: Double?
+
+    static let empty = HealthProfileBasics(
+        dateOfBirth: nil,
+        healthSex: nil,
+        weightKilograms: nil,
+        heightCentimeters: nil
+    )
+
+    var hasAnyValue: Bool {
+        dateOfBirth != nil ||
+        healthSex != nil ||
+        weightKilograms != nil ||
+        heightCentimeters != nil
+    }
+}
+
 enum ATHLTHGoal: String, CaseIterable, Identifiable, Codable, Hashable {
     case strength
     case running
@@ -92,18 +119,27 @@ enum ATHLTHGoal: String, CaseIterable, Identifiable, Codable, Hashable {
 }
 
 struct OnboardingProfileData: Codable, Hashable {
-    var dateOfBirth: Date
-    var healthSex: HealthSex
-    var weightKilograms: Double
-    var heightCentimeters: Double
+    var dateOfBirth: Date?
+    var healthSex: HealthSex?
+    var weightKilograms: Double?
+    var heightCentimeters: Double?
+    var personalDetailsSource: PersonalDetailsSource
     var goals: Set<ATHLTHGoal>
     var primaryGoal: ATHLTHGoal?
+
+    var healthBasics: HealthProfileBasics {
+        HealthProfileBasics(
+            dateOfBirth: dateOfBirth,
+            healthSex: healthSex,
+            weightKilograms: weightKilograms,
+            heightCentimeters: heightCentimeters
+        )
+    }
 }
 
 enum OnboardingStep: Int, CaseIterable {
     case account
     case username
-    case personal
     case goals
     case connections
     case ready
