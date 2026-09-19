@@ -246,8 +246,7 @@ struct SessionEditorView: View {
                                 targetPaceSecondsPerKilometer: nil,
                                 routeID: nil,
                                 exercises: [],
-                                notes: notes.isEmpty ? nil : notes,
-                                spotifyPlaylistURI: nil
+                                notes: notes.isEmpty ? nil : notes
                             ),
                             toDay: dayID
                         )
