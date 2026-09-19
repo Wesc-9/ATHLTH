@@ -220,6 +220,7 @@ final class AdminControlCenterStore: ObservableObject {
     @Published var users: [AdminUserRecord]
     @Published var auditEvents: [AdminAuditEvent]
     @Published var safetyCases: [AdminSafetyCase]
+    @Published var campaignHistory: [CampaignHistoryRecord]
 
     let analytics: AdminAnalyticsSnapshot
     let campaignDrafts: [OfferCampaignDraft]
@@ -228,8 +229,75 @@ final class AdminControlCenterStore: ObservableObject {
         users = AdminPreviewData.users
         auditEvents = AdminPreviewData.auditEvents
         safetyCases = AdminPreviewData.safetyCases
+        campaignHistory = AdminPreviewData.campaignHistory
         analytics = AdminPreviewData.analytics
         campaignDrafts = AdminPreviewData.campaignDrafts
+    }
+
+    func campaignEvents(for userID: UUID) -> [UserCampaignEvent] {
+        campaignHistory
+            .flatMap { campaign in
+                campaign.recipients
+                    .filter { $0.userID == userID }
+                    .map { recipient in
+                        UserCampaignEvent(
+                            id: UUID(),
+                            campaignID: campaign.id,
+                            campaignTitle: campaign.title,
+                            channels: campaign.channels,
+                            status: campaign.status,
+                            sentAt: recipient.deliveredAt ?? campaign.sentAt,
+                            openedAt: recipient.openedAt,
+                            convertedAt: recipient.convertedAt
+                        )
+                    }
+            }
+            .sorted { ($0.sentAt ?? .distantPast) > ($1.sentAt ?? .distantPast) }
+    }
+
+    func previewGeneralFreeAudience() -> Int {
+        analytics.freeUsers
+    }
+
+    func saveBlockedFreeCampaignDraft(
+        title: String,
+        message: String,
+        channels: Set<CampaignChannel>,
+        actorUsername: String
+    ) {
+        let cleanedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanedTitle.isEmpty, !cleanedMessage.isEmpty, !channels.isEmpty else { return }
+
+        let record = CampaignHistoryRecord(
+            id: UUID(),
+            title: cleanedTitle,
+            message: cleanedMessage,
+            audience: .freeUsers,
+            channels: channels,
+            status: .blocked,
+            createdByUsername: actorUsername,
+            createdAt: Date(),
+            sentAt: nil,
+            audienceCount: analytics.freeUsers,
+            deliveredCount: 0,
+            openedCount: 0,
+            convertedCount: 0,
+            recipients: []
+        )
+
+        campaignHistory.insert(record, at: 0)
+
+        auditEvents.insert(
+            AdminAuditEvent(
+                id: UUID(),
+                actor: "@\(actorUsername)",
+                action: "Prepared Free-user campaign",
+                target: cleanedTitle,
+                createdAt: Date()
+            ),
+            at: 0
+        )
     }
 
     func setRole(
@@ -419,6 +487,75 @@ enum AdminPreviewData {
         )
     ]
 
+    static let campaignHistory: [CampaignHistoryRecord] = [
+        CampaignHistoryRecord(
+            id: UUID(uuidString: "A1111111-1111-1111-1111-111111111111")!,
+            title: "Welcome to ATHLTH Plus",
+            message: "A preview offer for upgraded training-plan features.",
+            audience: .freeUsers,
+            channels: [.inApp, .email],
+            status: .sent,
+            createdByUsername: "stian",
+            createdAt: daysAgo(28),
+            sentAt: daysAgo(27),
+            audienceCount: 1_105,
+            deliveredCount: 1_074,
+            openedCount: 536,
+            convertedCount: 42,
+            recipients: [
+                CampaignRecipientSnapshot(
+                    id: UUID(),
+                    userID: UUID(uuidString: "93333333-3333-3333-3333-333333333333")!,
+                    username: "live_demo",
+                    deliveredAt: daysAgo(27),
+                    openedAt: daysAgo(26),
+                    convertedAt: nil
+                )
+            ]
+        ),
+        CampaignHistoryRecord(
+            id: UUID(uuidString: "A2222222-2222-2222-2222-222222222222")!,
+            title: "Strength plan launch",
+            message: "Early access to the 8-week hypertrophy plan.",
+            audience: .personalizedSegment,
+            channels: [.inApp],
+            status: .sent,
+            createdByUsername: "stian",
+            createdAt: daysAgo(18),
+            sentAt: daysAgo(17),
+            audienceCount: 184,
+            deliveredCount: 181,
+            openedCount: 112,
+            convertedCount: 19,
+            recipients: [
+                CampaignRecipientSnapshot(
+                    id: UUID(),
+                    userID: PreviewData.userID,
+                    username: "stian",
+                    deliveredAt: daysAgo(17),
+                    openedAt: daysAgo(17),
+                    convertedAt: daysAgo(15)
+                )
+            ]
+        ),
+        CampaignHistoryRecord(
+            id: UUID(uuidString: "A3333333-3333-3333-3333-333333333333")!,
+            title: "Nutrition launch draft",
+            message: "Future nutrition-plan introduction.",
+            audience: .freeUsers,
+            channels: [.inApp, .push],
+            status: .blocked,
+            createdByUsername: "stian",
+            createdAt: daysAgo(3),
+            sentAt: nil,
+            audienceCount: 1_173,
+            deliveredCount: 0,
+            openedCount: 0,
+            convertedCount: 0,
+            recipients: []
+        )
+    ]
+
     static let auditEvents: [AdminAuditEvent] = [
         AdminAuditEvent(
             id: UUID(),
@@ -547,19 +684,45 @@ struct AdminCenterView: View {
                     .buttonStyle(.plain)
                 }
 
-                AdminSectionCard(title: "Offers", icon: "megaphone.fill") {
+                AdminSectionCard(title: "Campaigns & offers", icon: "megaphone.fill") {
+                    NavigationLink {
+                        AdminGeneralCampaignComposerView(store: store)
+                    } label: {
+                        adminNavigationRow(
+                            title: "New Free-user campaign",
+                            subtitle: "Compose a general campaign for eligible Free users",
+                            icon: "paperplane.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+
+                    NavigationLink {
+                        AdminCampaignHistoryView(store: store)
+                    } label: {
+                        adminNavigationRow(
+                            title: "Campaign history",
+                            subtitle: "Sent, blocked and draft campaign records",
+                            icon: "clock.arrow.circlepath"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+
                     NavigationLink {
                         AdminOffersView(store: store)
                     } label: {
                         adminNavigationRow(
-                            title: "Offer readiness",
-                            subtitle: "Consent, segment previews and disabled drafts",
+                            title: "Personalized offer readiness",
+                            subtitle: "Consent, segments and personalized drafts",
                             icon: "slider.horizontal.3"
                         )
                     }
                     .buttonStyle(.plain)
 
-                    Text("HealthKit measurements and individual health results are excluded from offer targeting.")
+                    Text("HealthKit measurements and individual health results are excluded from campaign and offer targeting.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -893,6 +1056,36 @@ private struct AdminUserDetailView: View {
                             : user.interests.map(\.title).sorted().joined(separator: ", ")
                     )
                     LabeledContent("Offer consent", value: user.offerConsent.title)
+                }
+
+                Section("Campaign & offer history") {
+                    let events = store.campaignEvents(for: user.id)
+
+                    if events.isEmpty {
+                        Text("No campaign or offer history for this user.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(events) { event in
+                            NavigationLink {
+                                AdminUserCampaignEventView(event: event)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(event.campaignTitle)
+                                        .font(.subheadline.weight(.semibold))
+
+                                    HStack(spacing: 6) {
+                                        Text(event.status.title)
+                                        if let sentAt = event.sentAt {
+                                            Text("·")
+                                            Text(sentAt.formatted(date: .abbreviated, time: .omitted))
+                                        }
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Section("Connections") {
