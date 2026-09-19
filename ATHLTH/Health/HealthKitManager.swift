@@ -15,6 +15,7 @@ final class HealthKitManager: ObservableObject {
 
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
+    private var observerQueries: [HKObserverQuery] = []
     private let authorizationFlagKey = "athlth.healthAuthorizationRequested"
 
     var hasRequestedAuthorization: Bool {
@@ -64,9 +65,66 @@ final class HealthKitManager: ObservableObject {
             try await healthStore.requestAuthorization(toShare: [], read: readTypes)
             UserDefaults.standard.set(true, forKey: authorizationFlagKey)
             objectWillChange.send()
+            await configureBackgroundSync()
             await refreshAll()
         } catch {
             authorizationError = error.localizedDescription
+        }
+    }
+
+    func configureBackgroundSync() async {
+        guard healthDataAvailable else { return }
+
+        startBackgroundObservers()
+
+        var registrations: [(HKObjectType, HKUpdateFrequency)] = [
+            (HKObjectType.workoutType(), .immediate)
+        ]
+
+        if let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
+            registrations.append((sleepType, .hourly))
+        }
+
+        let quantityTypes: [(HKQuantityTypeIdentifier, HKUpdateFrequency)] = [
+            (.heartRate, .immediate),
+            (.restingHeartRate, .hourly),
+            (.heartRateVariabilitySDNN, .hourly),
+            (.activeEnergyBurned, .hourly),
+            (.distanceWalkingRunning, .hourly)
+        ]
+
+        for (identifier, frequency) in quantityTypes {
+            if let type = HKObjectType.quantityType(forIdentifier: identifier) {
+                registrations.append((type, frequency))
+            }
+        }
+
+        for (type, frequency) in registrations {
+            _ = await withCheckedContinuation { continuation in
+                healthStore.enableBackgroundDelivery(for: type, frequency: frequency) { success, _ in
+                    continuation.resume(returning: success)
+                }
+            }
+        }
+    }
+
+    private func startBackgroundObservers() {
+        guard observerQueries.isEmpty else { return }
+
+        let sampleTypes = readTypes.compactMap { $0 as? HKSampleType }
+
+        for type in sampleTypes {
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completionHandler, error in
+                defer { completionHandler() }
+                guard error == nil else { return }
+
+                Task { @MainActor [weak self] in
+                    await self?.refreshAll()
+                }
+            }
+
+            observerQueries.append(query)
+            healthStore.execute(query)
         }
     }
 
