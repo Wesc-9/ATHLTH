@@ -40,6 +40,23 @@ Training consistency, trends, personal records and achievements.
 ### Profile
 Unique username, social profile, friends, public/shared plans, routes, activities and optional live “Training now” presence.
 
+## First-run onboarding
+
+ATHLTH uses an account-first onboarding flow:
+
+1. Sign in / register with Apple or email.
+2. Choose a unique ATHLTH username.
+3. Enter private profile basics: date of birth, sex for health calculations, height and weight.
+4. Choose one or more goals and select one primary goal.
+5. Optionally connect Apple Health and Apple Watch.
+6. Enter ATHLTH.
+
+Current onboarding goals include strength/muscle, running, walking/daily movement, fitness/endurance, recovery/sleep, consistency, event training, health/progress tracking, structured plans and friends/challenges.
+
+Apple Health and Apple Watch are optional. Home Assistant is intentionally not part of onboarding and remains a Settings-only integration.
+
+Later, if Apple Health contains height/weight, ATHLTH should offer to use Apple Health as the source of truth rather than maintaining conflicting values.
+
 ## Accounts and social
 
 ATHLTH is designed for:
