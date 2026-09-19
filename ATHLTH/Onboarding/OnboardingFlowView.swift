@@ -9,6 +9,7 @@ struct OnboardingFlowView: View {
     @State private var username = ""
     @State private var selectedGoal: AchievementGoal?
     @State private var interests: Set<ATHLTHInterest> = []
+    @State private var allowPersonalizedOffers = false
     @State private var importedHealthDetails: HealthProfileBasics = .empty
     @State private var healthRequestInProgress = false
     @State private var showingEmailAuth = false
@@ -414,7 +415,20 @@ struct OnboardingFlowView: View {
                 }
             }
 
-            Text("Your goal and interests personalize ATHLTH itself. They are not used for promotional offers unless you separately allow personalized offers in the future.")
+            ATHLTHCard {
+                Toggle(isOn: $allowPersonalizedOffers) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Allow ATHLTH to use the goals and interests you choose to personalize ATHLTH offers.")
+                            .font(.subheadline.weight(.semibold))
+
+                        Text("Optional. You can continue without enabling this and change it later in Settings.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Text("This applies only to goals and interests you choose in ATHLTH. Apple Health / HealthKit data is not used for offer targeting.")
                 .font(.caption.italic())
                 .foregroundStyle(.secondary)
         }
@@ -763,7 +777,7 @@ struct OnboardingFlowView: View {
                 personalDetailsSource: importedHealthDetails.hasAnyValue ? .appleHealth : .none,
                 currentGoal: selectedGoal.map { UserGoalRecord(type: $0) },
                 interests: interests,
-                personalizedOfferConsent: .notAsked
+                personalizedOfferConsent: allowPersonalizedOffers ? .granted : .declined
             )
         )
     }
