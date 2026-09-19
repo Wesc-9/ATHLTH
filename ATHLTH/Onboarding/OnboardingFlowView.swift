@@ -7,8 +7,8 @@ struct OnboardingFlowView: View {
 
     @State private var step: OnboardingStep = .account
     @State private var username = ""
-    @State private var goals: Set<ATHLTHGoal> = []
-    @State private var primaryGoal: ATHLTHGoal?
+    @State private var selectedGoal: AchievementGoal?
+    @State private var interests: Set<ATHLTHInterest> = []
     @State private var importedHealthDetails: HealthProfileBasics = .empty
     @State private var healthRequestInProgress = false
     @State private var showingEmailAuth = false
@@ -319,53 +319,104 @@ struct OnboardingFlowView: View {
     private var goalsStep: some View {
         VStack(alignment: .leading, spacing: 18) {
             onboardingTitle(
-                "What do you want from ATHLTH?",
-                subtitle: "Choose the areas that matter to you, then select one main goal."
+                "What do you want to achieve?",
+                subtitle: "Choose the goal that matters most right now. You can change it later."
             )
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(ATHLTHGoal.allCases) { goal in
+            VStack(spacing: 10) {
+                ForEach(AchievementGoal.allCases) { goal in
                     Button {
-                        toggleGoal(goal)
+                        selectedGoal = goal
                     } label: {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: goal.systemImage)
-                                    .foregroundStyle(.green)
-                                Spacer()
-                                Image(systemName: goals.contains(goal) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(goals.contains(goal) ? Color.green : Color.secondary)
+                        HStack(spacing: 14) {
+                            Image(systemName: goal.systemImage)
+                                .font(.title2)
+                                .foregroundStyle(.green)
+                                .frame(width: 38)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(goal.title)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+
+                                Text(goal.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
                             }
 
-                            Text(goal.title)
-                                .font(.headline)
-                                .multilineTextAlignment(.leading)
+                            Spacer()
 
-                            Text(goal.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.leading)
+                            Image(systemName: selectedGoal == goal ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(selectedGoal == goal ? Color.green : Color.secondary)
                         }
                         .padding(14)
-                        .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            selectedGoal == goal
+                                ? Color.green.opacity(0.10)
+                                : Color.secondary.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 18)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(
+                                    selectedGoal == goal ? Color.green.opacity(0.45) : Color.clear,
+                                    lineWidth: 1
+                                )
+                        }
                     }
                     .buttonStyle(.plain)
                 }
             }
 
-            if !goals.isEmpty {
-                ATHLTHCard {
-                    Picker("Main goal", selection: Binding(
-                        get: { primaryGoal ?? goals.first! },
-                        set: { primaryGoal = $0 }
-                    )) {
-                        ForEach(Array(goals).sorted(by: { $0.title < $1.title })) { goal in
-                            Text(goal.title).tag(goal)
+            Divider()
+                .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Anything else you're interested in?")
+                    .font(.title3.weight(.bold))
+
+                Text("Choose all that apply. These help ATHLTH prioritize features, content and future plans for you.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 140), spacing: 10)],
+                    spacing: 10
+                ) {
+                    ForEach(ATHLTHInterest.allCases) { interest in
+                        Button {
+                            toggleInterest(interest)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: interest.systemImage)
+                                Text(interest.title)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer(minLength: 0)
+                                if interests.contains(interest) {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption.weight(.bold))
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 44)
+                            .foregroundStyle(interests.contains(interest) ? Color.green : Color.primary)
+                            .background(
+                                interests.contains(interest)
+                                    ? Color.green.opacity(0.10)
+                                    : Color.secondary.opacity(0.06),
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
+
+            Text("Your goal and interests personalize ATHLTH itself. They are not used for promotional offers unless you separately allow personalized offers in the future.")
+                .font(.caption.italic())
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -475,15 +526,22 @@ struct OnboardingFlowView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            if let primaryGoal {
+            if let selectedGoal {
                 ATHLTHCard {
-                    Label(primaryGoal.title, systemImage: primaryGoal.systemImage)
+                    Label(selectedGoal.title, systemImage: selectedGoal.systemImage)
                         .font(.headline)
                         .foregroundStyle(.green)
-                    Text("Your main goal")
+                    Text("Your current goal")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)
+
+                    if !interests.isEmpty {
+                        Text(interests.map(\.title).sorted().joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 6)
+                    }
                 }
             }
 
@@ -537,7 +595,7 @@ struct OnboardingFlowView: View {
                 }
 
             case .goals:
-                footerButton(title: "Continue", disabled: goals.isEmpty) {
+                footerButton(title: "Continue", disabled: selectedGoal == nil) {
                     step = .connections
                 }
 
@@ -681,17 +739,11 @@ struct OnboardingFlowView: View {
         }
     }
 
-    private func toggleGoal(_ goal: ATHLTHGoal) {
-        if goals.contains(goal) {
-            goals.remove(goal)
-            if primaryGoal == goal {
-                primaryGoal = goals.first
-            }
+    private func toggleInterest(_ interest: ATHLTHInterest) {
+        if interests.contains(interest) {
+            interests.remove(interest)
         } else {
-            goals.insert(goal)
-            if primaryGoal == nil {
-                primaryGoal = goal
-            }
+            interests.insert(interest)
         }
     }
 
@@ -708,8 +760,9 @@ struct OnboardingFlowView: View {
                 weightKilograms: importedHealthDetails.weightKilograms,
                 heightCentimeters: importedHealthDetails.heightCentimeters,
                 personalDetailsSource: importedHealthDetails.hasAnyValue ? .appleHealth : .none,
-                goals: goals,
-                primaryGoal: primaryGoal
+                currentGoal: selectedGoal.map { UserGoalRecord(type: $0) },
+                interests: interests,
+                personalizedOfferConsent: .notAsked
             )
         )
     }
