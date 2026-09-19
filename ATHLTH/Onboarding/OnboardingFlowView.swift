@@ -596,6 +596,7 @@ struct OnboardingFlowView: View {
 
             case .goals:
                 footerButton(title: "Continue", disabled: selectedGoal == nil) {
+                    saveProfileData()
                     step = .connections
                 }
 
