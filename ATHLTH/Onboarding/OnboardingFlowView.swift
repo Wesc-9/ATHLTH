@@ -11,6 +11,8 @@ struct OnboardingFlowView: View {
     @State private var primaryGoal: ATHLTHGoal?
     @State private var importedHealthDetails: HealthProfileBasics = .empty
     @State private var healthRequestInProgress = false
+    @State private var showingEmailAuth = false
+    @State private var legalDocument: LegalDocumentKind?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +41,30 @@ struct OnboardingFlowView: View {
             await health.refreshPersonalDetails()
             importedHealthDetails = health.personalDetails
         }
+        .sheet(isPresented: $showingEmailAuth) {
+            EmailAuthView { result in
+                session.beginMockSignIn(method: .email)
+
+                switch result {
+                case .newUser:
+                    step = .username
+                case .existingUser:
+                    session.completeOnboarding()
+                }
+            }
+        }
+        .sheet(item: $legalDocument) { document in
+            NavigationStack {
+                LegalDocumentView(kind: document)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") {
+                                legalDocument = nil
+                            }
+                        }
+                    }
+            }
+        }
     }
 
     private var progressHeader: some View {
@@ -49,8 +75,11 @@ struct OnboardingFlowView: View {
                         goBack()
                     } label: {
                         Image(systemName: "chevron.left")
+                            .frame(width: 38, height: 38)
                     }
                     .buttonStyle(.plain)
+                } else {
+                    Color.clear.frame(width: 38, height: 38)
                 }
 
                 Spacer()
@@ -61,9 +90,26 @@ struct OnboardingFlowView: View {
 
                 Spacer()
 
-                if step != .account {
-                    Color.clear.frame(width: 16, height: 16)
+                Menu {
+                    ForEach(AppLanguage.allCases) { language in
+                        Button {
+                            settings.language = language
+                        } label: {
+                            HStack {
+                                Label(language.title, systemImage: language.systemImage)
+                                if settings.language == language {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "globe")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 38, height: 38)
+                        .background(.thinMaterial, in: Circle())
                 }
+                .accessibilityLabel("Language")
             }
 
             ProgressView(value: step.progress)
@@ -119,8 +165,7 @@ struct OnboardingFlowView: View {
                 .tint(.black)
 
                 Button {
-                    session.beginMockSignIn(method: .email)
-                    step = .username
+                    showingEmailAuth = true
                 } label: {
                     Label("Continue with Email", systemImage: "envelope.fill")
                         .frame(maxWidth: .infinity)
@@ -129,10 +174,26 @@ struct OnboardingFlowView: View {
                 .controlSize(.large)
             }
 
-            Text("By continuing, you agree to ATHLTH’s Terms and Privacy Policy.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 7) {
+                Text("By continuing, you agree to ATHLTH’s")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 14) {
+                    Button("Terms of Service") {
+                        legalDocument = .terms
+                    }
+
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+
+                    Button("Privacy Policy") {
+                        legalDocument = .privacy
+                    }
+                }
+                .font(.caption.weight(.semibold))
+            }
+            .multilineTextAlignment(.center)
         }
     }
 
