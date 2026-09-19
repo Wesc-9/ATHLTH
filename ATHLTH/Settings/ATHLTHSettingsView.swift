@@ -136,6 +136,20 @@ struct ATHLTHSettingsView: View {
                 Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
             }
 
+            Section("Legal") {
+                NavigationLink {
+                    LegalDocumentView(kind: .terms)
+                } label: {
+                    Label("Terms of Service", systemImage: "doc.text")
+                }
+
+                NavigationLink {
+                    LegalDocumentView(kind: .privacy)
+                } label: {
+                    Label("Privacy Policy", systemImage: "hand.raised.fill")
+                }
+            }
+
             Section("Data & account") {
                 NavigationLink {
                     Text("Export will package ATHLTH-owned data such as plans, routes and activities. HealthKit export stays under Apple Health controls.")
