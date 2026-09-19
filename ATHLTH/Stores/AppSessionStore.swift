@@ -84,8 +84,9 @@ final class AppSessionStore: ObservableObject {
                 weightKilograms: basics.weightKilograms,
                 heightCentimeters: basics.heightCentimeters,
                 personalDetailsSource: source,
-                goals: existing?.goals ?? [],
-                primaryGoal: existing?.primaryGoal
+                currentGoal: existing?.currentGoal,
+                interests: existing?.interests ?? [],
+                personalizedOfferConsent: existing?.personalizedOfferConsent ?? .notAsked
             )
         )
     }
