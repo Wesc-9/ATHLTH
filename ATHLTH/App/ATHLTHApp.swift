@@ -28,10 +28,12 @@ struct AppRootView: View {
 
     var body: some View {
         Group {
-            if health.hasRequestedAuthorization || appSession.previewModeEnabled {
+            if appSession.previewModeEnabled {
                 ProductRootTabView()
+            } else if !appSession.signedIn || !appSession.onboardingCompleted {
+                OnboardingFlowView()
             } else {
-                HealthAccessView()
+                ProductRootTabView()
             }
         }
         .task {
