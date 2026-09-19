@@ -117,7 +117,12 @@ final class AppSettingsStore: ObservableObject {
     @Published var defaultActivityVisibility: ProfileVisibility { didSet { persist() } }
     @Published var shareTrainingPresence: Bool { didSet { persist() } }
     @Published var shareRoutesByDefault: Bool { didSet { persist() } }
+    @Published var hideRouteStartAndEnd: Bool { didSet { persist() } }
     @Published var shareHeartRateByDefault: Bool { didSet { persist() } }
+
+    @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
+    @Published var audioCuesEnabled: Bool { didSet { persist() } }
+    @Published var hapticCuesEnabled: Bool { didSet { persist() } }
 
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
@@ -143,7 +148,12 @@ final class AppSettingsStore: ObservableObject {
         defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .friends
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? true
         shareRoutesByDefault = defaults.object(forKey: "settings.shareRoutes") as? Bool ?? false
+        hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
         shareHeartRateByDefault = defaults.object(forKey: "settings.shareHeartRate") as? Bool ?? false
+
+        autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
+        audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
+        hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
 
         workoutRemindersEnabled = defaults.object(forKey: "settings.workoutReminders") as? Bool ?? true
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
@@ -164,7 +174,12 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(defaultActivityVisibility.rawValue, forKey: "settings.defaultActivityVisibility")
         defaults.set(shareTrainingPresence, forKey: "settings.shareTrainingPresence")
         defaults.set(shareRoutesByDefault, forKey: "settings.shareRoutes")
+        defaults.set(hideRouteStartAndEnd, forKey: "settings.hideRouteStartAndEnd")
         defaults.set(shareHeartRateByDefault, forKey: "settings.shareHeartRate")
+
+        defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
+        defaults.set(audioCuesEnabled, forKey: "settings.audioCues")
+        defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
 
         defaults.set(workoutRemindersEnabled, forKey: "settings.workoutReminders")
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
