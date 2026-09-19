@@ -102,6 +102,12 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+    func setPersonalizedOfferConsent(_ consent: PersonalizedOfferConsent) {
+        guard var profile = onboardingProfile else { return }
+        profile.personalizedOfferConsent = consent
+        saveOnboardingProfile(profile)
+    }
+
     func updatePersonalDetails(
         _ basics: HealthProfileBasics,
         source: PersonalDetailsSource
