@@ -290,7 +290,7 @@ struct ActiveStrengthWorkoutView: View {
             HStack(spacing: 12) {
                 valueStepper(
                     title: "Weight",
-                    value: "\(weightKilograms, specifier: "%.1f") kg",
+                    value: String(format: "%.1f kg", weightKilograms),
                     minus: { weightKilograms = max(0, weightKilograms - 2.5) },
                     plus: { weightKilograms += 2.5 }
                 )
