@@ -26,6 +26,24 @@ final class SubscriptionBackendService: ObservableObject {
                 )
             )
             .execute()
+
+        let response: AppStoreTransactionVerificationResponse = try await client.functions
+            .invoke(
+                "verify-app-store-transaction",
+                options: FunctionInvokeOptions(
+                    body: AppStoreTransactionVerificationRequest(
+                        transactionID: proof.transactionID,
+                        originalTransactionID: proof.originalTransactionID,
+                        productID: proof.productID,
+                        appAccountToken: proof.appAccountToken,
+                        signedTransactionInfo: proof.signedTransactionInfo
+                    )
+                )
+            )
+
+        guard response.verified else {
+            throw SubscriptionBackendError.verificationRejected
+        }
     }
 }
 
@@ -42,5 +60,28 @@ private struct AppStoreTransactionSubmissionParams: Encodable {
         case productID = "p_product_id"
         case appAccountToken = "p_app_account_token"
         case signedTransactionInfo = "p_signed_transaction_info"
+    }
+}
+
+private struct AppStoreTransactionVerificationRequest: Encodable {
+    let transactionID: String
+    let originalTransactionID: String
+    let productID: String
+    let appAccountToken: UUID?
+    let signedTransactionInfo: String
+}
+
+private struct AppStoreTransactionVerificationResponse: Decodable {
+    let verified: Bool
+}
+
+private enum SubscriptionBackendError: LocalizedError {
+    case verificationRejected
+
+    var errorDescription: String? {
+        switch self {
+        case .verificationRejected:
+            return "The App Store transaction could not be verified by ATHLTH."
+        }
     }
 }
