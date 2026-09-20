@@ -38,6 +38,8 @@ struct AppRootView: View {
     @EnvironmentObject private var accountService: SupabaseAccountService
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var subscriptionBackend: SubscriptionBackendService
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
 
     @State private var authCallbackError: String?
 
@@ -82,6 +84,26 @@ struct AppRootView: View {
         .onChange(of: subscriptionStore.latestTransactionProof) { _, _ in
             Task {
                 await submitLatestStoreProofIfPossible()
+            }
+        }
+        .onChange(of: watchConnection.lastCompletedWorkout) { _, result in
+            guard let result else { return }
+
+            if result.kind == .strength {
+                strengthWorkout.attachHealthMetrics(
+                    LinkedHealthWorkoutMetrics(
+                        healthKitWorkoutUUID: result.healthKitWorkoutUUID,
+                        duration: result.duration,
+                        activeCalories: result.activeCalories,
+                        averageHeartRate: result.averageHeartRate,
+                        maxHeartRate: result.maxHeartRate
+                    )
+                )
+            }
+
+            Task {
+                await health.refreshAll()
+                watchConnection.clearCompletedWorkout()
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
