@@ -3,6 +3,10 @@ import CryptoKit
 import Foundation
 import Supabase
 
+private struct DeleteAccountResponse: Decodable {
+    let deleted: Bool
+}
+
 enum EmailSignUpOutcome {
     case confirmationRequired
     case authenticated(BackendUserBootstrap)
@@ -145,6 +149,28 @@ final class SupabaseAccountService: ObservableObject {
         passwordRecoveryPending = false
     }
 
+    func deleteAccount() async throws {
+        guard currentUserID != nil else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        let response: DeleteAccountResponse = try await client.functions.invoke(
+            "delete-account",
+            options: FunctionInvokeOptions(
+                body: ["confirm": true]
+            )
+        )
+
+        guard response.deleted else {
+            throw SupabaseAccountError.accountDeletionFailed
+        }
+
+        // The server-side deletion invalidates the account. Clear any locally
+        // cached Supabase session as well so the next app launch starts clean.
+        try? await client.auth.signOut()
+        passwordRecoveryPending = false
+    }
+
     func restoreCurrentUser() async throws -> BackendUserBootstrap? {
         guard currentUserID != nil else { return nil }
         return try await loadCurrentUser()
@@ -229,6 +255,7 @@ enum SupabaseAccountError: LocalizedError {
     case missingAppleNonce
     case missingAppleIDToken
     case invalidAppleCredential
+    case accountDeletionFailed
 
     var errorDescription: String? {
         switch self {
@@ -240,6 +267,8 @@ enum SupabaseAccountError: LocalizedError {
             return "Apple did not return a valid sign-in token."
         case .invalidAppleCredential:
             return "Apple returned an invalid sign-in credential."
+        case .accountDeletionFailed:
+            return "ATHLTH could not delete your account. Please try again."
         }
     }
 }
