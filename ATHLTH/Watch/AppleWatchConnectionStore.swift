@@ -32,7 +32,7 @@ enum AppleWatchConnectionState: Equatable {
 final class AppleWatchConnectionStore: NSObject, ObservableObject {
     @Published private(set) var state: AppleWatchConnectionState = .checking
 
-    private var session: WCSession? {
+    var session: WCSession? {
         WCSession.isSupported() ? WCSession.default : nil
     }
 
@@ -113,6 +113,14 @@ extension AppleWatchConnectionStore: WCSessionDelegate {
 
     func sessionWatchStateDidChange(_ session: WCSession) {
         evaluate(session)
+    }
+
+    func session(
+        _ session: WCSession,
+        didFinish fileTransfer: WCSessionFileTransfer,
+        error: Error?
+    ) {
+        try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
     }
     #endif
 }
