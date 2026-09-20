@@ -52,6 +52,32 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var routePointCount: Int
 }
 
+enum WatchWorkoutMirrorState: String, Codable, Hashable {
+    case preparing
+    case running
+    case paused
+    case ending
+    case completed
+    case failed
+}
+
+struct WatchWorkoutLiveSnapshot: Codable, Hashable {
+    var kind: WatchWorkoutKind
+    var state: WatchWorkoutMirrorState
+    var startedAt: Date?
+    var elapsedTime: TimeInterval
+    var heartRate: Double
+    var activeCalories: Double
+    var distanceMeters: Double
+    var averageHeartRate: Double?
+    var maxHeartRate: Double?
+    var routePointCount: Int
+}
+
+struct WatchWorkoutMirrorCommand: Codable, Hashable {
+    var command: WatchWorkoutCommand
+}
+
 enum WatchWorkoutCommand: String, Codable, Hashable {
     case end
     case pause
