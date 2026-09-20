@@ -197,8 +197,7 @@ final class AppSessionStore: ObservableObject {
             subscriptionAccess = backendSubscriptionAccess
         } else if signedIn,
                   let entitlement = storeEntitlement,
-                  entitlement.appAccountToken == nil ||
-                    entitlement.appAccountToken == profile.userID {
+                  entitlement.appAccountToken == profile.userID {
             subscriptionAccess = SubscriptionAccess(
                 state: .paid,
                 source: .appStore,
