@@ -14,28 +14,66 @@ struct SubscriptionOfferView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 22) {
-                    VStack(spacing: 10) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 42))
-                            .foregroundStyle(OnboardingTheme.green)
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(OnboardingTheme.green.opacity(0.12))
+                                .frame(width: 82, height: 82)
 
-                        Text("Keep ATHLTH+")
-                            .font(.largeTitle.weight(.bold))
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            OnboardingTheme.deepGreen,
+                                            OnboardingTheme.green
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 62, height: 62)
+
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 27, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+
+                        Text("Choose ATHLTH+")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
                             .multilineTextAlignment(.center)
 
-                        Text("Choose a plan to keep your ATHLTH+ benefits after the trial.")
+                        Text("Choose the plan that fits you. The App Store shows the final price and billing details before you confirm.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.top, 12)
 
                     OnboardingCard {
                         VStack(alignment: .leading, spacing: 14) {
-                            benefit("Automatic Health background sync", icon: "heart.fill")
-                            benefit("Advanced training and planning tools", icon: "calendar.badge.clock")
-                            benefit("Full Apple Watch integration", icon: "applewatch")
-                            benefit("Expanded progress and recovery features", icon: "chart.line.uptrend.xyaxis")
+                            HStack {
+                                Text("Included with ATHLTH+")
+                                    .font(.headline)
+
+                                Spacer()
+
+                                Text("PREMIUM")
+                                    .font(.caption2.weight(.black))
+                                    .tracking(0.6)
+                                    .foregroundStyle(OnboardingTheme.deepGreen)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        OnboardingTheme.green.opacity(0.10),
+                                        in: Capsule()
+                                    )
+                            }
+
+                            benefit("Automatic Health background sync", icon: "arrow.triangle.2.circlepath")
+                            benefit("Sleep and recovery insights", icon: "moon.stars.fill")
+                            benefit("Advanced training plans and progression", icon: "calendar.badge.clock")
+                            benefit("Route challenges and premium recovery features", icon: "figure.run.circle.fill")
                         }
                     }
 
@@ -94,7 +132,7 @@ struct SubscriptionOfferView: View {
                                 if subscriptionStore.purchaseInProgress {
                                     ProgressView()
                                 } else {
-                                    Text("Continue with selected plan")
+                                    Text("Continue with this plan")
                                         .font(.headline)
                                 }
                                 Spacer()
@@ -114,7 +152,7 @@ struct SubscriptionOfferView: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    Text("You can close this window and continue using the rest of your free trial.")
+                    Text("You can close this window without purchasing and choose ATHLTH+ later in Settings.")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -125,7 +163,7 @@ struct SubscriptionOfferView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(OnboardingBackground().ignoresSafeArea())
-            .navigationTitle("ATHLTH+")
+            .navigationTitle("ATHLTH+ Plans")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -156,10 +194,14 @@ struct SubscriptionOfferView: View {
             HStack(spacing: 14) {
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(selected ? Color.green : Color.secondary)
+                    .foregroundStyle(
+                        selected
+                            ? OnboardingTheme.green
+                            : Color.secondary
+                    )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(planTitle(for: product))
+                    Text(LocalizedStringKey(planTitle(for: product)))
                         .font(.headline)
                         .foregroundStyle(.primary)
 
@@ -169,6 +211,19 @@ struct SubscriptionOfferView: View {
                 }
 
                 Spacer()
+
+                if product.id == SubscriptionStore.yearlyProductID {
+                    Text("YEARLY")
+                        .font(.caption2.weight(.black))
+                        .tracking(0.5)
+                        .foregroundStyle(OnboardingTheme.deepGreen)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(
+                            OnboardingTheme.green.opacity(0.10),
+                            in: Capsule()
+                        )
+                }
             }
             .padding(16)
             .frame(maxWidth: .infinity)
@@ -189,10 +244,14 @@ struct SubscriptionOfferView: View {
 
     @ViewBuilder
     private func benefit(_ title: String, icon: String) -> some View {
-        Label(title, systemImage: icon)
-            .font(.subheadline)
-            .foregroundStyle(.primary)
-            .tint(OnboardingTheme.green)
+        Label {
+            Text(LocalizedStringKey(title))
+        } icon: {
+            Image(systemName: icon)
+                .foregroundStyle(OnboardingTheme.green)
+        }
+        .font(.subheadline)
+        .foregroundStyle(.primary)
     }
 
     private func planTitle(for product: Product) -> String {
