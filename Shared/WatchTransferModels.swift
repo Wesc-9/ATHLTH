@@ -52,9 +52,16 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var routePoints: [WatchRoutePoint]
 }
 
+enum WatchWorkoutCommand: String, Codable, Hashable {
+    case end
+    case pause
+    case resume
+}
+
 enum WatchTransferKind: String {
     case route
     case workoutResult
+    case workoutCommand
 }
 
 enum WatchTransferMetadataKey {
@@ -62,4 +69,5 @@ enum WatchTransferMetadataKey {
     static let routeID = "routeID"
     static let title = "title"
     static let payload = "payload"
+    static let command = "command"
 }
