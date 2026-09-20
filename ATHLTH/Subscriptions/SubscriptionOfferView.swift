@@ -205,9 +205,12 @@ struct SubscriptionOfferView: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
 
-                    Text(product.displayPrice + planSuffix(for: product))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 0) {
+                        Text(product.displayPrice)
+                        Text(LocalizedStringKey(planSuffix(for: product)))
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
