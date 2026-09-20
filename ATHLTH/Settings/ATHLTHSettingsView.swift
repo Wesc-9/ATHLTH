@@ -50,12 +50,21 @@ struct ATHLTHSettingsView: View {
                     )
                 }
 
-                if session.subscriptionAccess.state == .paid,
-                   let periodEndsAt = session.subscriptionAccess.currentPeriodEndsAt {
-                    LabeledContent(
-                        "Current period",
-                        value: periodEndsAt.formatted(date: .abbreviated, time: .omitted)
-                    )
+                if let periodEndsAt = session.subscriptionAccess.currentPeriodEndsAt {
+                    switch session.subscriptionAccess.lifecycleState {
+                    case .active:
+                        LabeledContent(
+                            "Current period",
+                            value: periodEndsAt.formatted(date: .abbreviated, time: .omitted)
+                        )
+                    case .expired:
+                        LabeledContent(
+                            "Access ended",
+                            value: periodEndsAt.formatted(date: .abbreviated, time: .omitted)
+                        )
+                    default:
+                        EmptyView()
+                    }
                 }
 
                 LabeledContent(
