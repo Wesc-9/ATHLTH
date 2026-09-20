@@ -865,13 +865,33 @@ struct OnboardingFlowView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.headline)
-                .frame(maxWidth: .infinity)
+            ZStack {
+                Text(title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+
+                HStack {
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 16, weight: .bold))
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 20)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 60)
+            .contentShape(
+                RoundedRectangle(
+                    cornerRadius: OnboardingTheme.buttonRadius,
+                    style: .continuous
+                )
+            )
         }
         .buttonStyle(OnboardingPrimaryButtonStyle())
         .disabled(disabled)
-        .opacity(disabled ? 0.45 : 1)
+        .opacity(disabled ? 0.58 : 1)
+        .accessibilityHint(disabled ? "Complete the required field to continue." : "")
     }
 
     @ViewBuilder
