@@ -88,6 +88,17 @@ jobs:
           test "$IOS_VERSION" = "$WATCH_VERSION"
           test "$IOS_BUILD" -gt 1
 
+      - name: Seed archive entitlements with ad-hoc signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          IOS_APP="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app"
+          WATCH_APP="$IOS_APP/Watch/ATHLTH.app"
+          codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTHWatchExtension/ATHLTHWatchExtension.entitlements" "$WATCH_APP"
+          codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTH/Resources/ATHLTH.entitlements" "$IOS_APP"
+          echo "Archive Watch entitlements after ad-hoc signing:"
+          codesign -d --entitlements :- "$WATCH_APP" 2>/dev/null
+
       - name: Create local export options
         shell: bash
         run: |
