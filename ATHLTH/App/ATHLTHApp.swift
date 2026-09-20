@@ -61,20 +61,22 @@ struct AppRootView: View {
             await submitLatestStoreProofIfPossible()
 
             guard health.hasRequestedAuthorization else { return }
-            if appSession.hasPaidAccess {
-                await health.configureBackgroundSync()
-            }
+            await health.configureBackgroundSync(
+                allowed: appSession.canAccess(.backgroundHealthSync)
+            )
             await health.refreshAll()
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
             appSession.applyStoreKitEntitlement(entitlement)
 
-            guard appSession.hasPaidAccess, health.hasRequestedAuthorization else {
+            guard health.hasRequestedAuthorization else {
                 return
             }
 
             Task {
-                await health.configureBackgroundSync()
+                await health.configureBackgroundSync(
+                    allowed: appSession.canAccess(.backgroundHealthSync)
+                )
             }
         }
         .onChange(of: subscriptionStore.latestTransactionProof) { _, _ in

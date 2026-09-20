@@ -541,9 +541,9 @@ struct OnboardingFlowView: View {
                         healthRequestInProgress = true
                         await health.requestAuthorization()
 
-                        if session.hasPaidAccess {
-                            await health.configureBackgroundSync()
-                        }
+                        await health.configureBackgroundSync(
+                            allowed: session.canAccess(.backgroundHealthSync)
+                        )
 
                         await health.refreshPersonalDetails()
                         importedHealthDetails = health.personalDetails

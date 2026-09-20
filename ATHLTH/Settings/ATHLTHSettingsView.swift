@@ -60,7 +60,7 @@ struct ATHLTHSettingsView: View {
 
                 LabeledContent(
                     "Background Health sync",
-                    value: session.hasPaidAccess ? "Included" : "ATHLTH+ feature"
+                    value: session.canAccess(.backgroundHealthSync) ? "Included" : "ATHLTH+ feature"
                 )
 
                 Button {

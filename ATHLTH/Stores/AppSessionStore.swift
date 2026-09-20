@@ -54,9 +54,7 @@ final class AppSessionStore: ObservableObject {
         if storedSubscriptionAccess.state == .trial ||
             storedSubscriptionAccess.source == .serverVerified {
             self.backendSubscriptionAccess = storedSubscriptionAccess
-            self.subscriptionAccess = storedSubscriptionAccess.hasPaidAccess
-                ? storedSubscriptionAccess
-                : .free
+            self.subscriptionAccess = storedSubscriptionAccess
         } else {
             self.backendSubscriptionAccess = .free
             self.subscriptionAccess = .free
@@ -87,6 +85,13 @@ final class AppSessionStore: ObservableObject {
 
     var effectiveSubscriptionTier: SubscriptionTier {
         subscriptionAccess.effectiveTier
+    }
+
+    func canAccess(_ feature: ATHLTHFeature) -> Bool {
+        switch feature {
+        case .backgroundHealthSync:
+            return hasPaidAccess
+        }
     }
 
     func applyBackendBootstrap(
@@ -125,6 +130,31 @@ final class AppSessionStore: ObservableObject {
         case "active":
             backendSubscriptionAccess = SubscriptionAccess(
                 state: .paid,
+                source: .serverVerified,
+                productID: bootstrap.entitlement.appStoreProductID,
+                currentPeriodEndsAt: bootstrap.entitlement.currentPeriodEndsAt
+            )
+
+        case "expired":
+            if bootstrap.entitlement.source == "athlth_trial" {
+                backendSubscriptionAccess = SubscriptionAccess(
+                    state: .trial,
+                    trialStartedAt: bootstrap.entitlement.trialStartedAt,
+                    trialEndsAt: bootstrap.entitlement.trialEndsAt,
+                    source: .athlthTrial
+                )
+            } else {
+                backendSubscriptionAccess = SubscriptionAccess(
+                    state: .free,
+                    source: .serverVerified,
+                    productID: bootstrap.entitlement.appStoreProductID,
+                    currentPeriodEndsAt: bootstrap.entitlement.currentPeriodEndsAt
+                )
+            }
+
+        case "revoked":
+            backendSubscriptionAccess = SubscriptionAccess(
+                state: .free,
                 source: .serverVerified,
                 productID: bootstrap.entitlement.appStoreProductID,
                 currentPeriodEndsAt: bootstrap.entitlement.currentPeriodEndsAt
@@ -176,7 +206,8 @@ final class AppSessionStore: ObservableObject {
                 productID: entitlement.productID,
                 currentPeriodEndsAt: entitlement.expirationDate
             )
-        } else if backendSubscriptionAccess.hasPaidAccess {
+        } else if backendSubscriptionAccess.hasPaidAccess ||
+                    backendSubscriptionAccess.lifecycleState == .expired {
             subscriptionAccess = backendSubscriptionAccess
         } else {
             subscriptionAccess = .free
@@ -283,6 +314,8 @@ final class AppSessionStore: ObservableObject {
         usernameSeed = profile.displayName
         accountCreatedAt = Date()
         currentRole = .user
+        backendSubscriptionAccess = .free
+        storeEntitlement = nil
         subscriptionAccess = .free
     }
 

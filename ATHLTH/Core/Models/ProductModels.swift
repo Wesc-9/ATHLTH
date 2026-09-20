@@ -29,11 +29,31 @@ enum SubscriptionAccessState: String, Codable, Hashable {
     }
 }
 
+enum SubscriptionLifecycleState: String, Codable, Hashable {
+    case free
+    case trial
+    case active
+    case expired
+
+    var title: String {
+        switch self {
+        case .free: return "Free"
+        case .trial: return "ATHLTH+ trial"
+        case .active: return "ATHLTH+"
+        case .expired: return "ATHLTH+ expired"
+        }
+    }
+}
+
 enum SubscriptionAccessSource: String, Codable, Hashable {
     case none
     case athlthTrial
     case appStore
     case serverVerified
+}
+
+enum ATHLTHFeature: Hashable {
+    case backgroundHealthSync
 }
 
 struct SubscriptionAccess: Codable, Hashable {
@@ -70,8 +90,30 @@ struct SubscriptionAccess: Codable, Hashable {
         return Date() < trialEndsAt
     }
 
+    var paidIsActive: Bool {
+        guard state == .paid else { return false }
+        guard let currentPeriodEndsAt else { return true }
+        return Date() < currentPeriodEndsAt
+    }
+
+    var lifecycleState: SubscriptionLifecycleState {
+        switch state {
+        case .trial:
+            return trialIsActive ? .trial : .expired
+        case .paid:
+            return paidIsActive ? .active : .expired
+        case .free:
+            let normalizedSource = source ?? .none
+            if normalizedSource != .none,
+               trialEndsAt != nil || currentPeriodEndsAt != nil || productID != nil {
+                return .expired
+            }
+            return .free
+        }
+    }
+
     var hasPaidAccess: Bool {
-        state == .paid || trialIsActive
+        lifecycleState == .trial || lifecycleState == .active
     }
 
     var effectiveTier: SubscriptionTier {
@@ -79,10 +121,7 @@ struct SubscriptionAccess: Codable, Hashable {
     }
 
     var displayTitle: String {
-        if state == .trial, !trialIsActive {
-            return "Free"
-        }
-        return state.title
+        lifecycleState.title
     }
 
     var billingPeriodTitle: String? {
