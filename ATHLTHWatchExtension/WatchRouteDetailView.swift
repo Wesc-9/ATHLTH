@@ -56,11 +56,12 @@ struct WatchRouteDetailView: View {
                 .padding(.vertical, 8)
                 .watchSurface(radius: 16)
 
-                Button {
+                NavigationLink {
+                    WatchWorkoutStartView(route: route)
                 } label: {
                     HStack(spacing: 7) {
                         Image(systemName: "play.fill")
-                        Text("Start Workout")
+                        Text("Start Route")
                             .font(.system(size: 13, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)
@@ -79,10 +80,8 @@ struct WatchRouteDetailView: View {
                     ),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
-                .disabled(true)
-                .opacity(0.58)
 
-                Text("Workout recording is the next Watch milestone.")
+                Text("Run or walk this route with live GPS, heart rate and distance.")
                     .font(.system(size: 9))
                     .foregroundStyle(WatchTheme.muted)
                     .multilineTextAlignment(.center)
