@@ -14,6 +14,7 @@ final class AppSessionStore: ObservableObject {
     @Published var usernameSeed: String
     @Published var accountCreatedAt: Date
     @Published private(set) var currentRole: AccountRole
+    @Published private(set) var subscriptionAccess: SubscriptionAccess
 
     private let defaults: UserDefaults
 
@@ -40,6 +41,13 @@ final class AppSessionStore: ObservableObject {
             self.currentRole = .user
         }
 
+        if let subscriptionData = defaults.data(forKey: "session.subscriptionAccess"),
+           let subscription = try? JSONDecoder().decode(SubscriptionAccess.self, from: subscriptionData) {
+            self.subscriptionAccess = subscription
+        } else {
+            self.subscriptionAccess = .free
+        }
+
         if let storedDate = defaults.object(forKey: "session.accountCreatedAt") as? Date {
             self.accountCreatedAt = storedDate
         } else {
@@ -55,6 +63,40 @@ final class AppSessionStore: ObservableObject {
             self.onboardingProfile = try? JSONDecoder().decode(OnboardingProfileData.self, from: data)
         } else {
             self.onboardingProfile = nil
+        }
+    }
+
+    var hasPaidAccess: Bool {
+        subscriptionAccess.hasPaidAccess
+    }
+
+    var effectiveSubscriptionTier: SubscriptionTier {
+        subscriptionAccess.effectiveTier
+    }
+
+    func startNewUserPaidTrialIfNeeded() {
+        guard subscriptionAccess.state == .free else { return }
+
+        let start = Date()
+        let end = Calendar.current.date(byAdding: .day, value: 7, to: start)
+            ?? start.addingTimeInterval(7 * 24 * 60 * 60)
+
+        subscriptionAccess = SubscriptionAccess(
+            state: .trial,
+            trialStartedAt: start,
+            trialEndsAt: end
+        )
+        persistSubscriptionAccess()
+    }
+
+    func applyStoreSubscriptionAccess(_ access: SubscriptionAccess) {
+        subscriptionAccess = access
+        persistSubscriptionAccess()
+    }
+
+    private func persistSubscriptionAccess() {
+        if let data = try? JSONEncoder().encode(subscriptionAccess) {
+            defaults.set(data, forKey: "session.subscriptionAccess")
         }
     }
 
@@ -75,11 +117,15 @@ final class AppSessionStore: ObservableObject {
         defaults.set(clean, forKey: "session.usernameSeed")
     }
 
-    func beginMockSignIn(method: SignInMethod) {
+    func beginMockSignIn(method: SignInMethod, isNewUser: Bool = false) {
         signedIn = true
         signInMethod = method
         defaults.set(true, forKey: "session.signedIn")
         defaults.set(method.rawValue, forKey: "session.signInMethod")
+
+        if isNewUser {
+            startNewUserPaidTrialIfNeeded()
+        }
     }
 
     func setPendingUsername(_ username: String) {
@@ -146,9 +192,11 @@ final class AppSessionStore: ObservableObject {
         defaults.removeObject(forKey: "session.usernameSeed")
         defaults.removeObject(forKey: "session.accountCreatedAt")
         defaults.removeObject(forKey: "session.accountRole")
+        defaults.removeObject(forKey: "session.subscriptionAccess")
         usernameSeed = profile.displayName
         accountCreatedAt = Date()
         currentRole = .user
+        subscriptionAccess = .free
     }
 
     func beginTrainingStatus(for session: PlannedSession) {
