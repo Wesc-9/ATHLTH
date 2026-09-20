@@ -1,6 +1,76 @@
 import CoreLocation
 import Foundation
 
+enum SubscriptionTier: String, Codable, CaseIterable, Identifiable, Hashable {
+    case free
+    case paid
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .free: return "Free"
+        case .paid: return "Paid"
+        }
+    }
+}
+
+enum SubscriptionAccessState: String, Codable, Hashable {
+    case free
+    case trial
+    case paid
+
+    var title: String {
+        switch self {
+        case .free: return "Free"
+        case .trial: return "Paid trial"
+        case .paid: return "Paid"
+        }
+    }
+}
+
+struct SubscriptionAccess: Codable, Hashable {
+    var state: SubscriptionAccessState
+    var trialStartedAt: Date?
+    var trialEndsAt: Date?
+
+    static let free = SubscriptionAccess(
+        state: .free,
+        trialStartedAt: nil,
+        trialEndsAt: nil
+    )
+
+    var trialIsActive: Bool {
+        guard state == .trial, let trialEndsAt else { return false }
+        return Date() < trialEndsAt
+    }
+
+    var hasPaidAccess: Bool {
+        state == .paid || trialIsActive
+    }
+
+    var effectiveTier: SubscriptionTier {
+        hasPaidAccess ? .paid : .free
+    }
+
+    var displayTitle: String {
+        if state == .trial, !trialIsActive {
+            return "Free"
+        }
+        return state.title
+    }
+
+    var trialDaysRemaining: Int? {
+        guard trialIsActive, let trialEndsAt else { return nil }
+        let remaining = Calendar.current.dateComponents(
+            [.day],
+            from: Date(),
+            to: trialEndsAt
+        ).day ?? 0
+        return max(1, remaining + 1)
+    }
+}
+
 enum AccountRole: String, Codable, Hashable, CaseIterable {
     case user
     case admin
