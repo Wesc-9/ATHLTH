@@ -36,11 +36,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet pyjwt cryptography
+          python3 -m venv "$RUNNER_TEMP/asc-venv"
+          source "$RUNNER_TEMP/asc-venv/bin/activate"
+          python -m pip install --quiet pyjwt cryptography
           KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
           printf '%s' "$ASC_API_KEY_P8" > "$KEY_PATH"
           export ASC_KEY_PATH="$KEY_PATH"
-          python3 <<'PY'
+          python <<'PY'
           import json, os, time, urllib.request
           import jwt
 
