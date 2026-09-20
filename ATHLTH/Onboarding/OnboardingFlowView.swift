@@ -5,6 +5,7 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
     @State private var step: OnboardingStep = .account
     @State private var username = ""
@@ -18,6 +19,8 @@ struct OnboardingFlowView: View {
     @State private var usernameSuggestions: [String] = []
     @State private var usernameValidation: UsernameValidationState = .idle
     @State private var usernameClaimError: String?
+    @State private var showPaidPlansBeforeHome = false
+    @State private var showingSubscriptionOffer = false
 
     private let usernameService = MockUsernameAvailabilityService()
 
@@ -87,6 +90,24 @@ struct OnboardingFlowView: View {
                         }
                     }
             }
+        }
+        .sheet(
+            isPresented: $showingSubscriptionOffer,
+            onDismiss: {
+                session.completeOnboarding()
+            }
+        ) {
+            SubscriptionOfferView {
+                session.applyStoreSubscriptionAccess(
+                    SubscriptionAccess(
+                        state: .paid,
+                        trialStartedAt: nil,
+                        trialEndsAt: nil
+                    )
+                )
+                showingSubscriptionOffer = false
+            }
+            .environmentObject(subscriptionStore)
         }
     }
 
@@ -584,7 +605,11 @@ struct OnboardingFlowView: View {
             Spacer(minLength: 48)
 
             Button {
-                session.completeOnboarding()
+                if showPaidPlansBeforeHome {
+                    showingSubscriptionOffer = true
+                } else {
+                    session.completeOnboarding()
+                }
             } label: {
                 HStack {
                     Spacer()
@@ -602,7 +627,7 @@ struct OnboardingFlowView: View {
             Spacer(minLength: 110)
 
             if session.subscriptionAccess.trialIsActive {
-                VStack(spacing: 2) {
+                VStack(spacing: 5) {
                     Text("7-day Paid trial active")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -612,6 +637,32 @@ struct OnboardingFlowView: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
+
+                    Button {
+                        showPaidPlansBeforeHome.toggle()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(
+                                systemName: showPaidPlansBeforeHome
+                                    ? "checkmark.square.fill"
+                                    : "square"
+                            )
+                            .foregroundStyle(
+                                showPaidPlansBeforeHome
+                                    ? Color.green
+                                    : Color.secondary
+                            )
+
+                            Text("Keep my Paid benefits after the trial")
+                                .font(.caption2.weight(.semibold))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 5)
+
+                    Text("See Monthly and Yearly plans before entering ATHLTH.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
                 .multilineTextAlignment(.center)
             }
