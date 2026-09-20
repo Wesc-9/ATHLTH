@@ -3,8 +3,18 @@ import CryptoKit
 import Foundation
 import Supabase
 
+enum EmailSignUpOutcome {
+    case confirmationRequired
+    case authenticated(BackendUserBootstrap)
+}
+
 @MainActor
 final class SupabaseAccountService: ObservableObject {
+    static let emailConfirmationURL = URL(string: "athlth://auth/confirm")!
+    static let passwordResetURL = URL(string: "athlth://auth/reset")!
+
+    @Published private(set) var passwordRecoveryPending = false
+
     private let client: SupabaseClient
     private var appleRawNonce: String?
 
@@ -68,22 +78,71 @@ final class SupabaseAccountService: ObservableObject {
         return try await loadCurrentUser()
     }
 
-    func signUp(email: String, password: String) async throws {
-        _ = try await client.auth.signUp(
+    func signUp(email: String, password: String) async throws -> EmailSignUpOutcome {
+        let response = try await client.auth.signUp(
             email: email,
-            password: password
+            password: password,
+            redirectTo: Self.emailConfirmationURL
         )
+
+        if response.session != nil {
+            return .authenticated(try await loadCurrentUser())
+        }
+
+        return .confirmationRequired
     }
 
-    func signIn(email: String, password: String) async throws {
+    func signIn(email: String, password: String) async throws -> BackendUserBootstrap {
         try await client.auth.signIn(
             email: email,
             password: password
         )
+        return try await loadCurrentUser()
+    }
+
+    func sendPasswordReset(email: String) async throws {
+        try await client.auth.resetPasswordForEmail(
+            email,
+            redirectTo: Self.passwordResetURL
+        )
+    }
+
+    func updateRecoveredPassword(_ newPassword: String) async throws -> BackendUserBootstrap {
+        try await client.auth.update(
+            user: UserAttributes(password: newPassword)
+        )
+        passwordRecoveryPending = false
+        return try await loadCurrentUser()
+    }
+
+    func handleAuthCallback(_ url: URL) async throws -> BackendUserBootstrap? {
+        guard url.scheme?.lowercased() == "athlth",
+              url.host?.lowercased() == "auth"
+        else {
+            return nil
+        }
+
+        _ = try await client.auth.session(from: url)
+
+        if url.path == "/reset" {
+            passwordRecoveryPending = true
+            return nil
+        }
+
+        if url.path == "/confirm" {
+            return try await loadCurrentUser()
+        }
+
+        return nil
+    }
+
+    func cancelPasswordRecovery() {
+        passwordRecoveryPending = false
     }
 
     func signOut() async throws {
         try await client.auth.signOut()
+        passwordRecoveryPending = false
     }
 
     func restoreCurrentUser() async throws -> BackendUserBootstrap? {
