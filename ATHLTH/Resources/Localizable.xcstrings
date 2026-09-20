@@ -8,24 +8,6 @@
             "state": "translated",
             "value": "Velkommen til ATHLTH"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Te damos la bienvenida a ATHLTH"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Benvenuto in ATHLTH"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "欢迎使用 ATHLTH"
-          }
         }
       }
     },
@@ -35,24 +17,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Beveg deg bedre. Tren smartere. Få et komplett bilde av trening, restitusjon og fremgang."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muévete mejor. Entrena de forma más inteligente. Obtén una visión completa de tu entrenamiento, recuperación y progreso."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muoviti meglio. Allenati in modo più intelligente. Ottieni un quadro completo di allenamento, recupero e progressi."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "更好地运动，更聪明地训练。全面了解你的训练、恢复和进步。"
           }
         }
       }
@@ -64,24 +28,6 @@
             "state": "translated",
             "value": "Fortsett med Apple"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuar con Apple"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua con Apple"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使用 Apple 继续"
-          }
         }
       }
     },
@@ -91,24 +37,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fortsett med e-post"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuar con correo electrónico"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua con e-mail"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使用电子邮件继续"
           }
         }
       }
@@ -120,24 +48,6 @@
             "state": "translated",
             "value": "Ved å fortsette godtar du ATHLTHs"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Al continuar, aceptas los"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuando, accetti i"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "继续即表示你同意 ATHLTH 的"
-          }
         }
       }
     },
@@ -147,24 +57,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bruksvilkår"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Términos del servicio"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termini di servizio"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "服务条款"
           }
         }
       }
@@ -176,24 +68,6 @@
             "state": "translated",
             "value": "Personvernerklæring"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Política de privacidad"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Informativa sulla privacy"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "隐私政策"
-          }
         }
       }
     },
@@ -203,24 +77,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ferdig"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Listo"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fine"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完成"
           }
         }
       }
@@ -232,24 +88,6 @@
             "state": "translated",
             "value": "Språk"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Idioma"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lingua"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "语言"
-          }
         }
       }
     },
@@ -259,24 +97,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Velg brukernavn"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elige tu nombre de usuario"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scegli il tuo nome utente"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择用户名"
           }
         }
       }
@@ -288,24 +108,6 @@
             "state": "translated",
             "value": "Slik finner venner deg. Alle ATHLTH-brukernavn er unike."
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Así podrán encontrarte tus amigos. Cada nombre de usuario de ATHLTH es único."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "È così che gli amici potranno trovarti. Ogni nome utente ATHLTH è unico."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "朋友将通过它找到你。每个 ATHLTH 用户名都是唯一的。"
-          }
         }
       }
     },
@@ -315,24 +117,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "3–20 tegn"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "3–20 caracteres"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "3–20 caratteri"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "3–20 个字符"
           }
         }
       }
@@ -344,24 +128,6 @@
             "state": "translated",
             "value": "Bokstaver, tall og understrek"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Letras, números y guiones bajos"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lettere, numeri e trattini bassi"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "字母、数字和下划线"
-          }
         }
       }
     },
@@ -371,24 +137,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kan endres senere"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se puede cambiar más tarde"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Può essere modificato in seguito"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "以后可以更改"
           }
         }
       }
@@ -400,24 +148,6 @@
             "state": "translated",
             "value": "Hva ønsker du å bruke ATHLTH til?"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "¿Qué quieres conseguir con ATHLTH?"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cosa vuoi ottenere da ATHLTH?"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "你希望通过 ATHLTH 实现什么？"
-          }
         }
       }
     },
@@ -427,24 +157,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Velg områdene som betyr mest for deg, og velg deretter ett hovedmål."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elige las áreas que te importan y después selecciona un objetivo principal."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scegli le aree che ti interessano e poi seleziona un obiettivo principale."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择对你重要的领域，然后选择一个主要目标。"
           }
         }
       }
@@ -456,24 +168,6 @@
             "state": "translated",
             "value": "Hovedmål"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Objetivo principal"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Obiettivo principale"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "主要目标"
-          }
         }
       }
     },
@@ -483,24 +177,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fortsett"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuar"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "继续"
           }
         }
       }
@@ -512,24 +188,6 @@
             "state": "translated",
             "value": "Koble til helsedata"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conecta tus datos de salud"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collega i tuoi dati salute"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "连接你的健康数据"
-          }
         }
       }
     },
@@ -539,24 +197,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apple Health kan fylle inn tilgjengelige profilopplysninger og legge til trening, puls, søvn, restitusjon og aktivitetsdata. Alt her er valgfritt."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Health puede completar datos básicos disponibles y añadir entrenamientos, frecuencia cardíaca, sueño, recuperación y actividad. Todo aquí es opcional."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Health può compilare i dati di base disponibili e aggiungere allenamenti, frequenza cardiaca, sonno, recupero e attività. Tutto è facoltativo."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Health 可以填写可用的基本资料，并添加训练、心率、睡眠、恢复和活动数据。此处所有内容均为可选。"
           }
         }
       }
@@ -568,24 +208,6 @@
             "state": "translated",
             "value": "Koble til"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conectar"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collega"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "连接"
-          }
         }
       }
     },
@@ -595,24 +217,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tilkoblet"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conectado"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collegato"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已连接"
           }
         }
       }
@@ -624,24 +228,6 @@
             "state": "translated",
             "value": "Tilgjengelig fra Apple Health"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disponible en Apple Health"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disponibile da Apple Health"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "来自 Apple Health 的可用数据"
-          }
         }
       }
     },
@@ -651,24 +237,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fødselsdato"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fecha de nacimiento"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Data di nascita"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "出生日期"
           }
         }
       }
@@ -680,24 +248,6 @@
             "state": "translated",
             "value": "Kjønn"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sexo"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sesso"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "性别"
-          }
         }
       }
     },
@@ -707,24 +257,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vekt"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Peso"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Peso"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "体重"
           }
         }
       }
@@ -736,24 +268,6 @@
             "state": "translated",
             "value": "Høyde"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Altura"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Altezza"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "身高"
-          }
         }
       }
     },
@@ -763,24 +277,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Manglende profilopplysninger kan legges inn senere i Innstillinger. ATHLTH krever dem aldri for å fullføre oppsettet."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Los datos de perfil que falten pueden añadirse más tarde en Ajustes. ATHLTH nunca los exige para terminar la configuración."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I dati del profilo mancanti possono essere aggiunti in seguito nelle Impostazioni. ATHLTH non li richiede per completare la configurazione."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "缺少的资料可以稍后在“设置”中添加。ATHLTH 不会要求这些信息才能完成设置。"
           }
         }
       }
@@ -792,24 +288,6 @@
             "state": "translated",
             "value": "Privat som standard"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Privado de forma predeterminada"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Privato per impostazione predefinita"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认保持私密"
-          }
         }
       }
     },
@@ -819,24 +297,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tilkobling til Apple Health publiserer ikke helsedata. Sosial deling styres separat."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conectar Apple Health no publica tus datos de salud. El uso compartido social se controla por separado."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collegare Apple Health non rende pubblici i dati salute. La condivisione social è gestita separatamente."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "连接 Apple Health 不会公开健康数据。社交分享由单独的设置控制。"
           }
         }
       }
@@ -848,24 +308,6 @@
             "state": "translated",
             "value": "Hopp over foreløpig"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Omitir por ahora"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salta per ora"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "暂时跳过"
-          }
         }
       }
     },
@@ -875,24 +317,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Du er klar"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Todo listo"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sei pronto"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "准备就绪"
           }
         }
       }
@@ -904,24 +328,6 @@
             "state": "translated",
             "value": "Ditt hovedmål"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tu objetivo principal"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il tuo obiettivo principale"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "你的主要目标"
-          }
         }
       }
     },
@@ -931,24 +337,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Legg til senere"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Añadir más tarde"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi più tardi"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "稍后添加"
           }
         }
       }
@@ -960,24 +348,6 @@
             "state": "translated",
             "value": "Spotify og Home Assistant konfigureres senere i Innstillinger."
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spotify y Home Assistant se configuran más tarde en Ajustes."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spotify e Home Assistant si configurano in seguito nelle Impostazioni."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spotify 和 Home Assistant 可稍后在“设置”中配置。"
-          }
         }
       }
     },
@@ -987,24 +357,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gå inn i ATHLTH"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Entrar en ATHLTH"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Entra in ATHLTH"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "进入 ATHLTH"
           }
         }
       }
@@ -1016,24 +368,6 @@
             "state": "translated",
             "value": "Velkommen tilbake"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bienvenido de nuevo"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bentornato"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "欢迎回来"
-          }
         }
       }
     },
@@ -1043,24 +377,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Opprett ATHLTH-konto"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Crea tu cuenta ATHLTH"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Crea il tuo account ATHLTH"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "创建 ATHLTH 账户"
           }
         }
       }
@@ -1072,24 +388,6 @@
             "state": "translated",
             "value": "Logg inn med e-post og passord."
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inicia sesión con tu correo y contraseña."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Accedi con e-mail e password."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使用电子邮件和密码登录。"
-          }
         }
       }
     },
@@ -1099,24 +397,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bruk e-postadressen din for å opprette en ATHLTH-konto."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Usa tu correo para crear una cuenta ATHLTH."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Usa la tua e-mail per creare un account ATHLTH."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使用电子邮件创建 ATHLTH 账户。"
           }
         }
       }
@@ -1128,24 +408,6 @@
             "state": "translated",
             "value": "Logg inn"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Iniciar sesión"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Accedi"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "登录"
-          }
         }
       }
     },
@@ -1155,24 +417,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Opprett konto"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Crear cuenta"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Crea account"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "创建账户"
           }
         }
       }
@@ -1184,24 +428,6 @@
             "state": "translated",
             "value": "E-postadresse"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Correo electrónico"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Indirizzo e-mail"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "电子邮件地址"
-          }
         }
       }
     },
@@ -1211,24 +437,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Passord"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Contraseña"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Password"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "密码"
           }
         }
       }
@@ -1240,24 +448,6 @@
             "state": "translated",
             "value": "Bekreft passord"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Confirmar contraseña"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conferma password"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "确认密码"
-          }
         }
       }
     },
@@ -1267,24 +457,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jeg godtar bruksvilkårene og personvernerklæringen"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Acepto los Términos y la Política de privacidad"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Accetto i Termini e l’Informativa sulla privacy"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "我同意服务条款和隐私政策"
           }
         }
       }
@@ -1296,24 +468,6 @@
             "state": "translated",
             "value": "Vilkår"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Términos"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termini"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "条款"
-          }
         }
       }
     },
@@ -1323,24 +477,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Glemt passord?"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "¿Has olvidado la contraseña?"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Password dimenticata?"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "忘记密码？"
           }
         }
       }
@@ -1352,24 +488,6 @@
             "state": "translated",
             "value": "E-post"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Correo"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "E-mail"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "电子邮件"
-          }
         }
       }
     },
@@ -1379,24 +497,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lukk"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerrar"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chiudi"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "关闭"
           }
         }
       }
@@ -1408,24 +508,6 @@
             "state": "translated",
             "value": "Tilbakestill passord"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restablecer contraseña"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reimposta password"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重置密码"
-          }
         }
       }
     },
@@ -1435,24 +517,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Send lenke for tilbakestilling"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enviar enlace de restablecimiento"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Invia link di reimpostazione"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "发送重置链接"
           }
         }
       }
@@ -1464,24 +528,6 @@
             "state": "translated",
             "value": "Sjekk e-posten din"
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Revisa tu correo"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Controlla la tua e-mail"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "查看你的电子邮件"
-          }
         }
       }
     },
@@ -1491,24 +537,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hvis det finnes en ATHLTH-konto med denne e-postadressen, sendes instruksjoner for tilbakestilling av passord."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Si existe una cuenta ATHLTH con este correo, se enviarán instrucciones para restablecer la contraseña."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se esiste un account ATHLTH con questa e-mail, verranno inviate le istruzioni per reimpostare la password."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "如果该电子邮件地址对应 ATHLTH 账户，将发送密码重置说明。"
           }
         }
       }
@@ -1520,24 +548,6 @@
             "state": "translated",
             "value": "Skriv inn en gyldig e-postadresse."
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Introduce un correo válido."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inserisci un indirizzo e-mail valido."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请输入有效的电子邮件地址。"
-          }
         }
       }
     },
@@ -1547,24 +557,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Passordet må inneholde minst 8 tegn."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La contraseña debe tener al menos 8 caracteres."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La password deve contenere almeno 8 caratteri."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "密码必须至少包含 8 个字符。"
           }
         }
       }
@@ -1576,24 +568,6 @@
             "state": "translated",
             "value": "Passordene er ikke like."
           }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las contraseñas no coinciden."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le password non coincidono."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "两次输入的密码不一致。"
-          }
         }
       }
     },
@@ -1604,23 +578,835 @@
             "state": "translated",
             "value": "Du må godta bruksvilkårene og personvernerklæringen."
           }
-        },
-        "es": {
+        }
+      }
+    },
+    "Username": {
+      "localizations": {
+        "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Acepta los Términos y la Política de privacidad."
+            "value": "Brukernavn"
           }
-        },
-        "it": {
+        }
+      }
+    },
+    "Only a–z, 0–9 and _": {
+      "localizations": {
+        "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Accetta i Termini e l’Informativa sulla privacy."
+            "value": "Kun a–z, 0–9 og _"
           }
-        },
-        "zh-Hans": {
+        }
+      }
+    },
+    "Suggestions for you": {
+      "localizations": {
+        "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "请同意服务条款和隐私政策。"
+            "value": "Forslag til deg"
+          }
+        }
+      }
+    },
+    "What do you want to achieve?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hva ønsker du å oppnå?"
+          }
+        }
+      }
+    },
+    "Choose the goal that matters most right now. You can change it later.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg målet som betyr mest for deg akkurat nå. Du kan endre det senere."
+          }
+        }
+      }
+    },
+    "Anything else you're interested in?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Er det noe annet du er interessert i?"
+          }
+        }
+      }
+    },
+    "Choose all that apply. These help ATHLTH prioritize features, content and future plans for you.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg alt som passer. Dette hjelper ATHLTH med å prioritere funksjoner, innhold og fremtidige planer for deg."
+          }
+        }
+      }
+    },
+    "Allow ATHLTH to use the goals and interests you choose to personalize ATHLTH offers.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat at ATHLTH bruker målene og interessene du velger til å tilpasse ATHLTH-tilbud."
+          }
+        }
+      }
+    },
+    "Optional. You can continue without enabling this and change it later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgfritt. Du kan fortsette uten å aktivere dette og endre det senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "This applies only to goals and interests you choose in ATHLTH. Apple Health / HealthKit data is not used for offer targeting.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette gjelder bare mål og interesser du velger i ATHLTH. Data fra Apple Health / HealthKit brukes ikke til målretting av tilbud."
+          }
+        }
+      }
+    },
+    "Bring your health and training data into ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta med helse- og treningsdataene dine inn i ATHLTH."
+          }
+        }
+      }
+    },
+    "Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health"
+          }
+        }
+      }
+    },
+    "Workouts, heart rate, sleep, activity and recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsøkter, puls, søvn, aktivitet og restitusjon"
+          }
+        }
+      }
+    },
+    "Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch"
+          }
+        }
+      }
+    },
+    "Imported from Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importert fra Apple Health"
+          }
+        }
+      }
+    },
+    "7-day ATHLTH+ trial active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 dagers prøveperiode med ATHLTH+ er aktiv"
+          }
+        }
+      }
+    },
+    "Background Health sync is included during your trial.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bakgrunnssynkronisering av helsedata er inkludert i prøveperioden."
+          }
+        }
+      }
+    },
+    "ATHLTH is ready around your goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er klart rundt målet ditt."
+          }
+        }
+      }
+    },
+    "Start ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start ATHLTH"
+          }
+        }
+      }
+    },
+    "Keep my ATHLTH+ benefits after the trial": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Behold ATHLTH+-fordelene mine etter prøveperioden"
+          }
+        }
+      }
+    },
+    "See Monthly and Yearly plans before entering ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se måneds- og årsabonnement før du går inn i ATHLTH."
+          }
+        }
+      }
+    },
+    "Complete the required field to continue.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fyll ut det obligatoriske feltet for å fortsette."
+          }
+        }
+      }
+    },
+    "Create an account, then verify your email before continuing.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en konto, og bekreft deretter e-postadressen din før du fortsetter."
+          }
+        }
+      }
+    },
+    "Email account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-postkonto"
+          }
+        }
+      }
+    },
+    "Email verification required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-postbekreftelse kreves"
+          }
+        }
+      }
+    },
+    "Your ATHLTH account has been created, but sign-in is not completed until the email address is verified.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-kontoen din er opprettet, men innloggingen er ikke fullført før e-postadressen er bekreftet."
+          }
+        }
+      }
+    },
+    "Back to sign in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilbake til innlogging"
+          }
+        }
+      }
+    },
+    "If an ATHLTH account exists for this email address, a password-reset link has been sent. Open the link on this iPhone to return to ATHLTH and choose a new password.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvis det finnes en ATHLTH-konto med denne e-postadressen, er en lenke for å tilbakestille passordet sendt. Åpne lenken på denne iPhonen for å gå tilbake til ATHLTH og velge et nytt passord."
+          }
+        }
+      }
+    },
+    "Set a new password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angi et nytt passord"
+          }
+        }
+      }
+    },
+    "Choose a new password for your ATHLTH account.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg et nytt passord for ATHLTH-kontoen din."
+          }
+        }
+      }
+    },
+    "New password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nytt passord"
+          }
+        }
+      }
+    },
+    "Confirm new password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekreft nytt passord"
+          }
+        }
+      }
+    },
+    "Update Password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdater passord"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avbryt"
+          }
+        }
+      }
+    },
+    "Female": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kvinne"
+          }
+        }
+      }
+    },
+    "Male": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mann"
+          }
+        }
+      }
+    },
+    "Other": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annet"
+          }
+        }
+      }
+    },
+    "Prefer not to say": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ønsker ikke å oppgi"
+          }
+        }
+      }
+    },
+    "Lose weight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gå ned i vekt"
+          }
+        }
+      }
+    },
+    "Build muscle": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg muskler"
+          }
+        }
+      }
+    },
+    "Get stronger": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bli sterkere"
+          }
+        }
+      }
+    },
+    "Improve fitness & endurance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre kondisjon og utholdenhet"
+          }
+        }
+      }
+    },
+    "Run faster or farther": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løp raskere eller lengre"
+          }
+        }
+      }
+    },
+    "Move more": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beveg deg mer"
+          }
+        }
+      }
+    },
+    "Improve recovery & sleep": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre restitusjon og søvn"
+          }
+        }
+      }
+    },
+    "Improve mobility & flexibility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre bevegelighet og fleksibilitet"
+          }
+        }
+      }
+    },
+    "Prepare for an event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbered deg til et arrangement"
+          }
+        }
+      }
+    },
+    "Maintain health & fitness": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppretthold helse og form"
+          }
+        }
+      }
+    },
+    "Work toward a healthier body-weight goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jobb mot et sunnere mål for kroppsvekt."
+          }
+        }
+      }
+    },
+    "Prioritize muscle growth and progressive training.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prioriter muskelvekst og progressiv trening."
+          }
+        }
+      }
+    },
+    "Increase strength and track performance over time.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øk styrken og følg utviklingen over tid."
+          }
+        }
+      }
+    },
+    "Build cardiovascular fitness and stamina.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg kondisjon og utholdenhet."
+          }
+        }
+      }
+    },
+    "Improve pace, distance and running performance.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre tempo, distanse og løpsprestasjon."
+          }
+        }
+      }
+    },
+    "Increase everyday movement and activity.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øk hverdagsbevegelse og aktivitet."
+          }
+        }
+      }
+    },
+    "Focus on sleep, recovery and readiness.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fokuser på søvn, restitusjon og beredskap."
+          }
+        }
+      }
+    },
+    "Improve movement quality and flexibility.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre bevegelseskvalitet og fleksibilitet."
+          }
+        }
+      }
+    },
+    "Prepare for a race, challenge or target date.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbered deg til et løp, en utfordring eller en måldato."
+          }
+        }
+      }
+    },
+    "Stay active and maintain your current fitness.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold deg aktiv og oppretthold formen du har."
+          }
+        }
+      }
+    },
+    "Strength": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrke"
+          }
+        }
+      }
+    },
+    "Running": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løping"
+          }
+        }
+      }
+    },
+    "Walking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gåing"
+          }
+        }
+      }
+    },
+    "Recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon"
+          }
+        }
+      }
+    },
+    "Nutrition": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kosthold"
+          }
+        }
+      }
+    },
+    "Training plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsplaner"
+          }
+        }
+      }
+    },
+    "Health tracking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helsesporing"
+          }
+        }
+      }
+    },
+    "Friends & challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venner og utfordringer"
+          }
+        }
+      }
+    },
+    "Not requested": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke forespurt"
+          }
+        }
+      }
+    },
+    "Declined": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslått"
+          }
+        }
+      }
+    },
+    "Allowed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillatt"
+          }
+        }
+      }
+    },
+    "Authentication Error": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autentiseringsfeil"
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "Authentication could not be completed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autentiseringen kunne ikke fullføres."
+          }
+        }
+      }
+    },
+    "Move better.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beveg deg bedre."
+          }
+        }
+      }
+    },
+    "Checking availability…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker tilgjengelighet…"
+          }
+        }
+      }
+    },
+    "Username is available": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukernavnet er tilgjengelig"
+          }
+        }
+      }
+    },
+    "Username is already taken": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukernavnet er allerede tatt"
+          }
+        }
+      }
+    },
+    "Use 3–20 characters: a–z, 0–9 or _": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk 3–20 tegn: a–z, 0–9 eller _"
+          }
+        }
+      }
+    },
+    "That username is no longer available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Det brukernavnet er ikke lenger tilgjengelig."
+          }
+        }
+      }
+    },
+    "Checking Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker Apple Watch"
+          }
+        }
+      }
+    },
+    "Apple Watch connection is unavailable on this device": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch-tilkobling er ikke tilgjengelig på denne enheten"
+          }
+        }
+      }
+    },
+    "No paired Apple Watch found": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fant ingen sammenkoblet Apple Watch"
+          }
+        }
+      }
+    },
+    "ATHLTH Watch app is not installed yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Watch-appen er ikke installert ennå"
+          }
+        }
+      }
+    },
+    "Apple Watch is not ready to start an ATHLTH workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch er ikke klar til å starte en ATHLTH-treningsøkt."
           }
         }
       }
