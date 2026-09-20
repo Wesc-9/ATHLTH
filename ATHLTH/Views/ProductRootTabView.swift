@@ -260,27 +260,34 @@ struct ATHLTHTrainView: View {
                         settings.spotifyAutoplayLinkedPlaylists &&
                         (session.activePlan?.spotifyAutoplayOnWorkoutStart ?? false)
                 ) { captureDevice, trackingMode in
-                    startPlanSpotifyIfNeeded()
-                    session.beginTrainingStatus(for: workout)
-
                     if captureDevice == .appleWatch {
-                        Task {
+                        Task { @MainActor in
                             do {
                                 try await watchConnection.startWorkoutOnWatch(.strength)
-                                watchTransferMessage = "Strength workout started on Apple Watch."
+                                startPlanSpotifyIfNeeded()
+                                session.beginTrainingStatus(for: workout)
+                                strengthWorkout.start(
+                                    session: workout,
+                                    watchSessionID: UUID(),
+                                    trackingMode: trackingMode,
+                                    captureDevice: .appleWatch
+                                )
+                                showingStrengthWorkout = true
                             } catch {
                                 watchTransferError = error.localizedDescription
                             }
                         }
+                    } else {
+                        startPlanSpotifyIfNeeded()
+                        session.beginTrainingStatus(for: workout)
+                        strengthWorkout.start(
+                            session: workout,
+                            watchSessionID: nil,
+                            trackingMode: trackingMode,
+                            captureDevice: .iPhone
+                        )
+                        showingStrengthWorkout = true
                     }
-
-                    strengthWorkout.start(
-                        session: workout,
-                        watchSessionID: captureDevice == .appleWatch ? UUID() : nil,
-                        trackingMode: trackingMode,
-                        captureDevice: captureDevice
-                    )
-                    showingStrengthWorkout = true
                 }
             }
             .fullScreenCover(isPresented: $showingStrengthWorkout) {
