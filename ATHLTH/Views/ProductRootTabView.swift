@@ -198,11 +198,14 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     @State private var selectedSection = 0
     @State private var showingFileImporter = false
     @State private var importMessage: String?
     @State private var importError: String?
+    @State private var watchTransferMessage: String?
+    @State private var watchTransferError: String?
     @State private var selectedStrengthSession: PlannedSession?
     @State private var showingStrengthWorkout = false
 
@@ -237,7 +240,7 @@ struct ATHLTHTrainView: View {
             .sheet(item: $selectedStrengthSession) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
-                    watchConnected: settings.watchConnected,
+                    watchConnected: watchConnection.isReady,
                     defaultCapture: settings.preferredWorkoutCapture,
                     defaultTracking: settings.defaultStrengthTracking,
                     linkedSpotifyPlaylist: session.activePlan?.spotifyPlaylist,
@@ -270,21 +273,36 @@ struct ATHLTHTrainView: View {
                     await importGPX(result)
                 }
             }
-            .alert("Route Import", isPresented: Binding(
-                get: { importMessage != nil || importError != nil },
+            .alert("Routes", isPresented: Binding(
+                get: {
+                    importMessage != nil ||
+                    importError != nil ||
+                    watchTransferMessage != nil ||
+                    watchTransferError != nil
+                },
                 set: { newValue in
                     if !newValue {
                         importMessage = nil
                         importError = nil
+                        watchTransferMessage = nil
+                        watchTransferError = nil
                     }
                 }
             )) {
                 Button("OK", role: .cancel) {
                     importMessage = nil
                     importError = nil
+                    watchTransferMessage = nil
+                    watchTransferError = nil
                 }
             } message: {
-                Text(importError ?? importMessage ?? "")
+                Text(
+                    watchTransferError ??
+                    importError ??
+                    watchTransferMessage ??
+                    importMessage ??
+                    ""
+                )
             }
         }
     }
@@ -371,6 +389,25 @@ struct ATHLTHTrainView: View {
                     }
                 }
                 .padding(.top, 8)
+
+                HStack(spacing: 10) {
+                    Button {
+                        sendRouteToWatch(route)
+                    } label: {
+                        Label("Send to Apple Watch", systemImage: "applewatch")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .disabled(!watchConnection.isReady)
+
+                    if !watchConnection.isReady {
+                        Text(watchConnection.state.subtitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(.top, 8)
             } else {
                 ContentUnavailableView(
                     "No routes yet",
@@ -410,6 +447,15 @@ struct ATHLTHTrainView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .tint(.green)
+        }
+    }
+
+    private func sendRouteToWatch(_ route: TrainingRoute) {
+        do {
+            try watchConnection.sendRoute(route)
+            watchTransferMessage = "Sent \(route.title) to Apple Watch."
+        } catch {
+            watchTransferError = error.localizedDescription
         }
     }
 
