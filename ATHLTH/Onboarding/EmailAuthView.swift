@@ -1,28 +1,10 @@
 import SwiftUI
 
-enum EmailAuthMode: String, CaseIterable, Identifiable {
-    case signIn
-    case createAccount
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .signIn: return "Sign In"
-        case .createAccount: return "Create Account"
-        }
-    }
-}
-
-enum EmailAuthResult {
-    case existingUser(email: String)
-    case newUser(email: String)
-}
-
 struct EmailAuthView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var accountService: SupabaseAccountService
 
-    let onAuthenticated: (EmailAuthResult) -> Void
+    let onAuthenticated: (BackendUserBootstrap) -> Void
 
     @State private var mode: EmailAuthMode = .signIn
     @State private var email = ""
@@ -31,123 +13,18 @@ struct EmailAuthView: View {
     @State private var acceptedLegal = false
     @State private var showingReset = false
     @State private var errorMessage: String?
+    @State private var isSubmitting = false
+    @State private var confirmationSent = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    VStack(spacing: 8) {
-                        Image(systemName: "envelope.circle.fill")
-                            .font(.system(size: 64))
-                            .foregroundStyle(OnboardingTheme.green)
-
-                        Text(mode == .signIn ? "Welcome back" : "Create your ATHLTH account")
-                            .font(.largeTitle.weight(.bold))
-                            .multilineTextAlignment(.center)
-
-                        Text(
-                            mode == .signIn
-                                ? "Sign in with your email and password."
-                                : "Use your email to create an ATHLTH account."
-                        )
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                    if confirmationSent {
+                        confirmationState
+                    } else {
+                        authForm
                     }
-
-                    Picker("Email account", selection: $mode) {
-                        ForEach(EmailAuthMode.allCases) { item in
-                            Text(item.title).tag(item)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    OnboardingCard {
-                        VStack(spacing: 14) {
-                            TextField("Email address", text: $email)
-                                .textContentType(.emailAddress)
-                                .keyboardType(.emailAddress)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .padding(14)
-                                .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(OnboardingTheme.border, lineWidth: 1)
-                                }
-
-                            SecureField("Password", text: $password)
-                                .textContentType(mode == .signIn ? .password : .newPassword)
-                                .padding(14)
-                                .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(OnboardingTheme.border, lineWidth: 1)
-                                }
-
-                            if mode == .createAccount {
-                                SecureField("Confirm password", text: $confirmPassword)
-                                    .textContentType(.newPassword)
-                                    .padding(14)
-                                    .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(OnboardingTheme.border, lineWidth: 1)
-                                }
-                            }
-                        }
-                    }
-
-                    if mode == .createAccount {
-                        OnboardingCard {
-                            Toggle(isOn: $acceptedLegal) {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text("I agree to the Terms and Privacy Policy")
-                                        .font(.subheadline.weight(.semibold))
-
-                                    HStack(spacing: 12) {
-                                        NavigationLink("Terms") {
-                                            LegalDocumentView(kind: .terms)
-                                        }
-
-                                        NavigationLink("Privacy Policy") {
-                                            LegalDocumentView(kind: .privacy)
-                                        }
-                                    }
-                                    .font(.caption)
-                                }
-                            }
-                        }
-                    }
-
-                    if let errorMessage {
-                        Label(errorMessage, systemImage: "exclamationmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    Button {
-                        submit()
-                    } label: {
-                        Text(mode == .signIn ? "Sign In" : "Create Account")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(OnboardingPrimaryButtonStyle())
-
-                    if mode == .signIn {
-                        Button("Forgot password?") {
-                            showingReset = true
-                        }
-                        .font(.subheadline)
-                    }
-
-                    #if DEBUG
-                    Text("Authentication is simulated in V0.1 development builds. Passwords are not stored by this screen.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    #endif
                 }
                 .padding(24)
                 .frame(maxWidth: 620)
@@ -164,21 +41,184 @@ struct EmailAuthView: View {
                 }
             }
             .sheet(isPresented: $showingReset) {
-                PasswordResetView(initialEmail: email)
+                PasswordResetRequestView(initialEmail: email)
+                    .environmentObject(accountService)
             }
             .onChange(of: mode) {
                 errorMessage = nil
                 password = ""
                 confirmPassword = ""
                 acceptedLegal = false
+                confirmationSent = false
             }
+        }
+    }
+
+    private var authForm: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 8) {
+                Image(systemName: "envelope.circle.fill")
+                    .font(.system(size: 64))
+                    .foregroundStyle(OnboardingTheme.green)
+
+                Text(mode == .signIn ? "Welcome back" : "Create your ATHLTH account")
+                    .font(.largeTitle.weight(.bold))
+                    .multilineTextAlignment(.center)
+
+                Text(
+                    mode == .signIn
+                        ? "Sign in with your email and password."
+                        : "Create an account, then verify your email before continuing."
+                )
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            }
+
+            Picker("Email account", selection: $mode) {
+                ForEach(EmailAuthMode.allCases) { item in
+                    Text(item.title).tag(item)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            OnboardingCard {
+                VStack(spacing: 14) {
+                    TextField("Email address", text: $email)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .padding(14)
+                        .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(OnboardingTheme.border, lineWidth: 1)
+                        }
+
+                    SecureField("Password", text: $password)
+                        .textContentType(mode == .signIn ? .password : .newPassword)
+                        .padding(14)
+                        .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(OnboardingTheme.border, lineWidth: 1)
+                        }
+
+                    if mode == .createAccount {
+                        SecureField("Confirm password", text: $confirmPassword)
+                            .textContentType(.newPassword)
+                            .padding(14)
+                            .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(OnboardingTheme.border, lineWidth: 1)
+                            }
+                    }
+                }
+            }
+
+            if mode == .createAccount {
+                OnboardingCard {
+                    Toggle(isOn: $acceptedLegal) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("I agree to the Terms and Privacy Policy")
+                                .font(.subheadline.weight(.semibold))
+
+                            HStack(spacing: 12) {
+                                NavigationLink("Terms") {
+                                    LegalDocumentView(kind: .terms)
+                                }
+
+                                NavigationLink("Privacy Policy") {
+                                    LegalDocumentView(kind: .privacy)
+                                }
+                            }
+                            .font(.caption)
+                        }
+                    }
+                }
+            }
+
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Button {
+                submit()
+            } label: {
+                HStack {
+                    if isSubmitting {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(mode == .signIn ? "Sign In" : "Create Account")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(OnboardingPrimaryButtonStyle())
+            .disabled(isSubmitting)
+            .opacity(isSubmitting ? 0.65 : 1)
+
+            if mode == .signIn {
+                Button("Forgot password?") {
+                    showingReset = true
+                }
+                .font(.subheadline)
+                .disabled(isSubmitting)
+            }
+        }
+    }
+
+    private var confirmationState: some View {
+        VStack(spacing: 18) {
+            Spacer().frame(height: 28)
+
+            Image(systemName: "envelope.badge.fill")
+                .font(.system(size: 70))
+                .foregroundStyle(OnboardingTheme.green)
+
+            Text("Check your email")
+                .font(.largeTitle.weight(.bold))
+                .multilineTextAlignment(.center)
+
+            Text("We sent a confirmation link to \(email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()). Open it on this iPhone to verify your address and return to ATHLTH.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+
+            OnboardingCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Email verification required", systemImage: "checkmark.shield.fill")
+                        .font(.headline)
+                        .foregroundStyle(OnboardingTheme.green)
+
+                    Text("Your ATHLTH account has been created, but sign-in is not completed until the email address is verified.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Button("Back to sign in") {
+                mode = .signIn
+                confirmationSent = false
+                password = ""
+                confirmPassword = ""
+            }
+            .buttonStyle(OnboardingPrimaryButtonStyle())
         }
     }
 
     private func submit() {
         errorMessage = nil
 
-        let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let cleanEmail = email
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
 
         guard cleanEmail.contains("@"), cleanEmail.contains(".") else {
             errorMessage = "Enter a valid email address."
@@ -200,21 +240,67 @@ struct EmailAuthView: View {
                 errorMessage = "Please accept the Terms and Privacy Policy."
                 return
             }
-
-            onAuthenticated(.newUser(email: cleanEmail))
-        } else {
-            onAuthenticated(.existingUser(email: cleanEmail))
         }
 
-        dismiss()
+        Task {
+            isSubmitting = true
+            defer { isSubmitting = false }
+
+            do {
+                switch mode {
+                case .signIn:
+                    let bootstrap = try await accountService.signIn(
+                        email: cleanEmail,
+                        password: password
+                    )
+                    onAuthenticated(bootstrap)
+                    dismiss()
+
+                case .createAccount:
+                    let outcome = try await accountService.signUp(
+                        email: cleanEmail,
+                        password: password
+                    )
+
+                    switch outcome {
+                    case .confirmationRequired:
+                        email = cleanEmail
+                        confirmationSent = true
+
+                    case .authenticated(let bootstrap):
+                        onAuthenticated(bootstrap)
+                        dismiss()
+                    }
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 }
 
-private struct PasswordResetView: View {
+enum EmailAuthMode: String, CaseIterable, Identifiable {
+    case signIn
+    case createAccount
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .signIn: return "Sign In"
+        case .createAccount: return "Create Account"
+        }
+    }
+}
+
+private struct PasswordResetRequestView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var accountService: SupabaseAccountService
 
     @State private var email: String
     @State private var sent = false
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
 
     init(initialEmail: String) {
         _email = State(initialValue: initialEmail)
@@ -228,7 +314,7 @@ private struct PasswordResetView: View {
                         Label("Check your email", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(OnboardingTheme.green)
 
-                        Text("If an ATHLTH account exists for this email address, password-reset instructions will be sent.")
+                        Text("If an ATHLTH account exists for this email address, a password-reset link has been sent. Open the link on this iPhone to return to ATHLTH and choose a new password.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -241,21 +327,26 @@ private struct PasswordResetView: View {
                             .autocorrectionDisabled()
                     }
 
-                    Section {
-                        Button("Send reset link") {
-                            sent = true
+                    if let errorMessage {
+                        Section {
+                            Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                                .foregroundStyle(.red)
                         }
-                        .disabled(!email.contains("@"))
+                    }
+
+                    Section {
+                        Button {
+                            sendReset()
+                        } label: {
+                            if isSubmitting {
+                                ProgressView()
+                            } else {
+                                Text("Send reset link")
+                            }
+                        }
+                        .disabled(isSubmitting || !email.contains("@"))
                     }
                 }
-
-                #if DEBUG
-                Section {
-                    Text("Reset email delivery is a V0.1 placeholder until the authentication backend is connected.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                #endif
             }
             .scrollContentBackground(.hidden)
             .background(OnboardingBackground().ignoresSafeArea())
@@ -268,6 +359,30 @@ private struct PasswordResetView: View {
                         dismiss()
                     }
                 }
+            }
+        }
+    }
+
+    private func sendReset() {
+        let cleanEmail = email
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        guard cleanEmail.contains("@"), cleanEmail.contains(".") else {
+            errorMessage = "Enter a valid email address."
+            return
+        }
+
+        Task {
+            isSubmitting = true
+            errorMessage = nil
+            defer { isSubmitting = false }
+
+            do {
+                try await accountService.sendPasswordReset(email: cleanEmail)
+                sent = true
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }
