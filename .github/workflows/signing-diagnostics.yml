@@ -79,8 +79,13 @@ jobs:
 
           def get_json(url):
               req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
-              with urllib.request.urlopen(req, timeout=30) as resp:
-                  return json.load(resp)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      return json.load(resp)
+              except Exception as e:
+                  body = getattr(e, "read", lambda: b"")()
+                  print("HTTP failure:", url, getattr(e, "code", None), body.decode("utf-8", errors="replace"))
+                  raise
 
           for identifier in ["com.wesc9.athlth", "com.wesc9.athlth.watchkitapp"]:
               from urllib.parse import quote
@@ -88,8 +93,9 @@ jobs:
               rows = payload.get("data", [])
               print(f"Bundle {identifier}: {len(rows)} match(es)")
               for row in rows:
+                  print(json.dumps({"id": row.get("id"), "attributes": row.get("attributes", {})}, sort_keys=True))
                   bundle_id = row["id"]
-                  caps = get_json(f"https://api.appstoreconnect.apple.com/v1/bundleIds/{bundle_id}/bundleIdCapabilities?limit=200")
+                  caps = get_json(f"https://api.appstoreconnect.apple.com/v1/bundleIds/{bundle_id}/bundleIdCapabilities?fields%5BbundleIdCapabilities%5D=capabilityType%2Csettings&limit=50")
                   cap_types = sorted(x.get("attributes", {}).get("capabilityType") for x in caps.get("data", []) if x.get("attributes", {}).get("capabilityType"))
                   print(json.dumps({"identifier": identifier, "bundleIdResourceId": bundle_id, "capabilities": cap_types}, sort_keys=True))
           PY
