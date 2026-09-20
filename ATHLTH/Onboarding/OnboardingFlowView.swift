@@ -4,6 +4,7 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     @State private var step: OnboardingStep = .account
     @State private var username = ""
@@ -62,8 +63,14 @@ struct OnboardingFlowView: View {
             }
         }
         .task(id: step) {
-            guard step == .username else { return }
-            await loadUsernameSuggestions()
+            switch step {
+            case .username:
+                await loadUsernameSuggestions()
+            case .connections:
+                watchConnection.refreshStatus()
+            default:
+                break
+            }
         }
         .task(id: username) {
             guard step == .username else { return }
@@ -468,13 +475,13 @@ struct OnboardingFlowView: View {
             ATHLTHCard {
                 connectionRow(
                     title: "Apple Watch",
-                    subtitle: settings.watchConnected
+                    subtitle: watchConnection.isReady
                         ? "Connected"
-                        : "Start and track workouts from Apple Watch",
+                        : watchConnection.state.subtitle,
                     icon: "applewatch",
-                    connected: settings.watchConnected
+                    connected: watchConnection.isReady
                 ) {
-                    settings.watchConnected = true
+                    watchConnection.connect()
                 }
             }
 
@@ -585,7 +592,7 @@ struct OnboardingFlowView: View {
                 )
                 readinessChip(
                     title: "Apple Watch",
-                    connected: settings.watchConnected,
+                    connected: watchConnection.isReady,
                     icon: "applewatch"
                 )
             }
