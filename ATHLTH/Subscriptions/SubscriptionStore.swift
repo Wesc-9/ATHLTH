@@ -20,8 +20,8 @@ struct AppStoreTransactionProof: Equatable, Sendable {
 
 @MainActor
 final class SubscriptionStore: ObservableObject {
-    static let monthlyProductID = "com.wesc9.athlth.paid.monthly"
-    static let yearlyProductID = "com.wesc9.athlth.paid.yearly"
+    static let monthlyProductID = "com.wesc9.athlth.plus.monthly"
+    static let yearlyProductID = "com.wesc9.athlth.plus.yearly"
 
     static let productIDs: Set<String> = [
         monthlyProductID,
