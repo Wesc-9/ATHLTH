@@ -73,12 +73,12 @@ targets:
     sources:
       - path: ATHLTHWatchExtension
       - path: Shared
+    info:
+      path: ATHLTHWatchExtension/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.watchkitapp.watchkitextension
         PRODUCT_NAME: ATHLTH Watch
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: ATHLTH
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.watchkit
-        INFOPLIST_KEY_NSExtension_NSExtensionAttributes_WKAppBundleIdentifier: com.wesc9.athlth.watchkitapp
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: ATHLTHWatchExtension/ATHLTHWatchExtension.entitlements
         CODE_SIGN_STYLE: Automatic
