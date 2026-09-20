@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/v0.1-product-foundation
+      - restore/v1-athlth-plus
     paths:
       - .github/testflight-trigger
+      - .github/workflows/testflight.yml
 
 concurrency:
   group: athlth-testflight
@@ -17,11 +18,11 @@ permissions:
 
 jobs:
   testflight:
-    runs-on: xcode-27
+    runs-on: macos-26
     env:
       APPLE_TEAM_ID: D3AX7B6RMW
-      ASC_KEY_ID: T38TGJU4AV
-      ASC_ISSUER_ID: 8ede2ab1-ca29-45a7-9653-94925310eea0
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
 
     steps:
@@ -31,17 +32,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in ASC_API_KEY_P8; do
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required GitHub secret: $name"
               exit 1
             fi
           done
 
-      - name: Verify Xcode 27
+      - name: Select Xcode 26.6
         run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
           xcodebuild -version
-          xcodebuild -version | head -n 1 | grep -q '^Xcode 27'
 
       - name: Install XcodeGen
         run: brew install xcodegen
