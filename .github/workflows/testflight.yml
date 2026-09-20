@@ -7,7 +7,6 @@ on:
       - restore/v1-athlth-plus
     paths:
       - .github/testflight-trigger
-      - .github/workflows/testflight.yml
 
 concurrency:
   group: athlth-testflight
