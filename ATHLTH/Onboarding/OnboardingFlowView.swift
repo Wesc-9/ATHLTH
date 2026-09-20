@@ -349,7 +349,11 @@ struct OnboardingFlowView: View {
                     }
 
                 if let title = usernameValidation.title, !username.isEmpty {
-                    Label(title, systemImage: usernameValidation.systemImage)
+                    Label {
+                        Text(LocalizedStringKey(title))
+                    } icon: {
+                        Image(systemName: usernameValidation.systemImage)
+                    }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(
                             usernameValidation == .available
@@ -812,10 +816,15 @@ struct OnboardingFlowView: View {
 
     @ViewBuilder
     private func validationRule(_ title: String, passed: Bool) -> some View {
-        Label(
-            title,
-            systemImage: passed ? "checkmark.circle.fill" : "circle"
-        )
+        Label {
+            Text(LocalizedStringKey(title))
+        } icon: {
+            Image(
+                systemName: passed
+                    ? "checkmark.circle.fill"
+                    : "circle"
+            )
+        }
         .foregroundStyle(passed ? Color.green : Color.secondary)
     }
 
