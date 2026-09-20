@@ -1580,6 +1580,306 @@
           }
         }
       }
+    },
+    "Configure": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer"
+          }
+        }
+      }
+    },
+    "Configure Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer Apple Watch"
+          }
+        }
+      }
+    },
+    "Set up ATHLTH on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer ATHLTH på Apple Watch"
+          }
+        }
+      }
+    },
+    "ATHLTH checks your iPhone Health access, Watch installation, live connection and Health access on Apple Watch in one setup flow.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH sjekker Apple Health-tilgang på iPhone, installasjon på klokken, live-tilkobling og Health-tilgang på Apple Watch i én samlet oppsettflyt."
+          }
+        }
+      }
+    },
+    "Apple Health on iPhone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health på iPhone"
+          }
+        }
+      }
+    },
+    "Apple Health access has been requested": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health-tilgang er forespurt"
+          }
+        }
+      }
+    },
+    "Allow ATHLTH to request the Health data it needs on your iPhone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat ATHLTH å be om helsedataene appen trenger på iPhone."
+          }
+        }
+      }
+    },
+    "Configure Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer Apple Health"
+          }
+        }
+      }
+    },
+    "ATHLTH on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH på Apple Watch"
+          }
+        }
+      }
+    },
+    "Checking paired Apple Watch…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker sammenkoblet Apple Watch…"
+          }
+        }
+      }
+    },
+    "Apple Watch connectivity is unavailable on this iPhone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch-tilkobling er ikke tilgjengelig på denne iPhonen."
+          }
+        }
+      }
+    },
+    "No paired Apple Watch was found. Pair your Watch in Apple’s Watch app, then return here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fant ingen sammenkoblet Apple Watch. Koble klokken til i Apples Watch-app, og gå deretter tilbake hit."
+          }
+        }
+      }
+    },
+    "ATHLTH is not installed on your Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er ikke installert på Apple Watch."
+          }
+        }
+      }
+    },
+    "Open the Watch app on this iPhone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne Watch-appen på denne iPhonen"
+          }
+        }
+      }
+    },
+    "Find ATHLTH under Available Apps": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn ATHLTH under Tilgjengelige apper"
+          }
+        }
+      }
+    },
+    "Tap Install and open ATHLTH once on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trykk Installer og åpne ATHLTH én gang på Apple Watch"
+          }
+        }
+      }
+    },
+    "Apple does not provide an API that lets ATHLTH install the Watch app automatically. Installation must be confirmed in the Watch app.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple tilbyr ikke et API som lar ATHLTH installere Watch-appen automatisk. Installasjonen må bekreftes i Watch-appen."
+          }
+        }
+      }
+    },
+    "ATHLTH is installed on Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er installert på Apple Watch."
+          }
+        }
+      }
+    },
+    "Open ATHLTH once on Apple Watch, keep it visible, then tap Check again to verify the live connection.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH én gang på Apple Watch, la appen være synlig, og trykk deretter Sjekk igjen for å bekrefte live-tilkoblingen."
+          }
+        }
+      }
+    },
+    "Check again": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekk igjen"
+          }
+        }
+      }
+    },
+    "Health access on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health-tilgang på Apple Watch"
+          }
+        }
+      }
+    },
+    "Install and connect ATHLTH on Apple Watch before configuring Watch Health access.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installer og koble til ATHLTH på Apple Watch før du konfigurerer Health-tilgang på klokken."
+          }
+        }
+      }
+    },
+    "Open ATHLTH on Apple Watch. When you continue, the Health permission sheet appears on the Watch so you can approve workout, heart-rate, energy, distance and route access.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH på Apple Watch. Når du fortsetter, vises Health-tillatelsene på klokken slik at du kan godkjenne tilgang til treningsøkter, puls, energi, distanse og ruter."
+          }
+        }
+      }
+    },
+    "Configure Health on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer Health på Apple Watch"
+          }
+        }
+      }
+    },
+    "Open ATHLTH on Apple Watch first. The Watch must be reachable before ATHLTH can ask watchOS to show the Health permission sheet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH på Apple Watch først. Klokken må være tilgjengelig før ATHLTH kan be watchOS vise Health-tillatelsene."
+          }
+        }
+      }
+    },
+    "Apple Watch must be connected before Health access can be configured.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch må være tilkoblet før Health-tilgang kan konfigureres."
+          }
+        }
+      }
+    },
+    "Open ATHLTH on Apple Watch, then tap Configure Health again.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH på Apple Watch, og trykk deretter Konfigurer Health på nytt."
+          }
+        }
+      }
+    },
+    "Check your Apple Watch for the Health permission sheet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se på Apple Watch etter Health-tillatelsene."
+          }
+        }
+      }
+    },
+    "Apple Watch Health setup completed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health-oppsettet på Apple Watch er fullført."
+          }
+        }
+      }
+    },
+    "Apple Watch Health setup could not be completed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health-oppsettet på Apple Watch kunne ikke fullføres."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
