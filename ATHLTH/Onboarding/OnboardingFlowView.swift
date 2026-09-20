@@ -597,9 +597,28 @@ struct OnboardingFlowView: View {
                 )
             }
 
-            Text("Spotify and Home Assistant are configured later in Settings.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if session.subscriptionAccess.trialIsActive {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(.green)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("7-day Paid trial active")
+                            .font(.subheadline.weight(.semibold))
+
+                        if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
+                            Text("Paid access until \(trialEndsAt.formatted(date: .abbreviated, time: .omitted))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity)
+                .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+            }
         }
     }
 
