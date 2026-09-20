@@ -15,7 +15,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         super.init()
 
         healthStore.workoutSessionMirroringStartHandler = { [weak self] session in
-            self?.attach(session)
+            DispatchQueue.main.async {
+                self?.attach(session)
+            }
         }
     }
 
