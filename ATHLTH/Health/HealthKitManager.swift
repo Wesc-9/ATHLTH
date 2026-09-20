@@ -89,6 +89,11 @@ final class HealthKitManager: ObservableObject {
     func configureBackgroundSync() async {
         guard healthDataAvailable else { return }
 
+        guard paidBackgroundSyncAllowed else {
+            await disableBackgroundSync()
+            return
+        }
+
         startBackgroundObservers()
 
         var registrations: [(HKObjectType, HKUpdateFrequency)] = [
@@ -120,6 +125,17 @@ final class HealthKitManager: ObservableObject {
                 }
             }
         }
+    }
+
+    private var paidBackgroundSyncAllowed: Bool {
+        guard
+            let data = UserDefaults.standard.data(forKey: "session.subscriptionAccess"),
+            let access = try? JSONDecoder().decode(SubscriptionAccess.self, from: data)
+        else {
+            return false
+        }
+
+        return access.hasPaidAccess
     }
 
     func disableBackgroundSync() async {
