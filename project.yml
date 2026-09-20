@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.wesc9
   deploymentTarget:
     iOS: "18.0"
+    watchOS: "11.0"
   createIntermediateGroups: true
 settings:
   base:
@@ -15,6 +16,9 @@ targets:
     platform: iOS
     sources:
       - path: ATHLTH
+      - path: Shared
+    dependencies:
+      - target: ATHLTHWatchApp
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth
@@ -30,3 +34,39 @@ targets:
         SUPPORTS_MACCATALYST: NO
     scheme:
       testTargets: []
+
+  ATHLTHWatchApp:
+    type: application.watchapp2
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: ATHLTHWatchApp
+    dependencies:
+      - target: ATHLTHWatchExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.watchkitapp
+        PRODUCT_NAME: ATHLTH
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: ATHLTH
+        INFOPLIST_KEY_WKWatchKitApp: YES
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.wesc9.athlth
+        INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp: NO
+        CODE_SIGN_STYLE: Automatic
+
+  ATHLTHWatchExtension:
+    type: watchkit2-extension
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: ATHLTHWatchExtension
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.watchkitapp.watchkitextension
+        PRODUCT_NAME: ATHLTH Watch
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: ATHLTH
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.watchkit
+        INFOPLIST_KEY_NSExtension_NSExtensionAttributes_WKAppBundleIdentifier: com.wesc9.athlth.watchkitapp
+        CODE_SIGN_STYLE: Automatic
