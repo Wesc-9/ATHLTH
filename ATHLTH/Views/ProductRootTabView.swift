@@ -4,6 +4,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ProductRootTabView: View {
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+
     var body: some View {
         TabView {
             ATHLTHHomeView()
@@ -22,6 +24,17 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Profile", systemImage: "person.fill") }
         }
         .tint(.green)
+        .sheet(
+            isPresented: $workoutMirroring.isPresentationRequested,
+            onDismiss: {
+                if !workoutMirroring.hasActiveMirroredWorkout {
+                    workoutMirroring.dismissSummary()
+                }
+            }
+        ) {
+            MirroredWorkoutLiveView()
+                .environmentObject(workoutMirroring)
+        }
     }
 }
 
