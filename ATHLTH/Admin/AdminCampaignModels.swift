@@ -11,7 +11,7 @@ enum CampaignAudience: String, Codable, Hashable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .freeUsers: return "Free users"
-        case .paidUsers: return "Paid users"
+        case .paidUsers: return "ATHLTH+ users"
         case .allUsers: return "All users"
         case .personalizedSegment: return "Personalized segment"
         }
