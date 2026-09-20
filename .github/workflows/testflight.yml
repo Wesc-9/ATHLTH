@@ -71,13 +71,27 @@ jobs:
             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
-            ATHLTH_BUILD_NUMBER="$GITHUB_RUN_NUMBER" \
             CODE_SIGN_STYLE=Automatic \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             clean archive
+
+      - name: Verify archived bundle versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          IOS_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/Info.plist"
+          WATCH_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/Watch/ATHLTH.app/Info.plist"
+          IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$IOS_PLIST")
+          WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_PLIST")
+          echo "iPhone CFBundleVersion: $IOS_BUILD"
+          echo "Watch CFBundleVersion: $WATCH_BUILD"
+          if [ "$IOS_BUILD" -le 1 ] || [ "$WATCH_BUILD" -le 1 ]; then
+            echo "::error::Both iPhone and Watch bundle versions must be greater than 1."
+            exit 1
+          fi
 
       - name: Create export options
         shell: bash
