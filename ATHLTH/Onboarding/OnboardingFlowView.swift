@@ -550,92 +550,73 @@ struct OnboardingFlowView: View {
     }
 
     private var readyStep: some View {
-        VStack(spacing: 20) {
-            Spacer().frame(height: 26)
+        VStack(spacing: 0) {
+            Spacer(minLength: 36)
 
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 78))
+                .font(.system(size: 76))
                 .foregroundStyle(.green)
 
             Text("You’re ready")
                 .font(.largeTitle.weight(.bold))
+                .padding(.top, 16)
 
-            Text("ATHLTH is set up around your goals. Health connections, personal details, privacy, Spotify and other integrations can be changed later in Settings.")
-                .font(.title3)
+            Text("ATHLTH is ready around your goal.")
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .padding(.top, 8)
 
             if let selectedGoal {
-                ATHLTHCard {
-                    Label(selectedGoal.title, systemImage: selectedGoal.systemImage)
-                        .font(.headline)
+                HStack(spacing: 9) {
+                    Image(systemName: selectedGoal.systemImage)
                         .foregroundStyle(.green)
-                    Text("Your current goal")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 4)
 
-                    if !interests.isEmpty {
-                        Text(interests.map(\.title).sorted().joined(separator: " · "))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 6)
-                    }
+                    Text(selectedGoal.title)
+                        .font(.subheadline.weight(.semibold))
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(.green.opacity(0.08), in: Capsule())
+                .padding(.top, 18)
             }
 
-            HStack(spacing: 12) {
-                readinessChip(
-                    title: "Apple Health",
-                    connected: health.hasRequestedAuthorization,
-                    icon: "heart.fill"
-                )
-                readinessChip(
-                    title: "Apple Watch",
-                    connected: watchConnection.isReady,
-                    icon: "applewatch"
-                )
-            }
+            Spacer(minLength: 48)
 
-            if session.subscriptionAccess.trialIsActive {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(.green)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("7-day Paid trial active")
-                            .font(.subheadline.weight(.semibold))
-
-                        if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
-                            Text("Paid access until \(trialEndsAt.formatted(date: .abbreviated, time: .omitted))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
+            Button {
+                session.completeOnboarding()
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("Start ATHLTH")
+                        .font(.headline)
+                    Image(systemName: "arrow.right")
                     Spacer()
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity)
-                .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+                .padding(.vertical, 5)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.green)
+
+            Spacer(minLength: 110)
+
+            if session.subscriptionAccess.trialIsActive {
+                VStack(spacing: 2) {
+                    Text("7-day Paid trial active")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
+                        Text("Paid access until \(trialEndsAt.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .multilineTextAlignment(.center)
             }
         }
-    }
-
-    @ViewBuilder
-    private func readinessChip(title: String, connected: Bool, icon: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .foregroundStyle(connected ? Color.green : Color.secondary)
-            Text(title)
-                .font(.caption.weight(.semibold))
-            Text(connected ? "Connected" : "Add later")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .frame(maxWidth: .infinity, minHeight: 600)
     }
 
     private var footer: some View {
@@ -665,9 +646,7 @@ struct OnboardingFlowView: View {
                 }
 
             case .ready:
-                footerButton(title: "Enter ATHLTH") {
-                    session.completeOnboarding()
-                }
+                EmptyView()
             }
         }
         .padding(20)
