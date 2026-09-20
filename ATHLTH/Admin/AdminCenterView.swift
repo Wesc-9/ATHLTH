@@ -813,12 +813,12 @@ struct AdminCenterView: View {
             summaryCard(
                 title: "Trial",
                 value: formatNumber(store.analytics.trialUsers),
-                subtitle: "7-day Paid access",
+                subtitle: "7-day ATHLTH+ access",
                 icon: "sparkles"
             )
 
             summaryCard(
-                title: "Paid",
+                title: "ATHLTH+",
                 value: formatNumber(store.analytics.paidUsers),
                 subtitle: percentage(store.analytics.paidUsers, of: store.analytics.totalUsers),
                 icon: "creditcard.fill"
@@ -952,7 +952,7 @@ private struct AdminUsersView: View {
                 Picker("Plan", selection: $tier) {
                     Text("All").tag(SubscriptionTier?.none)
                     Text("Free").tag(SubscriptionTier?.some(.free))
-                    Text("Paid").tag(SubscriptionTier?.some(.paid))
+                    Text("ATHLTH+").tag(SubscriptionTier?.some(.paid))
                 }
                 .pickerStyle(.segmented)
             }
@@ -1493,7 +1493,7 @@ private struct AdminMarketplaceView: View {
         List {
             Section("Marketplace readiness") {
                 LabeledContent("Products", value: "0")
-                LabeledContent("Paid users", value: "Tracked")
+                LabeledContent("ATHLTH+ users", value: "Tracked")
                 LabeledContent("Trial users", value: "Tracked separately")
                 LabeledContent("Revenue", value: "Not connected")
                 LabeledContent("Subscriptions", value: "Not connected")
