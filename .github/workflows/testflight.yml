@@ -2,11 +2,6 @@ name: Upload ATHLTH to TestFlight
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/v0.1-product-foundation
-    paths:
-      - .github/testflight-trigger
 
 concurrency:
   group: athlth-testflight
