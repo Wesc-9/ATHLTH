@@ -89,7 +89,7 @@ struct WatchHomeView: View {
             isPresented: Binding(
                 get: { workoutManager.isWorkoutPresented },
                 set: { presented in
-                    if !presented, !workoutManager.isActive {
+                    if !presented, workoutManager.state == .completed {
                         workoutManager.reset()
                     }
                 }
