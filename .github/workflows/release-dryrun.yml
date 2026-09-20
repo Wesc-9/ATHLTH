@@ -1,3 +1,4 @@
+# Final pre-upload validation: unsigned archive + cloud-signed local export
 name: Validate TestFlight pipeline without upload
 
 on:
