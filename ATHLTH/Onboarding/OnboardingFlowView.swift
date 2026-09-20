@@ -142,7 +142,7 @@ struct OnboardingFlowView: View {
                 Spacer()
 
                 Menu {
-                    ForEach(AppLanguage.allCases) { language in
+                    ForEach(AppLanguage.selectableCases) { language in
                         Button {
                             settings.language = language
                         } label: {
@@ -448,11 +448,11 @@ struct OnboardingFlowView: View {
                                 .frame(width: 38)
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(goal.title)
+                                Text(LocalizedStringKey(goal.title))
                                     .font(.headline)
                                     .foregroundStyle(.primary)
 
-                                Text(goal.subtitle)
+                                Text(LocalizedStringKey(goal.subtitle))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .multilineTextAlignment(.leading)
@@ -504,7 +504,7 @@ struct OnboardingFlowView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: interest.systemImage)
-                                Text(interest.title)
+                                Text(LocalizedStringKey(interest.title))
                                     .font(.subheadline.weight(.semibold))
                                 Spacer(minLength: 0)
                                 if interests.contains(interest) {
@@ -677,7 +677,7 @@ struct OnboardingFlowView: View {
                     Image(systemName: selectedGoal.systemImage)
                         .foregroundStyle(OnboardingTheme.green)
 
-                    Text(selectedGoal.title)
+                    Text(LocalizedStringKey(selectedGoal.title))
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(.horizontal, 14)
@@ -897,9 +897,9 @@ struct OnboardingFlowView: View {
     @ViewBuilder
     private func onboardingTitle(_ title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 32, weight: .bold))
-            Text(subtitle)
+            Text(LocalizedStringKey(subtitle))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -921,17 +921,19 @@ struct OnboardingFlowView: View {
                 .frame(width: 34)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.headline)
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Button(connected ? "Connected" : "Connect") {
+            Button {
                 action()
+            } label: {
+                Text(LocalizedStringKey(connected ? "Connected" : "Connect"))
             }
             .buttonStyle(.bordered)
             .disabled(healthRequestInProgress && title == "Apple Health")
