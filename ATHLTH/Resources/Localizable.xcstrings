@@ -1410,6 +1410,176 @@
           }
         }
       }
+    },
+    "Checking Apple Watch…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker Apple Watch…"
+          }
+        }
+      }
+    },
+    "Install ATHLTH on Apple Watch to continue": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installer ATHLTH på Apple Watch for å fortsette"
+          }
+        }
+      }
+    },
+    "ATHLTH is installed on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er installert på Apple Watch"
+          }
+        }
+      }
+    },
+    "Checking…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker…"
+          }
+        }
+      }
+    },
+    "Help": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hjelp"
+          }
+        }
+      }
+    },
+    "Setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppsett"
+          }
+        }
+      }
+    },
+    "Check": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekk"
+          }
+        }
+      }
+    },
+    "Apple Watch connectivity is not available on this iPhone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch-tilkobling er ikke tilgjengelig på denne iPhonen."
+          }
+        }
+      }
+    },
+    "Pair your Apple Watch with this iPhone in the Watch app, then return to ATHLTH and try again.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble Apple Watch sammen med denne iPhonen i Watch-appen, gå deretter tilbake til ATHLTH og prøv igjen."
+          }
+        }
+      }
+    },
+    "Open the Watch app on your iPhone, find ATHLTH under Available Apps, tap Install, then open ATHLTH once on Apple Watch and return here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne Watch-appen på iPhone, finn ATHLTH under Tilgjengelige apper, trykk Installer, åpne deretter ATHLTH én gang på Apple Watch og gå tilbake hit."
+          }
+        }
+      }
+    },
+    "ATHLTH Watch app is installed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Watch-appen er installert"
+          }
+        }
+      }
+    },
+    "Installed · open ATHLTH on Apple Watch once to verify the live connection": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installert · åpne ATHLTH én gang på Apple Watch for å bekrefte live-tilkoblingen"
+          }
+        }
+      }
+    },
+    "Connected to ATHLTH on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilkoblet ATHLTH på Apple Watch"
+          }
+        }
+      }
+    },
+    "ATHLTH Watch app responded": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Watch-appen svarte"
+          }
+        }
+      }
+    },
+    "Installed · open ATHLTH on Apple Watch and try again": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installert · åpne ATHLTH på Apple Watch og prøv igjen"
+          }
+        }
+      }
+    },
+    "Apple Watch setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch-oppsett"
+          }
+        }
+      }
+    },
+    "Open ATHLTH on Apple Watch and try again.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH på Apple Watch og prøv igjen."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
