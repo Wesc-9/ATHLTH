@@ -216,24 +216,44 @@ export default {
         throw new Error("Verified transaction has an unsupported App Store environment.");
       }
 
-      const entitlementUpdate = {
-        tier: "athlth_plus",
-        status,
-        source: "app_store",
-        app_store_product_id: transaction.productId,
-        app_store_original_transaction_id: transaction.originalTransactionId,
-        app_store_environment: environment,
-        current_period_ends_at: expiresAt?.toISOString() ?? null,
-        last_verified_at: new Date().toISOString(),
-      };
+      const signedAt = transaction.signedDate
+        ? new Date(transaction.signedDate)
+        : new Date();
 
-      const { error: entitlementError } = await ctx.supabaseAdmin
+      const { data: current, error: currentError } = await ctx.supabaseAdmin
         .from("subscription_entitlements")
-        .update(entitlementUpdate)
-        .eq("user_id", userID);
+        .select("last_verified_at")
+        .eq("user_id", userID)
+        .maybeSingle();
 
-      if (entitlementError) {
-        throw new Error("Unable to persist verified entitlement.");
+      if (currentError) {
+        throw new Error("Unable to read current subscription entitlement.");
+      }
+
+      const lastVerifiedAt = current?.last_verified_at
+        ? new Date(current.last_verified_at)
+        : null;
+
+      if (!lastVerifiedAt || lastVerifiedAt.getTime() <= signedAt.getTime()) {
+        const entitlementUpdate = {
+          tier: "athlth_plus",
+          status,
+          source: "app_store",
+          app_store_product_id: transaction.productId,
+          app_store_original_transaction_id: transaction.originalTransactionId,
+          app_store_environment: environment,
+          current_period_ends_at: expiresAt?.toISOString() ?? null,
+          last_verified_at: signedAt.toISOString(),
+        };
+
+        const { error: entitlementError } = await ctx.supabaseAdmin
+          .from("subscription_entitlements")
+          .update(entitlementUpdate)
+          .eq("user_id", userID);
+
+        if (entitlementError) {
+          throw new Error("Unable to persist verified entitlement.");
+        }
       }
 
       const { error: submissionError } = await ctx.supabaseAdmin
