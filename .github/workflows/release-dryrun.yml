@@ -138,6 +138,18 @@ jobs:
           WATCH_APP=$(find "$APP/Watch" -maxdepth 1 -name '*.app' -print -quit)
           codesign --verify --deep --strict "$APP"
           codesign --verify --strict "$WATCH_APP"
+
+          IOS_ENT="$RUNNER_TEMP/ios-entitlements.plist"
+          WATCH_ENT="$RUNNER_TEMP/watch-entitlements.plist"
+          codesign -d --entitlements "$IOS_ENT" "$APP"
+          codesign -d --entitlements "$WATCH_ENT" "$WATCH_APP"
+          echo "iPhone signed entitlements:"
+          plutil -p "$IOS_ENT"
+          echo "Watch signed entitlements:"
+          plutil -p "$WATCH_ENT"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$IOS_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
+
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_APP/Info.plist")
           echo "Exported iPhone CFBundleVersion: $IOS_BUILD"
