@@ -1,11 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ -z "${APPLE_TEAM_ID:-}" ]]; then
-  echo "APPLE_TEAM_ID is required."
-  echo "Example: APPLE_TEAM_ID=ABCDE12345 ./scripts/testflight_archive.sh"
-  exit 1
-fi
+APPLE_TEAM_ID="${APPLE_TEAM_ID:-D3AX7B6RMW}"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ARCHIVE_PATH="$ROOT_DIR/build/ATHLTH.xcarchive"
