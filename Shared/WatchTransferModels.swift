@@ -49,7 +49,7 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var distanceMeters: Double
     var averageHeartRate: Double?
     var maxHeartRate: Double?
-    var routePoints: [WatchRoutePoint]
+    var routePointCount: Int
 }
 
 enum WatchWorkoutCommand: String, Codable, Hashable {
