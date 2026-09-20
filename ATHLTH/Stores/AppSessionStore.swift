@@ -17,6 +17,8 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var subscriptionAccess: SubscriptionAccess
 
     private let defaults: UserDefaults
+    private var backendSubscriptionAccess: SubscriptionAccess
+    private var storeEntitlement: StoreSubscriptionEntitlement?
 
     init(
         profile: UserProfile = PreviewData.profile,
@@ -41,12 +43,25 @@ final class AppSessionStore: ObservableObject {
             self.currentRole = .user
         }
 
+        let storedSubscriptionAccess: SubscriptionAccess
         if let subscriptionData = defaults.data(forKey: "session.subscriptionAccess"),
            let subscription = try? JSONDecoder().decode(SubscriptionAccess.self, from: subscriptionData) {
-            self.subscriptionAccess = subscription
+            storedSubscriptionAccess = subscription
         } else {
+            storedSubscriptionAccess = .free
+        }
+
+        if storedSubscriptionAccess.state == .trial ||
+            storedSubscriptionAccess.source == .serverVerified {
+            self.backendSubscriptionAccess = storedSubscriptionAccess
+            self.subscriptionAccess = storedSubscriptionAccess.hasPaidAccess
+                ? storedSubscriptionAccess
+                : .free
+        } else {
+            self.backendSubscriptionAccess = .free
             self.subscriptionAccess = .free
         }
+        self.storeEntitlement = nil
 
         if let storedDate = defaults.object(forKey: "session.accountCreatedAt") as? Date {
             self.accountCreatedAt = storedDate
@@ -100,21 +115,25 @@ final class AppSessionStore: ObservableObject {
 
         switch bootstrap.entitlement.status {
         case "trialing":
-            subscriptionAccess = SubscriptionAccess(
+            backendSubscriptionAccess = SubscriptionAccess(
                 state: .trial,
                 trialStartedAt: bootstrap.entitlement.trialStartedAt,
-                trialEndsAt: bootstrap.entitlement.trialEndsAt
+                trialEndsAt: bootstrap.entitlement.trialEndsAt,
+                source: .athlthTrial
             )
+
         case "active":
-            subscriptionAccess = SubscriptionAccess(
+            backendSubscriptionAccess = SubscriptionAccess(
                 state: .paid,
-                trialStartedAt: nil,
-                trialEndsAt: nil
+                source: .serverVerified,
+                productID: bootstrap.entitlement.appStoreProductID,
+                currentPeriodEndsAt: bootstrap.entitlement.currentPeriodEndsAt
             )
+
         default:
-            subscriptionAccess = .free
+            backendSubscriptionAccess = .free
         }
-        persistSubscriptionAccess()
+        recomputeSubscriptionAccess()
 
         onboardingCompleted = bootstrap.profile.onboardingCompleted
         defaults.set(onboardingCompleted, forKey: "session.onboardingCompleted")
@@ -126,22 +145,43 @@ final class AppSessionStore: ObservableObject {
     }
 
     func startNewUserPaidTrialIfNeeded() {
-        guard subscriptionAccess.state == .free else { return }
+        guard !backendSubscriptionAccess.hasPaidAccess else { return }
 
         let start = Date()
         let end = Calendar.current.date(byAdding: .day, value: 7, to: start)
             ?? start.addingTimeInterval(7 * 24 * 60 * 60)
 
-        subscriptionAccess = SubscriptionAccess(
+        backendSubscriptionAccess = SubscriptionAccess(
             state: .trial,
             trialStartedAt: start,
-            trialEndsAt: end
+            trialEndsAt: end,
+            source: .athlthTrial
         )
-        persistSubscriptionAccess()
+        recomputeSubscriptionAccess()
     }
 
-    func applyStoreSubscriptionAccess(_ access: SubscriptionAccess) {
-        subscriptionAccess = access
+    func applyStoreKitEntitlement(_ entitlement: StoreSubscriptionEntitlement?) {
+        storeEntitlement = entitlement
+        recomputeSubscriptionAccess()
+    }
+
+    private func recomputeSubscriptionAccess() {
+        if signedIn,
+           let entitlement = storeEntitlement,
+           entitlement.appAccountToken == nil ||
+            entitlement.appAccountToken == profile.userID {
+            subscriptionAccess = SubscriptionAccess(
+                state: .paid,
+                source: .appStore,
+                productID: entitlement.productID,
+                currentPeriodEndsAt: entitlement.expirationDate
+            )
+        } else if backendSubscriptionAccess.hasPaidAccess {
+            subscriptionAccess = backendSubscriptionAccess
+        } else {
+            subscriptionAccess = .free
+        }
+
         persistSubscriptionAccess()
     }
 
