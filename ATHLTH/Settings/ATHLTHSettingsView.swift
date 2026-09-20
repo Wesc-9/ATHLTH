@@ -8,8 +8,7 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
     @State private var healthAuthorizationInProgress = false
-    @State private var watchConnectRequested = false
-    @State private var showingWatchSetupHelp = false
+    @State private var showingWatchSetup = false
 
     var body: some View {
         List {
@@ -177,8 +176,7 @@ struct ATHLTHSettingsView: View {
                 .disabled(healthAuthorizationInProgress)
 
                 Button {
-                    watchConnectRequested = true
-                    watchConnection.connect()
+                    showingWatchSetup = true
                 } label: {
                     integrationRow(
                         .appleWatch,
@@ -315,31 +313,11 @@ struct ATHLTHSettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: watchConnection.state) { _, state in
-            guard watchConnectRequested else { return }
-
-            switch state {
-            case .checking:
-                break
-            case .ready:
-                watchConnectRequested = false
-            case .unsupported, .notPaired, .appNotInstalled:
-                watchConnectRequested = false
-                showingWatchSetupHelp = true
-            }
-        }
-        .alert(
-            "Apple Watch setup",
-            isPresented: $showingWatchSetupHelp
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(
-                LocalizedStringKey(
-                    watchConnection.state.setupHelpMessage
-                        ?? "Open ATHLTH on Apple Watch and try again."
-                )
-            )
+        .sheet(isPresented: $showingWatchSetup) {
+            AppleWatchSetupView()
+                .environmentObject(health)
+                .environmentObject(session)
+                .environmentObject(watchConnection)
         }
     }
 
