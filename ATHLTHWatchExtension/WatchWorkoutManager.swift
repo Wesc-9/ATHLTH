@@ -408,6 +408,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             kind: kind,
             state: stateOverride ?? mirrorState(for: state),
             startedAt: startedAt,
+            capturedAt: now,
             elapsedTime: elapsedTime,
             heartRate: heartRate,
             activeCalories: activeCalories,
