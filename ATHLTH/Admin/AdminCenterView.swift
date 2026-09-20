@@ -44,6 +44,7 @@ struct AdminMetricBreakdown: Identifiable, Hashable {
 struct AdminAnalyticsSnapshot: Hashable {
     var totalUsers: Int
     var freeUsers: Int
+    var trialUsers: Int
     var paidUsers: Int
     var privilegedUsers: Int
     var newUsers7Days: Int
@@ -421,7 +422,8 @@ enum AdminPreviewData {
 
     static let analytics = AdminAnalyticsSnapshot(
         totalUsers: 1_248,
-        freeUsers: 1_173,
+        freeUsers: 1_090,
+        trialUsers: 83,
         paidUsers: 75,
         privilegedUsers: 2,
         newUsers7Days: 38,
@@ -806,6 +808,13 @@ struct AdminCenterView: View {
                 value: formatNumber(store.analytics.freeUsers),
                 subtitle: percentage(store.analytics.freeUsers, of: store.analytics.totalUsers),
                 icon: "person.fill"
+            )
+
+            summaryCard(
+                title: "Trial",
+                value: formatNumber(store.analytics.trialUsers),
+                subtitle: "7-day Paid access",
+                icon: "sparkles"
             )
 
             summaryCard(
@@ -1485,6 +1494,7 @@ private struct AdminMarketplaceView: View {
             Section("Marketplace readiness") {
                 LabeledContent("Products", value: "0")
                 LabeledContent("Paid users", value: "Tracked")
+                LabeledContent("Trial users", value: "Tracked separately")
                 LabeledContent("Revenue", value: "Not connected")
                 LabeledContent("Subscriptions", value: "Not connected")
                 LabeledContent("Refunds", value: "Not connected")
