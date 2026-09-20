@@ -2,15 +2,19 @@ name: Build ATHLTH
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 26.6
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+      - name: Select Xcode 27
+        run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate Xcode project
@@ -20,7 +24,6 @@ jobs:
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
-            -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             build

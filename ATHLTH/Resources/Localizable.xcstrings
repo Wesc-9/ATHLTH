@@ -1,5 +1,2256 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {},
-  "version" : "1.0"
+  "sourceLanguage": "en",
+  "strings": {
+    "Welcome to ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velkommen til ATHLTH"
+          }
+        }
+      }
+    },
+    "Move better. Train smarter. Build a complete picture of your training, recovery and progress.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beveg deg bedre. Tren smartere. Få et komplett bilde av trening, restitusjon og fremgang."
+          }
+        }
+      }
+    },
+    "Continue with Apple": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett med Apple"
+          }
+        }
+      }
+    },
+    "Continue with Email": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett med e-post"
+          }
+        }
+      }
+    },
+    "By continuing, you agree to ATHLTH’s": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ved å fortsette godtar du ATHLTHs"
+          }
+        }
+      }
+    },
+    "Terms of Service": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruksvilkår"
+          }
+        }
+      }
+    },
+    "Privacy Policy": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personvernerklæring"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferdig"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Språk"
+          }
+        }
+      }
+    },
+    "Choose your username": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg brukernavn"
+          }
+        }
+      }
+    },
+    "This is how friends will find you. Every ATHLTH username is unique.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slik finner venner deg. Alle ATHLTH-brukernavn er unike."
+          }
+        }
+      }
+    },
+    "3–20 characters": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3–20 tegn"
+          }
+        }
+      }
+    },
+    "Letters, numbers and underscores": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bokstaver, tall og understrek"
+          }
+        }
+      }
+    },
+    "Can be changed later": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kan endres senere"
+          }
+        }
+      }
+    },
+    "What do you want from ATHLTH?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hva ønsker du å bruke ATHLTH til?"
+          }
+        }
+      }
+    },
+    "Choose the areas that matter to you, then select one main goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg områdene som betyr mest for deg, og velg deretter ett hovedmål."
+          }
+        }
+      }
+    },
+    "Main goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hovedmål"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett"
+          }
+        }
+      }
+    },
+    "Connect your health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble til helsedata"
+          }
+        }
+      }
+    },
+    "Apple Health can fill in available profile basics and add workouts, heart rate, sleep, recovery and activity data. Everything here is optional.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health kan fylle inn tilgjengelige profilopplysninger og legge til trening, puls, søvn, restitusjon og aktivitetsdata. Alt her er valgfritt."
+          }
+        }
+      }
+    },
+    "Connect": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble til"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilkoblet"
+          }
+        }
+      }
+    },
+    "Available from Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilgjengelig fra Apple Health"
+          }
+        }
+      }
+    },
+    "Date of birth": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fødselsdato"
+          }
+        }
+      }
+    },
+    "Sex": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kjønn"
+          }
+        }
+      }
+    },
+    "Weight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vekt"
+          }
+        }
+      }
+    },
+    "Height": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Høyde"
+          }
+        }
+      }
+    },
+    "Missing profile details can be added later in Settings. ATHLTH never requires them to finish onboarding.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manglende profilopplysninger kan legges inn senere i Innstillinger. ATHLTH krever dem aldri for å fullføre oppsettet."
+          }
+        }
+      }
+    },
+    "Private by default": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privat som standard"
+          }
+        }
+      }
+    },
+    "Connecting Apple Health does not publish health data. Social sharing is controlled separately.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilkobling til Apple Health publiserer ikke helsedata. Sosial deling styres separat."
+          }
+        }
+      }
+    },
+    "Skip for now": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hopp over foreløpig"
+          }
+        }
+      }
+    },
+    "You’re ready": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du er klar"
+          }
+        }
+      }
+    },
+    "Your main goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditt hovedmål"
+          }
+        }
+      }
+    },
+    "Add later": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til senere"
+          }
+        }
+      }
+    },
+    "Spotify and Home Assistant are configured later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spotify og Home Assistant konfigureres senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "Enter ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gå inn i ATHLTH"
+          }
+        }
+      }
+    },
+    "Welcome back": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velkommen tilbake"
+          }
+        }
+      }
+    },
+    "Create your ATHLTH account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett ATHLTH-konto"
+          }
+        }
+      }
+    },
+    "Sign in with your email and password.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logg inn med e-post og passord."
+          }
+        }
+      }
+    },
+    "Use your email to create an ATHLTH account.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk e-postadressen din for å opprette en ATHLTH-konto."
+          }
+        }
+      }
+    },
+    "Sign In": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logg inn"
+          }
+        }
+      }
+    },
+    "Create Account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett konto"
+          }
+        }
+      }
+    },
+    "Email address": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-postadresse"
+          }
+        }
+      }
+    },
+    "Password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passord"
+          }
+        }
+      }
+    },
+    "Confirm password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekreft passord"
+          }
+        }
+      }
+    },
+    "I agree to the Terms and Privacy Policy": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jeg godtar bruksvilkårene og personvernerklæringen"
+          }
+        }
+      }
+    },
+    "Terms": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vilkår"
+          }
+        }
+      }
+    },
+    "Forgot password?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glemt passord?"
+          }
+        }
+      }
+    },
+    "Email": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-post"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lukk"
+          }
+        }
+      }
+    },
+    "Reset Password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilbakestill passord"
+          }
+        }
+      }
+    },
+    "Send reset link": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send lenke for tilbakestilling"
+          }
+        }
+      }
+    },
+    "Check your email": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekk e-posten din"
+          }
+        }
+      }
+    },
+    "If an ATHLTH account exists for this email address, password-reset instructions will be sent.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvis det finnes en ATHLTH-konto med denne e-postadressen, sendes instruksjoner for tilbakestilling av passord."
+          }
+        }
+      }
+    },
+    "Enter a valid email address.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skriv inn en gyldig e-postadresse."
+          }
+        }
+      }
+    },
+    "Password must contain at least 8 characters.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passordet må inneholde minst 8 tegn."
+          }
+        }
+      }
+    },
+    "The passwords do not match.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passordene er ikke like."
+          }
+        }
+      }
+    },
+    "Please accept the Terms and Privacy Policy.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du må godta bruksvilkårene og personvernerklæringen."
+          }
+        }
+      }
+    },
+    "Username": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukernavn"
+          }
+        }
+      }
+    },
+    "Only a–z, 0–9 and _": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun a–z, 0–9 og _"
+          }
+        }
+      }
+    },
+    "Suggestions for you": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forslag til deg"
+          }
+        }
+      }
+    },
+    "What do you want to achieve?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hva ønsker du å oppnå?"
+          }
+        }
+      }
+    },
+    "Choose the goal that matters most right now. You can change it later.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg målet som betyr mest for deg akkurat nå. Du kan endre det senere."
+          }
+        }
+      }
+    },
+    "Anything else you're interested in?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Er det noe annet du er interessert i?"
+          }
+        }
+      }
+    },
+    "Choose all that apply. These help ATHLTH prioritize features, content and future plans for you.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg alt som passer. Dette hjelper ATHLTH med å prioritere funksjoner, innhold og fremtidige planer for deg."
+          }
+        }
+      }
+    },
+    "Allow ATHLTH to use the goals and interests you choose to personalize ATHLTH offers.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat at ATHLTH bruker målene og interessene du velger til å tilpasse ATHLTH-tilbud."
+          }
+        }
+      }
+    },
+    "Optional. You can continue without enabling this and change it later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgfritt. Du kan fortsette uten å aktivere dette og endre det senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "This applies only to goals and interests you choose in ATHLTH. Apple Health / HealthKit data is not used for offer targeting.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette gjelder bare mål og interesser du velger i ATHLTH. Data fra Apple Health / HealthKit brukes ikke til målretting av tilbud."
+          }
+        }
+      }
+    },
+    "Bring your health and training data into ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta med helse- og treningsdataene dine inn i ATHLTH."
+          }
+        }
+      }
+    },
+    "Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health"
+          }
+        }
+      }
+    },
+    "Workouts, heart rate, sleep, activity and recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsøkter, puls, søvn, aktivitet og restitusjon"
+          }
+        }
+      }
+    },
+    "Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch"
+          }
+        }
+      }
+    },
+    "Imported from Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importert fra Apple Health"
+          }
+        }
+      }
+    },
+    "7-day ATHLTH+ trial active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 dagers prøveperiode med ATHLTH+ er aktiv"
+          }
+        }
+      }
+    },
+    "Background Health sync is included during your trial.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bakgrunnssynkronisering av helsedata er inkludert i prøveperioden."
+          }
+        }
+      }
+    },
+    "ATHLTH is ready around your goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er klart rundt målet ditt."
+          }
+        }
+      }
+    },
+    "Start ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start ATHLTH"
+          }
+        }
+      }
+    },
+    "Keep my ATHLTH+ benefits after the trial": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Behold ATHLTH+-fordelene mine etter prøveperioden"
+          }
+        }
+      }
+    },
+    "See Monthly and Yearly plans before entering ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se måneds- og årsabonnement før du går inn i ATHLTH."
+          }
+        }
+      }
+    },
+    "Complete the required field to continue.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fyll ut det obligatoriske feltet for å fortsette."
+          }
+        }
+      }
+    },
+    "Create an account, then verify your email before continuing.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en konto, og bekreft deretter e-postadressen din før du fortsetter."
+          }
+        }
+      }
+    },
+    "Email account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-postkonto"
+          }
+        }
+      }
+    },
+    "Email verification required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-postbekreftelse kreves"
+          }
+        }
+      }
+    },
+    "Your ATHLTH account has been created, but sign-in is not completed until the email address is verified.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-kontoen din er opprettet, men innloggingen er ikke fullført før e-postadressen er bekreftet."
+          }
+        }
+      }
+    },
+    "Back to sign in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilbake til innlogging"
+          }
+        }
+      }
+    },
+    "If an ATHLTH account exists for this email address, a password-reset link has been sent. Open the link on this iPhone to return to ATHLTH and choose a new password.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvis det finnes en ATHLTH-konto med denne e-postadressen, er en lenke for å tilbakestille passordet sendt. Åpne lenken på denne iPhonen for å gå tilbake til ATHLTH og velge et nytt passord."
+          }
+        }
+      }
+    },
+    "Set a new password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angi et nytt passord"
+          }
+        }
+      }
+    },
+    "Choose a new password for your ATHLTH account.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg et nytt passord for ATHLTH-kontoen din."
+          }
+        }
+      }
+    },
+    "New password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nytt passord"
+          }
+        }
+      }
+    },
+    "Confirm new password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekreft nytt passord"
+          }
+        }
+      }
+    },
+    "Update Password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdater passord"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avbryt"
+          }
+        }
+      }
+    },
+    "Female": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kvinne"
+          }
+        }
+      }
+    },
+    "Male": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mann"
+          }
+        }
+      }
+    },
+    "Other": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annet"
+          }
+        }
+      }
+    },
+    "Prefer not to say": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ønsker ikke å oppgi"
+          }
+        }
+      }
+    },
+    "Lose weight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gå ned i vekt"
+          }
+        }
+      }
+    },
+    "Build muscle": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg muskler"
+          }
+        }
+      }
+    },
+    "Get stronger": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bli sterkere"
+          }
+        }
+      }
+    },
+    "Improve fitness & endurance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre kondisjon og utholdenhet"
+          }
+        }
+      }
+    },
+    "Run faster or farther": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løp raskere eller lengre"
+          }
+        }
+      }
+    },
+    "Move more": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beveg deg mer"
+          }
+        }
+      }
+    },
+    "Improve recovery & sleep": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre restitusjon og søvn"
+          }
+        }
+      }
+    },
+    "Improve mobility & flexibility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre bevegelighet og fleksibilitet"
+          }
+        }
+      }
+    },
+    "Prepare for an event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbered deg til et arrangement"
+          }
+        }
+      }
+    },
+    "Maintain health & fitness": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppretthold helse og form"
+          }
+        }
+      }
+    },
+    "Work toward a healthier body-weight goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jobb mot et sunnere mål for kroppsvekt."
+          }
+        }
+      }
+    },
+    "Prioritize muscle growth and progressive training.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prioriter muskelvekst og progressiv trening."
+          }
+        }
+      }
+    },
+    "Increase strength and track performance over time.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øk styrken og følg utviklingen over tid."
+          }
+        }
+      }
+    },
+    "Build cardiovascular fitness and stamina.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg kondisjon og utholdenhet."
+          }
+        }
+      }
+    },
+    "Improve pace, distance and running performance.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre tempo, distanse og løpsprestasjon."
+          }
+        }
+      }
+    },
+    "Increase everyday movement and activity.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øk hverdagsbevegelse og aktivitet."
+          }
+        }
+      }
+    },
+    "Focus on sleep, recovery and readiness.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fokuser på søvn, restitusjon og beredskap."
+          }
+        }
+      }
+    },
+    "Improve movement quality and flexibility.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbedre bevegelseskvalitet og fleksibilitet."
+          }
+        }
+      }
+    },
+    "Prepare for a race, challenge or target date.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbered deg til et løp, en utfordring eller en måldato."
+          }
+        }
+      }
+    },
+    "Stay active and maintain your current fitness.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold deg aktiv og oppretthold formen du har."
+          }
+        }
+      }
+    },
+    "Strength": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrke"
+          }
+        }
+      }
+    },
+    "Running": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løping"
+          }
+        }
+      }
+    },
+    "Walking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gåing"
+          }
+        }
+      }
+    },
+    "Recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon"
+          }
+        }
+      }
+    },
+    "Nutrition": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kosthold"
+          }
+        }
+      }
+    },
+    "Training plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsplaner"
+          }
+        }
+      }
+    },
+    "Health tracking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helsesporing"
+          }
+        }
+      }
+    },
+    "Friends & challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venner og utfordringer"
+          }
+        }
+      }
+    },
+    "Not requested": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke forespurt"
+          }
+        }
+      }
+    },
+    "Declined": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslått"
+          }
+        }
+      }
+    },
+    "Allowed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillatt"
+          }
+        }
+      }
+    },
+    "Authentication Error": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autentiseringsfeil"
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "Authentication could not be completed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autentiseringen kunne ikke fullføres."
+          }
+        }
+      }
+    },
+    "Move better.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beveg deg bedre."
+          }
+        }
+      }
+    },
+    "Checking availability…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker tilgjengelighet…"
+          }
+        }
+      }
+    },
+    "Username is available": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukernavnet er tilgjengelig"
+          }
+        }
+      }
+    },
+    "Username is already taken": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukernavnet er allerede tatt"
+          }
+        }
+      }
+    },
+    "Use 3–20 characters: a–z, 0–9 or _": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk 3–20 tegn: a–z, 0–9 eller _"
+          }
+        }
+      }
+    },
+    "That username is no longer available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Det brukernavnet er ikke lenger tilgjengelig."
+          }
+        }
+      }
+    },
+    "Checking Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker Apple Watch"
+          }
+        }
+      }
+    },
+    "Apple Watch connection is unavailable on this device": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch-tilkobling er ikke tilgjengelig på denne enheten"
+          }
+        }
+      }
+    },
+    "No paired Apple Watch found": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fant ingen sammenkoblet Apple Watch"
+          }
+        }
+      }
+    },
+    "ATHLTH Watch app is not installed yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Watch-appen er ikke installert ennå"
+          }
+        }
+      }
+    },
+    "Apple Watch is not ready to start an ATHLTH workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch er ikke klar til å starte en ATHLTH-treningsøkt."
+          }
+        }
+      }
+    },
+    "Checking Apple Watch…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker Apple Watch…"
+          }
+        }
+      }
+    },
+    "Install ATHLTH on Apple Watch to continue": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installer ATHLTH på Apple Watch for å fortsette"
+          }
+        }
+      }
+    },
+    "ATHLTH is installed on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er installert på Apple Watch"
+          }
+        }
+      }
+    },
+    "Checking…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker…"
+          }
+        }
+      }
+    },
+    "Help": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hjelp"
+          }
+        }
+      }
+    },
+    "Setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppsett"
+          }
+        }
+      }
+    },
+    "Check": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekk"
+          }
+        }
+      }
+    },
+    "Apple Watch connectivity is not available on this iPhone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch-tilkobling er ikke tilgjengelig på denne iPhonen."
+          }
+        }
+      }
+    },
+    "Pair your Apple Watch with this iPhone in the Watch app, then return to ATHLTH and try again.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble Apple Watch sammen med denne iPhonen i Watch-appen, gå deretter tilbake til ATHLTH og prøv igjen."
+          }
+        }
+      }
+    },
+    "Open the Watch app on your iPhone, find ATHLTH under Available Apps, tap Install, then open ATHLTH once on Apple Watch and return here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne Watch-appen på iPhone, finn ATHLTH under Tilgjengelige apper, trykk Installer, åpne deretter ATHLTH én gang på Apple Watch og gå tilbake hit."
+          }
+        }
+      }
+    },
+    "ATHLTH Watch app is installed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Watch-appen er installert"
+          }
+        }
+      }
+    },
+    "Installed · open ATHLTH on Apple Watch once to verify the live connection": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installert · åpne ATHLTH én gang på Apple Watch for å bekrefte live-tilkoblingen"
+          }
+        }
+      }
+    },
+    "Connected to ATHLTH on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilkoblet ATHLTH på Apple Watch"
+          }
+        }
+      }
+    },
+    "ATHLTH Watch app responded": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Watch-appen svarte"
+          }
+        }
+      }
+    },
+    "Installed · open ATHLTH on Apple Watch and try again": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installert · åpne ATHLTH på Apple Watch og prøv igjen"
+          }
+        }
+      }
+    },
+    "Apple Watch setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch-oppsett"
+          }
+        }
+      }
+    },
+    "Open ATHLTH on Apple Watch and try again.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH på Apple Watch og prøv igjen."
+          }
+        }
+      }
+    },
+    "Configure": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer"
+          }
+        }
+      }
+    },
+    "Configure Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer Apple Watch"
+          }
+        }
+      }
+    },
+    "Set up ATHLTH on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer ATHLTH på Apple Watch"
+          }
+        }
+      }
+    },
+    "ATHLTH checks your iPhone Health access, Watch installation, live connection and Health access on Apple Watch in one setup flow.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH sjekker Apple Health-tilgang på iPhone, installasjon på klokken, live-tilkobling og Health-tilgang på Apple Watch i én samlet oppsettflyt."
+          }
+        }
+      }
+    },
+    "Apple Health on iPhone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health på iPhone"
+          }
+        }
+      }
+    },
+    "Apple Health access has been requested": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health-tilgang er forespurt"
+          }
+        }
+      }
+    },
+    "Allow ATHLTH to request the Health data it needs on your iPhone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat ATHLTH å be om helsedataene appen trenger på iPhone."
+          }
+        }
+      }
+    },
+    "Configure Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer Apple Health"
+          }
+        }
+      }
+    },
+    "ATHLTH on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH på Apple Watch"
+          }
+        }
+      }
+    },
+    "Checking paired Apple Watch…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker sammenkoblet Apple Watch…"
+          }
+        }
+      }
+    },
+    "Apple Watch connectivity is unavailable on this iPhone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch-tilkobling er ikke tilgjengelig på denne iPhonen."
+          }
+        }
+      }
+    },
+    "No paired Apple Watch was found. Pair your Watch in Apple’s Watch app, then return here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fant ingen sammenkoblet Apple Watch. Koble klokken til i Apples Watch-app, og gå deretter tilbake hit."
+          }
+        }
+      }
+    },
+    "ATHLTH is not installed on your Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er ikke installert på Apple Watch."
+          }
+        }
+      }
+    },
+    "Open the Watch app on this iPhone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne Watch-appen på denne iPhonen"
+          }
+        }
+      }
+    },
+    "Find ATHLTH under Available Apps": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn ATHLTH under Tilgjengelige apper"
+          }
+        }
+      }
+    },
+    "Tap Install and open ATHLTH once on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trykk Installer og åpne ATHLTH én gang på Apple Watch"
+          }
+        }
+      }
+    },
+    "Apple does not provide an API that lets ATHLTH install the Watch app automatically. Installation must be confirmed in the Watch app.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple tilbyr ikke et API som lar ATHLTH installere Watch-appen automatisk. Installasjonen må bekreftes i Watch-appen."
+          }
+        }
+      }
+    },
+    "ATHLTH is installed on Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er installert på Apple Watch."
+          }
+        }
+      }
+    },
+    "Open ATHLTH once on Apple Watch, keep it visible, then tap Check again to verify the live connection.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH én gang på Apple Watch, la appen være synlig, og trykk deretter Sjekk igjen for å bekrefte live-tilkoblingen."
+          }
+        }
+      }
+    },
+    "Check again": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekk igjen"
+          }
+        }
+      }
+    },
+    "Health access on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health-tilgang på Apple Watch"
+          }
+        }
+      }
+    },
+    "Install and connect ATHLTH on Apple Watch before configuring Watch Health access.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installer og koble til ATHLTH på Apple Watch før du konfigurerer Health-tilgang på klokken."
+          }
+        }
+      }
+    },
+    "Open ATHLTH on Apple Watch. When you continue, the Health permission sheet appears on the Watch so you can approve workout, heart-rate, energy, distance and route access.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH på Apple Watch. Når du fortsetter, vises Health-tillatelsene på klokken slik at du kan godkjenne tilgang til treningsøkter, puls, energi, distanse og ruter."
+          }
+        }
+      }
+    },
+    "Configure Health on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konfigurer Health på Apple Watch"
+          }
+        }
+      }
+    },
+    "Open ATHLTH on Apple Watch first. The Watch must be reachable before ATHLTH can ask watchOS to show the Health permission sheet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH på Apple Watch først. Klokken må være tilgjengelig før ATHLTH kan be watchOS vise Health-tillatelsene."
+          }
+        }
+      }
+    },
+    "Apple Watch must be connected before Health access can be configured.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch må være tilkoblet før Health-tilgang kan konfigureres."
+          }
+        }
+      }
+    },
+    "Open ATHLTH on Apple Watch, then tap Configure Health again.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne ATHLTH på Apple Watch, og trykk deretter Konfigurer Health på nytt."
+          }
+        }
+      }
+    },
+    "Check your Apple Watch for the Health permission sheet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se på Apple Watch etter Health-tillatelsene."
+          }
+        }
+      }
+    },
+    "Apple Watch Health setup completed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health-oppsettet på Apple Watch er fullført."
+          }
+        }
+      }
+    },
+    "Apple Watch Health setup could not be completed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health-oppsettet på Apple Watch kunne ikke fullføres."
+          }
+        }
+      }
+    },
+    "Get more relevant offers": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Få mer relevante tilbud"
+          }
+        }
+      }
+    },
+    "Optional": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgfritt"
+          }
+        }
+      }
+    },
+    "Let ATHLTH use the goals and interests you choose to make offers and promotions more relevant to you.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ATHLTH bruke målene og interessene du velger for å gjøre tilbud og kampanjer mer relevante for deg."
+          }
+        }
+      }
+    },
+    "Personalized offers": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilpassede tilbud"
+          }
+        }
+      }
+    },
+    "More relevant offers and fewer irrelevant promotions.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mer relevante tilbud og færre irrelevante kampanjer."
+          }
+        }
+      }
+    },
+    "Apple Health and HealthKit data is never used to target offers.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data fra Apple Health og HealthKit brukes aldri til å målrette tilbud."
+          }
+        }
+      }
+    },
+    "Off by default · You can change this later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Av som standard · Du kan endre dette senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "ATHLTH is set up around your goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er satt opp rundt målet ditt."
+          }
+        }
+      }
+    },
+    "7 DAYS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 DAGER"
+          }
+        }
+      }
+    },
+    "Your ATHLTH+ trial is active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøveperioden din med ATHLTH+ er aktiv"
+          }
+        }
+      }
+    },
+    "Get more from ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Få mer ut av ATHLTH"
+          }
+        }
+      }
+    },
+    "Get more from Apple Health and Apple Watch with deeper insights, automatic sync and advanced training tools.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Få mer ut av Apple Health og Apple Watch med dypere innsikt, automatisk synkronisering og avanserte treningsverktøy."
+          }
+        }
+      }
+    },
+    "Automatic Health background sync": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisk bakgrunnssynkronisering av helsedata"
+          }
+        }
+      }
+    },
+    "Sleep and recovery insights": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Innsikt i søvn og restitusjon"
+          }
+        }
+      }
+    },
+    "Advanced training plans and progression": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanserte treningsplaner og progresjon"
+          }
+        }
+      }
+    },
+    "Route challenges and premium recovery features": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruteutfordringer og premiumfunksjoner for restitusjon"
+          }
+        }
+      }
+    },
+    "Trial ends": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøveperioden avsluttes"
+          }
+        }
+      }
+    },
+    "Choose ATHLTH+ plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg ATHLTH+-abonnement"
+          }
+        }
+      }
+    },
+    "The App Store shows the price and billing details before you confirm a purchase.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Store viser pris og betalingsdetaljer før du bekrefter et kjøp."
+          }
+        }
+      }
+    },
+    "Continue to ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett til ATHLTH"
+          }
+        }
+      }
+    },
+    "You can choose ATHLTH+ later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan velge ATHLTH+ senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "Choose ATHLTH+": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg ATHLTH+"
+          }
+        }
+      }
+    },
+    "Choose the plan that fits you. The App Store shows the final price and billing details before you confirm.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg abonnementet som passer deg. App Store viser endelig pris og betalingsdetaljer før du bekrefter."
+          }
+        }
+      }
+    },
+    "Included with ATHLTH+": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inkludert med ATHLTH+"
+          }
+        }
+      }
+    },
+    "PREMIUM": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PREMIUM"
+          }
+        }
+      }
+    },
+    "Continue with this plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett med dette abonnementet"
+          }
+        }
+      }
+    },
+    "You can close this window without purchasing and choose ATHLTH+ later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan lukke dette vinduet uten å kjøpe og velge ATHLTH+ senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "ATHLTH+ Plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH+-abonnement"
+          }
+        }
+      }
+    },
+    "YEARLY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ÅRLIG"
+          }
+        }
+      }
+    },
+    "Monthly": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Månedlig"
+          }
+        }
+      }
+    },
+    "Yearly": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Årlig"
+          }
+        }
+      }
+    },
+    " / month": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " / måned"
+          }
+        }
+      }
+    },
+    " / year": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " / år"
+          }
+        }
+      }
+    },
+    "Loading plans…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laster abonnementer…"
+          }
+        }
+      }
+    },
+    "Plans aren’t available yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abonnementene er ikke tilgjengelige ennå"
+          }
+        }
+      }
+    },
+    "Monthly and Yearly App Store products will appear here when they are configured.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Måneds- og årsabonnement fra App Store vises her når de er konfigurert."
+          }
+        }
+      }
+    },
+    "Uses only goals and interests you choose in ATHLTH to make offers and promotions more relevant. Apple Health / HealthKit data is never used for offer targeting.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruker kun mål og interesser du velger i ATHLTH for å gjøre tilbud og kampanjer mer relevante. Data fra Apple Health / HealthKit brukes aldri til å målrette tilbud."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
 }

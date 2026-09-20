@@ -8,6 +8,7 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var workouts: [WorkoutSummary] = []
     @Published private(set) var sleep: SleepSummary = .empty
     @Published private(set) var heart: HeartSummary = .empty
+    @Published private(set) var personalDetails: HealthProfileBasics = .empty
     @Published private(set) var isRefreshing = false
     @Published var authorizationError: String?
     @Published private(set) var backgroundDeliveryTestResult: String?
@@ -15,6 +16,7 @@ final class HealthKitManager: ObservableObject {
 
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
+    private var observerQueries: [HKObserverQuery] = []
     private let authorizationFlagKey = "athlth.healthAuthorizationRequested"
 
     var hasRequestedAuthorization: Bool {
@@ -25,10 +27,112 @@ final class HealthKitManager: ObservableObject {
         HKHealthStore.isHealthDataAvailable()
     }
 
+    /// Health data ATHLTH can make meaningful use of now or in the planned
+    /// training/recovery experience. Deliberately excludes unrelated sensitive
+    /// domains such as clinical records and reproductive-health data.
     private var readTypes: Set<HKObjectType> {
         var types: Set<HKObjectType> = [
             HKObjectType.workoutType(),
             HKSeriesType.workoutRoute()
+        ]
+
+        let quantityIdentifiers: [HKQuantityTypeIdentifier] = [
+            // Heart, cardio and recovery
+            .heartRate,
+            .restingHeartRate,
+            .walkingHeartRateAverage,
+            .heartRateVariabilitySDNN,
+            .vo2Max,
+            .oxygenSaturation,
+            .respiratoryRate,
+
+            // Daily activity and energy
+            .activeEnergyBurned,
+            .basalEnergyBurned,
+            .stepCount,
+            .appleExerciseTime,
+            .appleStandTime,
+            .flightsClimbed,
+
+            // Distance and sport
+            .distanceWalkingRunning,
+            .distanceCycling,
+            .distanceSwimming,
+            .swimmingStrokeCount,
+
+            // Walking and mobility
+            .walkingSpeed,
+            .walkingStepLength,
+            .walkingAsymmetryPercentage,
+            .walkingDoubleSupportPercentage,
+            .sixMinuteWalkTestDistance,
+            .stairAscentSpeed,
+            .stairDescentSpeed,
+
+            // Running dynamics
+            .runningSpeed,
+            .runningPower,
+            .runningStrideLength,
+            .runningVerticalOscillation,
+            .runningGroundContactTime,
+
+            // Cycling dynamics
+            .cyclingSpeed,
+            .cyclingPower,
+            .cyclingCadence,
+
+            // Body measurements
+            .height,
+            .bodyMass,
+            .bodyMassIndex,
+            .bodyFatPercentage,
+            .leanBodyMass,
+            .waistCircumference
+        ]
+
+        for identifier in quantityIdentifiers {
+            if let type = HKObjectType.quantityType(forIdentifier: identifier) {
+                types.insert(type)
+            }
+        }
+
+        let categoryIdentifiers: [HKCategoryTypeIdentifier] = [
+            .sleepAnalysis,
+            .mindfulSession,
+            .appleStandHour,
+            .highHeartRateEvent,
+            .lowHeartRateEvent,
+            .irregularHeartRhythmEvent
+        ]
+
+        for identifier in categoryIdentifiers {
+            if let type = HKObjectType.categoryType(forIdentifier: identifier) {
+                types.insert(type)
+            }
+        }
+
+        let characteristicIdentifiers: [HKCharacteristicTypeIdentifier] = [
+            .dateOfBirth,
+            .biologicalSex,
+            .bloodType,
+            .wheelchairUse
+        ]
+
+        for identifier in characteristicIdentifiers {
+            if let type = HKObjectType.characteristicType(forIdentifier: identifier) {
+                types.insert(type)
+            }
+        }
+
+        return types
+    }
+
+    /// Only types that currently drive ATHLTH's live dashboard need observer
+    /// queries. Authorization is intentionally broader than background refresh
+    /// so a step count or mobility update does not trigger a full data reload.
+    private var backgroundObserverTypes: Set<HKSampleType> {
+        var types: Set<HKSampleType> = [
+            HKObjectType.workoutType()
         ]
 
         let quantityIdentifiers: [HKQuantityTypeIdentifier] = [
@@ -64,9 +168,82 @@ final class HealthKitManager: ObservableObject {
             try await healthStore.requestAuthorization(toShare: [], read: readTypes)
             UserDefaults.standard.set(true, forKey: authorizationFlagKey)
             objectWillChange.send()
+            await refreshPersonalDetails()
             await refreshAll()
         } catch {
             authorizationError = error.localizedDescription
+        }
+    }
+
+    func configureBackgroundSync(allowed: Bool) async {
+        guard healthDataAvailable else { return }
+
+        guard allowed else {
+            await disableBackgroundSync()
+            return
+        }
+
+        startBackgroundObservers()
+
+        var registrations: [(HKObjectType, HKUpdateFrequency)] = [
+            (HKObjectType.workoutType(), .immediate)
+        ]
+
+        if let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
+            registrations.append((sleepType, .hourly))
+        }
+
+        let quantityTypes: [(HKQuantityTypeIdentifier, HKUpdateFrequency)] = [
+            (.heartRate, .immediate),
+            (.restingHeartRate, .hourly),
+            (.heartRateVariabilitySDNN, .hourly),
+            (.activeEnergyBurned, .hourly),
+            (.distanceWalkingRunning, .hourly)
+        ]
+
+        for (identifier, frequency) in quantityTypes {
+            if let type = HKObjectType.quantityType(forIdentifier: identifier) {
+                registrations.append((type, frequency))
+            }
+        }
+
+        for (type, frequency) in registrations {
+            _ = await withCheckedContinuation { continuation in
+                healthStore.enableBackgroundDelivery(for: type, frequency: frequency) { success, _ in
+                    continuation.resume(returning: success)
+                }
+            }
+        }
+    }
+
+    func disableBackgroundSync() async {
+        for query in observerQueries {
+            healthStore.stop(query)
+        }
+        observerQueries.removeAll()
+
+        _ = await withCheckedContinuation { continuation in
+            healthStore.disableAllBackgroundDelivery { success, _ in
+                continuation.resume(returning: success)
+            }
+        }
+    }
+
+    private func startBackgroundObservers() {
+        guard observerQueries.isEmpty else { return }
+
+        for type in backgroundObserverTypes {
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completionHandler, error in
+                defer { completionHandler() }
+                guard error == nil else { return }
+
+                Task { @MainActor [weak self] in
+                    await self?.refreshAll()
+                }
+            }
+
+            observerQueries.append(query)
+            healthStore.execute(query)
         }
     }
 
@@ -83,9 +260,50 @@ final class HealthKitManager: ObservableObject {
             workoutObjects = Dictionary(uniqueKeysWithValues: fetched.map { ($0.uuid, $0) })
             sleep = try await fetchLatestSleep()
             heart = try await fetchHeartSummary()
+            await refreshPersonalDetails()
         } catch {
             authorizationError = error.localizedDescription
         }
+    }
+
+    func refreshPersonalDetails() async {
+        guard healthDataAvailable else {
+            personalDetails = .empty
+            return
+        }
+
+        var details = HealthProfileBasics.empty
+
+        if let components = try? healthStore.dateOfBirthComponents() {
+            details.dateOfBirth = Calendar.current.date(from: components)
+        }
+
+        if let biologicalSex = try? healthStore.biologicalSex().biologicalSex {
+            switch biologicalSex {
+            case .female:
+                details.healthSex = .female
+            case .male:
+                details.healthSex = .male
+            case .other:
+                details.healthSex = .other
+            case .notSet:
+                details.healthSex = nil
+            @unknown default:
+                details.healthSex = nil
+            }
+        }
+
+        details.heightCentimeters = try? await latestQuantity(
+            identifier: .height,
+            unit: HKUnit.meterUnit(with: .centi)
+        )?.0
+
+        details.weightKilograms = try? await latestQuantity(
+            identifier: .bodyMass,
+            unit: HKUnit.gramUnit(with: .kilo)
+        )?.0
+
+        personalDetails = details
     }
 
     func authorizationRequestStatusDescription() async -> String {

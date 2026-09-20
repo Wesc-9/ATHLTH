@@ -1,0 +1,61 @@
+name: Archive Preflight
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  archive-preflight:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Xcode
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Validate Release archive for physical devices
+        run: |
+          set -euo pipefail
+          xcodebuild             -project ATHLTH.xcodeproj             -scheme ATHLTH             -configuration Release             -destination 'generic/platform=iOS'             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive"             CODE_SIGNING_ALLOWED=NO             archive
+
+      - name: Verify archive contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/ATHLTH.xcarchive"
+          APP="$ARCHIVE/Products/Applications/ATHLTH.app"
+          WATCH_PLIST="$APP/Watch/ATHLTH.app/Info.plist"
+
+          test -d "$ARCHIVE"
+          test -f "$WATCH_PLIST"
+
+          IOS_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$ARCHIVE/Info.plist")
+          WATCH_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$WATCH_PLIST")
+          WK_APPLICATION=$(/usr/libexec/PlistBuddy -c 'Print :WKApplication' "$WATCH_PLIST")
+          COMPANION_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :WKCompanionAppBundleIdentifier' "$WATCH_PLIST")
+
+          /usr/libexec/PlistBuddy -c 'Print :UILaunchScreen' "$APP/Info.plist" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations' "$APP/Info.plist" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :NSHealthShareUsageDescription' "$APP/Info.plist" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :NSHealthUpdateUsageDescription' "$APP/Info.plist" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :NSHealthShareUsageDescription' "$WATCH_PLIST" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :NSHealthUpdateUsageDescription' "$WATCH_PLIST" >/dev/null
+
+          test "$IOS_BUNDLE_ID" = "com.wesc9.athlth"
+          test "$WATCH_BUNDLE_ID" = "com.wesc9.athlth.watchkitapp"
+          test "$WK_APPLICATION" = "true"
+          test "$COMPANION_BUNDLE_ID" = "com.wesc9.athlth"
+
+          echo "iOS bundle: $IOS_BUNDLE_ID"
+          echo "Watch bundle: $WATCH_BUNDLE_ID"
+          echo "WKApplication: $WK_APPLICATION"
+          echo "Watch companion: $COMPANION_BUNDLE_ID"
+          echo "App Store required Info.plist metadata verified."

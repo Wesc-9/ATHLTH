@@ -1,0 +1,140 @@
+name: Check ATHLTH TestFlight Status
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/v0.1-product-foundation
+    paths:
+      - .github/testflight-status-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    env:
+      ASC_KEY_ID: T38TGJU4AV
+      ASC_ISSUER_ID: 8ede2ab1-ca29-45a7-9653-94925310eea0
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      ATHLTH_BUNDLE_ID: com.wesc9.athlth
+
+    steps:
+      - name: Prepare App Store Connect key
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+
+          KEY_PATH="$KEY_PATH" python3 - <<'PY'
+          import json
+          import os
+
+          value = os.environ["ASC_API_KEY_P8"].strip()
+          if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+              if value[0] == '"':
+                  try:
+                      value = json.loads(value)
+                  except json.JSONDecodeError:
+                      value = value[1:-1]
+              else:
+                  value = value[1:-1]
+
+          value = value.replace("\\r\\n", "\n").replace("\\n", "\n")
+
+          with open(os.environ["KEY_PATH"], "w", encoding="utf-8") as handle:
+              handle.write(value)
+              if not value.endswith("\n"):
+                  handle.write("\n")
+          PY
+
+          chmod 600 "$KEY_PATH"
+          echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Install JWT dependencies
+        run: python3 -m pip install --quiet PyJWT cryptography
+
+      - name: Query latest TestFlight build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TOKEN="$(
+            ASC_KEY_PATH="$ASC_KEY_PATH" python3 - <<'PY'
+          import os
+          import time
+          import jwt
+
+          with open(os.environ["ASC_KEY_PATH"], "r", encoding="utf-8") as handle:
+              private_key = handle.read()
+
+          now = int(time.time())
+          print(jwt.encode(
+              {
+                  "iss": os.environ["ASC_ISSUER_ID"],
+                  "iat": now,
+                  "exp": now + 600,
+                  "aud": "appstoreconnect-v1",
+              },
+              private_key,
+              algorithm="ES256",
+              headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"},
+          ))
+          PY
+          )"
+
+          AUTH=(-H "Authorization: Bearer $TOKEN")
+
+          curl -fsS "${AUTH[@]}"             "https://api.appstoreconnect.apple.com/v1/apps?filter%5BbundleId%5D=${ATHLTH_BUNDLE_ID}&limit=1"             > "$RUNNER_TEMP/apps.json"
+
+          APP_ID="$(python3 - <<'PY'
+          import json, os
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "apps.json"), encoding="utf-8") as f:
+              body = json.load(f)
+          data = body.get("data", [])
+          if not data:
+              raise SystemExit("ATHLTH app record not found in App Store Connect")
+          print(data[0]["id"])
+          PY
+          )"
+
+          curl -fsS "${AUTH[@]}"             "https://api.appstoreconnect.apple.com/v1/builds?filter%5Bapp%5D=${APP_ID}&sort=-uploadedDate&limit=5"             > "$RUNNER_TEMP/builds.json"
+
+          python3 - <<'PY'
+          import json, os
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "builds.json"), encoding="utf-8") as f:
+              body = json.load(f)
+          data = body.get("data", [])
+          if not data:
+              raise SystemExit("No TestFlight builds found yet")
+          latest = data[0]
+          attrs = latest.get("attributes", {})
+          print("Latest ATHLTH TestFlight build:")
+          print("  build_id:", latest["id"])
+          print("  build_number:", attrs.get("version"))
+          print("  uploaded_date:", attrs.get("uploadedDate"))
+          print("  processing_state:", attrs.get("processingState"))
+          print("  expired:", attrs.get("expired"))
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "latest_build_id"), "w", encoding="utf-8") as out:
+              out.write(latest["id"])
+          PY
+
+          BUILD_ID="$(cat "$RUNNER_TEMP/latest_build_id")"
+
+          HTTP_CODE="$(
+            curl -sS "${AUTH[@]}"               -o "$RUNNER_TEMP/beta-detail.json"               -w '%{http_code}'               "https://api.appstoreconnect.apple.com/v1/builds/${BUILD_ID}/buildBetaDetail"
+          )"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            python3 - <<'PY'
+          import json, os
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "beta-detail.json"), encoding="utf-8") as f:
+              body = json.load(f)
+          attrs = body.get("data", {}).get("attributes", {})
+          print("  internal_build_state:", attrs.get("internalBuildState"))
+          print("  external_build_state:", attrs.get("externalBuildState"))
+          PY
+          else
+            echo "  beta_detail_http: $HTTP_CODE"
+          fi
