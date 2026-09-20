@@ -50,3 +50,4 @@ struct AppRootView: View {
             await health.refreshAll()
         }
 }
+}
