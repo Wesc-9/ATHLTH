@@ -1,9 +1,12 @@
+import AuthenticationServices
+import CryptoKit
 import Foundation
 import Supabase
 
 @MainActor
 final class SupabaseAccountService: ObservableObject {
     private let client: SupabaseClient
+    private var appleRawNonce: String?
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -11,6 +14,58 @@ final class SupabaseAccountService: ObservableObject {
 
     var currentUserID: UUID? {
         client.auth.currentUser?.id
+    }
+
+    func prepareAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {
+        let rawNonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        appleRawNonce = rawNonce
+        request.requestedScopes = [.email, .fullName]
+        request.nonce = Self.sha256(rawNonce)
+    }
+
+    func signInWithApple(
+        credential: ASAuthorizationAppleIDCredential
+    ) async throws -> BackendUserBootstrap {
+        guard let rawNonce = appleRawNonce else {
+            throw SupabaseAccountError.missingAppleNonce
+        }
+
+        defer { appleRawNonce = nil }
+
+        guard let idToken = credential.identityToken
+            .flatMap({ String(data: $0, encoding: .utf8) })
+        else {
+            throw SupabaseAccountError.missingAppleIDToken
+        }
+
+        _ = try await client.auth.signInWithIdToken(
+            credentials: OpenIDConnectCredentials(
+                provider: .apple,
+                idToken: idToken,
+                nonce: rawNonce
+            )
+        )
+
+        if let fullName = credential.fullName {
+            let displayName = [
+                fullName.givenName,
+                fullName.middleName,
+                fullName.familyName
+            ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+            if !displayName.isEmpty, let userID = currentUserID {
+                try await client
+                    .from("profiles")
+                    .update(["display_name": displayName])
+                    .eq("id", value: userID)
+                    .execute()
+            }
+        }
+
+        return try await loadCurrentUser()
     }
 
     func signUp(email: String, password: String) async throws {
@@ -29,6 +84,11 @@ final class SupabaseAccountService: ObservableObject {
 
     func signOut() async throws {
         try await client.auth.signOut()
+    }
+
+    func restoreCurrentUser() async throws -> BackendUserBootstrap? {
+        guard currentUserID != nil else { return nil }
+        return try await loadCurrentUser()
     }
 
     func loadCurrentUser() async throws -> BackendUserBootstrap {
@@ -67,6 +127,21 @@ final class SupabaseAccountService: ObservableObject {
         )
     }
 
+    func markOnboardingComplete() async throws {
+        guard let userID = currentUserID else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        try await client
+            .from("profiles")
+            .update([
+                "onboarding_completed": "true",
+                "onboarding_completed_at": ISO8601DateFormatter().string(from: Date())
+            ])
+            .eq("id", value: userID)
+            .execute()
+    }
+
     func claimUsername(_ username: String) async throws {
         guard let userID = currentUserID else {
             throw SupabaseAccountError.notAuthenticated
@@ -82,15 +157,30 @@ final class SupabaseAccountService: ObservableObject {
             .eq("id", value: userID)
             .execute()
     }
+
+    private static func sha256(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
 }
 
 enum SupabaseAccountError: LocalizedError {
     case notAuthenticated
+    case missingAppleNonce
+    case missingAppleIDToken
+    case invalidAppleCredential
 
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
             return "No authenticated ATHLTH user is available."
+        case .missingAppleNonce:
+            return "Apple sign in could not be validated. Please try again."
+        case .missingAppleIDToken:
+            return "Apple did not return a valid sign-in token."
+        case .invalidAppleCredential:
+            return "Apple returned an invalid sign-in credential."
         }
     }
 }
