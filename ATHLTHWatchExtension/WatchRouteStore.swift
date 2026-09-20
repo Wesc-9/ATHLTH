@@ -139,8 +139,17 @@ extension WatchRouteStore: WCSessionDelegate {
         didReceiveMessage message: [String: Any],
         replyHandler: @escaping ([String: Any]) -> Void
     ) {
-        if message[WatchTransferMetadataKey.kind] as? String
-            == WatchTransferKind.connectionPing.rawValue {
+        guard let rawKind = message[WatchTransferMetadataKey.kind] as? String,
+              let kind = WatchTransferKind(rawValue: rawKind) else {
+            handleWorkoutCommand(message)
+            replyHandler([
+                WatchTransferMetadataKey.status: "ok"
+            ])
+            return
+        }
+
+        switch kind {
+        case .connectionPing:
             DispatchQueue.main.async { [weak self] in
                 self?.connectionText = "Connected to iPhone"
             }
@@ -150,13 +159,38 @@ extension WatchRouteStore: WCSessionDelegate {
                     WatchTransferKind.connectionPing.rawValue,
                 WatchTransferMetadataKey.status: "ok"
             ])
-            return
-        }
 
-        handleWorkoutCommand(message)
-        replyHandler([
-            WatchTransferMetadataKey.status: "ok"
-        ])
+        case .healthAuthorizationRequest:
+            Task {
+                let error = await WatchWorkoutManager.shared
+                    .requestHealthAuthorizationForSetup()
+
+                var response: [String: Any] = [
+                    WatchTransferMetadataKey.kind:
+                        WatchTransferKind.healthAuthorizationRequest.rawValue
+                ]
+
+                if let error {
+                    response[WatchTransferMetadataKey.status] = "failed"
+                    response[WatchTransferMetadataKey.error] = error
+                } else {
+                    response[WatchTransferMetadataKey.status] = "authorized"
+                }
+
+                replyHandler(response)
+            }
+
+        case .workoutCommand:
+            handleWorkoutCommand(message)
+            replyHandler([
+                WatchTransferMetadataKey.status: "ok"
+            ])
+
+        case .route, .workoutResult:
+            replyHandler([
+                WatchTransferMetadataKey.status: "ok"
+            ])
+        }
     }
 
     func session(
