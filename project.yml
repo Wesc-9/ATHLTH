@@ -1,4 +1,5 @@
 name: ATHLTH
+preGenCommand: python3 scripts/generate_app_icons.py
 options:
   bundleIdPrefix: com.wesc9
   deploymentTarget:
