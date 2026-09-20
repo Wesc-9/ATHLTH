@@ -262,6 +262,18 @@ struct ATHLTHTrainView: View {
                 ) { captureDevice, trackingMode in
                     startPlanSpotifyIfNeeded()
                     session.beginTrainingStatus(for: workout)
+
+                    if captureDevice == .appleWatch {
+                        Task {
+                            do {
+                                try await watchConnection.startWorkoutOnWatch(.strength)
+                                watchTransferMessage = "Strength workout started on Apple Watch."
+                            } catch {
+                                watchTransferError = error.localizedDescription
+                            }
+                        }
+                    }
+
                     strengthWorkout.start(
                         session: workout,
                         watchSessionID: captureDevice == .appleWatch ? UUID() : nil,
@@ -285,7 +297,7 @@ struct ATHLTHTrainView: View {
                     await importGPX(result)
                 }
             }
-            .alert("Routes", isPresented: Binding(
+            .alert("ATHLTH", isPresented: Binding(
                 get: {
                     importMessage != nil ||
                     importError != nil ||
@@ -348,17 +360,35 @@ struct ATHLTHTrainView: View {
         }
 
         ATHLTHCard {
-            ATHLTHSectionHeader(title: "Quick Start")
+            ATHLTHSectionHeader(
+                title: "Quick Start",
+                actionTitle: watchConnection.isReady ? "Apple Watch" : "Connect Watch"
+            )
             HStack {
                 ForEach([WorkoutKind.running, .walking, .strength, .custom]) { kind in
-                    VStack(spacing: 7) {
-                        Image(systemName: kind.systemImage)
-                            .font(.title2)
-                            .foregroundStyle(.green)
-                        Text(kind.title)
-                            .font(.caption.weight(.semibold))
+                    Button {
+                        startQuickWorkoutOnWatch(kind)
+                    } label: {
+                        VStack(spacing: 7) {
+                            Image(systemName: kind.systemImage)
+                                .font(.title2)
+                                .foregroundStyle(.green)
+                            Text(kind.title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 76)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 76)
+                    .buttonStyle(.plain)
+                    .disabled(
+                        watchWorkoutKind(for: kind) == nil ||
+                        !watchConnection.isReady ||
+                        watchConnection.workoutLaunchInProgress
+                    )
+                    .opacity(
+                        watchWorkoutKind(for: kind) == nil ||
+                        !watchConnection.isReady ? 0.45 : 1
+                    )
                 }
             }
             .padding(.top, 10)
@@ -465,6 +495,34 @@ struct ATHLTHTrainView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .tint(.green)
+        }
+    }
+
+    private func watchWorkoutKind(
+        for kind: WorkoutKind
+    ) -> WatchWorkoutKind? {
+        switch kind {
+        case .running:
+            return .running
+        case .walking:
+            return .walking
+        case .strength:
+            return .strength
+        case .mobility, .recovery, .custom:
+            return nil
+        }
+    }
+
+    private func startQuickWorkoutOnWatch(_ kind: WorkoutKind) {
+        guard let watchKind = watchWorkoutKind(for: kind) else { return }
+
+        Task {
+            do {
+                try await watchConnection.startWorkoutOnWatch(watchKind)
+                watchTransferMessage = "\(watchKind.title) started on Apple Watch."
+            } catch {
+                watchTransferError = error.localizedDescription
+            }
         }
     }
 
