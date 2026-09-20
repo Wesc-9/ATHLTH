@@ -7,14 +7,21 @@ struct WatchHomeView: View {
         NavigationStack {
             List {
                 Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("ATHLTH")
-                            .font(.headline.weight(.black))
-                            .tracking(2)
+                    HStack(alignment: .top, spacing: 8) {
+                        ATHLTHBrandMark(size: .watch)
 
-                        Text(routeStore.connectionText)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 4)
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+
+                            Text(routeStore.connectionText)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
                     }
                     .listRowBackground(Color.clear)
                 }
