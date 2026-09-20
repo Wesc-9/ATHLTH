@@ -239,16 +239,13 @@ struct MirroredWorkoutLiveView: View {
         snapshot: WatchWorkoutLiveSnapshot,
         now: Date
     ) -> TimeInterval {
-        guard
-            snapshot.state == .running,
-            let startedAt = snapshot.startedAt
-        else {
+        guard snapshot.state == .running else {
             return snapshot.elapsedTime
         }
 
         return max(
             snapshot.elapsedTime,
-            now.timeIntervalSince(startedAt)
+            snapshot.elapsedTime + now.timeIntervalSince(snapshot.capturedAt)
         )
     }
 
