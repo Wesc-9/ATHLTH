@@ -141,12 +141,23 @@ jobs:
 
           IOS_ENT="$RUNNER_TEMP/ios-entitlements.plist"
           WATCH_ENT="$RUNNER_TEMP/watch-entitlements.plist"
-          codesign -d --entitlements "$IOS_ENT" "$APP"
-          codesign -d --entitlements "$WATCH_ENT" "$WATCH_APP"
+          codesign -d --entitlements :- "$APP" > "$IOS_ENT" 2>/dev/null
+          codesign -d --entitlements :- "$WATCH_APP" > "$WATCH_ENT" 2>/dev/null
+
           echo "iPhone signed entitlements:"
           plutil -p "$IOS_ENT"
           echo "Watch signed entitlements:"
           plutil -p "$WATCH_ENT"
+
+          IOS_PROFILE="$RUNNER_TEMP/ios-profile.plist"
+          WATCH_PROFILE="$RUNNER_TEMP/watch-profile.plist"
+          security cms -D -i "$APP/embedded.mobileprovision" > "$IOS_PROFILE"
+          security cms -D -i "$WATCH_APP/embedded.mobileprovision" > "$WATCH_PROFILE"
+          echo "iPhone provisioning profile entitlements:"
+          /usr/libexec/PlistBuddy -c "Print :Entitlements" "$IOS_PROFILE"
+          echo "Watch provisioning profile entitlements:"
+          /usr/libexec/PlistBuddy -c "Print :Entitlements" "$WATCH_PROFILE"
+
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$IOS_ENT" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
 
