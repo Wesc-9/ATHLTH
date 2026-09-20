@@ -4,6 +4,7 @@ import SwiftUI
 struct SubscriptionOfferView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
+    @EnvironmentObject private var accountService: SupabaseAccountService
 
     let onPurchaseCompleted: () -> Void
 
@@ -76,7 +77,14 @@ struct SubscriptionOfferView: View {
                             }
 
                             Task {
-                                if await subscriptionStore.purchase(product) {
+                                guard let userID = accountService.currentUserID else {
+                                    return
+                                }
+
+                                if await subscriptionStore.purchase(
+                                    product,
+                                    appAccountToken: userID
+                                ) {
                                     onPurchaseCompleted()
                                 }
                             }
