@@ -29,15 +29,40 @@ enum SubscriptionAccessState: String, Codable, Hashable {
     }
 }
 
+enum SubscriptionAccessSource: String, Codable, Hashable {
+    case none
+    case athlthTrial
+    case appStore
+    case serverVerified
+}
+
 struct SubscriptionAccess: Codable, Hashable {
     var state: SubscriptionAccessState
     var trialStartedAt: Date?
     var trialEndsAt: Date?
+    var source: SubscriptionAccessSource?
+    var productID: String?
+    var currentPeriodEndsAt: Date?
+
+    init(
+        state: SubscriptionAccessState,
+        trialStartedAt: Date? = nil,
+        trialEndsAt: Date? = nil,
+        source: SubscriptionAccessSource? = nil,
+        productID: String? = nil,
+        currentPeriodEndsAt: Date? = nil
+    ) {
+        self.state = state
+        self.trialStartedAt = trialStartedAt
+        self.trialEndsAt = trialEndsAt
+        self.source = source
+        self.productID = productID
+        self.currentPeriodEndsAt = currentPeriodEndsAt
+    }
 
     static let free = SubscriptionAccess(
         state: .free,
-        trialStartedAt: nil,
-        trialEndsAt: nil
+        source: .none
     )
 
     var trialIsActive: Bool {
@@ -58,6 +83,17 @@ struct SubscriptionAccess: Codable, Hashable {
             return "Free"
         }
         return state.title
+    }
+
+    var billingPeriodTitle: String? {
+        switch productID {
+        case SubscriptionStore.monthlyProductID:
+            return "Monthly"
+        case SubscriptionStore.yearlyProductID:
+            return "Yearly"
+        default:
+            return nil
+        }
     }
 
     var trialDaysRemaining: Int? {
