@@ -93,11 +93,21 @@ final class ATHLTHPlusStore: ObservableObject {
     @Published private(set) var hasATHLTHPlus = false
     @Published private(set) var products: [Product] = []
     @Published private(set) var paidAccessUntil: Date?
+    @Published private(set) var activeProductID: String?
     @Published var purchaseError: String?
     @Published private(set) var isLoading = false
 
     var monthly: Product? { products.first { $0.id == Self.monthlyProductID } }
     var yearly: Product? { products.first { $0.id == Self.yearlyProductID } }
+
+    var activeProduct: Product? { products.first { $0.id == activeProductID } }
+
+    var trialText: String? {
+        guard let subscription = yearly?.subscription,
+              let offer = subscription.introductoryOffer,
+              offer.paymentMode == .freeTrial else { return nil }
+        return "Try ATHLTH+ free for \(offer.period.localizedDescription). Cancel anytime."
+    }
 
     func loadProducts() async {
         guard products.isEmpty else { return }
@@ -111,6 +121,7 @@ final class ATHLTHPlusStore: ObservableObject {
     func refreshEntitlements() async {
         var active = false
         var latestExpiration: Date?
+        var latestProductID: String?
 
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
@@ -120,12 +131,31 @@ final class ATHLTHPlusStore: ObservableObject {
                 if let expiration = transaction.expirationDate,
                    latestExpiration == nil || expiration > latestExpiration! {
                     latestExpiration = expiration
+                    latestProductID = transaction.productID
+                } else if transaction.expirationDate == nil {
+                    latestProductID = transaction.productID
                 }
             }
         }
 
         hasATHLTHPlus = active
         paidAccessUntil = latestExpiration
+        activeProductID = latestProductID
+    }
+
+    func restorePurchases() async {
+        isLoading = true
+        purchaseError = nil
+        defer { isLoading = false }
+        do {
+            try await AppStore.sync()
+            await refreshEntitlements()
+            if !hasATHLTHPlus {
+                purchaseError = "No active ATHLTH+ subscription was found for this Apple ID."
+            }
+        } catch {
+            purchaseError = error.localizedDescription
+        }
     }
 
     func purchase(_ product: Product) async -> Bool {
@@ -260,7 +290,7 @@ struct ATHLTHReadyView: View {
                 .tint(.green)
                 .clipShape(Capsule())
 
-                Label("ATHLTH+ plans are optional and can be reviewed before entering ATHLTH.", systemImage: "info.circle")
+                Label("ATHLTH+ plans are optional. Any free trial and pricing are confirmed by the App Store before purchase.", systemImage: "info.circle")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -350,7 +380,20 @@ struct ATHLTHPlusPlansView: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    Label("You can close this window and continue without ATHLTH+.", systemImage: "info.circle")
+                    if let trialText = membership.trialText {
+                        Label(trialText, systemImage: "gift.fill")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(.green)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    Button("Restore purchases") {
+                        Task { await membership.restorePurchases() }
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .disabled(membership.isLoading)
+
+                    Label("You can close this window and continue without ATHLTH+. Purchases are billed and managed by Apple.", systemImage: "info.circle")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -421,7 +464,7 @@ struct ATHLTHPlusPlansView: View {
                     .font(.title2.bold())
                 Text(detail).font(.caption).foregroundStyle(.secondary)
                 if plan == .yearly {
-                    Text("Save 34%").font(.caption.weight(.semibold)).foregroundStyle(.green)
+                    Text(yearlySavingsText).font(.caption.weight(.semibold)).foregroundStyle(.green)
                 } else {
                     Text("Cancel anytime").font(.caption).foregroundStyle(.secondary)
                 }
@@ -435,6 +478,15 @@ struct ATHLTHPlusPlansView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var yearlySavingsText: String {
+        guard let monthly = membership.monthly,
+              let yearly = membership.yearly else { return "Best annual value" }
+        let monthlyAnnual = monthly.price * 12
+        guard monthlyAnnual > 0, yearly.price < monthlyAnnual else { return "Best annual value" }
+        let savings = ((monthlyAnnual - yearly.price) / monthlyAnnual * 100) as NSDecimalNumber
+        return "Save \(savings.intValue)%"
     }
 
     private enum Plan {
@@ -468,7 +520,7 @@ struct ATHLTHPlusActivatedView: View {
             }
 
             VStack(alignment: .leading, spacing: 14) {
-                Label("ATHLTH+ activated", systemImage: "crown.fill")
+                Label(membership.activeProductID == ATHLTHPlusStore.yearlyProductID ? "Yearly plan activated" : "ATHLTH+ activated", systemImage: "crown.fill")
                     .font(.title3.bold())
                     .foregroundStyle(.green)
                 Text("You now have full access to ATHLTH+.")
@@ -510,5 +562,20 @@ struct ATHLTHPlusActivatedView: View {
             LinearGradient(colors: [.white, .green.opacity(0.06)], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
         )
+    }
+}
+
+
+private extension Product.SubscriptionPeriod {
+    var localizedDescription: String {
+        let unitName: String
+        switch unit {
+        case .day: unitName = value == 1 ? "day" : "days"
+        case .week: unitName = value == 1 ? "week" : "weeks"
+        case .month: unitName = value == 1 ? "month" : "months"
+        case .year: unitName = value == 1 ? "year" : "years"
+        @unknown default: unitName = "period"
+        }
+        return "\(value) \(unitName)"
     }
 }
