@@ -39,24 +39,14 @@ struct AppRootView: View {
             }
         }
         .task {
-            await applyHealthSyncEntitlement()
-        }
-        .onChange(of: appSession.subscriptionAccess) {
-            Task {
-                await applyHealthSyncEntitlement()
+            guard health.hasRequestedAuthorization else { return }
+
+            if appSession.hasPaidAccess {
+                await health.configureBackgroundSync()
+            } else {
+                await health.disableBackgroundSync()
             }
+
+            await health.refreshAll()
         }
-    }
-
-    private func applyHealthSyncEntitlement() async {
-        guard health.hasRequestedAuthorization else { return }
-
-        if appSession.hasPaidAccess {
-            await health.configureBackgroundSync()
-        } else {
-            await health.disableBackgroundSync()
-        }
-
-        await health.refreshAll()
-    }
 }
