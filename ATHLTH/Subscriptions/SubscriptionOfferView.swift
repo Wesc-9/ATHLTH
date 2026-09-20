@@ -16,7 +16,7 @@ struct SubscriptionOfferView: View {
                     VStack(spacing: 10) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 42))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(OnboardingTheme.green)
 
                         Text("Keep ATHLTH Paid")
                             .font(.largeTitle.weight(.bold))
@@ -29,12 +29,14 @@ struct SubscriptionOfferView: View {
                     }
                     .padding(.top, 12)
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        benefit("Automatic Health background sync", icon: "heart.fill")
-                        benefit("Advanced training and planning tools", icon: "calendar.badge.clock")
-                        benefit("Expanded progress and recovery features", icon: "chart.line.uptrend.xyaxis")
+                    OnboardingCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            benefit("Automatic Health background sync", icon: "heart.fill")
+                            benefit("Advanced training and planning tools", icon: "calendar.badge.clock")
+                            benefit("Full Apple Watch integration", icon: "applewatch")
+                            benefit("Expanded progress and recovery features", icon: "chart.line.uptrend.xyaxis")
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     if subscriptionStore.isLoading {
                         ProgressView("Loading plans…")
@@ -56,11 +58,12 @@ struct SubscriptionOfferView: View {
                         }
                         .padding(20)
                         .frame(maxWidth: .infinity)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                        .onboardingSurface(cornerRadius: 18)
                     } else {
-                        VStack(spacing: 12) {
+                        HStack(alignment: .stretch, spacing: 12) {
                             ForEach(subscriptionStore.products, id: \.id) { product in
                                 planCard(product)
+                                    .frame(maxWidth: .infinity)
                             }
                         }
 
@@ -89,9 +92,7 @@ struct SubscriptionOfferView: View {
                                 Spacer()
                             }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .tint(.green)
+                        .buttonStyle(OnboardingPrimaryButtonStyle())
                         .disabled(
                             selectedProductID == nil ||
                             subscriptionStore.purchaseInProgress
@@ -115,6 +116,7 @@ struct SubscriptionOfferView: View {
                 .frame(maxWidth: 620)
                 .frame(maxWidth: .infinity)
             }
+            .background(OnboardingBackground().ignoresSafeArea())
             .navigationTitle("Paid plans")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -163,13 +165,13 @@ struct SubscriptionOfferView: View {
             .padding(16)
             .frame(maxWidth: .infinity)
             .background(
-                selected ? Color.green.opacity(0.09) : Color.secondary.opacity(0.06),
+                selected ? OnboardingTheme.green.opacity(0.08) : Color.white.opacity(0.90),
                 in: RoundedRectangle(cornerRadius: 18)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
                     .stroke(
-                        selected ? Color.green.opacity(0.45) : Color.clear,
+                        selected ? OnboardingTheme.green.opacity(0.48) : OnboardingTheme.border,
                         lineWidth: 1
                     )
             }
@@ -181,6 +183,8 @@ struct SubscriptionOfferView: View {
     private func benefit(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
             .font(.subheadline)
+            .foregroundStyle(.primary)
+            .tint(OnboardingTheme.green)
     }
 
     private func planTitle(for product: Product) -> String {
