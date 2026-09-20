@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - restore/v1-athlth-plus
   pull_request:
     branches:
       - main
