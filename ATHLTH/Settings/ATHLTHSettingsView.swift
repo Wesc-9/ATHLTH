@@ -128,10 +128,11 @@ struct ATHLTHSettingsView: View {
                 Toggle("Share heart rate by default", isOn: $settings.shareHeartRateByDefault)
 
                 Toggle(
-                    "Personalized ATHLTH offers",
+                    "Personalized offers",
                     isOn: Binding(
                         get: {
-                            session.onboardingProfile?.personalizedOfferConsent == .granted
+                            session.onboardingProfile?.personalizedOfferConsent
+                                == .granted
                         },
                         set: { enabled in
                             session.setPersonalizedOfferConsent(
@@ -140,8 +141,9 @@ struct ATHLTHSettingsView: View {
                         }
                     )
                 )
+                .tint(OnboardingTheme.green)
 
-                Text("Uses only goals and interests you choose in ATHLTH. Apple Health / HealthKit data is excluded from offer targeting.")
+                Text("Uses only goals and interests you choose in ATHLTH to make offers and promotions more relevant. Apple Health / HealthKit data is never used for offer targeting.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
