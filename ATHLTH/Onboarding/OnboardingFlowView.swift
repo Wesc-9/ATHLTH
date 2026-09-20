@@ -48,22 +48,24 @@ struct OnboardingFlowView: View {
         }
         .background(OnboardingBackground().ignoresSafeArea())
         .task {
+            if session.signedIn, !session.onboardingCompleted {
+                if let bootstrap = try? await accountService.loadCurrentUser() {
+                    routeAuthenticatedUser(bootstrap)
+                } else if session.profile.username.isEmpty {
+                    step = .username
+                } else {
+                    step = .goals
+                }
+            }
+
             guard health.hasRequestedAuthorization else { return }
             await health.refreshPersonalDetails()
             importedHealthDetails = health.personalDetails
         }
         .sheet(isPresented: $showingEmailAuth) {
-            EmailAuthView { result in
-                switch result {
-                case .newUser(let email):
-                    session.beginMockSignIn(method: .email, isNewUser: true)
-                    let seed = email.split(separator: "@").first.map(String.init) ?? "athlete"
-                    session.setUsernameSeed(seed)
-                    step = .username
-                case .existingUser:
-                    session.beginMockSignIn(method: .email, isNewUser: false)
-                    session.completeOnboarding()
-                }
+            EmailAuthView { bootstrap in
+                session.applyBackendBootstrap(bootstrap, method: .email)
+                routeAuthenticatedUser(bootstrap)
             }
         }
         .task(id: step) {
@@ -891,6 +893,22 @@ struct OnboardingFlowView: View {
         .frame(minHeight: 72)
     }
 
+    private func routeAuthenticatedUser(_ bootstrap: BackendUserBootstrap) {
+        if bootstrap.profile.onboardingCompleted {
+            return
+        }
+
+        if let existingUsername = bootstrap.profile.username,
+           !existingUsername.isEmpty {
+            username = existingUsername
+            step = .goals
+        } else {
+            let seed = bootstrap.profile.displayName ?? "athlete"
+            session.setUsernameSeed(seed)
+            step = .username
+        }
+    }
+
     private func handleAppleAuthorization(
         _ result: Result<ASAuthorization, Error>
     ) {
@@ -911,25 +929,16 @@ struct OnboardingFlowView: View {
                 )
                 session.applyBackendBootstrap(bootstrap, method: .apple)
 
-                if bootstrap.profile.onboardingCompleted {
-                    return
+                if bootstrap.profile.username == nil,
+                   bootstrap.profile.displayName == nil,
+                   let emailSeed = credential.email?
+                    .split(separator: "@")
+                    .first
+                    .map(String.init) {
+                    session.setUsernameSeed(emailSeed)
                 }
 
-                if let existingUsername = bootstrap.profile.username,
-                   !existingUsername.isEmpty {
-                    username = existingUsername
-                    step = .goals
-                } else {
-                    let emailSeed = credential.email?
-                        .split(separator: "@")
-                        .first
-                        .map(String.init)
-                    let seed = bootstrap.profile.displayName
-                        ?? emailSeed
-                        ?? "athlete"
-                    session.setUsernameSeed(seed)
-                    step = .username
-                }
+                routeAuthenticatedUser(bootstrap)
             } catch {
                 authenticationError = error.localizedDescription
             }
