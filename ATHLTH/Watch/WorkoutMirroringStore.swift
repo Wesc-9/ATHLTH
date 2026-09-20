@@ -71,6 +71,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             kind: workoutKind(for: session.workoutConfiguration.activityType),
             state: mirrorState(for: session.state),
             startedAt: session.startDate,
+            capturedAt: Date(),
             elapsedTime: elapsedTime(for: session),
             heartRate: snapshot?.heartRate ?? 0,
             activeCalories: snapshot?.activeCalories ?? 0,
