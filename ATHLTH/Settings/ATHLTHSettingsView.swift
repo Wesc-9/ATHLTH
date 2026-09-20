@@ -5,6 +5,7 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
     var body: some View {
         List {
@@ -37,6 +38,10 @@ struct ATHLTHSettingsView: View {
             Section("Subscription") {
                 LabeledContent("Plan", value: session.subscriptionAccess.displayTitle)
 
+                if let billingPeriod = session.subscriptionAccess.billingPeriodTitle {
+                    LabeledContent("Billing", value: billingPeriod)
+                }
+
                 if session.subscriptionAccess.trialIsActive,
                    let trialEndsAt = session.subscriptionAccess.trialEndsAt {
                     LabeledContent(
@@ -45,10 +50,39 @@ struct ATHLTHSettingsView: View {
                     )
                 }
 
+                if session.subscriptionAccess.state == .paid,
+                   let periodEndsAt = session.subscriptionAccess.currentPeriodEndsAt {
+                    LabeledContent(
+                        "Current period",
+                        value: periodEndsAt.formatted(date: .abbreviated, time: .omitted)
+                    )
+                }
+
                 LabeledContent(
                     "Background Health sync",
                     value: session.hasPaidAccess ? "Included" : "ATHLTH+ feature"
                 )
+
+                Button {
+                    Task {
+                        _ = await subscriptionStore.restorePurchases()
+                    }
+                } label: {
+                    HStack {
+                        Text("Restore Purchases")
+                        Spacer()
+                        if subscriptionStore.restoreInProgress {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(subscriptionStore.restoreInProgress)
+
+                if let errorMessage = subscriptionStore.errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
 
                 Text("Apple Health and Apple Watch can still be connected on Free. Automatic Health background sync is an ATHLTH+ feature.")
                     .font(.caption)
