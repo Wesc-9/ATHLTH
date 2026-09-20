@@ -183,12 +183,19 @@ final class StrengthWorkoutStore: ObservableObject {
         guard var workout = activeWorkout else { return }
 
         workout.endedAt = Date()
+
+        let existingMetrics = workout.healthMetrics
         workout.healthMetrics = LinkedHealthWorkoutMetrics(
-            healthKitWorkoutUUID: healthKitWorkoutUUID,
-            duration: duration,
-            activeCalories: activeCalories,
-            averageHeartRate: averageHeartRate,
-            maxHeartRate: maxHeartRate
+            healthKitWorkoutUUID:
+                healthKitWorkoutUUID ?? existingMetrics.healthKitWorkoutUUID,
+            duration:
+                duration ?? existingMetrics.duration,
+            activeCalories:
+                activeCalories ?? existingMetrics.activeCalories,
+            averageHeartRate:
+                averageHeartRate ?? existingMetrics.averageHeartRate,
+            maxHeartRate:
+                maxHeartRate ?? existingMetrics.maxHeartRate
         )
 
         completedWorkout = workout
