@@ -1880,6 +1880,376 @@
           }
         }
       }
+    },
+    "Get more relevant offers": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Få mer relevante tilbud"
+          }
+        }
+      }
+    },
+    "Optional": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgfritt"
+          }
+        }
+      }
+    },
+    "Let ATHLTH use the goals and interests you choose to make offers and promotions more relevant to you.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ATHLTH bruke målene og interessene du velger for å gjøre tilbud og kampanjer mer relevante for deg."
+          }
+        }
+      }
+    },
+    "Personalized offers": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilpassede tilbud"
+          }
+        }
+      }
+    },
+    "More relevant offers and fewer irrelevant promotions.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mer relevante tilbud og færre irrelevante kampanjer."
+          }
+        }
+      }
+    },
+    "Apple Health and HealthKit data is never used to target offers.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data fra Apple Health og HealthKit brukes aldri til å målrette tilbud."
+          }
+        }
+      }
+    },
+    "Off by default · You can change this later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Av som standard · Du kan endre dette senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "ATHLTH is set up around your goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH er satt opp rundt målet ditt."
+          }
+        }
+      }
+    },
+    "7 DAYS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 DAGER"
+          }
+        }
+      }
+    },
+    "Your ATHLTH+ trial is active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøveperioden din med ATHLTH+ er aktiv"
+          }
+        }
+      }
+    },
+    "Get more from ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Få mer ut av ATHLTH"
+          }
+        }
+      }
+    },
+    "Get more from Apple Health and Apple Watch with deeper insights, automatic sync and advanced training tools.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Få mer ut av Apple Health og Apple Watch med dypere innsikt, automatisk synkronisering og avanserte treningsverktøy."
+          }
+        }
+      }
+    },
+    "Automatic Health background sync": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisk bakgrunnssynkronisering av helsedata"
+          }
+        }
+      }
+    },
+    "Sleep and recovery insights": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Innsikt i søvn og restitusjon"
+          }
+        }
+      }
+    },
+    "Advanced training plans and progression": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanserte treningsplaner og progresjon"
+          }
+        }
+      }
+    },
+    "Route challenges and premium recovery features": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruteutfordringer og premiumfunksjoner for restitusjon"
+          }
+        }
+      }
+    },
+    "Trial ends": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøveperioden avsluttes"
+          }
+        }
+      }
+    },
+    "Choose ATHLTH+ plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg ATHLTH+-abonnement"
+          }
+        }
+      }
+    },
+    "The App Store shows the price and billing details before you confirm a purchase.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Store viser pris og betalingsdetaljer før du bekrefter et kjøp."
+          }
+        }
+      }
+    },
+    "Continue to ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett til ATHLTH"
+          }
+        }
+      }
+    },
+    "You can choose ATHLTH+ later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan velge ATHLTH+ senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "Choose ATHLTH+": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg ATHLTH+"
+          }
+        }
+      }
+    },
+    "Choose the plan that fits you. The App Store shows the final price and billing details before you confirm.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg abonnementet som passer deg. App Store viser endelig pris og betalingsdetaljer før du bekrefter."
+          }
+        }
+      }
+    },
+    "Included with ATHLTH+": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inkludert med ATHLTH+"
+          }
+        }
+      }
+    },
+    "PREMIUM": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PREMIUM"
+          }
+        }
+      }
+    },
+    "Continue with this plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett med dette abonnementet"
+          }
+        }
+      }
+    },
+    "You can close this window without purchasing and choose ATHLTH+ later in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan lukke dette vinduet uten å kjøpe og velge ATHLTH+ senere i Innstillinger."
+          }
+        }
+      }
+    },
+    "ATHLTH+ Plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH+-abonnement"
+          }
+        }
+      }
+    },
+    "YEARLY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ÅRLIG"
+          }
+        }
+      }
+    },
+    "Monthly": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Månedlig"
+          }
+        }
+      }
+    },
+    "Yearly": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Årlig"
+          }
+        }
+      }
+    },
+    " / month": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " / måned"
+          }
+        }
+      }
+    },
+    " / year": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " / år"
+          }
+        }
+      }
+    },
+    "Loading plans…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laster abonnementer…"
+          }
+        }
+      }
+    },
+    "Plans aren’t available yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abonnementene er ikke tilgjengelige ennå"
+          }
+        }
+      }
+    },
+    "Monthly and Yearly App Store products will appear here when they are configured.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Måneds- og årsabonnement fra App Store vises her når de er konfigurert."
+          }
+        }
+      }
+    },
+    "Uses only goals and interests you choose in ATHLTH to make offers and promotions more relevant. Apple Health / HealthKit data is never used for offer targeting.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruker kun mål og interesser du velger i ATHLTH for å gjøre tilbud og kampanjer mer relevante. Data fra Apple Health / HealthKit brukes aldri til å målrette tilbud."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
