@@ -24,14 +24,20 @@ targets:
     dependencies:
       - target: ATHLTHWatchApp
       - package: Supabase
+    info:
+      path: ATHLTH/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: ATHLTH
+        NSHealthShareUsageDescription: "ATHLTH reads workouts, sleep, and heart data to give you private training insights on your device."
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: com.wesc9.athlth.auth
+            CFBundleURLSchemes:
+              - athlth
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth
         PRODUCT_NAME: ATHLTH
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: ATHLTH
-        INFOPLIST_KEY_NSHealthShareUsageDescription: "ATHLTH reads workouts, sleep, and heart data to give you private training insights on your device."
-        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         CODE_SIGN_ENTITLEMENTS: ATHLTH/Resources/ATHLTH.entitlements
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
