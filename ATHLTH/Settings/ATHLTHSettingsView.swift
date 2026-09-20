@@ -4,6 +4,7 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     var body: some View {
         List {
@@ -110,11 +111,16 @@ struct ATHLTHSettingsView: View {
                     connected: health.hasRequestedAuthorization
                 )
 
-                integrationRow(
-                    .appleWatch,
-                    subtitle: settings.watchConnected ? "Connected" : "Configure companion app",
-                    connected: settings.watchConnected
-                )
+                Button {
+                    watchConnection.connect()
+                } label: {
+                    integrationRow(
+                        .appleWatch,
+                        subtitle: watchConnection.state.subtitle,
+                        connected: watchConnection.isReady
+                    )
+                }
+                .buttonStyle(.plain)
 
                 NavigationLink {
                     SpotifySettingsView()
