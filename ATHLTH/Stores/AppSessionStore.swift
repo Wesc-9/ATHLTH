@@ -295,6 +295,50 @@ final class AppSessionStore: ObservableObject {
         defaults.set(true, forKey: "session.onboardingCompleted")
     }
 
+    func clearAfterAccountDeletion() {
+        signedIn = false
+        onboardingCompleted = false
+        signInMethod = nil
+        onboardingProfile = nil
+        activePlan = nil
+        savedRoutes = []
+        challenges = []
+
+        profile = UserProfile(
+            id: UUID(),
+            userID: UUID(),
+            username: "",
+            displayName: "",
+            bio: "",
+            avatarURL: nil,
+            presence: TrainingPresence(
+                state: .offline,
+                workoutTitle: nil,
+                startedAt: nil,
+                visibility: .privateOnly
+            ),
+            followersCount: 0,
+            followingCount: 0,
+            workoutsCount: 0
+        )
+
+        usernameSeed = "athlete"
+        accountCreatedAt = Date()
+        currentRole = .user
+        backendSubscriptionAccess = .free
+        storeEntitlement = nil
+        subscriptionAccess = .free
+
+        defaults.removeObject(forKey: "session.signedIn")
+        defaults.removeObject(forKey: "session.onboardingCompleted")
+        defaults.removeObject(forKey: "session.signInMethod")
+        defaults.removeObject(forKey: "session.onboardingProfile")
+        defaults.removeObject(forKey: "session.usernameSeed")
+        defaults.removeObject(forKey: "session.accountCreatedAt")
+        defaults.removeObject(forKey: "session.accountRole")
+        defaults.removeObject(forKey: "session.subscriptionAccess")
+    }
+
     func resetOnboardingForPreview() {
         signedIn = false
         onboardingCompleted = false
