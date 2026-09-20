@@ -1,0 +1,46 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload ATHLTH to TestFlight"
+  lane :beta do
+    setup_ci
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_API_KEY_P8"),
+      is_key_content_base64: false
+    )
+
+    build_number = ENV.fetch("GITHUB_RUN_NUMBER")
+    increment_build_number(
+      build_number: build_number,
+      xcodeproj: "ATHLTH.xcodeproj"
+    )
+
+    build_app(
+      project: "ATHLTH.xcodeproj",
+      scheme: "ATHLTH",
+      configuration: "Release",
+      export_method: "app-store",
+      export_options: {
+        signingStyle: "automatic",
+        teamID: ENV.fetch("APPLE_TEAM_ID"),
+        uploadSymbols: true
+      },
+      xcargs: [
+        "DEVELOPMENT_TEAM=#{ENV.fetch("APPLE_TEAM_ID")}",
+        "CODE_SIGN_STYLE=Automatic",
+        "-allowProvisioningUpdates",
+        "-authenticationKeyPath #{ENV.fetch("ASC_KEY_PATH")}",
+        "-authenticationKeyID #{ENV.fetch("ASC_KEY_ID")}",
+        "-authenticationKeyIssuerID #{ENV.fetch("ASC_ISSUER_ID")}"
+      ].join(" ")
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
+    )
+  end
+end
