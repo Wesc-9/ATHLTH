@@ -26,6 +26,8 @@ struct OnboardingFlowView: View {
     @State private var authenticationError: String?
     @State private var appleSignInInProgress = false
     @State private var onboardingCompletionError: String?
+    @State private var watchConnectRequested = false
+    @State private var showingWatchSetupHelp = false
 
     private let usernameService = SupabaseUsernameAvailabilityService()
 
@@ -82,6 +84,19 @@ struct OnboardingFlowView: View {
             guard step == .username else { return }
             await validateUsernameAfterTyping()
         }
+        .onChange(of: watchConnection.state) { _, state in
+            guard watchConnectRequested else { return }
+
+            switch state {
+            case .checking:
+                break
+            case .ready:
+                watchConnectRequested = false
+            case .unsupported, .notPaired, .appNotInstalled:
+                watchConnectRequested = false
+                showingWatchSetupHelp = true
+            }
+        }
         .sheet(item: $legalDocument) { document in
             NavigationStack {
                 LegalDocumentView(kind: document)
@@ -93,6 +108,19 @@ struct OnboardingFlowView: View {
                         }
                     }
             }
+        }
+        .alert(
+            "Apple Watch setup",
+            isPresented: $showingWatchSetupHelp
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(
+                LocalizedStringKey(
+                    watchConnection.state.setupHelpMessage
+                        ?? "Open ATHLTH on Apple Watch and try again."
+                )
+            )
         }
         .sheet(
             isPresented: $showingSubscriptionOffer,
@@ -588,12 +616,13 @@ struct OnboardingFlowView: View {
             OnboardingCard {
                 connectionRow(
                     title: "Apple Watch",
-                    subtitle: watchConnection.isReady
-                        ? "Connected"
-                        : watchConnection.state.subtitle,
+                    subtitle: watchConnection.connectionDetail
+                        ?? watchConnection.state.subtitle,
                     icon: "applewatch",
-                    connected: watchConnection.isReady
+                    connected: watchConnection.isReady,
+                    actionTitle: watchConnection.state.actionTitle
                 ) {
+                    watchConnectRequested = true
                     watchConnection.connect()
                 }
             }
@@ -929,6 +958,7 @@ struct OnboardingFlowView: View {
         subtitle: String,
         icon: String,
         connected: Bool,
+        actionTitle: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
         HStack(spacing: 14) {
@@ -950,10 +980,18 @@ struct OnboardingFlowView: View {
             Button {
                 action()
             } label: {
-                Text(LocalizedStringKey(connected ? "Connected" : "Connect"))
+                Text(
+                    LocalizedStringKey(
+                        actionTitle
+                            ?? (connected ? "Connected" : "Connect")
+                    )
+                )
             }
             .buttonStyle(.bordered)
-            .disabled(healthRequestInProgress && title == "Apple Health")
+            .disabled(
+                (healthRequestInProgress && title == "Apple Health")
+                || (title == "Apple Watch" && watchConnection.state == .checking)
+            )
         }
         .frame(minHeight: 72)
     }
