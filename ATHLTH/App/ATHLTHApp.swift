@@ -38,9 +38,15 @@ struct AppRootView: View {
                 ProductRootTabView()
             }
         }
-        .task {
+        .task(id: appSession.subscriptionAccess) {
             guard health.hasRequestedAuthorization else { return }
-            await health.configureBackgroundSync()
+
+            if appSession.hasPaidAccess {
+                await health.configureBackgroundSync()
+            } else {
+                await health.disableBackgroundSync()
+            }
+
             await health.refreshAll()
         }
     }
