@@ -144,6 +144,14 @@ struct AppRootView: View {
             return
         }
 
-        try? await subscriptionBackend.submit(proof)
+        do {
+            try await subscriptionBackend.submit(proof)
+
+            if let bootstrap = try? await accountService.loadCurrentUser() {
+                appSession.applyBackendBootstrap(bootstrap)
+            }
+        } catch {
+            return
+        }
     }
 }
