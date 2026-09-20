@@ -17,15 +17,43 @@ enum AppleWatchConnectionState: Equatable {
     var subtitle: String {
         switch self {
         case .checking:
-            return "Checking Apple Watch"
+            return "Checking Apple Watch…"
         case .unsupported:
             return "Apple Watch connection is unavailable on this device"
         case .notPaired:
             return "No paired Apple Watch found"
         case .appNotInstalled:
-            return "ATHLTH Watch app is not installed yet"
+            return "Install ATHLTH on Apple Watch to continue"
         case .ready:
-            return "Connected"
+            return "ATHLTH is installed on Apple Watch"
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .checking:
+            return "Checking…"
+        case .unsupported:
+            return "Help"
+        case .notPaired:
+            return "Help"
+        case .appNotInstalled:
+            return "Install"
+        case .ready:
+            return "Check"
+        }
+    }
+
+    var setupHelpMessage: String? {
+        switch self {
+        case .unsupported:
+            return "Apple Watch connectivity is not available on this iPhone."
+        case .notPaired:
+            return "Pair your Apple Watch with this iPhone in the Watch app, then return to ATHLTH and try again."
+        case .appNotInstalled:
+            return "Open the Watch app on your iPhone, find ATHLTH under Available Apps, tap Install, then open ATHLTH once on Apple Watch and return here."
+        case .checking, .ready:
+            return nil
         }
     }
 }
@@ -46,6 +74,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
     @Published private(set) var lastCompletedWorkout: WatchWorkoutResult?
     @Published private(set) var workoutLaunchInProgress = false
     @Published private(set) var workoutLaunchError: String?
+    @Published private(set) var connectionDetail: String?
 
     private let healthStore = HKHealthStore()
 
@@ -63,10 +92,16 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
     }
 
     func connect() {
-        refreshStatus()
+        connectionDetail = nil
+        publish(.checking)
+        refreshStatus(verifyLiveConnection: true)
     }
 
     func refreshStatus() {
+        refreshStatus(verifyLiveConnection: false)
+    }
+
+    private func refreshStatus(verifyLiveConnection: Bool) {
         guard let session else {
             publish(.unsupported)
             return
@@ -80,7 +115,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
             return
         }
 
-        evaluate(session)
+        evaluate(
+            session,
+            verifyLiveConnection: verifyLiveConnection
+        )
     }
 
     @MainActor
@@ -140,18 +178,69 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         }
     }
 
-    private func evaluate(_ session: WCSession) {
+    private func evaluate(
+        _ session: WCSession,
+        verifyLiveConnection: Bool = false
+    ) {
         #if os(iOS)
         if !session.isPaired {
             publish(.notPaired)
-        } else if !session.isWatchAppInstalled {
-            publish(.appNotInstalled)
-        } else {
-            publish(.ready)
+            return
         }
+
+        if !session.isWatchAppInstalled {
+            publish(.appNotInstalled)
+            return
+        }
+
+        publish(.ready)
+
+        guard verifyLiveConnection else {
+            connectionDetail = "ATHLTH Watch app is installed"
+            return
+        }
+
+        verifyConnection(with: session)
         #else
         publish(.unsupported)
         #endif
+    }
+
+    private func verifyConnection(with session: WCSession) {
+        guard session.isReachable else {
+            DispatchQueue.main.async { [weak self] in
+                self?.connectionDetail = "Installed · open ATHLTH on Apple Watch once to verify the live connection"
+            }
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.connectionPing.rawValue
+        ]
+
+        session.sendMessage(
+            payload,
+            replyHandler: { [weak self] reply in
+                let status = reply[
+                    WatchTransferMetadataKey.status
+                ] as? String
+
+                DispatchQueue.main.async {
+                    self?.connectionDetail = status == "ok"
+                        ? "Connected to ATHLTH on Apple Watch"
+                        : "ATHLTH Watch app responded"
+                    self?.publish(.ready)
+                }
+            },
+            errorHandler: { [weak self] error in
+                DispatchQueue.main.async {
+                    self?.connectionDetail =
+                        "Installed · open ATHLTH on Apple Watch and try again"
+                    self?.workoutLaunchError = error.localizedDescription
+                }
+            }
+        )
     }
 
     private func publish(_ newState: AppleWatchConnectionState) {
@@ -187,7 +276,10 @@ extension AppleWatchConnectionStore: WCSessionDelegate {
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
     ) {
-        if error != nil {
+        if let error {
+            DispatchQueue.main.async { [weak self] in
+                self?.connectionDetail = error.localizedDescription
+            }
             evaluate(session)
             return
         }
