@@ -42,6 +42,13 @@ jobs:
           WK_APPLICATION=$(/usr/libexec/PlistBuddy -c 'Print :WKApplication' "$WATCH_PLIST")
           COMPANION_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :WKCompanionAppBundleIdentifier' "$WATCH_PLIST")
 
+          /usr/libexec/PlistBuddy -c 'Print :UILaunchScreen' "$APP/Info.plist" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations' "$APP/Info.plist" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :NSHealthShareUsageDescription' "$APP/Info.plist" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :NSHealthUpdateUsageDescription' "$APP/Info.plist" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :NSHealthShareUsageDescription' "$WATCH_PLIST" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :NSHealthUpdateUsageDescription' "$WATCH_PLIST" >/dev/null
+
           test "$IOS_BUNDLE_ID" = "com.wesc9.athlth"
           test "$WATCH_BUNDLE_ID" = "com.wesc9.athlth.watchkitapp"
           test "$WK_APPLICATION" = "true"
@@ -51,3 +58,4 @@ jobs:
           echo "Watch bundle: $WATCH_BUNDLE_ID"
           echo "WKApplication: $WK_APPLICATION"
           echo "Watch companion: $COMPANION_BUNDLE_ID"
+          echo "App Store required Info.plist metadata verified."
