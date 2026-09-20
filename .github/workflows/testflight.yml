@@ -3,10 +3,8 @@ name: Upload ATHLTH to TestFlight
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - .github/testflight-release
+    tags:
+      - "v*"
 
 concurrency:
   group: athlth-testflight
@@ -56,62 +54,11 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          xcodebuild \
-            -project ATHLTH.xcodeproj \
-            -scheme ATHLTH \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CURRENT_PROJECT_VERSION="2" \
-            CODE_SIGN_STYLE=Automatic \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            clean archive
+      - name: Install Fastlane
+        run: bundle install
 
-      - name: Create export options
-        shell: bash
-        run: |
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>destination</key>
-            <string>upload</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>teamID</key>
-            <string>$APPLE_TEAM_ID</string>
-            <key>manageAppVersionAndBuildNumber</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-
-      - name: Upload to App Store Connect / TestFlight
-        shell: bash
-        run: |
-          set -euo pipefail
-          xcodebuild \
-            -exportArchive \
-            -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+      - name: Build and upload to TestFlight
+        run: bundle exec fastlane ios beta
 
       - name: Upload diagnostics
         if: failure()
@@ -120,5 +67,5 @@ jobs:
           name: athlth-testflight-diagnostics
           path: |
             ~/Library/Logs/DiagnosticReports
-            ${{ runner.temp }}/export
+            fastlane/report.xml
           if-no-files-found: ignore
