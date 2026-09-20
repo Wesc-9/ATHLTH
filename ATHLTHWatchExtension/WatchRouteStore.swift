@@ -136,6 +136,31 @@ extension WatchRouteStore: WCSessionDelegate {
 
     func session(
         _ session: WCSession,
+        didReceiveMessage message: [String: Any],
+        replyHandler: @escaping ([String: Any]) -> Void
+    ) {
+        if message[WatchTransferMetadataKey.kind] as? String
+            == WatchTransferKind.connectionPing.rawValue {
+            DispatchQueue.main.async { [weak self] in
+                self?.connectionText = "Connected to iPhone"
+            }
+
+            replyHandler([
+                WatchTransferMetadataKey.kind:
+                    WatchTransferKind.connectionPing.rawValue,
+                WatchTransferMetadataKey.status: "ok"
+            ])
+            return
+        }
+
+        handleWorkoutCommand(message)
+        replyHandler([
+            WatchTransferMetadataKey.status: "ok"
+        ])
+    }
+
+    func session(
+        _ session: WCSession,
         didReceiveUserInfo userInfo: [String: Any] = [:]
     ) {
         handleWorkoutCommand(userInfo)
