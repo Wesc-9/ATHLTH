@@ -38,16 +38,25 @@ struct AppRootView: View {
                 ProductRootTabView()
             }
         }
-        .task(id: appSession.subscriptionAccess) {
-            guard health.hasRequestedAuthorization else { return }
-
-            if appSession.hasPaidAccess {
-                await health.configureBackgroundSync()
-            } else {
-                await health.disableBackgroundSync()
-            }
-
-            await health.refreshAll()
+        .task {
+            await applyHealthSyncEntitlement()
         }
+        .onChange(of: appSession.subscriptionAccess) {
+            Task {
+                await applyHealthSyncEntitlement()
+            }
+        }
+    }
+
+    private func applyHealthSyncEntitlement() async {
+        guard health.hasRequestedAuthorization else { return }
+
+        if appSession.hasPaidAccess {
+            await health.configureBackgroundSync()
+        } else {
+            await health.disableBackgroundSync()
+        }
+
+        await health.refreshAll()
     }
 }
