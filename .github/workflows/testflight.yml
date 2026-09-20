@@ -92,7 +92,83 @@ jobs:
             exit 1
           fi
 
-      - name: Create export options
+      - name: Seed archive entitlements with ad-hoc signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          IOS_APP="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app"
+          WATCH_APP="$IOS_APP/Watch/ATHLTH.app"
+          codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTHWatchExtension/ATHLTHWatchExtension.entitlements" "$WATCH_APP"
+          codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTH/Resources/ATHLTH.entitlements" "$IOS_APP"
+
+      - name: Create validation export options
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/ValidationExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>export</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Export and validate signed IPA before upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
+            -exportPath "$RUNNER_TEMP/validation-export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ValidationExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+          IPA=$(find "$RUNNER_TEMP/validation-export" -maxdepth 1 -name '*.ipa' -print -quit)
+          test -n "$IPA"
+          mkdir -p "$RUNNER_TEMP/validation-ipa"
+          unzip -q "$IPA" -d "$RUNNER_TEMP/validation-ipa"
+          APP=$(find "$RUNNER_TEMP/validation-ipa/Payload" -maxdepth 1 -name '*.app' -print -quit)
+          WATCH_APP=$(find "$APP/Watch" -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$APP"
+          test -n "$WATCH_APP"
+
+          codesign --verify --deep --strict "$APP"
+          codesign --verify --strict "$WATCH_APP"
+
+          IOS_ENT="$RUNNER_TEMP/validation-ios-entitlements.plist"
+          WATCH_ENT="$RUNNER_TEMP/validation-watch-entitlements.plist"
+          codesign -d --entitlements :- "$APP" > "$IOS_ENT" 2>/dev/null
+          codesign -d --entitlements :- "$WATCH_APP" > "$WATCH_ENT" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$IOS_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
+
+          IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist")
+          WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_APP/Info.plist")
+          IOS_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Info.plist")
+          WATCH_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$WATCH_APP/Info.plist")
+          echo "Validated iPhone: $IOS_VERSION ($IOS_BUILD)"
+          echo "Validated Watch:  $WATCH_VERSION ($WATCH_BUILD)"
+          test "$IOS_BUILD" = "$WATCH_BUILD"
+          test "$IOS_VERSION" = "$WATCH_VERSION"
+          test "$IOS_BUILD" -gt 1
+
+      - name: Create upload export options
         shell: bash
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
