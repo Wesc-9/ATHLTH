@@ -3,6 +3,7 @@ import SwiftUI
 struct EmailAuthView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var accountService: SupabaseAccountService
+    @EnvironmentObject private var session: AppSessionStore
 
     let onAuthenticated: (BackendUserBootstrap) -> Void
 
@@ -50,6 +51,17 @@ struct EmailAuthView: View {
                 confirmPassword = ""
                 acceptedLegal = false
                 confirmationSent = false
+            }
+            .onChange(of: session.signedIn) {
+                if session.signedIn {
+                    dismiss()
+                }
+            }
+            .onChange(of: accountService.passwordRecoveryPending) {
+                if accountService.passwordRecoveryPending {
+                    showingReset = false
+                    dismiss()
+                }
             }
         }
     }
