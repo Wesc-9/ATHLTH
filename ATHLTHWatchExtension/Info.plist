@@ -4,16 +4,12 @@
 <dict>
     <key>CFBundleDisplayName</key>
     <string>ATHLTH</string>
-    <key>NSExtension</key>
-    <dict>
-        <key>NSExtensionAttributes</key>
-        <dict>
-            <key>WKAppBundleIdentifier</key>
-            <string>com.wesc9.athlth.watchkitapp</string>
-        </dict>
-        <key>NSExtensionPointIdentifier</key>
-        <string>com.apple.watchkit</string>
-    </dict>
+    <key>WKApplication</key>
+    <true/>
+    <key>WKCompanionAppBundleIdentifier</key>
+    <string>com.wesc9.athlth</string>
+    <key>WKRunsIndependentlyOfCompanionApp</key>
+    <false/>
     <key>NSHealthShareUsageDescription</key>
     <string>ATHLTH reads live heart rate, energy and distance to show your workout metrics on Apple Watch.</string>
     <key>NSHealthUpdateUsageDescription</key>
