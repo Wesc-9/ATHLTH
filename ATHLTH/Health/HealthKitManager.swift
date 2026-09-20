@@ -79,7 +79,6 @@ final class HealthKitManager: ObservableObject {
             try await healthStore.requestAuthorization(toShare: [], read: readTypes)
             UserDefaults.standard.set(true, forKey: authorizationFlagKey)
             objectWillChange.send()
-            await configureBackgroundSync()
             await refreshPersonalDetails()
             await refreshAll()
         } catch {
@@ -119,6 +118,19 @@ final class HealthKitManager: ObservableObject {
                 healthStore.enableBackgroundDelivery(for: type, frequency: frequency) { success, _ in
                     continuation.resume(returning: success)
                 }
+            }
+        }
+    }
+
+    func disableBackgroundSync() async {
+        for query in observerQueries {
+            healthStore.stop(query)
+        }
+        observerQueries.removeAll()
+
+        _ = await withCheckedContinuation { continuation in
+            healthStore.disableAllBackgroundDelivery { success, _ in
+                continuation.resume(returning: success)
             }
         }
     }
