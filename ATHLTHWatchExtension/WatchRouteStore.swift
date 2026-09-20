@@ -62,6 +62,28 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
     }
 
+    private func handleWorkoutCommand(_ payload: [String: Any]) {
+        guard
+            payload[WatchTransferMetadataKey.kind] as? String
+                == WatchTransferKind.workoutCommand.rawValue,
+            let rawCommand = payload[WatchTransferMetadataKey.command] as? String,
+            let command = WatchWorkoutCommand(rawValue: rawCommand)
+        else {
+            return
+        }
+
+        DispatchQueue.main.async {
+            switch command {
+            case .end:
+                WatchWorkoutManager.shared.end()
+            case .pause:
+                WatchWorkoutManager.shared.pause()
+            case .resume:
+                WatchWorkoutManager.shared.resume()
+            }
+        }
+    }
+
     private func importRoute(from fileURL: URL) {
         do {
             let data = try Data(contentsOf: fileURL)
@@ -103,6 +125,20 @@ extension WatchRouteStore: WCSessionDelegate {
                     : "Connecting to iPhone"
             }
         }
+    }
+
+    func session(
+        _ session: WCSession,
+        didReceiveMessage message: [String: Any]
+    ) {
+        handleWorkoutCommand(message)
+    }
+
+    func session(
+        _ session: WCSession,
+        didReceiveUserInfo userInfo: [String: Any] = [:]
+    ) {
+        handleWorkoutCommand(userInfo)
     }
 
     func session(_ session: WCSession, didReceive file: WCSessionFile) {
