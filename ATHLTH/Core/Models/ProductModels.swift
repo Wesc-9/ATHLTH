@@ -10,7 +10,7 @@ enum SubscriptionTier: String, Codable, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .free: return "Free"
-        case .paid: return "Paid"
+        case .paid: return "ATHLTH+"
         }
     }
 }
@@ -23,8 +23,8 @@ enum SubscriptionAccessState: String, Codable, Hashable {
     var title: String {
         switch self {
         case .free: return "Free"
-        case .trial: return "Paid trial"
-        case .paid: return "Paid"
+        case .trial: return "ATHLTH+ trial"
+        case .paid: return "ATHLTH+"
         }
     }
 }
