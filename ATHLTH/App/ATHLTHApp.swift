@@ -40,13 +40,6 @@ struct AppRootView: View {
         }
         .task {
             guard health.hasRequestedAuthorization else { return }
-
-            if appSession.hasPaidAccess {
-                await health.configureBackgroundSync()
-            } else {
-                await health.disableBackgroundSync()
-            }
-
             await health.refreshAll()
         }
 }
