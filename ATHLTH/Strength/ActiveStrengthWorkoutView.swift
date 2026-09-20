@@ -4,6 +4,7 @@ struct ActiveStrengthWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var appSession: AppSessionStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     @State private var reps = 8
     @State private var weightKilograms = 20.0
@@ -53,6 +54,10 @@ struct ActiveStrengthWorkoutView: View {
                 titleVisibility: .visible
             ) {
                 Button("Finish Workout", role: .destructive) {
+                    if strength.activeWorkout?.captureDevice == .appleWatch {
+                        watchConnection.sendWorkoutCommand(.end)
+                    }
+
                     strength.finish()
                     appSession.endTrainingStatus()
                     dismiss()
@@ -80,7 +85,7 @@ struct ActiveStrengthWorkoutView: View {
 
         switch workout.captureDevice {
         case .appleWatch:
-            return "This finishes the ATHLTH log. The production Apple Watch integration will end the linked HealthKit workout at the same point."
+            return "This finishes the ATHLTH log and ends the linked HealthKit workout on Apple Watch."
         case .iPhone:
             return "This finishes the ATHLTH workout on iPhone. Apple Watch is not required."
         }
