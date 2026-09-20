@@ -113,25 +113,26 @@ struct OnboardingFlowView: View {
     }
 
     private var progressHeader: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 13) {
             HStack(alignment: .center) {
                 if step != .account {
                     Button {
                         goBack()
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 40, height: 40)
-                            .background(.white.opacity(0.86), in: Circle())
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(OnboardingTheme.ink)
+                            .frame(width: 42, height: 42)
+                            .background(.white.opacity(0.84), in: Circle())
                             .overlay {
                                 Circle()
-                                    .stroke(OnboardingTheme.border, lineWidth: 1)
+                                    .stroke(Color.white.opacity(0.95), lineWidth: 1)
                             }
+                            .shadow(color: Color.black.opacity(0.045), radius: 10, y: 5)
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Color.clear.frame(width: 40, height: 40)
+                    Color.clear.frame(width: 42, height: 42)
                 }
 
                 Spacer()
@@ -156,24 +157,39 @@ struct OnboardingFlowView: View {
                 } label: {
                     Image(systemName: "globe")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 40, height: 40)
-                        .background(.white.opacity(0.86), in: Circle())
+                        .foregroundStyle(OnboardingTheme.deepGreen)
+                        .frame(width: 42, height: 42)
+                        .background(.white.opacity(0.84), in: Circle())
                         .overlay {
                             Circle()
-                                .stroke(OnboardingTheme.border, lineWidth: 1)
+                                .stroke(Color.white.opacity(0.95), lineWidth: 1)
                         }
+                        .shadow(color: Color.black.opacity(0.045), radius: 10, y: 5)
                 }
                 .accessibilityLabel("Language")
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: 7) {
                 ForEach(0..<5, id: \.self) { index in
                     Capsule()
                         .fill(
                             index <= step.rawValue
-                                ? OnboardingTheme.green
-                                : Color.black.opacity(0.08)
+                                ? LinearGradient(
+                                    colors: [
+                                        OnboardingTheme.brightGreen,
+                                        OnboardingTheme.deepGreen
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                : LinearGradient(
+                                    colors: [
+                                        Color.black.opacity(0.075),
+                                        Color.black.opacity(0.055)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                         )
                         .frame(height: 5)
                 }
@@ -181,10 +197,10 @@ struct OnboardingFlowView: View {
 
             Text("\(step.rawValue + 1) of 5")
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(OnboardingTheme.mutedInk)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
+        .padding(.horizontal, OnboardingTheme.screenHorizontalPadding)
+        .padding(.top, 14)
         .padding(.bottom, 8)
     }
 
@@ -205,28 +221,22 @@ struct OnboardingFlowView: View {
     }
 
     private var accountStep: some View {
-        VStack(spacing: 22) {
-            Spacer().frame(height: 18)
+        VStack(spacing: 20) {
+            OnboardingHeroArtwork()
+                .padding(.top, 8)
 
-            ZStack {
-                Circle()
-                    .fill(OnboardingTheme.green.opacity(0.10))
-                    .frame(width: 88, height: 88)
-
-                Image(systemName: "figure.run")
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundStyle(OnboardingTheme.green)
-            }
-
-            VStack(spacing: 8) {
+            VStack(spacing: 9) {
                 Text("Welcome to ATHLTH")
-                    .font(.system(size: 34, weight: .bold))
+                    .font(.system(size: 35, weight: .bold, design: .rounded))
+                    .foregroundStyle(OnboardingTheme.ink)
+                    .multilineTextAlignment(.center)
 
                 Text("Move better. Train smarter. Build a complete picture of your training, recovery and progress.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(OnboardingTheme.mutedInk)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(3)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 6)
             }
 
             OnboardingCard {
@@ -239,8 +249,13 @@ struct OnboardingFlowView: View {
                     }
                     .signInWithAppleButtonStyle(.black)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .frame(height: 56)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: OnboardingTheme.buttonRadius,
+                            style: .continuous
+                        )
+                    )
                     .disabled(appleSignInInProgress)
 
                     Button {
@@ -249,14 +264,23 @@ struct OnboardingFlowView: View {
                         Label("Continue with Email", systemImage: "envelope.fill")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 52)
+                            .frame(height: 56)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.primary)
-                    .background(Color.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 16))
+                    .foregroundStyle(OnboardingTheme.ink)
+                    .background(
+                        Color.white.opacity(0.78),
+                        in: RoundedRectangle(
+                            cornerRadius: OnboardingTheme.buttonRadius,
+                            style: .continuous
+                        )
+                    )
                     .overlay {
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(OnboardingTheme.border, lineWidth: 1)
+                        RoundedRectangle(
+                            cornerRadius: OnboardingTheme.buttonRadius,
+                            style: .continuous
+                        )
+                        .stroke(OnboardingTheme.border, lineWidth: 1)
                     }
                 }
             }
@@ -271,7 +295,7 @@ struct OnboardingFlowView: View {
             VStack(spacing: 7) {
                 Text("By continuing, you agree to ATHLTH’s")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(OnboardingTheme.mutedInk)
 
                 HStack(spacing: 14) {
                     Button("Terms of Service") {
@@ -286,9 +310,10 @@ struct OnboardingFlowView: View {
                     }
                 }
                 .font(.caption2.weight(.semibold))
-                .tint(OnboardingTheme.green)
+                .tint(OnboardingTheme.deepGreen)
             }
             .multilineTextAlignment(.center)
+            .padding(.bottom, 8)
         }
     }
 
@@ -766,10 +791,15 @@ struct OnboardingFlowView: View {
                 EmptyView()
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
+        .padding(.horizontal, OnboardingTheme.screenHorizontalPadding)
+        .padding(.top, 12)
         .padding(.bottom, 18)
-        .background(Color.white.opacity(0.72))
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.78))
+                .frame(height: 1)
+        }
     }
 
     @ViewBuilder
