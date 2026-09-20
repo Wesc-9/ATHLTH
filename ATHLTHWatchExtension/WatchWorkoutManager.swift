@@ -38,6 +38,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var timer: Timer?
     private var startedAt: Date?
     private var finishing = false
+    private var lastMirrorSnapshotSentAt: Date?
 
     private override init() {
         super.init()
@@ -106,6 +107,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         routeBuilder = nil
         startedAt = nil
         finishing = false
+        lastMirrorSnapshotSentAt = nil
         publish {
             self.state = .idle
             self.elapsedTime = 0
@@ -174,6 +176,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             let startDate = Date()
             startedAt = startDate
+
+            try await session.startMirroringToCompanionDevice()
+            await sendLiveSnapshot(
+                stateOverride: .preparing,
+                force: true
+            )
 
             session.startActivity(with: startDate)
 
@@ -246,6 +254,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 guard let self, let builder = self.workoutBuilder else { return }
                 self.publish {
                     self.elapsedTime = builder.elapsedTime
+                }
+
+                Task { [weak self] in
+                    await self?.sendLiveSnapshot()
                 }
             }
         }
@@ -349,6 +361,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.elapsedTime = result.duration
             self.state = .completed
         }
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            await self.sendLiveSnapshot(
+                stateOverride: .completed,
+                force: true
+            )
+
+            if let workoutSession = self.workoutSession {
+                try? await workoutSession.stopMirroringToCompanionDevice()
+            }
+        }
     }
 
     private func sendToPhone(_ result: WatchWorkoutResult) {
@@ -363,6 +388,64 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             WatchTransferMetadataKey.kind: WatchTransferKind.workoutResult.rawValue,
             WatchTransferMetadataKey.payload: data
         ])
+    }
+
+    private func sendLiveSnapshot(
+        stateOverride: WatchWorkoutMirrorState? = nil,
+        force: Bool = false
+    ) async {
+        guard let workoutSession else { return }
+
+        let now = Date()
+
+        if !force,
+           let lastMirrorSnapshotSentAt,
+           now.timeIntervalSince(lastMirrorSnapshotSentAt) < 0.85 {
+            return
+        }
+
+        let snapshot = WatchWorkoutLiveSnapshot(
+            kind: kind,
+            state: stateOverride ?? mirrorState(for: state),
+            startedAt: startedAt,
+            elapsedTime: elapsedTime,
+            heartRate: heartRate,
+            activeCalories: activeCalories,
+            distanceMeters: distanceMeters,
+            averageHeartRate: averageHeartRate,
+            maxHeartRate: maxHeartRate,
+            routePointCount: routePoints.count
+        )
+
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+
+        do {
+            try await workoutSession.sendToRemoteWorkoutSession(data: data)
+            lastMirrorSnapshotSentAt = now
+        } catch {
+            publish {
+                self.errorMessage = "iPhone mirroring: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func mirrorState(
+        for state: WatchWorkoutState
+    ) -> WatchWorkoutMirrorState {
+        switch state {
+        case .idle, .preparing:
+            return .preparing
+        case .running:
+            return .running
+        case .paused:
+            return .paused
+        case .ending:
+            return .ending
+        case .completed:
+            return .completed
+        case .failed:
+            return .failed
+        }
     }
 
     private func updateStatistics(
@@ -451,6 +534,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.errorMessage = error.localizedDescription
             self.state = .failed(error.localizedDescription)
         }
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.sendLiveSnapshot(
+                stateOverride: .failed,
+                force: true
+            )
+        }
     }
 
     private func publishState(_ newState: WatchWorkoutState) {
@@ -478,9 +569,28 @@ extension WatchWorkoutManager: HKWorkoutSessionDelegate {
         switch toState {
         case .running:
             publishState(.running)
+            Task {
+                await sendLiveSnapshot(
+                    stateOverride: .running,
+                    force: true
+                )
+            }
         case .paused:
             publishState(.paused)
+            Task {
+                await sendLiveSnapshot(
+                    stateOverride: .paused,
+                    force: true
+                )
+            }
         case .ended:
+            publishState(.ending)
+            Task {
+                await sendLiveSnapshot(
+                    stateOverride: .ending,
+                    force: true
+                )
+            }
             finishWorkout(at: date)
         default:
             break
@@ -492,6 +602,33 @@ extension WatchWorkoutManager: HKWorkoutSessionDelegate {
         didFailWithError error: Error
     ) {
         fail(error)
+    }
+
+    func workoutSession(
+        _ workoutSession: HKWorkoutSession,
+        didReceiveDataFromRemoteWorkoutSession data: [Data]
+    ) {
+        for payload in data {
+            guard let command = try? JSONDecoder().decode(
+                WatchWorkoutMirrorCommand.self,
+                from: payload
+            ) else {
+                continue
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+
+                switch command.command {
+                case .end:
+                    self.end()
+                case .pause:
+                    self.pause()
+                case .resume:
+                    self.resume()
+                }
+            }
+        }
     }
 }
 
