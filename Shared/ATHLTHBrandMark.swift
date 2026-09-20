@@ -69,7 +69,7 @@ struct ATHLTHBrandMark: View {
                 .frame(width: size.markWidth, height: size.markHeight)
                 .accessibilityHidden(true)
 
-            Text("ATHLTH")
+            Text("VTHLTH")
                 .font(.system(size: size.wordmarkSize, weight: .black))
                 .tracking(size.tracking)
                 .lineLimit(1)
