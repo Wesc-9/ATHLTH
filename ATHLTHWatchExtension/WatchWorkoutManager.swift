@@ -223,6 +223,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    func requestHealthAuthorizationForSetup() async -> String? {
+        do {
+            try await requestAuthorization()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     private func requestAuthorization() async throws {
         guard HKHealthStore.isHealthDataAvailable() else {
             throw WatchWorkoutError.healthDataUnavailable
