@@ -109,7 +109,7 @@ struct WatchActiveWorkoutView: View {
             .padding(.bottom, 10)
         }
         .background(WatchTheme.canvas.ignoresSafeArea())
-        .interactiveDismissDisabled(workoutManager.isActive || workoutManager.state == .ending)
+        .interactiveDismissDisabled(workoutManager.state != .completed)
     }
 
     private var activeContent: some View {
