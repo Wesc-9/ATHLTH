@@ -8,6 +8,7 @@ struct ATHLTHWatchApp: App {
         WindowGroup {
             WatchHomeView()
                 .environmentObject(routeStore)
+                .preferredColorScheme(.light)
         }
     }
 }
