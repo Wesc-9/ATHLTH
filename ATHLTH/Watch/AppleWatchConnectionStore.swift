@@ -75,6 +75,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
     @Published private(set) var workoutLaunchInProgress = false
     @Published private(set) var workoutLaunchError: String?
     @Published private(set) var connectionDetail: String?
+    @Published private(set) var watchHealthAuthorizationInProgress = false
+    @Published private(set) var watchHealthAuthorizationDetail: String?
 
     private let healthStore = HKHealthStore()
     private var verifyWhenActivated = false
@@ -153,6 +155,61 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
             workoutLaunchError = error.localizedDescription
             throw error
         }
+    }
+
+    func requestWatchHealthAuthorization() {
+        guard let session, state.isReady else {
+            watchHealthAuthorizationDetail =
+                "Apple Watch must be connected before Health access can be configured."
+            return
+        }
+
+        guard session.isReachable else {
+            watchHealthAuthorizationDetail =
+                "Open ATHLTH on Apple Watch, then tap Configure Health again."
+            return
+        }
+
+        watchHealthAuthorizationInProgress = true
+        watchHealthAuthorizationDetail =
+            "Check your Apple Watch for the Health permission sheet."
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.healthAuthorizationRequest.rawValue
+        ]
+
+        session.sendMessage(
+            payload,
+            replyHandler: { [weak self] reply in
+                let status = reply[
+                    WatchTransferMetadataKey.status
+                ] as? String
+                let remoteError = reply[
+                    WatchTransferMetadataKey.error
+                ] as? String
+
+                DispatchQueue.main.async {
+                    self?.watchHealthAuthorizationInProgress = false
+
+                    if status == "authorized" {
+                        self?.watchHealthAuthorizationDetail =
+                            "Apple Watch Health setup completed."
+                    } else {
+                        self?.watchHealthAuthorizationDetail =
+                            remoteError
+                            ?? "Apple Watch Health setup could not be completed."
+                    }
+                }
+            },
+            errorHandler: { [weak self] error in
+                DispatchQueue.main.async {
+                    self?.watchHealthAuthorizationInProgress = false
+                    self?.watchHealthAuthorizationDetail =
+                        "Open ATHLTH on Apple Watch and try again. \(error.localizedDescription)"
+                }
+            }
+        )
     }
 
     func clearCompletedWorkout() {
