@@ -77,6 +77,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
     @Published private(set) var connectionDetail: String?
 
     private let healthStore = HKHealthStore()
+    private var verifyWhenActivated = false
 
     var session: WCSession? {
         WCSession.isSupported() ? WCSession.default : nil
@@ -110,6 +111,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         session.delegate = self
 
         if session.activationState == .notActivated {
+            verifyWhenActivated = verifyLiveConnection
             publish(.checking)
             session.activate()
             return
@@ -280,11 +282,17 @@ extension AppleWatchConnectionStore: WCSessionDelegate {
             DispatchQueue.main.async { [weak self] in
                 self?.connectionDetail = error.localizedDescription
             }
+            verifyWhenActivated = false
             evaluate(session)
             return
         }
 
-        evaluate(session)
+        let shouldVerify = verifyWhenActivated
+        verifyWhenActivated = false
+        evaluate(
+            session,
+            verifyLiveConnection: shouldVerify
+        )
     }
 
     func session(
