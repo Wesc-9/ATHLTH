@@ -24,7 +24,6 @@ jobs:
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
-            -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             build
