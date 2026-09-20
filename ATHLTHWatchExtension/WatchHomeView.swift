@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WatchHomeView: View {
     @EnvironmentObject private var routeStore: WatchRouteStore
+    @EnvironmentObject private var workoutManager: WatchWorkoutManager
 
     var body: some View {
         NavigationStack {
@@ -23,28 +24,18 @@ struct WatchHomeView: View {
                         }
                         .buttonStyle(.plain)
 
-                        VStack(alignment: .leading, spacing: 7) {
-                            ZStack {
-                                Circle()
-                                    .fill(WatchTheme.green.opacity(0.11))
-                                    .frame(width: 34, height: 34)
-
-                                Image(systemName: "figure.run")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(WatchTheme.green)
-                            }
-
-                            Text("Start Workout")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.primary)
-
-                            Text("Coming next")
-                                .font(.system(size: 10))
-                                .foregroundStyle(WatchTheme.muted)
+                        NavigationLink {
+                            WatchWorkoutStartView(route: nil)
+                        } label: {
+                            actionCard(
+                                title: "Start Workout",
+                                subtitle: workoutManager.isActive
+                                    ? "Workout active"
+                                    : "Run · Walk · Strength",
+                                icon: "figure.run"
+                            )
                         }
-                        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-                        .padding(11)
-                        .watchSurface()
+                        .buttonStyle(.plain)
                     }
 
                     VStack(alignment: .leading, spacing: 9) {
@@ -93,6 +84,19 @@ struct WatchHomeView: View {
             }
             .background(WatchTheme.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { workoutManager.isWorkoutPresented },
+                set: { presented in
+                    if !presented, !workoutManager.isActive {
+                        workoutManager.reset()
+                    }
+                }
+            )
+        ) {
+            WatchActiveWorkoutView()
+                .environmentObject(workoutManager)
         }
     }
 
