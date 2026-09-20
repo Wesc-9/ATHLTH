@@ -27,6 +27,9 @@ final class HealthKitManager: ObservableObject {
         HKHealthStore.isHealthDataAvailable()
     }
 
+    /// Health data ATHLTH can make meaningful use of now or in the planned
+    /// training/recovery experience. Deliberately excludes unrelated sensitive
+    /// domains such as clinical records and reproductive-health data.
     private var readTypes: Set<HKObjectType> {
         var types: Set<HKObjectType> = [
             HKObjectType.workoutType(),
@@ -34,13 +37,110 @@ final class HealthKitManager: ObservableObject {
         ]
 
         let quantityIdentifiers: [HKQuantityTypeIdentifier] = [
+            // Heart, cardio and recovery
+            .heartRate,
+            .restingHeartRate,
+            .walkingHeartRateAverage,
+            .heartRateVariabilitySDNN,
+            .vo2Max,
+            .oxygenSaturation,
+            .respiratoryRate,
+
+            // Daily activity and energy
+            .activeEnergyBurned,
+            .basalEnergyBurned,
+            .stepCount,
+            .appleExerciseTime,
+            .appleStandTime,
+            .flightsClimbed,
+
+            // Distance and sport
+            .distanceWalkingRunning,
+            .distanceCycling,
+            .distanceSwimming,
+            .swimmingStrokeCount,
+
+            // Walking and mobility
+            .walkingSpeed,
+            .walkingStepLength,
+            .walkingAsymmetryPercentage,
+            .walkingDoubleSupportPercentage,
+            .sixMinuteWalkTestDistance,
+            .stairAscentSpeed,
+            .stairDescentSpeed,
+
+            // Running dynamics
+            .runningSpeed,
+            .runningPower,
+            .runningStrideLength,
+            .runningVerticalOscillation,
+            .runningGroundContactTime,
+
+            // Cycling dynamics
+            .cyclingSpeed,
+            .cyclingPower,
+            .cyclingCadence,
+
+            // Body measurements
+            .height,
+            .bodyMass,
+            .bodyMassIndex,
+            .bodyFatPercentage,
+            .leanBodyMass,
+            .waistCircumference
+        ]
+
+        for identifier in quantityIdentifiers {
+            if let type = HKObjectType.quantityType(forIdentifier: identifier) {
+                types.insert(type)
+            }
+        }
+
+        let categoryIdentifiers: [HKCategoryTypeIdentifier] = [
+            .sleepAnalysis,
+            .mindfulSession,
+            .appleStandHour,
+            .highHeartRateEvent,
+            .lowHeartRateEvent,
+            .irregularHeartRhythmEvent
+        ]
+
+        for identifier in categoryIdentifiers {
+            if let type = HKObjectType.categoryType(forIdentifier: identifier) {
+                types.insert(type)
+            }
+        }
+
+        let characteristicIdentifiers: [HKCharacteristicTypeIdentifier] = [
+            .dateOfBirth,
+            .biologicalSex,
+            .bloodType,
+            .wheelchairUse
+        ]
+
+        for identifier in characteristicIdentifiers {
+            if let type = HKObjectType.characteristicType(forIdentifier: identifier) {
+                types.insert(type)
+            }
+        }
+
+        return types
+    }
+
+    /// Only types that currently drive ATHLTH's live dashboard need observer
+    /// queries. Authorization is intentionally broader than background refresh
+    /// so a step count or mobility update does not trigger a full data reload.
+    private var backgroundObserverTypes: Set<HKSampleType> {
+        var types: Set<HKSampleType> = [
+            HKObjectType.workoutType()
+        ]
+
+        let quantityIdentifiers: [HKQuantityTypeIdentifier] = [
             .heartRate,
             .restingHeartRate,
             .heartRateVariabilitySDNN,
             .activeEnergyBurned,
-            .distanceWalkingRunning,
-            .height,
-            .bodyMass
+            .distanceWalkingRunning
         ]
 
         for identifier in quantityIdentifiers {
@@ -51,17 +151,6 @@ final class HealthKitManager: ObservableObject {
 
         if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
             types.insert(sleep)
-        }
-
-        let characteristicIdentifiers: [HKCharacteristicTypeIdentifier] = [
-            .dateOfBirth,
-            .biologicalSex
-        ]
-
-        for identifier in characteristicIdentifiers {
-            if let type = HKObjectType.characteristicType(forIdentifier: identifier) {
-                types.insert(type)
-            }
         }
 
         return types
@@ -143,9 +232,7 @@ final class HealthKitManager: ObservableObject {
     private func startBackgroundObservers() {
         guard observerQueries.isEmpty else { return }
 
-        let sampleTypes = readTypes.compactMap { $0 as? HKSampleType }
-
-        for type in sampleTypes {
+        for type in backgroundObserverTypes {
             let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completionHandler, error in
                 defer { completionHandler() }
                 guard error == nil else { return }
