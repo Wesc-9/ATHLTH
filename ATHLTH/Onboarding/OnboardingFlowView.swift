@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct OnboardingFlowView: View {
@@ -6,6 +7,7 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
+    @EnvironmentObject private var accountService: SupabaseAccountService
 
     @State private var step: OnboardingStep = .account
     @State private var username = ""
@@ -21,8 +23,11 @@ struct OnboardingFlowView: View {
     @State private var usernameClaimError: String?
     @State private var showPaidPlansBeforeHome = false
     @State private var showingSubscriptionOffer = false
+    @State private var authenticationError: String?
+    @State private var appleSignInInProgress = false
+    @State private var onboardingCompletionError: String?
 
-    private let usernameService = MockUsernameAvailabilityService()
+    private let usernameService = SupabaseUsernameAvailabilityService()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -90,7 +95,9 @@ struct OnboardingFlowView: View {
         .sheet(
             isPresented: $showingSubscriptionOffer,
             onDismiss: {
-                session.completeOnboarding()
+                Task {
+                    await finishOnboarding()
+                }
             }
         ) {
             SubscriptionOfferView {
@@ -226,19 +233,17 @@ struct OnboardingFlowView: View {
 
             OnboardingCard {
                 VStack(spacing: 12) {
-                    Button {
-                        session.beginMockSignIn(method: .apple, isNewUser: true)
-                        session.setUsernameSeed(session.profile.displayName)
-                        step = .username
-                    } label: {
-                        Label("Continue with Apple", systemImage: "apple.logo")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
+                    SignInWithAppleButton(.continue) { request in
+                        authenticationError = nil
+                        accountService.prepareAppleSignIn(request)
+                    } onCompletion: { result in
+                        handleAppleAuthorization(result)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .background(Color.black, in: RoundedRectangle(cornerRadius: 16))
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .disabled(appleSignInInProgress)
 
                     Button {
                         showingEmailAuth = true
@@ -256,6 +261,13 @@ struct OnboardingFlowView: View {
                             .stroke(OnboardingTheme.border, lineWidth: 1)
                     }
                 }
+            }
+
+            if let authenticationError {
+                Label(authenticationError, systemImage: "exclamationmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             VStack(spacing: 7) {
@@ -657,7 +669,9 @@ struct OnboardingFlowView: View {
                 if showPaidPlansBeforeHome {
                     showingSubscriptionOffer = true
                 } else {
-                    session.completeOnboarding()
+                    Task {
+                        await finishOnboarding()
+                    }
                 }
             } label: {
                 HStack {
@@ -670,6 +684,13 @@ struct OnboardingFlowView: View {
                 .padding(.vertical, 5)
             }
             .buttonStyle(OnboardingPrimaryButtonStyle())
+
+            if let onboardingCompletionError {
+                Label(onboardingCompletionError, systemImage: "exclamationmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.top, 10)
+            }
 
             Spacer(minLength: 110)
 
@@ -868,6 +889,64 @@ struct OnboardingFlowView: View {
             .disabled(healthRequestInProgress && title == "Apple Health")
         }
         .frame(minHeight: 72)
+    }
+
+    private func handleAppleAuthorization(
+        _ result: Result<ASAuthorization, Error>
+    ) {
+        Task {
+            authenticationError = nil
+            appleSignInInProgress = true
+            defer { appleSignInInProgress = false }
+
+            do {
+                guard let credential = try result.get().credential
+                    as? ASAuthorizationAppleIDCredential
+                else {
+                    throw SupabaseAccountError.invalidAppleCredential
+                }
+
+                let bootstrap = try await accountService.signInWithApple(
+                    credential: credential
+                )
+                session.applyBackendBootstrap(bootstrap, method: .apple)
+
+                if bootstrap.profile.onboardingCompleted {
+                    return
+                }
+
+                if let existingUsername = bootstrap.profile.username,
+                   !existingUsername.isEmpty {
+                    username = existingUsername
+                    step = .goals
+                } else {
+                    let emailSeed = credential.email?
+                        .split(separator: "@")
+                        .first
+                        .map(String.init)
+                    let seed = bootstrap.profile.displayName
+                        ?? emailSeed
+                        ?? "athlete"
+                    session.setUsernameSeed(seed)
+                    step = .username
+                }
+            } catch {
+                authenticationError = error.localizedDescription
+            }
+        }
+    }
+
+    private func finishOnboarding() async {
+        onboardingCompletionError = nil
+
+        do {
+            if accountService.currentUserID != nil {
+                try await accountService.markOnboardingComplete()
+            }
+            session.completeOnboarding()
+        } catch {
+            onboardingCompletionError = error.localizedDescription
+        }
     }
 
     private func toggleInterest(_ interest: ATHLTHInterest) {
