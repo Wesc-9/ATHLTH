@@ -21,7 +21,7 @@ jobs:
   testflight:
     runs-on: macos-26
     env:
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_TEAM_ID: D3AX7B6RMW
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required GitHub secret: $name"
               exit 1
