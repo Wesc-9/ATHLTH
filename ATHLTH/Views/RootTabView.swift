@@ -92,66 +92,113 @@ struct HealthAccessView: View {
 struct TodayView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var plan: TrainingPlanStore
+    @EnvironmentObject private var membership: ATHLTHPlusStore
+
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour < 12 { return "Good morning" }
+        if hour < 18 { return "Good afternoon" }
+        return "Good evening"
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Today")
-                            .font(.largeTitle.weight(.bold))
-                        Text("Your health and training, without the noise.")
-                            .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(greeting.uppercased())
+                                .font(.caption.weight(.semibold))
+                                .tracking(1.8)
+                                .foregroundStyle(.secondary)
+                            Text("Today")
+                                .font(.system(size: 38, weight: .bold, design: .rounded))
+                            Text("Move better. Live longer.")
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if membership.hasATHLTHPlus {
+                            Label("ATHLTH+", systemImage: "crown.fill")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.green)
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 8)
+                                .background(.green.opacity(0.1), in: Capsule())
+                        }
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Today's training")
-                            .font(.headline)
-                        HStack {
-                            Label(plan.selectedActivity.title, systemImage: plan.selectedActivity.icon)
-                            Spacer()
+                    HStack(spacing: 12) {
+                        Image(systemName: plan.selectedActivity.icon)
+                            .font(.title2)
+                            .foregroundStyle(.green)
+                            .frame(width: 50, height: 50)
+                            .background(.green.opacity(0.1), in: Circle())
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("TODAY'S TRAINING")
+                                .font(.caption2.weight(.semibold))
+                                .tracking(1.4)
+                                .foregroundStyle(.secondary)
+                            Text(plan.selectedActivity.title)
+                                .font(.title3.weight(.bold))
                             if plan.selectedActivity == .strength {
                                 Text(plan.selectedStrengthSplit.title)
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .font(.title3.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(.secondary)
                     }
                     .padding(18)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26))
+                    .overlay(RoundedRectangle(cornerRadius: 26).stroke(.white.opacity(0.4)))
+
+                    Text("Your health")
+                        .font(.title2.weight(.bold))
 
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                        MetricCard(
-                            title: "Sleep",
-                            value: health.sleep.totalAsleep > 0 ? health.sleep.totalAsleep.shortDuration : "—",
-                            systemImage: "moon.stars.fill"
-                        )
-                        MetricCard(
-                            title: "Resting HR",
-                            value: health.heart.restingHeartRate.map { "\(Int($0.rounded())) bpm" } ?? "—",
-                            systemImage: "heart.circle.fill"
-                        )
-                        MetricCard(
-                            title: "HRV",
-                            value: health.heart.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—",
-                            systemImage: "waveform.path.ecg"
-                        )
+                        MetricCard(title: "Sleep", value: health.sleep.totalAsleep > 0 ? health.sleep.totalAsleep.shortDuration : "—", systemImage: "moon.stars.fill")
+                        MetricCard(title: "Resting HR", value: health.heart.restingHeartRate.map { "\(Int($0.rounded())) bpm" } ?? "—", systemImage: "heart.circle.fill")
+                        MetricCard(title: "HRV", value: health.heart.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—", systemImage: "waveform.path.ecg")
                     }
 
                     if let latest = health.workouts.first {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Latest workout")
-                                .font(.headline)
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Latest workout").font(.title3.weight(.bold))
+                                Spacer()
+                                Text(latest.startDate, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                             WorkoutRow(summary: latest)
                         }
                         .padding(18)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26))
+                    }
+
+                    if membership.hasATHLTHPlus {
+                        HStack(spacing: 13) {
+                            Image(systemName: "sparkles")
+                                .foregroundStyle(.green)
+                                .frame(width: 44, height: 44)
+                                .background(.green.opacity(0.1), in: Circle())
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("ATHLTH+ insights").font(.headline)
+                                Text("Premium training and recovery insights will appear here as they become available.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(18)
+                        .background(.green.opacity(0.055), in: RoundedRectangle(cornerRadius: 26))
                     }
                 }
-                .padding()
+                .padding(20)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
+            .background(LinearGradient(colors: [.green.opacity(0.025), .clear], startPoint: .top, endPoint: .center).ignoresSafeArea())
             .refreshable { await health.refreshAll() }
         }
     }
