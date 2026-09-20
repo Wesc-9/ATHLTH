@@ -5,3 +5,4 @@ Trigger: 2
 Trigger: 3 — version 0.2.0 build 2
 Fastlane trigger: 1 — ATHLTH 0.2.0
 Fastlane trigger: 2 — ATHLTH 0.2.0 retry
+Fastlane trigger: 3 — Team ID fix
