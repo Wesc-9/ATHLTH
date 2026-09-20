@@ -8,6 +8,8 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
     @State private var healthAuthorizationInProgress = false
+    @State private var watchConnectRequested = false
+    @State private var showingWatchSetupHelp = false
 
     var body: some View {
         List {
@@ -175,11 +177,13 @@ struct ATHLTHSettingsView: View {
                 .disabled(healthAuthorizationInProgress)
 
                 Button {
+                    watchConnectRequested = true
                     watchConnection.connect()
                 } label: {
                     integrationRow(
                         .appleWatch,
-                        subtitle: watchConnection.state.subtitle,
+                        subtitle: watchConnection.connectionDetail
+                            ?? watchConnection.state.subtitle,
                         connected: watchConnection.isReady
                     )
                 }
@@ -311,6 +315,32 @@ struct ATHLTHSettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: watchConnection.state) { _, state in
+            guard watchConnectRequested else { return }
+
+            switch state {
+            case .checking:
+                break
+            case .ready:
+                watchConnectRequested = false
+            case .unsupported, .notPaired, .appNotInstalled:
+                watchConnectRequested = false
+                showingWatchSetupHelp = true
+            }
+        }
+        .alert(
+            "Apple Watch setup",
+            isPresented: $showingWatchSetupHelp
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(
+                LocalizedStringKey(
+                    watchConnection.state.setupHelpMessage
+                        ?? "Open ATHLTH on Apple Watch and try again."
+                )
+            )
+        }
     }
 
     @ViewBuilder
@@ -326,7 +356,7 @@ struct ATHLTHSettingsView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(integration.title)
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
