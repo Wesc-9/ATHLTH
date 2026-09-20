@@ -49,14 +49,14 @@ struct OnboardingFlowView: View {
         }
         .sheet(isPresented: $showingEmailAuth) {
             EmailAuthView { result in
-                session.beginMockSignIn(method: .email)
-
                 switch result {
                 case .newUser(let email):
+                    session.beginMockSignIn(method: .email, isNewUser: true)
                     let seed = email.split(separator: "@").first.map(String.init) ?? "athlete"
                     session.setUsernameSeed(seed)
                     step = .username
                 case .existingUser:
+                    session.beginMockSignIn(method: .email, isNewUser: false)
                     session.completeOnboarding()
                 }
             }
@@ -170,7 +170,7 @@ struct OnboardingFlowView: View {
 
             VStack(spacing: 12) {
                 Button {
-                    session.beginMockSignIn(method: .apple)
+                    session.beginMockSignIn(method: .apple, isNewUser: true)
                     session.setUsernameSeed(session.profile.displayName)
                     step = .username
                 } label: {
@@ -438,38 +438,57 @@ struct OnboardingFlowView: View {
         VStack(alignment: .leading, spacing: 18) {
             onboardingTitle(
                 "Connect your health",
-                subtitle: "Apple Health can fill in available profile basics and add workouts, heart rate, sleep, recovery and activity data. Everything here is optional."
+                subtitle: "Bring your health and training data into ATHLTH."
             )
 
             ATHLTHCard {
                 connectionRow(
                     title: "Apple Health",
                     subtitle: health.hasRequestedAuthorization
-                        ? "Connected — use available Health data"
-                        : "Import available health and profile data",
+                        ? "Connected"
+                        : "Workouts, heart rate, sleep, activity and recovery",
                     icon: "heart.fill",
                     connected: health.hasRequestedAuthorization
                 ) {
                     Task {
                         healthRequestInProgress = true
                         await health.requestAuthorization()
+
+                        if session.hasPaidAccess {
+                            await health.configureBackgroundSync()
+                        }
+
                         await health.refreshPersonalDetails()
                         importedHealthDetails = health.personalDetails
                         healthRequestInProgress = false
                     }
                 }
+            }
 
-                if importedHealthDetails.hasAnyValue {
-                    Divider()
-                        .padding(.vertical, 10)
+            ATHLTHCard {
+                connectionRow(
+                    title: "Apple Watch",
+                    subtitle: settings.watchConnected
+                        ? "Connected"
+                        : "Start and track workouts from Apple Watch",
+                    icon: "applewatch",
+                    connected: settings.watchConnected
+                ) {
+                    settings.watchConnected = true
+                }
+            }
 
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("Available from Apple Health")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+            if importedHealthDetails.hasAnyValue {
+                ATHLTHCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Imported from Apple Health")
+                            .font(.headline)
 
                         if let birthDate = importedHealthDetails.dateOfBirth {
-                            LabeledContent("Date of birth", value: birthDate.formatted(date: .abbreviated, time: .omitted))
+                            LabeledContent(
+                                "Date of birth",
+                                value: birthDate.formatted(date: .abbreviated, time: .omitted)
+                            )
                         }
 
                         if let sex = importedHealthDetails.healthSex {
@@ -477,7 +496,10 @@ struct OnboardingFlowView: View {
                         }
 
                         if let weight = importedHealthDetails.weightKilograms {
-                            LabeledContent("Weight", value: String(format: "%.1f kg", weight))
+                            LabeledContent(
+                                "Weight",
+                                value: String(format: "%.1f kg", weight)
+                            )
                         }
 
                         if let height = importedHealthDetails.heightCentimeters {
@@ -486,29 +508,25 @@ struct OnboardingFlowView: View {
                     }
                     .font(.subheadline)
                 }
-
-                Text("Missing profile details can be added later in Settings. ATHLTH never requires them to finish onboarding.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 8)
             }
 
-            ATHLTHCard {
-                connectionRow(
-                    title: "Apple Watch",
-                    subtitle: settings.watchConnected
-                        ? "Connected"
-                        : "Optional — ATHLTH works fully from iPhone",
-                    icon: "applewatch",
-                    connected: settings.watchConnected
-                ) {
-                    settings.watchConnected.toggle()
-                }
+            if session.subscriptionAccess.state == .trial,
+               session.subscriptionAccess.trialIsActive {
+                ATHLTHCard {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.green)
 
-                Text("Watch setup can be changed later in Profile → Settings → Connections.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 8)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("7-day Paid trial active")
+                                .font(.subheadline.weight(.semibold))
+
+                            Text("Background Health sync is included during your trial.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
 
             ATHLTHCard {
@@ -619,13 +637,6 @@ struct OnboardingFlowView: View {
                     saveProfileData()
                     step = .ready
                 }
-
-                Button("Skip for now") {
-                    importedHealthDetails = .empty
-                    saveProfileData()
-                    step = .ready
-                }
-                .font(.subheadline)
 
             case .ready:
                 footerButton(title: "Enter ATHLTH") {
@@ -752,6 +763,7 @@ struct OnboardingFlowView: View {
             .buttonStyle(.bordered)
             .disabled(healthRequestInProgress && title == "Apple Health")
         }
+        .frame(minHeight: 72)
     }
 
     private func toggleInterest(_ interest: ATHLTHInterest) {
