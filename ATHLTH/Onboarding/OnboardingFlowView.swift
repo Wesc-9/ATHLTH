@@ -131,16 +131,7 @@ struct OnboardingFlowView: View {
 
                 Spacer()
 
-                VStack(spacing: 3) {
-                    Text("ATHLTH")
-                        .font(.system(size: 21, weight: .black))
-                        .tracking(6)
-
-                    Text("MOVE BETTER   LIVE LONGER")
-                        .font(.system(size: 7, weight: .semibold))
-                        .tracking(2.0)
-                        .foregroundStyle(.secondary)
-                }
+                ATHLTHBrandMark(size: .compact, showTagline: true)
 
                 Spacer()
 
