@@ -38,7 +38,7 @@ enum AppleWatchConnectionState: Equatable {
         case .notPaired:
             return "Help"
         case .appNotInstalled:
-            return "Install"
+            return "Setup"
         case .ready:
             return "Check"
         }
