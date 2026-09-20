@@ -76,4 +76,20 @@ jobs:
                   "expirationDate": a.get("expirationDate"),
               }
               print(json.dumps(safe, sort_keys=True))
+
+          def get_json(url):
+              req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  return json.load(resp)
+
+          for identifier in ["com.wesc9.athlth", "com.wesc9.athlth.watchkitapp"]:
+              from urllib.parse import quote
+              payload = get_json("https://api.appstoreconnect.apple.com/v1/bundleIds?filter%5Bidentifier%5D=" + quote(identifier))
+              rows = payload.get("data", [])
+              print(f"Bundle {identifier}: {len(rows)} match(es)")
+              for row in rows:
+                  bundle_id = row["id"]
+                  caps = get_json(f"https://api.appstoreconnect.apple.com/v1/bundleIds/{bundle_id}/bundleIdCapabilities?limit=200")
+                  cap_types = sorted(x.get("attributes", {}).get("capabilityType") for x in caps.get("data", []) if x.get("attributes", {}).get("capabilityType"))
+                  print(json.dumps({"identifier": identifier, "bundleIdResourceId": bundle_id, "capabilities": cap_types}, sort_keys=True))
           PY
