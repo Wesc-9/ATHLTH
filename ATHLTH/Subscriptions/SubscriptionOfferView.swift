@@ -60,7 +60,7 @@ struct SubscriptionOfferView: View {
                         .frame(maxWidth: .infinity)
                         .onboardingSurface(cornerRadius: 18)
                     } else {
-                        HStack(alignment: .stretch, spacing: 12) {
+                        HStack(alignment: .top, spacing: 12) {
                             ForEach(subscriptionStore.products, id: \.id) { product in
                                 planCard(product)
                                     .frame(maxWidth: .infinity)
