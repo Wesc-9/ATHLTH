@@ -1,4 +1,4 @@
-name: Upload ATHLTH to TestFlight
+name: ATHLTH TestFlight
 
 on:
   workflow_dispatch:
@@ -16,7 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  testflight:
+  upload:
+    name: Build and upload
     runs-on: macos-26
     env:
       APPLE_TEAM_ID: D3AX7B6RMW
@@ -25,29 +26,32 @@ jobs:
       ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Validate required secrets
+      - name: Validate configuration
         shell: bash
         run: |
           set -euo pipefail
           for name in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::Missing required GitHub secret: $name"
+              echo "::error::Missing GitHub secret: $name"
               exit 1
             fi
           done
+          echo "Configuration OK"
 
-      - name: Select Xcode 26.6
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          xcodebuild -version
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Generate project
+        run: |
+          brew install xcodegen
+          xcodegen generate
 
-      - name: Generate Xcode project
-        run: xcodegen generate
-
-      - name: Prepare App Store Connect API key
+      - name: Prepare App Store Connect key
         shell: bash
         run: |
           set -euo pipefail
@@ -56,26 +60,13 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Archive
+      - name: Archive ATHLTH
         shell: bash
         run: |
-          set -euo pipefail
-          xcodebuild \
-            -project ATHLTH.xcodeproj \
-            -scheme ATHLTH \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
-            CODE_SIGN_STYLE=Automatic \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            clean archive
+          set -o pipefail
+          xcodebuild             -project ATHLTH.xcodeproj             -scheme ATHLTH             -configuration Release             -destination 'generic/platform=iOS'             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive"             DEVELOPMENT_TEAM="$APPLE_TEAM_ID"             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"             CODE_SIGN_STYLE=Automatic             -allowProvisioningUpdates             -authenticationKeyPath "$ASC_KEY_PATH"             -authenticationKeyID "$ASC_KEY_ID"             -authenticationKeyIssuerID "$ASC_ISSUER_ID"             clean archive | tee "$RUNNER_TEMP/archive.log"
 
-      - name: Create export options
+      - name: Create TestFlight export options
         shell: bash
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
@@ -99,26 +90,19 @@ jobs:
           </plist>
           EOF
 
-      - name: Upload to App Store Connect / TestFlight
+      - name: Upload to TestFlight
         shell: bash
         run: |
-          set -euo pipefail
-          xcodebuild \
-            -exportArchive \
-            -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          set -o pipefail
+          xcodebuild             -exportArchive             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive"             -exportPath "$RUNNER_TEMP/export"             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"             -allowProvisioningUpdates             -authenticationKeyPath "$ASC_KEY_PATH"             -authenticationKeyID "$ASC_KEY_ID"             -authenticationKeyIssuerID "$ASC_ISSUER_ID"             | tee "$RUNNER_TEMP/upload.log"
 
-      - name: Upload diagnostics
+      - name: Save failure logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: athlth-testflight-diagnostics
+          name: athlth-testflight-logs
           path: |
-            ~/Library/Logs/DiagnosticReports
+            ${{ runner.temp }}/archive.log
+            ${{ runner.temp }}/upload.log
             ${{ runner.temp }}/export
           if-no-files-found: ignore
