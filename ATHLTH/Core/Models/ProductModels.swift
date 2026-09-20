@@ -19,12 +19,16 @@ enum SubscriptionAccessState: String, Codable, Hashable {
     case free
     case trial
     case paid
+    case expired
+    case revoked
 
     var title: String {
         switch self {
         case .free: return "Free"
         case .trial: return "ATHLTH+ trial"
         case .paid: return "ATHLTH+"
+        case .expired: return "ATHLTH+ expired"
+        case .revoked: return "ATHLTH+ revoked"
         }
     }
 }
@@ -34,6 +38,7 @@ enum SubscriptionLifecycleState: String, Codable, Hashable {
     case trial
     case active
     case expired
+    case revoked
 
     var title: String {
         switch self {
@@ -41,6 +46,7 @@ enum SubscriptionLifecycleState: String, Codable, Hashable {
         case .trial: return "ATHLTH+ trial"
         case .active: return "ATHLTH+"
         case .expired: return "ATHLTH+ expired"
+        case .revoked: return "ATHLTH+ revoked"
         }
     }
 }
@@ -52,8 +58,21 @@ enum SubscriptionAccessSource: String, Codable, Hashable {
     case serverVerified
 }
 
-enum ATHLTHFeature: Hashable {
+enum ATHLTHFeature: Hashable, CaseIterable {
     case backgroundHealthSync
+    case advancedTrainingPlans
+    case routeChallenges
+    case advancedRecovery
+
+    var requiresATHLTHPlus: Bool {
+        switch self {
+        case .backgroundHealthSync,
+             .advancedTrainingPlans,
+             .routeChallenges,
+             .advancedRecovery:
+            return true
+        }
+    }
 }
 
 struct SubscriptionAccess: Codable, Hashable {
@@ -102,6 +121,10 @@ struct SubscriptionAccess: Codable, Hashable {
             return trialIsActive ? .trial : .expired
         case .paid:
             return paidIsActive ? .active : .expired
+        case .expired:
+            return .expired
+        case .revoked:
+            return .revoked
         case .free:
             let normalizedSource = source ?? .none
             if normalizedSource != .none,
