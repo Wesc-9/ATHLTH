@@ -32,20 +32,16 @@ struct OnboardingFlowView: View {
                 VStack(spacing: 22) {
                     content
                 }
-                .padding(24)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 28)
                 .frame(maxWidth: 680)
                 .frame(maxWidth: .infinity)
             }
 
             footer
         }
-        .background(
-            LinearGradient(
-                colors: [.green.opacity(0.08), .blue.opacity(0.05), .clear],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(OnboardingBackground().ignoresSafeArea())
         .task {
             guard health.hasRequestedAuthorization else { return }
             await health.refreshPersonalDetails()
@@ -113,24 +109,38 @@ struct OnboardingFlowView: View {
 
     private var progressHeader: some View {
         VStack(spacing: 12) {
-            HStack {
+            HStack(alignment: .center) {
                 if step != .account {
                     Button {
                         goBack()
                     } label: {
                         Image(systemName: "chevron.left")
-                            .frame(width: 38, height: 38)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 40, height: 40)
+                            .background(.white.opacity(0.86), in: Circle())
+                            .overlay {
+                                Circle()
+                                    .stroke(OnboardingTheme.border, lineWidth: 1)
+                            }
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Color.clear.frame(width: 38, height: 38)
+                    Color.clear.frame(width: 40, height: 40)
                 }
 
                 Spacer()
 
-                Text("ATHLTH")
-                    .font(.headline.weight(.black))
-                    .tracking(5)
+                VStack(spacing: 3) {
+                    Text("ATHLTH")
+                        .font(.system(size: 21, weight: .black))
+                        .tracking(6)
+
+                    Text("MOVE BETTER   LIVE LONGER")
+                        .font(.system(size: 7, weight: .semibold))
+                        .tracking(2.0)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
@@ -149,19 +159,37 @@ struct OnboardingFlowView: View {
                     }
                 } label: {
                     Image(systemName: "globe")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 38, height: 38)
-                        .background(.thinMaterial, in: Circle())
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 40, height: 40)
+                        .background(.white.opacity(0.86), in: Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(OnboardingTheme.border, lineWidth: 1)
+                        }
                 }
                 .accessibilityLabel("Language")
             }
 
-            ProgressView(value: step.progress)
-                .tint(.green)
+            HStack(spacing: 6) {
+                ForEach(0..<5, id: \.self) { index in
+                    Capsule()
+                        .fill(
+                            index <= step.rawValue
+                                ? OnboardingTheme.green
+                                : Color.black.opacity(0.08)
+                        )
+                        .frame(height: 5)
+                }
+            }
+
+            Text("\(step.rawValue + 1) of 5")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 24)
-        .padding(.top, 18)
-        .padding(.bottom, 10)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
     }
 
     @ViewBuilder
@@ -181,47 +209,67 @@ struct OnboardingFlowView: View {
     }
 
     private var accountStep: some View {
-        VStack(spacing: 20) {
-            Spacer().frame(height: 28)
+        VStack(spacing: 22) {
+            Spacer().frame(height: 18)
 
-            Image(systemName: "figure.run.circle.fill")
-                .font(.system(size: 82))
-                .foregroundStyle(.green)
+            ZStack {
+                Circle()
+                    .fill(OnboardingTheme.green.opacity(0.10))
+                    .frame(width: 88, height: 88)
 
-            Text("Welcome to ATHLTH")
-                .font(.largeTitle.weight(.bold))
+                Image(systemName: "figure.run")
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(OnboardingTheme.green)
+            }
 
-            Text("Move better. Train smarter. Build a complete picture of your training, recovery and progress.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                Text("Welcome to ATHLTH")
+                    .font(.system(size: 34, weight: .bold))
 
-            VStack(spacing: 12) {
-                Button {
-                    session.beginMockSignIn(method: .apple, isNewUser: true)
-                    session.setUsernameSeed(session.profile.displayName)
-                    step = .username
-                } label: {
-                    Label("Continue with Apple", systemImage: "apple.logo")
-                        .frame(maxWidth: .infinity)
+                Text("Move better. Train smarter. Build a complete picture of your training, recovery and progress.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+            }
+
+            OnboardingCard {
+                VStack(spacing: 12) {
+                    Button {
+                        session.beginMockSignIn(method: .apple, isNewUser: true)
+                        session.setUsernameSeed(session.profile.displayName)
+                        step = .username
+                    } label: {
+                        Label("Continue with Apple", systemImage: "apple.logo")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .background(Color.black, in: RoundedRectangle(cornerRadius: 16))
+
+                    Button {
+                        showingEmailAuth = true
+                    } label: {
+                        Label("Continue with Email", systemImage: "envelope.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary)
+                    .background(Color.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 16))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(OnboardingTheme.border, lineWidth: 1)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(.black)
-
-                Button {
-                    showingEmailAuth = true
-                } label: {
-                    Label("Continue with Email", systemImage: "envelope.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
             }
 
             VStack(spacing: 7) {
                 Text("By continuing, you agree to ATHLTH’s")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 14) {
@@ -236,7 +284,8 @@ struct OnboardingFlowView: View {
                         legalDocument = .privacy
                     }
                 }
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
+                .tint(OnboardingTheme.green)
             }
             .multilineTextAlignment(.center)
         }
@@ -259,7 +308,12 @@ struct OnboardingFlowView: View {
                     .autocorrectionDisabled()
                     .font(.title2.weight(.semibold))
                     .padding(16)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                    .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(OnboardingTheme.border, lineWidth: 1)
+                    }
+                    .shadow(color: Color.black.opacity(0.035), radius: 10, x: 0, y: 5)
                     .onChange(of: username) {
                         username = UsernameGenerator.normalizedTypedUsername(username)
                     }
@@ -328,7 +382,11 @@ struct OnboardingFlowView: View {
                                 }
                                 .padding(.horizontal, 14)
                                 .frame(height: 46)
-                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                                }
                             }
                             .buttonStyle(.plain)
                         }
@@ -360,7 +418,7 @@ struct OnboardingFlowView: View {
                         HStack(spacing: 14) {
                             Image(systemName: goal.systemImage)
                                 .font(.title2)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(OnboardingTheme.green)
                                 .frame(width: 38)
 
                             VStack(alignment: .leading, spacing: 4) {
@@ -377,7 +435,7 @@ struct OnboardingFlowView: View {
                             Spacer()
 
                             Image(systemName: selectedGoal == goal ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selectedGoal == goal ? Color.green : Color.secondary)
+                                .foregroundStyle(selectedGoal == goal ? OnboardingTheme.green : Color.secondary)
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -390,7 +448,7 @@ struct OnboardingFlowView: View {
                         .overlay {
                             RoundedRectangle(cornerRadius: 18)
                                 .stroke(
-                                    selectedGoal == goal ? Color.green.opacity(0.45) : Color.clear,
+                                    selectedGoal == goal ? OnboardingTheme.green.opacity(0.42) : OnboardingTheme.border,
                                     lineWidth: 1
                                 )
                         }
@@ -430,11 +488,11 @@ struct OnboardingFlowView: View {
                             }
                             .padding(.horizontal, 12)
                             .frame(minHeight: 44)
-                            .foregroundStyle(interests.contains(interest) ? Color.green : Color.primary)
+                            .foregroundStyle(interests.contains(interest) ? OnboardingTheme.green : Color.primary)
                             .background(
                                 interests.contains(interest)
-                                    ? Color.green.opacity(0.10)
-                                    : Color.secondary.opacity(0.06),
+                                    ? OnboardingTheme.green.opacity(0.10)
+                                    : Color.white.opacity(0.90),
                                 in: RoundedRectangle(cornerRadius: 14)
                             )
                         }
@@ -443,7 +501,7 @@ struct OnboardingFlowView: View {
                 }
             }
 
-            ATHLTHCard {
+            OnboardingCard {
                 Toggle(isOn: $allowPersonalizedOffers) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text("Allow ATHLTH to use the goals and interests you choose to personalize ATHLTH offers.")
@@ -469,7 +527,7 @@ struct OnboardingFlowView: View {
                 subtitle: "Bring your health and training data into ATHLTH."
             )
 
-            ATHLTHCard {
+            OnboardingCard {
                 connectionRow(
                     title: "Apple Health",
                     subtitle: health.hasRequestedAuthorization
@@ -493,7 +551,7 @@ struct OnboardingFlowView: View {
                 }
             }
 
-            ATHLTHCard {
+            OnboardingCard {
                 connectionRow(
                     title: "Apple Watch",
                     subtitle: watchConnection.isReady
@@ -507,7 +565,7 @@ struct OnboardingFlowView: View {
             }
 
             if importedHealthDetails.hasAnyValue {
-                ATHLTHCard {
+                OnboardingCard {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Imported from Apple Health")
                             .font(.headline)
@@ -540,10 +598,10 @@ struct OnboardingFlowView: View {
 
             if session.subscriptionAccess.state == .trial,
                session.subscriptionAccess.trialIsActive {
-                ATHLTHCard {
+                OnboardingCard {
                     HStack(spacing: 12) {
                         Image(systemName: "sparkles")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(OnboardingTheme.green)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text("7-day Paid trial active")
@@ -557,10 +615,10 @@ struct OnboardingFlowView: View {
                 }
             }
 
-            ATHLTHCard {
+            OnboardingCard {
                 Label("Private by default", systemImage: "lock.shield.fill")
                     .font(.headline)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(OnboardingTheme.green)
 
                 Text("Connecting Apple Health does not publish health data. Social sharing is controlled separately.")
                     .font(.caption)
@@ -576,7 +634,7 @@ struct OnboardingFlowView: View {
 
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 76))
-                .foregroundStyle(.green)
+                .foregroundStyle(OnboardingTheme.green)
 
             Text("You’re ready")
                 .font(.largeTitle.weight(.bold))
@@ -591,14 +649,14 @@ struct OnboardingFlowView: View {
             if let selectedGoal {
                 HStack(spacing: 9) {
                     Image(systemName: selectedGoal.systemImage)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(OnboardingTheme.green)
 
                     Text(selectedGoal.title)
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
-                .background(.green.opacity(0.08), in: Capsule())
+                .background(OnboardingTheme.green.opacity(0.09), in: Capsule())
                 .padding(.top, 18)
             }
 
@@ -620,9 +678,7 @@ struct OnboardingFlowView: View {
                 }
                 .padding(.vertical, 5)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(.green)
+            .buttonStyle(OnboardingPrimaryButtonStyle())
 
             Spacer(minLength: 110)
 
@@ -700,8 +756,10 @@ struct OnboardingFlowView: View {
                 EmptyView()
             }
         }
-        .padding(20)
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 18)
+        .background(Color.white.opacity(0.72))
     }
 
     @ViewBuilder
@@ -771,17 +829,16 @@ struct OnboardingFlowView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .tint(.green)
+        .buttonStyle(OnboardingPrimaryButtonStyle())
         .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
     }
 
     @ViewBuilder
     private func onboardingTitle(_ title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(title)
-                .font(.largeTitle.weight(.bold))
+                .font(.system(size: 32, weight: .bold))
             Text(subtitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -800,7 +857,7 @@ struct OnboardingFlowView: View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(connected ? Color.green : Color.secondary)
+                .foregroundStyle(connected ? OnboardingTheme.green : Color.secondary)
                 .frame(width: 34)
 
             VStack(alignment: .leading, spacing: 3) {
