@@ -5,6 +5,10 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - main
+    paths:
+      - .github/testflight-release
 
 concurrency:
   group: athlth-testflight
