@@ -73,14 +73,22 @@ struct EmailAuthView: View {
                     .font(.system(size: 64))
                     .foregroundStyle(OnboardingTheme.green)
 
-                Text(mode == .signIn ? "Welcome back" : "Create your ATHLTH account")
+                Text(
+                    LocalizedStringKey(
+                        mode == .signIn
+                            ? "Welcome back"
+                            : "Create your ATHLTH account"
+                    )
+                )
                     .font(.largeTitle.weight(.bold))
                     .multilineTextAlignment(.center)
 
                 Text(
-                    mode == .signIn
-                        ? "Sign in with your email and password."
-                        : "Create an account, then verify your email before continuing."
+                    LocalizedStringKey(
+                        mode == .signIn
+                            ? "Sign in with your email and password."
+                            : "Create an account, then verify your email before continuing."
+                    )
                 )
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -88,7 +96,7 @@ struct EmailAuthView: View {
 
             Picker("Email account", selection: $mode) {
                 ForEach(EmailAuthMode.allCases) { item in
-                    Text(item.title).tag(item)
+                    Text(LocalizedStringKey(item.title)).tag(item)
                 }
             }
             .pickerStyle(.segmented)
@@ -166,7 +174,11 @@ struct EmailAuthView: View {
                         ProgressView()
                             .tint(.white)
                     }
-                    Text(mode == .signIn ? "Sign In" : "Create Account")
+                    Text(
+                        LocalizedStringKey(
+                            mode == .signIn ? "Sign In" : "Create Account"
+                        )
+                    )
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity)
