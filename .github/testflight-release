@@ -9,3 +9,4 @@ Fastlane trigger: 3 — Team ID fix
 Fastlane trigger: 5 — ASC secrets restored
 Direct xcodebuild trigger — ATHLTH 0.2.0
 Clean TestFlight pipeline trigger
+Retry after App Store bundle validation fixes
