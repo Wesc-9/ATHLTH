@@ -339,7 +339,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             distanceMeters: distanceMeters,
             averageHeartRate: averageHeartRate,
             maxHeartRate: maxHeartRate,
-            routePoints: routePoints
+            routePointCount: routePoints.count
         )
 
         sendToPhone(result)
