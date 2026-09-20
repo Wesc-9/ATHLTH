@@ -70,7 +70,6 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
             CODE_SIGN_STYLE=Automatic \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
@@ -90,6 +89,10 @@ jobs:
           echo "Watch CFBundleVersion: $WATCH_BUILD"
           if [ "$IOS_BUILD" -le 1 ] || [ "$WATCH_BUILD" -le 1 ]; then
             echo "::error::Both iPhone and Watch bundle versions must be greater than 1."
+            exit 1
+          fi
+          if [ "$IOS_BUILD" != "$WATCH_BUILD" ]; then
+            echo "::error::iPhone and Watch bundle versions must match."
             exit 1
           fi
 
