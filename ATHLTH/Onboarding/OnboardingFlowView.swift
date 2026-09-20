@@ -21,7 +21,6 @@ struct OnboardingFlowView: View {
     @State private var usernameSuggestions: [String] = []
     @State private var usernameValidation: UsernameValidationState = .idle
     @State private var usernameClaimError: String?
-    @State private var showPaidPlansBeforeHome = false
     @State private var showingSubscriptionOffer = false
     @State private var authenticationError: String?
     @State private var appleSignInInProgress = false
@@ -101,19 +100,16 @@ struct OnboardingFlowView: View {
                 .environmentObject(session)
                 .environmentObject(watchConnection)
         }
-        .sheet(
-            isPresented: $showingSubscriptionOffer,
-            onDismiss: {
-                Task {
-                    await finishOnboarding()
-                }
-            }
-        ) {
+        .sheet(isPresented: $showingSubscriptionOffer) {
             SubscriptionOfferView {
                 session.applyStoreKitEntitlement(
                     subscriptionStore.activeEntitlement
                 )
                 showingSubscriptionOffer = false
+
+                Task {
+                    await finishOnboarding()
+                }
             }
             .environmentObject(subscriptionStore)
         }
@@ -543,21 +539,76 @@ struct OnboardingFlowView: View {
             }
 
             OnboardingCard {
-                Toggle(isOn: $allowPersonalizedOffers) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Allow ATHLTH to use the goals and interests you choose to personalize ATHLTH offers.")
-                            .font(.subheadline.weight(.semibold))
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style: .continuous
+                            )
+                            .fill(OnboardingTheme.green.opacity(0.11))
+                            .frame(width: 46, height: 46)
 
-                        Text("Optional. You can continue without enabling this and change it later in Settings.")
+                            Image(systemName: "tag.fill")
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(OnboardingTheme.green)
+                        }
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 8) {
+                                Text("Get more relevant offers")
+                                    .font(.headline)
+
+                                Text("Optional")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(OnboardingTheme.deepGreen)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        OnboardingTheme.green.opacity(0.10),
+                                        in: Capsule()
+                                    )
+                            }
+
+                            Text("Let ATHLTH use the goals and interests you choose to make offers and promotions more relevant to you.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Toggle("", isOn: $allowPersonalizedOffers)
+                            .labelsHidden()
+                            .tint(OnboardingTheme.green)
+                            .accessibilityLabel("Personalized offers")
+                    }
+
+                    Divider()
+
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(OnboardingTheme.green)
+
+                        Text("More relevant offers and fewer irrelevant promotions.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "hand.raised.fill")
+                            .foregroundStyle(OnboardingTheme.green)
+
+                        Text("Apple Health and HealthKit data is never used to target offers.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text("Off by default · You can change this later in Settings.")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.tertiary)
                 }
             }
-
-            Text("This applies only to goals and interests you choose in ATHLTH. Apple Health / HealthKit data is not used for offer targeting.")
-                .font(.caption.italic())
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -674,110 +725,256 @@ struct OnboardingFlowView: View {
     }
 
     private var readyStep: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 36)
+        VStack(spacing: 22) {
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(OnboardingTheme.green.opacity(0.12))
+                        .frame(width: 92, height: 92)
 
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 76))
-                .foregroundStyle(OnboardingTheme.green)
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    OnboardingTheme.brightGreen,
+                                    OnboardingTheme.deepGreen
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 72, height: 72)
 
-            Text("You’re ready")
-                .font(.largeTitle.weight(.bold))
-                .padding(.top, 16)
-
-            Text("ATHLTH is ready around your goal.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-
-            if let selectedGoal {
-                HStack(spacing: 9) {
-                    Image(systemName: selectedGoal.systemImage)
-                        .foregroundStyle(OnboardingTheme.green)
-
-                    Text(LocalizedStringKey(selectedGoal.title))
-                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.white)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(OnboardingTheme.green.opacity(0.09), in: Capsule())
-                .padding(.top, 18)
-            }
+                .shadow(
+                    color: OnboardingTheme.deepGreen.opacity(0.16),
+                    radius: 18,
+                    y: 10
+                )
 
-            Spacer(minLength: 48)
+                Text("You’re ready")
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .foregroundStyle(OnboardingTheme.ink)
+                    .multilineTextAlignment(.center)
 
-            Button {
-                if showPaidPlansBeforeHome {
-                    showingSubscriptionOffer = true
-                } else {
-                    Task {
-                        await finishOnboarding()
+                Text("ATHLTH is set up around your goal.")
+                    .font(.system(size: 16))
+                    .foregroundStyle(OnboardingTheme.mutedInk)
+                    .multilineTextAlignment(.center)
+
+                if let selectedGoal {
+                    HStack(spacing: 9) {
+                        Image(systemName: selectedGoal.systemImage)
+                            .foregroundStyle(OnboardingTheme.green)
+
+                        Text(LocalizedStringKey(selectedGoal.title))
+                            .font(.subheadline.weight(.semibold))
                     }
+                    .padding(.horizontal, 15)
+                    .padding(.vertical, 10)
+                    .background(
+                        OnboardingTheme.green.opacity(0.10),
+                        in: Capsule()
+                    )
                 }
-            } label: {
-                HStack {
-                    Spacer()
-                    Text("Start ATHLTH")
-                        .font(.headline)
-                    Image(systemName: "arrow.right")
-                    Spacer()
-                }
-                .padding(.vertical, 5)
             }
-            .buttonStyle(OnboardingPrimaryButtonStyle())
+            .padding(.top, 8)
 
-            if let onboardingCompletionError {
-                Label(onboardingCompletionError, systemImage: "exclamationmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .padding(.top, 10)
-            }
+            OnboardingCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        OnboardingTheme.deepGreen,
+                                        OnboardingTheme.green
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 52, height: 52)
 
-            Spacer(minLength: 110)
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
 
-            if session.subscriptionAccess.trialIsActive {
-                VStack(spacing: 5) {
-                    Text("7-day ATHLTH+ trial active")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 8) {
+                                Text("ATHLTH+")
+                                    .font(.title3.weight(.bold))
 
-                    if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
-                        Text("Paid access until \(trialEndsAt.formatted(date: .abbreviated, time: .omitted))")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                                if session.subscriptionAccess.trialIsActive {
+                                    Text("7 DAYS")
+                                        .font(.caption2.weight(.black))
+                                        .tracking(0.5)
+                                        .foregroundStyle(OnboardingTheme.deepGreen)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            OnboardingTheme.green.opacity(0.12),
+                                            in: Capsule()
+                                        )
+                                }
+                            }
+
+                            Text(
+                                session.subscriptionAccess.trialIsActive
+                                    ? "Your ATHLTH+ trial is active"
+                                    : "Get more from ATHLTH"
+                            )
+                            .font(.subheadline.weight(.semibold))
+
+                            Text("Get more from Apple Health and Apple Watch with deeper insights, automatic sync and advanced training tools.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer()
+                    }
+
+                    VStack(alignment: .leading, spacing: 11) {
+                        plusBenefit(
+                            "Automatic Health background sync",
+                            icon: "arrow.triangle.2.circlepath"
+                        )
+                        plusBenefit(
+                            "Sleep and recovery insights",
+                            icon: "moon.stars.fill"
+                        )
+                        plusBenefit(
+                            "Advanced training plans and progression",
+                            icon: "calendar.badge.clock"
+                        )
+                        plusBenefit(
+                            "Route challenges and premium recovery features",
+                            icon: "figure.run.circle.fill"
+                        )
+                    }
+
+                    if let trialEndsAt = session.subscriptionAccess.trialEndsAt,
+                       session.subscriptionAccess.trialIsActive {
+                        Divider()
+
+                        HStack {
+                            Label(
+                                "Trial ends",
+                                systemImage: "clock.fill"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Text(
+                                trialEndsAt.formatted(
+                                    date: .abbreviated,
+                                    time: .omitted
+                                )
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(OnboardingTheme.ink)
+                        }
                     }
 
                     Button {
-                        showPaidPlansBeforeHome.toggle()
+                        showingSubscriptionOffer = true
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(
-                                systemName: showPaidPlansBeforeHome
-                                    ? "checkmark.square.fill"
-                                    : "square"
-                            )
-                            .foregroundStyle(
-                                showPaidPlansBeforeHome
-                                    ? Color.green
-                                    : Color.secondary
-                            )
-
-                            Text("Keep my ATHLTH+ benefits after the trial")
-                                .font(.caption2.weight(.semibold))
+                        HStack {
+                            Spacer()
+                            Text("Choose ATHLTH+ plan")
+                                .font(.headline)
+                            Image(systemName: "arrow.right")
+                            Spacer()
                         }
+                        .frame(height: 58)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.top, 5)
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
 
-                    Text("See Monthly and Yearly plans before entering ATHLTH.")
+                    Text("The App Store shows the price and billing details before you confirm a purchase.")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
                 }
-                .multilineTextAlignment(.center)
             }
+
+            Button {
+                Task {
+                    await finishOnboarding()
+                }
+            } label: {
+                Text("Continue to ATHLTH")
+                    .font(.headline)
+                    .foregroundStyle(OnboardingTheme.ink)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        Color.white.opacity(0.76),
+                        in: RoundedRectangle(
+                            cornerRadius: OnboardingTheme.buttonRadius,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: OnboardingTheme.buttonRadius,
+                            style: .continuous
+                        )
+                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+
+            if let onboardingCompletionError {
+                Label(
+                    onboardingCompletionError,
+                    systemImage: "exclamationmark.circle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.red)
+            }
+
+            Text("You can choose ATHLTH+ later in Settings.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.bottom, 8)
         }
-        .frame(maxWidth: .infinity, minHeight: 600)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func plusBenefit(
+        _ title: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 11) {
+            ZStack {
+                Circle()
+                    .fill(OnboardingTheme.green.opacity(0.10))
+                    .frame(width: 30, height: 30)
+
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(OnboardingTheme.green)
+            }
+
+            Text(LocalizedStringKey(title))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(OnboardingTheme.ink)
+
+            Spacer(minLength: 0)
+        }
     }
 
     private var footer: some View {
