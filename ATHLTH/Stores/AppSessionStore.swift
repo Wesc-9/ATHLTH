@@ -74,6 +74,57 @@ final class AppSessionStore: ObservableObject {
         subscriptionAccess.effectiveTier
     }
 
+    func applyBackendBootstrap(
+        _ bootstrap: BackendUserBootstrap,
+        method: SignInMethod? = nil
+    ) {
+        signedIn = true
+        defaults.set(true, forKey: "session.signedIn")
+
+        if let method {
+            signInMethod = method
+            defaults.set(method.rawValue, forKey: "session.signInMethod")
+        }
+
+        profile.userID = bootstrap.profile.id
+        profile.username = bootstrap.profile.username ?? ""
+        profile.displayName = bootstrap.profile.displayName ?? profile.displayName
+        profile.bio = bootstrap.profile.bio ?? ""
+        profile.avatarURL = bootstrap.profile.avatarURL.flatMap(URL.init(string:))
+
+        accountCreatedAt = bootstrap.profile.createdAt
+        defaults.set(accountCreatedAt, forKey: "session.accountCreatedAt")
+
+        currentRole = AccountRole(rawValue: bootstrap.role.role) ?? .user
+        defaults.set(currentRole.rawValue, forKey: "session.accountRole")
+
+        switch bootstrap.entitlement.status {
+        case "trialing":
+            subscriptionAccess = SubscriptionAccess(
+                state: .trial,
+                trialStartedAt: bootstrap.entitlement.trialStartedAt,
+                trialEndsAt: bootstrap.entitlement.trialEndsAt
+            )
+        case "active":
+            subscriptionAccess = SubscriptionAccess(
+                state: .paid,
+                trialStartedAt: nil,
+                trialEndsAt: nil
+            )
+        default:
+            subscriptionAccess = .free
+        }
+        persistSubscriptionAccess()
+
+        onboardingCompleted = bootstrap.profile.onboardingCompleted
+        defaults.set(onboardingCompleted, forKey: "session.onboardingCompleted")
+
+        let seed = bootstrap.profile.displayName
+            ?? bootstrap.profile.username
+            ?? "athlete"
+        setUsernameSeed(seed)
+    }
+
     func startNewUserPaidTrialIfNeeded() {
         guard subscriptionAccess.state == .free else { return }
 
@@ -135,10 +186,6 @@ final class AppSessionStore: ObservableObject {
 
         profile.username = cleaned
 
-        #if DEBUG
-        currentRole = cleaned == "stian" ? .owner : .user
-        defaults.set(currentRole.rawValue, forKey: "session.accountRole")
-        #endif
     }
 
     func saveOnboardingProfile(_ data: OnboardingProfileData) {
