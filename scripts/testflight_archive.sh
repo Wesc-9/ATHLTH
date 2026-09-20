@@ -3,6 +3,20 @@ set -euo pipefail
 
 APPLE_TEAM_ID="${APPLE_TEAM_ID:-D3AX7B6RMW}"
 
+XCODE_27_PATH="/Applications/Xcode_27.0.app/Contents/Developer"
+if [[ -d "$XCODE_27_PATH" ]]; then
+  export DEVELOPER_DIR="$XCODE_27_PATH"
+fi
+
+XCODE_VERSION="$(xcodebuild -version | head -n 1)"
+echo "Using $XCODE_VERSION"
+
+if [[ "$XCODE_VERSION" != Xcode\ 27* ]]; then
+  echo "ATHLTH TestFlight archives should be built with Xcode 27."
+  echo "Install/select Xcode 27, then run this script again."
+  exit 1
+fi
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ARCHIVE_PATH="$ROOT_DIR/build/ATHLTH.xcarchive"
 
