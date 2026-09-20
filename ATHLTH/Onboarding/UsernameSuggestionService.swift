@@ -1,4 +1,5 @@
 import Foundation
+import Supabase
 
 protocol UsernameAvailabilityProviding {
     func isAvailable(_ username: String) async -> Bool
@@ -30,6 +31,64 @@ enum UsernameValidationState: Equatable {
         case .available: return "checkmark.circle.fill"
         case .taken, .invalid: return "xmark.circle.fill"
         }
+    }
+}
+
+
+struct SupabaseUsernameAvailabilityService: UsernameAvailabilityProviding {
+    private let client: SupabaseClient
+
+    init(client: SupabaseClient = SupabaseEnvironment.client) {
+        self.client = client
+    }
+
+    func isAvailable(_ username: String) async -> Bool {
+        guard UsernameGenerator.isValid(username) else { return false }
+
+        do {
+            let available: Bool = try await client
+                .rpc(
+                    "is_username_available",
+                    params: ["candidate": username.lowercased()]
+                )
+                .execute()
+                .value
+            return available
+        } catch {
+            return false
+        }
+    }
+
+    func suggestions(for nameSeed: String) async -> [String] {
+        let base = UsernameGenerator.normalizedBase(from: nameSeed)
+        var result: [String] = []
+
+        for candidate in UsernameGenerator.candidatePool(for: base) {
+            guard result.count < 3 else { break }
+            guard await isAvailable(candidate) else { continue }
+            if !result.contains(candidate) {
+                result.append(candidate)
+            }
+        }
+
+        return result
+    }
+
+    func claim(_ username: String) async throws {
+        let normalized = username.lowercased()
+        guard await isAvailable(normalized) else {
+            throw UsernameClaimError.unavailable
+        }
+
+        guard let userID = client.auth.currentUser?.id else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        try await client
+            .from("profiles")
+            .update(["username": normalized])
+            .eq("id", value: userID)
+            .execute()
     }
 }
 
