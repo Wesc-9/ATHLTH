@@ -7,11 +7,13 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
+    @State private var healthAuthorizationInProgress = false
+
     var body: some View {
         List {
             Section("App") {
                 Picker("Language", selection: $settings.language) {
-                    ForEach(AppLanguage.allCases) { language in
+                    ForEach(AppLanguage.selectableCases) { language in
                         Text(language.title).tag(language)
                     }
                 }
@@ -148,11 +150,29 @@ struct ATHLTHSettingsView: View {
             }
 
             Section("Connections") {
-                integrationRow(
-                    .appleHealth,
-                    subtitle: health.hasRequestedAuthorization ? "Connected / authorization requested" : "Not configured",
-                    connected: health.hasRequestedAuthorization
-                )
+                Button {
+                    Task {
+                        healthAuthorizationInProgress = true
+                        await health.requestAuthorization()
+                        await health.configureBackgroundSync(
+                            allowed: session.canAccess(.backgroundHealthSync)
+                        )
+                        await health.refreshAll()
+                        healthAuthorizationInProgress = false
+                    }
+                } label: {
+                    integrationRow(
+                        .appleHealth,
+                        subtitle: healthAuthorizationInProgress
+                            ? "Updating Health access…"
+                            : health.hasRequestedAuthorization
+                                ? "Connected · tap to update access"
+                                : "Tap to connect",
+                        connected: health.hasRequestedAuthorization
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(healthAuthorizationInProgress)
 
                 Button {
                     watchConnection.connect()
