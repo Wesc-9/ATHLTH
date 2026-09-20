@@ -10,6 +10,7 @@ struct ATHLTHApp: App {
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
     @StateObject private var subscriptionStore = SubscriptionStore()
+    @StateObject private var accountService = SupabaseAccountService()
 
     var body: some Scene {
         WindowGroup {
@@ -22,6 +23,7 @@ struct ATHLTHApp: App {
                 .environmentObject(spotifyPlayback)
                 .environmentObject(watchConnection)
                 .environmentObject(subscriptionStore)
+                .environmentObject(accountService)
                 .environment(\.locale, settings.language.locale)
                 .preferredColorScheme(settings.appearance.colorScheme)
         }
@@ -31,6 +33,7 @@ struct ATHLTHApp: App {
 struct AppRootView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var appSession: AppSessionStore
+    @EnvironmentObject private var accountService: SupabaseAccountService
 
     var body: some View {
         Group {
@@ -43,6 +46,10 @@ struct AppRootView: View {
             }
         }
         .task {
+            if let bootstrap = try? await accountService.restoreCurrentUser() {
+                appSession.applyBackendBootstrap(bootstrap)
+            }
+
             guard health.hasRequestedAuthorization else { return }
             await health.configureBackgroundSync()
             await health.refreshAll()
