@@ -89,13 +89,31 @@ jobs:
 
           for identifier in ["com.wesc9.athlth", "com.wesc9.athlth.watchkitapp"]:
               from urllib.parse import quote
-              payload = get_json("https://api.appstoreconnect.apple.com/v1/bundleIds?filter%5Bidentifier%5D=" + quote(identifier))
-              rows = payload.get("data", [])
-              print(f"Bundle {identifier}: {len(rows)} match(es)")
+              url = (
+                  "https://api.appstoreconnect.apple.com/v1/bundleIds"
+                  "?filter%5Bidentifier%5D=" + quote(identifier) +
+                  "&include=bundleIdCapabilities"
+                  "&fields%5BbundleIds%5D=identifier%2Cname%2Cplatform%2CbundleIdCapabilities"
+                  "&fields%5BbundleIdCapabilities%5D=capabilityType%2Csettings"
+                  "&limit=50"
+              )
+              payload = get_json(url)
+              rows = [r for r in payload.get("data", []) if r.get("attributes", {}).get("identifier") == identifier]
+              included = {x.get("id"): x for x in payload.get("included", []) if x.get("type") == "bundleIdCapabilities"}
+              print(f"Exact bundle {identifier}: {len(rows)} match(es)")
               for row in rows:
-                  print(json.dumps({"id": row.get("id"), "attributes": row.get("attributes", {})}, sort_keys=True))
-                  bundle_id = row["id"]
-                  caps = get_json(f"https://api.appstoreconnect.apple.com/v1/bundleIds/{bundle_id}/bundleIdCapabilities?fields%5BbundleIdCapabilities%5D=capabilityType%2Csettings&limit=50")
-                  cap_types = sorted(x.get("attributes", {}).get("capabilityType") for x in caps.get("data", []) if x.get("attributes", {}).get("capabilityType"))
-                  print(json.dumps({"identifier": identifier, "bundleIdResourceId": bundle_id, "capabilities": cap_types}, sort_keys=True))
+                  rel = row.get("relationships", {}).get("bundleIdCapabilities", {}).get("data", [])
+                  caps = []
+                  for link in rel:
+                      item = included.get(link.get("id"), {})
+                      cap = item.get("attributes", {}).get("capabilityType")
+                      if cap:
+                          caps.append(cap)
+                  print(json.dumps({
+                      "identifier": identifier,
+                      "bundleIdResourceId": row.get("id"),
+                      "name": row.get("attributes", {}).get("name"),
+                      "platform": row.get("attributes", {}).get("platform"),
+                      "capabilities": sorted(caps)
+                  }, sort_keys=True))
           PY
