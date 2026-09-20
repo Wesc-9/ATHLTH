@@ -30,8 +30,20 @@ targets:
       path: ATHLTH/Resources/Info.plist
       properties:
         CFBundleDisplayName: ATHLTH
-        NSHealthShareUsageDescription: "ATHLTH reads workouts, sleep, and heart data to give you private training insights on your device."
+        NSHealthShareUsageDescription: "ATHLTH reads workouts, sleep, heart rate, activity and related Health data to provide your training history, recovery insights and workout metrics."
+        NSHealthUpdateUsageDescription: "ATHLTH saves workouts and related training data to Apple Health so workouts recorded with ATHLTH and Apple Watch stay in sync."
         ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         CFBundleURLTypes:
           - CFBundleURLName: com.wesc9.athlth.auth
             CFBundleURLSchemes:
@@ -61,6 +73,16 @@ targets:
       - path: Shared
     info:
       path: ATHLTHWatchExtension/Info.plist
+      properties:
+        CFBundleDisplayName: ATHLTH
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.wesc9.athlth
+        WKRunsIndependentlyOfCompanionApp: false
+        NSHealthShareUsageDescription: "ATHLTH reads live heart rate, energy, distance and workout data to show your training metrics on Apple Watch."
+        NSHealthUpdateUsageDescription: "ATHLTH saves workouts and workout routes from Apple Watch to Apple Health so your training history stays complete."
+        NSLocationWhenInUseUsageDescription: "ATHLTH uses your location during outdoor workouts to record distance and your workout route."
+        WKBackgroundModes:
+          - workout-processing
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.watchkitapp
