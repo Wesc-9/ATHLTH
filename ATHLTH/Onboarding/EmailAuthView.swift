@@ -39,7 +39,7 @@ struct EmailAuthView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "envelope.circle.fill")
                             .font(.system(size: 64))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(OnboardingTheme.green)
 
                         Text(mode == .signIn ? "Welcome back" : "Create your ATHLTH account")
                             .font(.largeTitle.weight(.bold))
@@ -61,7 +61,7 @@ struct EmailAuthView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    ATHLTHCard {
+                    OnboardingCard {
                         VStack(spacing: 14) {
                             TextField("Email address", text: $email)
                                 .textContentType(.emailAddress)
@@ -69,24 +69,36 @@ struct EmailAuthView: View {
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .padding(14)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                                }
 
                             SecureField("Password", text: $password)
                                 .textContentType(mode == .signIn ? .password : .newPassword)
                                 .padding(14)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                                }
 
                             if mode == .createAccount {
                                 SecureField("Confirm password", text: $confirmPassword)
                                     .textContentType(.newPassword)
                                     .padding(14)
-                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                    .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                                }
                             }
                         }
                     }
 
                     if mode == .createAccount {
-                        ATHLTHCard {
+                        OnboardingCard {
                             Toggle(isOn: $acceptedLegal) {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text("I agree to the Terms and Privacy Policy")
@@ -121,9 +133,7 @@ struct EmailAuthView: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(.green)
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
 
                     if mode == .signIn {
                         Button("Forgot password?") {
@@ -143,6 +153,7 @@ struct EmailAuthView: View {
                 .frame(maxWidth: 620)
                 .frame(maxWidth: .infinity)
             }
+            .background(OnboardingBackground().ignoresSafeArea())
             .navigationTitle("Email")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -215,7 +226,7 @@ private struct PasswordResetView: View {
                 if sent {
                     Section {
                         Label("Check your email", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(OnboardingTheme.green)
 
                         Text("If an ATHLTH account exists for this email address, password-reset instructions will be sent.")
                             .font(.subheadline)
@@ -246,6 +257,9 @@ private struct PasswordResetView: View {
                 }
                 #endif
             }
+            .scrollContentBackground(.hidden)
+            .background(OnboardingBackground().ignoresSafeArea())
+            .tint(OnboardingTheme.green)
             .navigationTitle("Reset Password")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
