@@ -103,12 +103,8 @@ struct OnboardingFlowView: View {
             }
         ) {
             SubscriptionOfferView {
-                session.applyStoreSubscriptionAccess(
-                    SubscriptionAccess(
-                        state: .paid,
-                        trialStartedAt: nil,
-                        trialEndsAt: nil
-                    )
+                session.applyStoreKitEntitlement(
+                    subscriptionStore.activeEntitlement
                 )
                 showingSubscriptionOffer = false
             }
