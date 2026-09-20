@@ -195,9 +195,13 @@ struct OnboardingFlowView: View {
                 }
             }
 
-            Text("\(step.rawValue + 1) of 5")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(OnboardingTheme.mutedInk)
+            Text(
+                settings.language == .norwegian
+                    ? "\(step.rawValue + 1) av 5"
+                    : "\(step.rawValue + 1) of 5"
+            )
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(OnboardingTheme.mutedInk)
         }
         .padding(.horizontal, OnboardingTheme.screenHorizontalPadding)
         .padding(.top, 14)
@@ -604,7 +608,11 @@ struct OnboardingFlowView: View {
                         }
 
                         if let sex = importedHealthDetails.healthSex {
-                            LabeledContent("Sex", value: sex.title)
+                            LabeledContent {
+                                Text(LocalizedStringKey(sex.title))
+                            } label: {
+                                Text("Sex")
+                            }
                         }
 
                         if let weight = importedHealthDetails.weightKilograms {
