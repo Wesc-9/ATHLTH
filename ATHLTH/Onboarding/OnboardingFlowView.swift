@@ -26,8 +26,7 @@ struct OnboardingFlowView: View {
     @State private var authenticationError: String?
     @State private var appleSignInInProgress = false
     @State private var onboardingCompletionError: String?
-    @State private var watchConnectRequested = false
-    @State private var showingWatchSetupHelp = false
+    @State private var showingWatchSetup = false
 
     private let usernameService = SupabaseUsernameAvailabilityService()
 
@@ -84,19 +83,6 @@ struct OnboardingFlowView: View {
             guard step == .username else { return }
             await validateUsernameAfterTyping()
         }
-        .onChange(of: watchConnection.state) { _, state in
-            guard watchConnectRequested else { return }
-
-            switch state {
-            case .checking:
-                break
-            case .ready:
-                watchConnectRequested = false
-            case .unsupported, .notPaired, .appNotInstalled:
-                watchConnectRequested = false
-                showingWatchSetupHelp = true
-            }
-        }
         .sheet(item: $legalDocument) { document in
             NavigationStack {
                 LegalDocumentView(kind: document)
@@ -109,18 +95,11 @@ struct OnboardingFlowView: View {
                     }
             }
         }
-        .alert(
-            "Apple Watch setup",
-            isPresented: $showingWatchSetupHelp
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(
-                LocalizedStringKey(
-                    watchConnection.state.setupHelpMessage
-                        ?? "Open ATHLTH on Apple Watch and try again."
-                )
-            )
+        .sheet(isPresented: $showingWatchSetup) {
+            AppleWatchSetupView()
+                .environmentObject(health)
+                .environmentObject(session)
+                .environmentObject(watchConnection)
         }
         .sheet(
             isPresented: $showingSubscriptionOffer,
@@ -620,10 +599,9 @@ struct OnboardingFlowView: View {
                         ?? watchConnection.state.subtitle,
                     icon: "applewatch",
                     connected: watchConnection.isReady,
-                    actionTitle: watchConnection.state.actionTitle
+                    actionTitle: "Configure"
                 ) {
-                    watchConnectRequested = true
-                    watchConnection.connect()
+                    showingWatchSetup = true
                 }
             }
 
