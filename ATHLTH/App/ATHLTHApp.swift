@@ -35,6 +35,8 @@ struct AppRootView: View {
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var accountService: SupabaseAccountService
 
+    @State private var authCallbackError: String?
+
     var body: some View {
         Group {
             if appSession.previewModeEnabled {
@@ -53,6 +55,49 @@ struct AppRootView: View {
             guard health.hasRequestedAuthorization else { return }
             await health.configureBackgroundSync()
             await health.refreshAll()
+        }
+        .onOpenURL { url in
+            Task {
+                do {
+                    if let bootstrap = try await accountService.handleAuthCallback(url) {
+                        appSession.applyBackendBootstrap(bootstrap, method: .email)
+                    }
+                } catch {
+                    authCallbackError = error.localizedDescription
+                }
+            }
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { accountService.passwordRecoveryPending },
+                set: { presented in
+                    if !presented {
+                        accountService.cancelPasswordRecovery()
+                    }
+                }
+            )
+        ) {
+            PasswordUpdateView { bootstrap in
+                appSession.applyBackendBootstrap(bootstrap, method: .email)
+            }
+            .environmentObject(accountService)
+        }
+        .alert(
+            "Authentication Error",
+            isPresented: Binding(
+                get: { authCallbackError != nil },
+                set: { presented in
+                    if !presented {
+                        authCallbackError = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                authCallbackError = nil
+            }
+        } message: {
+            Text(authCallbackError ?? "Authentication could not be completed.")
         }
     }
 }
