@@ -101,7 +101,7 @@ jobs:
 
           curl -fsS "${AUTH[@]}"             "https://api.appstoreconnect.apple.com/v1/builds?filter%5Bapp%5D=${APP_ID}&sort=-uploadedDate&limit=5"             > "$RUNNER_TEMP/builds.json"
 
-          BUILD_ID="$(python3 - <<'PY'
+          python3 - <<'PY'
           import json, os
           with open(os.path.join(os.environ["RUNNER_TEMP"], "builds.json"), encoding="utf-8") as f:
               body = json.load(f)
@@ -119,7 +119,6 @@ jobs:
           with open(os.path.join(os.environ["RUNNER_TEMP"], "latest_build_id"), "w", encoding="utf-8") as out:
               out.write(latest["id"])
           PY
-          )" || true
 
           BUILD_ID="$(cat "$RUNNER_TEMP/latest_build_id")"
 
