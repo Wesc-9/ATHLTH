@@ -1,19 +1,5 @@
 import SwiftUI
 
-enum SubscriptionTier: String, Codable, CaseIterable, Identifiable, Hashable {
-    case free
-    case paid
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .free: return "Free"
-        case .paid: return "Paid"
-        }
-    }
-}
-
 enum AdminAccountStatus: String, Codable, Hashable {
     case active
     case suspended
