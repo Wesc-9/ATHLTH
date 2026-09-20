@@ -226,9 +226,21 @@ struct ATHLTHTrainView: View {
 
                     switch selectedSection {
                     case 1:
-                        AdvancedPlannerView()
+                        ATHLTHPlusFeatureGate(
+                            feature: .advancedTrainingPlans,
+                            title: "Advanced Calendar",
+                            message: "Multi-week planning and advanced scheduling are included with ATHLTH+."
+                        ) {
+                            AdvancedPlannerView()
+                        }
                     case 2:
-                        TrainingPlanManagerView()
+                        ATHLTHPlusFeatureGate(
+                            feature: .advancedTrainingPlans,
+                            title: "Advanced Training Plans",
+                            message: "Build, copy and manage advanced training plans with ATHLTH+."
+                        ) {
+                            TrainingPlanManagerView()
+                        }
                     default:
                         todayContent
                     }
@@ -382,10 +394,16 @@ struct ATHLTHTrainView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if let challenge = session.challenges.first {
-                        Label(challenge.title, systemImage: "trophy.fill")
+                    if session.canAccess(.routeChallenges) {
+                        if let challenge = session.challenges.first {
+                            Label(challenge.title, systemImage: "trophy.fill")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.blue)
+                        }
+                    } else {
+                        Label("ATHLTH+ challenges", systemImage: "lock.fill")
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.top, 8)
@@ -545,94 +563,102 @@ struct ATHLTHRecoveryView: View {
                         subtitle: "Use sleep and recovery signals to guide today's load."
                     )
 
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Recovery Score", actionTitle: "Today")
-                        HStack(spacing: 24) {
-                            ATHLTHProgressRing(
-                                title: recovery.readinessText,
-                                value: "\(recovery.score)",
-                                progress: Double(recovery.score) / 100,
-                                icon: "leaf.fill",
-                                tint: .green
-                            )
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Well recovered")
-                                    .font(.title2.weight(.bold))
-                                Text("Your sleep and HRV support a normal training session today.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                    ATHLTHPlusFeatureGate(
+                        feature: .advancedRecovery,
+                        title: "Advanced Recovery",
+                        message: "Recovery scoring, trends and training guidance are included with ATHLTH+."
+                    ) {
+                        VStack(spacing: 18) {
+                            ATHLTHCard {
+                                ATHLTHSectionHeader(title: "Recovery Score", actionTitle: "Today")
+                                HStack(spacing: 24) {
+                                    ATHLTHProgressRing(
+                                        title: recovery.readinessText,
+                                        value: "\(recovery.score)",
+                                        progress: Double(recovery.score) / 100,
+                                        icon: "leaf.fill",
+                                        tint: .green
+                                    )
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Well recovered")
+                                            .font(.title2.weight(.bold))
+                                        Text("Your sleep and HRV support a normal training session today.")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.top, 12)
                             }
-                        }
-                        .padding(.top, 12)
-                    }
 
-                    HStack(spacing: 12) {
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Sleep")
-                            ATHLTHMetric(
-                                title: "Sleep quality",
-                                value: recovery.sleepDuration.shortDuration,
-                                icon: "moon.fill",
-                                tint: .purple
-                            )
-                            .padding(.top, 10)
-                        }
+                            HStack(spacing: 12) {
+                                ATHLTHCard {
+                                    ATHLTHSectionHeader(title: "Sleep")
+                                    ATHLTHMetric(
+                                        title: "Sleep quality",
+                                        value: recovery.sleepDuration.shortDuration,
+                                        icon: "moon.fill",
+                                        tint: .purple
+                                    )
+                                    .padding(.top, 10)
+                                }
 
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Heart & HRV")
-                            HStack {
-                                ATHLTHMetric(
-                                    title: "HRV",
-                                    value: recovery.hrvMilliseconds.map { "\(Int($0)) ms" } ?? "—",
-                                    icon: "waveform.path.ecg",
-                                    tint: .blue
-                                )
-                                ATHLTHMetric(
-                                    title: "Resting HR",
-                                    value: recovery.restingHeartRate.map { "\(Int($0)) bpm" } ?? "—",
-                                    icon: "heart.fill",
-                                    tint: .red
-                                )
+                                ATHLTHCard {
+                                    ATHLTHSectionHeader(title: "Heart & HRV")
+                                    HStack {
+                                        ATHLTHMetric(
+                                            title: "HRV",
+                                            value: recovery.hrvMilliseconds.map { "\(Int($0)) ms" } ?? "—",
+                                            icon: "waveform.path.ecg",
+                                            tint: .blue
+                                        )
+                                        ATHLTHMetric(
+                                            title: "Resting HR",
+                                            value: recovery.restingHeartRate.map { "\(Int($0)) bpm" } ?? "—",
+                                            icon: "heart.fill",
+                                            tint: .red
+                                        )
+                                    }
+                                    .padding(.top, 10)
+                                }
                             }
-                            .padding(.top, 10)
-                        }
-                    }
 
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Recovery Trend")
-                        Chart {
-                            ForEach(Array([72, 75, 81, 84, 79, 86, 82].enumerated()), id: \.offset) { index, value in
-                                BarMark(
-                                    x: .value("Day", index),
-                                    y: .value("Recovery", value)
-                                )
-                                .foregroundStyle(.green.gradient)
+                            ATHLTHCard {
+                                ATHLTHSectionHeader(title: "Recovery Trend")
+                                Chart {
+                                    ForEach(Array([72, 75, 81, 84, 79, 86, 82].enumerated()), id: \.offset) { index, value in
+                                        BarMark(
+                                            x: .value("Day", index),
+                                            y: .value("Recovery", value)
+                                        )
+                                        .foregroundStyle(.green.gradient)
+                                    }
+                                }
+                                .frame(height: 170)
+                                .padding(.top, 12)
                             }
-                        }
-                        .frame(height: 170)
-                        .padding(.top, 12)
-                    }
 
-                    HStack(spacing: 12) {
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Breathing & Mobility")
-                            Label("5 min box breathing", systemImage: "wind")
-                                .font(.headline)
-                                .padding(.top, 10)
-                            Text("Calm down and reset before training.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                            HStack(spacing: 12) {
+                                ATHLTHCard {
+                                    ATHLTHSectionHeader(title: "Breathing & Mobility")
+                                    Label("5 min box breathing", systemImage: "wind")
+                                        .font(.headline)
+                                        .padding(.top, 10)
+                                    Text("Calm down and reset before training.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
 
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Today's Training")
-                            Label("Moderate intensity", systemImage: "dumbbell.fill")
-                                .font(.headline)
-                                .foregroundStyle(.green)
-                                .padding(.top, 10)
-                            Text("Recovery looks good. Keep some reserve.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                ATHLTHCard {
+                                    ATHLTHSectionHeader(title: "Today's Training")
+                                    Label("Moderate intensity", systemImage: "dumbbell.fill")
+                                        .font(.headline)
+                                        .foregroundStyle(.green)
+                                        .padding(.top, 10)
+                                    Text("Recovery looks good. Keep some reserve.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
                     }
                 }
