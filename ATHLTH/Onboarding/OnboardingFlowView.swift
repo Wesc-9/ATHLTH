@@ -595,7 +595,7 @@ struct OnboardingFlowView: View {
                             .foregroundStyle(OnboardingTheme.green)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("7-day Paid trial active")
+                            Text("7-day ATHLTH+ trial active")
                                 .font(.subheadline.weight(.semibold))
 
                             Text("Background Health sync is included during your trial.")
@@ -675,7 +675,7 @@ struct OnboardingFlowView: View {
 
             if session.subscriptionAccess.trialIsActive {
                 VStack(spacing: 5) {
-                    Text("7-day Paid trial active")
+                    Text("7-day ATHLTH+ trial active")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -700,7 +700,7 @@ struct OnboardingFlowView: View {
                                     : Color.secondary
                             )
 
-                            Text("Keep my Paid benefits after the trial")
+                            Text("Keep my ATHLTH+ benefits after the trial")
                                 .font(.caption2.weight(.semibold))
                         }
                     }
