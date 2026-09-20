@@ -121,6 +121,25 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    func sendWorkoutCommand(_ command: WatchWorkoutCommand) {
+        guard let session, state.isReady else { return }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind: WatchTransferKind.workoutCommand.rawValue,
+            WatchTransferMetadataKey.command: command.rawValue
+        ]
+
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
+                DispatchQueue.main.async {
+                    self?.workoutLaunchError = error.localizedDescription
+                }
+            }
+        } else {
+            session.transferUserInfo(payload)
+        }
+    }
+
     private func evaluate(_ session: WCSession) {
         #if os(iOS)
         if !session.isPaired {
