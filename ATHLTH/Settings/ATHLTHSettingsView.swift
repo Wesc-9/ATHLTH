@@ -47,10 +47,10 @@ struct ATHLTHSettingsView: View {
 
                 LabeledContent(
                     "Background Health sync",
-                    value: session.hasPaidAccess ? "Included" : "Paid feature"
+                    value: session.hasPaidAccess ? "Included" : "ATHLTH+ feature"
                 )
 
-                Text("Apple Health and Apple Watch can still be connected on Free. Automatic Health background sync is a Paid feature.")
+                Text("Apple Health and Apple Watch can still be connected on Free. Automatic Health background sync is an ATHLTH+ feature.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
