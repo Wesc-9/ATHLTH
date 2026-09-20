@@ -828,9 +828,11 @@ struct OnboardingFlowView: View {
                             }
 
                             Text(
-                                session.subscriptionAccess.trialIsActive
-                                    ? "Your ATHLTH+ trial is active"
-                                    : "Get more from ATHLTH"
+                                LocalizedStringKey(
+                                    session.subscriptionAccess.trialIsActive
+                                        ? "Your ATHLTH+ trial is active"
+                                        : "Get more from ATHLTH"
+                                )
                             )
                             .font(.subheadline.weight(.semibold))
 
