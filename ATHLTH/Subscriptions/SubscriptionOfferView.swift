@@ -18,11 +18,11 @@ struct SubscriptionOfferView: View {
                             .font(.system(size: 42))
                             .foregroundStyle(OnboardingTheme.green)
 
-                        Text("Keep ATHLTH Paid")
+                        Text("Keep ATHLTH+")
                             .font(.largeTitle.weight(.bold))
                             .multilineTextAlignment(.center)
 
-                        Text("Choose a plan to keep your Paid benefits after the trial.")
+                        Text("Choose a plan to keep your ATHLTH+ benefits after the trial.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -117,7 +117,7 @@ struct SubscriptionOfferView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(OnboardingBackground().ignoresSafeArea())
-            .navigationTitle("Paid plans")
+            .navigationTitle("ATHLTH+")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
