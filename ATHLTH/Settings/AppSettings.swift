@@ -9,6 +9,11 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
     case italian = "it"
     case chineseSimplified = "zh-Hans"
 
+    static let selectableCases: [AppLanguage] = [
+        .norwegian,
+        .english
+    ]
+
     var id: String { rawValue }
 
     var title: String {
@@ -193,7 +198,23 @@ final class AppSettingsStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        language = AppLanguage(rawValue: defaults.string(forKey: "settings.language") ?? "") ?? .system
+        let storedLanguage = AppLanguage(
+            rawValue: defaults.string(forKey: "settings.language") ?? ""
+        )
+
+        if let storedLanguage,
+           AppLanguage.selectableCases.contains(storedLanguage) {
+            language = storedLanguage
+        } else {
+            let preferredLanguage = Locale.preferredLanguages.first?
+                .lowercased() ?? "en"
+
+            language = (
+                preferredLanguage.hasPrefix("nb")
+                || preferredLanguage.hasPrefix("no")
+                || preferredLanguage.hasPrefix("nn")
+            ) ? .norwegian : .english
+        }
         measurementPreference = MeasurementPreference(rawValue: defaults.string(forKey: "settings.measurement") ?? "") ?? .metric
         appearance = AppAppearance(rawValue: defaults.string(forKey: "settings.appearance") ?? "") ?? .system
 
