@@ -38,6 +38,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var timer: Timer?
     private var startedAt: Date?
     private var finishing = false
+    private var mirroringActive = false
     private var lastMirrorSnapshotSentAt: Date?
 
     private override init() {
@@ -107,6 +108,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         routeBuilder = nil
         startedAt = nil
         finishing = false
+        mirroringActive = false
         lastMirrorSnapshotSentAt = nil
         publish {
             self.state = .idle
@@ -177,11 +179,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             let startDate = Date()
             startedAt = startDate
 
-            try await session.startMirroringToCompanionDevice()
-            await sendLiveSnapshot(
-                stateOverride: .preparing,
-                force: true
-            )
+            do {
+                try await session.startMirroringToCompanionDevice()
+                mirroringActive = true
+                await sendLiveSnapshot(
+                    stateOverride: .preparing,
+                    force: true
+                )
+            } catch {
+                mirroringActive = false
+                publish {
+                    self.errorMessage = "iPhone live view unavailable: \(error.localizedDescription)"
+                }
+            }
 
             session.startActivity(with: startDate)
 
@@ -370,8 +380,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 force: true
             )
 
-            if let workoutSession = self.workoutSession {
+            if self.mirroringActive,
+               let workoutSession = self.workoutSession {
                 try? await workoutSession.stopMirroringToCompanionDevice()
+                self.mirroringActive = false
             }
         }
     }
@@ -394,7 +406,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         stateOverride: WatchWorkoutMirrorState? = nil,
         force: Bool = false
     ) async {
-        guard let workoutSession else { return }
+        guard mirroringActive, let workoutSession else { return }
 
         let now = Date()
 
