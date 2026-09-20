@@ -65,6 +65,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var kind: WatchWorkoutKind
     var state: WatchWorkoutMirrorState
     var startedAt: Date?
+    var capturedAt: Date
     var elapsedTime: TimeInterval
     var heartRate: Double
     var activeCalories: Double
