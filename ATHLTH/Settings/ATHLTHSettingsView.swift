@@ -33,37 +33,6 @@ struct ATHLTHSettingsView: View {
                 .foregroundStyle(.secondary)
             }
 
-            Section("Subscription") {
-                LabeledContent(
-                    "Plan",
-                    value: session.subscriptionAccess.displayTitle
-                )
-
-                if session.subscriptionAccess.trialIsActive,
-                   let trialEndsAt = session.subscriptionAccess.trialEndsAt {
-                    LabeledContent(
-                        "Trial ends",
-                        value: trialEndsAt.formatted(date: .abbreviated, time: .omitted)
-                    )
-
-                    if let days = session.subscriptionAccess.trialDaysRemaining {
-                        LabeledContent(
-                            "Paid access remaining",
-                            value: "\(days) day\(days == 1 ? "" : "s")"
-                        )
-                    }
-                }
-
-                LabeledContent(
-                    "Background Health sync",
-                    value: session.hasPaidAccess ? "Included" : "Paid"
-                )
-
-                Text("Apple Health and Apple Watch connections remain available on Free. Paid access adds automatic background Health sync.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
             Section("Profile") {
                 NavigationLink {
                     PersonalHealthProfileView()
