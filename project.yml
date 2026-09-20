@@ -75,6 +75,8 @@ targets:
       path: ATHLTHWatchExtension/Info.plist
       properties:
         CFBundleDisplayName: ATHLTH
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.wesc9.athlth
         WKRunsIndependentlyOfCompanionApp: false
@@ -92,7 +94,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SKIP_INSTALL: YES
-        CURRENT_PROJECT_VERSION: "$(ATHLTH_BUILD_NUMBER)"
+        CURRENT_PROJECT_VERSION: "18"
     postBuildScripts:
       - name: Finalize single-target Watch Info.plist
         basedOnDependencyAnalysis: false
