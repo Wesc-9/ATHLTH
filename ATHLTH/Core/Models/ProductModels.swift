@@ -62,7 +62,7 @@ struct SubscriptionAccess: Codable, Hashable {
 
     static let free = SubscriptionAccess(
         state: .free,
-        source: .none
+        source: SubscriptionAccessSource.none
     )
 
     var trialIsActive: Bool {
