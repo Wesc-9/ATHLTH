@@ -94,6 +94,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         state.isReady
     }
 
+    var isReachable: Bool {
+        session?.isReachable == true
+    }
+
     func connect() {
         connectionDetail = nil
         publish(.checking)
