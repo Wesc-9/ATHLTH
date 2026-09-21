@@ -292,15 +292,17 @@ struct OnboardingFlowView: View {
                 .lineLimit(1)
                 .fixedSize()
 
-            Text("PROGRESS LIVES HERE.")
-                .font(.system(size: 11, weight: .medium))
-                .tracking(3.9)
+            Text("YOUR BODY. YOUR DATA. YOUR PROGRESS.")
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(2.2)
                 .foregroundStyle(.white.opacity(0.86))
+                .multilineTextAlignment(.center)
                 .lineLimit(1)
-                .fixedSize()
+                .minimumScaleFactor(0.78)
+                .frame(maxWidth: .infinity)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("ATHLTH. Progress lives here.")
+        .accessibilityLabel("ATHLTH. Your body. Your data. Your progress.")
     }
 
     private var accountSignInPanel: some View {
