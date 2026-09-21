@@ -1,5 +1,4 @@
 import AuthenticationServices
-import CryptoKit
 import Foundation
 import Supabase
 
@@ -16,8 +15,6 @@ final class SupabaseAccountService: ObservableObject {
     @Published private(set) var passwordRecoveryPending = false
 
     private let client: SupabaseClient
-    private var appleRawNonce: String?
-
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
     }
@@ -27,51 +24,61 @@ final class SupabaseAccountService: ObservableObject {
     }
 
     func prepareAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {
-        let rawNonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        appleRawNonce = rawNonce
         request.requestedScopes = [.email, .fullName]
-        request.nonce = Self.sha256(rawNonce)
     }
 
     func signInWithApple(
         credential: ASAuthorizationAppleIDCredential
     ) async throws -> BackendUserBootstrap {
-        guard let rawNonce = appleRawNonce else {
-            throw SupabaseAccountError.missingAppleNonce
-        }
-
-        defer { appleRawNonce = nil }
-
         guard let idToken = credential.identityToken
             .flatMap({ String(data: $0, encoding: .utf8) })
         else {
             throw SupabaseAccountError.missingAppleIDToken
         }
 
-        _ = try await client.auth.signInWithIdToken(
-            credentials: OpenIDConnectCredentials(
-                provider: .apple,
-                idToken: idToken,
-                nonce: rawNonce
+        do {
+            _ = try await client.auth.signInWithIdToken(
+                credentials: OpenIDConnectCredentials(
+                    provider: .apple,
+                    idToken: idToken
+                )
             )
-        )
+        } catch {
+            throw SupabaseAccountError.appleSignInFailed(
+                Self.appleSignInMessage(for: error)
+            )
+        }
 
         if let fullName = credential.fullName {
-            let displayName = [
-                fullName.givenName,
-                fullName.middleName,
-                fullName.familyName
-            ]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+            let givenName = fullName.givenName?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let middleName = fullName.middleName?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let familyName = fullName.familyName?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
-            if !displayName.isEmpty, let userID = currentUserID {
-                try await client
-                    .from("profiles")
-                    .update(["display_name": displayName])
-                    .eq("id", value: userID)
-                    .execute()
+            let displayName = [givenName, middleName, familyName]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+
+            if !displayName.isEmpty {
+                try? await client.auth.update(
+                    user: UserAttributes(
+                        data: [
+                            "full_name": .string(displayName),
+                            "given_name": .string(givenName),
+                            "family_name": .string(familyName)
+                        ]
+                    )
+                )
+
+                if let userID = currentUserID {
+                    try? await client
+                        .from("profiles")
+                        .update(["display_name": displayName])
+                        .eq("id", value: userID)
+                        .execute()
+                }
             }
         }
 
@@ -237,11 +244,27 @@ final class SupabaseAccountService: ObservableObject {
             .execute()
     }
 
-    private static func sha256(_ input: String) -> String {
-        SHA256.hash(data: Data(input.utf8))
-            .map { String(format: "%02x", $0) }
-            .joined()
+    private static func appleSignInMessage(for error: Error) -> String {
+        let technicalMessage = error.localizedDescription
+        let lowered = technicalMessage.lowercased()
+
+        if lowered.contains("audience") ||
+            lowered.contains("client id") ||
+            lowered.contains("client_id") {
+            return "Apple sign-in is not configured for this ATHLTH app identifier."
+        }
+
+        if lowered.contains("nonce") {
+            return "Apple sign-in verification failed. Please try again."
+        }
+
+        if lowered.contains("provider") {
+            return "Apple sign-in is not fully configured on ATHLTH’s authentication service."
+        }
+
+        return "Apple sign-in failed: \(technicalMessage)"
     }
+
 }
 
 private struct DeleteAccountResponse: Decodable {
@@ -250,23 +273,23 @@ private struct DeleteAccountResponse: Decodable {
 
 enum SupabaseAccountError: LocalizedError {
     case notAuthenticated
-    case missingAppleNonce
     case missingAppleIDToken
     case invalidAppleCredential
     case accountDeletionFailed
+    case appleSignInFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
             return "No authenticated ATHLTH user is available."
-        case .missingAppleNonce:
-            return "Apple sign in could not be validated. Please try again."
         case .missingAppleIDToken:
             return "Apple did not return a valid sign-in token."
         case .invalidAppleCredential:
             return "Apple returned an invalid sign-in credential."
         case .accountDeletionFailed:
             return "ATHLTH could not confirm that your account was deleted. Please try again."
+        case .appleSignInFailed(let message):
+            return message
         }
     }
 }
