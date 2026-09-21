@@ -555,9 +555,7 @@ struct OnboardingFlowView: View {
             OnboardingCard {
                 connectionRow(
                     title: "Apple Watch",
-                    subtitle: watchConnection.isReady
-                        ? "Connected"
-                        : watchConnection.state.subtitle,
+                    subtitle: watchConnection.statusText,
                     icon: "applewatch",
                     connected: watchConnection.isReady
                 ) {
