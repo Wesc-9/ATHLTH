@@ -305,7 +305,7 @@ struct OnboardingFlowView: View {
 
     private var accountSignInPanel: some View {
         VStack(spacing: 12) {
-            SignInWithAppleButton(.signIn) { request in
+            SignInWithAppleButton(.continue) { request in
                 authenticationError = nil
                 accountService.prepareAppleSignIn(request)
             } onCompletion: { result in
