@@ -1,48 +1,80 @@
-import { withSupabase } from "npm:@supabase/server@1.7.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 type DeleteAccountRequest = {
   confirm?: boolean;
 };
 
-export default {
-  fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
-    if (req.method !== "POST") {
-      return Response.json({ error: "Method not allowed." }, { status: 405 });
-    }
+const json = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
 
-    const userID = ctx.userClaims?.sub;
-    if (!userID) {
-      return Response.json({ error: "Missing authenticated user." }, { status: 401 });
-    }
+Deno.serve(async (req: Request) => {
+  if (req.method !== "POST") {
+    return json({ error: "Method not allowed." }, 405);
+  }
 
-    let body: DeleteAccountRequest;
-    try {
-      body = await req.json();
-    } catch {
-      return Response.json({ error: "Invalid request body." }, { status: 400 });
-    }
+  const authorization = req.headers.get("Authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return json({ error: "Missing authenticated user." }, 401);
+  }
 
-    if (body.confirm !== true) {
-      return Response.json(
-        { error: "Account deletion was not confirmed." },
-        { status: 400 },
-      );
-    }
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token) {
+    return json({ error: "Missing authenticated user." }, 401);
+  }
 
-    const { error } = await ctx.supabaseAdmin.auth.admin.deleteUser(userID);
+  const supabaseURL = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (error) {
-      console.error("ATHLTH account deletion failed", {
-        userID,
-        message: error.message,
-      });
+  if (!supabaseURL || !serviceRoleKey) {
+    console.error("delete-account is missing required Supabase environment variables.");
+    return json({ error: "Account deletion is temporarily unavailable." }, 500);
+  }
 
-      return Response.json(
-        { error: "Unable to delete the ATHLTH account." },
-        { status: 500 },
-      );
-    }
+  const admin = createClient(supabaseURL, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 
-    return Response.json({ deleted: true });
-  }),
-};
+  const {
+    data: { user },
+    error: userError,
+  } = await admin.auth.getUser(token);
+
+  if (userError || !user) {
+    console.warn("delete-account rejected an invalid user token.", {
+      message: userError?.message ?? "No user returned",
+    });
+    return json({ error: "Your sign-in session is no longer valid. Please sign in again." }, 401);
+  }
+
+  let body: DeleteAccountRequest;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "Invalid request body." }, 400);
+  }
+
+  if (body.confirm !== true) {
+    return json({ error: "Account deletion was not confirmed." }, 400);
+  }
+
+  const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+
+  if (deleteError) {
+    console.error("ATHLTH account deletion failed.", {
+      userID: user.id,
+      message: deleteError.message,
+    });
+    return json({ error: "Unable to delete the ATHLTH account." }, 500);
+  }
+
+  return json({ deleted: true });
+});
