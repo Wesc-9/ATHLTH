@@ -32,6 +32,8 @@ struct EmailAuthView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(OnboardingBackground().ignoresSafeArea())
+            .foregroundStyle(.white)
+            .preferredColorScheme(.dark)
             .navigationTitle("Email")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -82,7 +84,7 @@ struct EmailAuthView: View {
                         ? "Sign in with your email and password."
                         : "Create an account, then verify your email before continuing."
                 )
-                .foregroundStyle(.secondary)
+                .foregroundStyle(OnboardingTheme.mutedText)
                 .multilineTextAlignment(.center)
             }
 
@@ -101,7 +103,7 @@ struct EmailAuthView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .padding(14)
-                        .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
                         .overlay {
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -110,7 +112,7 @@ struct EmailAuthView: View {
                     SecureField("Password", text: $password)
                         .textContentType(mode == .signIn ? .password : .newPassword)
                         .padding(14)
-                        .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
                         .overlay {
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -120,7 +122,7 @@ struct EmailAuthView: View {
                         SecureField("Confirm password", text: $confirmPassword)
                             .textContentType(.newPassword)
                             .padding(14)
-                            .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 14))
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 14)
                                     .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -199,7 +201,7 @@ struct EmailAuthView: View {
 
             Text("We sent a confirmation link to \(email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()). Open it on this iPhone to verify your address and return to ATHLTH.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(OnboardingTheme.mutedText)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
 
@@ -211,7 +213,7 @@ struct EmailAuthView: View {
 
                     Text("Your ATHLTH account has been created, but sign-in is not completed until the email address is verified.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(OnboardingTheme.mutedText)
                 }
             }
 
@@ -328,7 +330,7 @@ private struct PasswordResetRequestView: View {
 
                         Text("If an ATHLTH account exists for this email address, a password-reset link has been sent. Open the link on this iPhone to return to ATHLTH and choose a new password.")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(OnboardingTheme.mutedText)
                     }
                 } else {
                     Section {
