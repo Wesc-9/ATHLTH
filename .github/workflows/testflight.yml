@@ -46,6 +46,13 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Verify deterministic app icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/generate_app_icons.py
+          git diff --exit-code --             ATHLTH/Assets.xcassets/AppIcon.appiconset             ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset
+
       - name: Generate Xcode project
         run: xcodegen generate
 
@@ -167,6 +174,36 @@ jobs:
           test "$IOS_BUILD" = "$WATCH_BUILD"
           test "$IOS_VERSION" = "$WATCH_VERSION"
           test "$IOS_BUILD" -gt 1
+
+      - name: Verify release capabilities and companion metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          IPA=$(find "$RUNNER_TEMP/validation-export" -maxdepth 1 -name '*.ipa' -print -quit)
+          rm -rf "$RUNNER_TEMP/capability-check"
+          mkdir -p "$RUNNER_TEMP/capability-check"
+          unzip -q "$IPA" -d "$RUNNER_TEMP/capability-check"
+          APP=$(find "$RUNNER_TEMP/capability-check/Payload" -maxdepth 1 -name '*.app' -print -quit)
+          WATCH_APP=$(find "$APP/Watch" -maxdepth 1 -name '*.app' -print -quit)
+
+          IOS_ENT="$RUNNER_TEMP/capability-ios-entitlements.plist"
+          WATCH_ENT="$RUNNER_TEMP/capability-watch-entitlements.plist"
+          codesign -d --entitlements :- "$APP" > "$IOS_ENT" 2>/dev/null
+          codesign -d --entitlements :- "$WATCH_APP" > "$WATCH_ENT" 2>/dev/null
+
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$IOS_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit.background-delivery" "$IOS_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.applesignin:0" "$IOS_ENT" | grep -qx "Default"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
+
+          /usr/libexec/PlistBuddy -c "Print :WKCompanionAppBundleIdentifier" "$WATCH_APP/Info.plist" | grep -qx "com.wesc9.athlth"
+          /usr/libexec/PlistBuddy -c "Print :WKBackgroundModes:0" "$WATCH_APP/Info.plist" | grep -qx "workout-processing"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes:0:CFBundleURLSchemes:0" "$APP/Info.plist" | grep -qx "athlth"
+
+          ICON=$(find "$APP" -maxdepth 1 -name 'AppIcon*.png' -print -quit)
+          test -n "$ICON"
+          test -s "$ICON"
+          echo "Release capabilities, Watch companion metadata and compiled app icon verified."
 
       - name: Create upload export options
         shell: bash
