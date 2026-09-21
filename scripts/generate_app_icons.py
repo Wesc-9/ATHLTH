@@ -5,37 +5,107 @@ import base64
 import hashlib
 import json
 import struct
+import zlib
 from pathlib import Path
+
+SIZE = 1024
+SOURCE_SIZE = 256
+SOURCE_PATH = Path("ATHLTH/Brand/AppIconSource/raw256.b64")
+EXPECTED_SOURCE_SHA256 = "9f55506801aa4b5980afccccd0f729d54f474346a10d08d40e08d1ac51e77cfc"
 
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
-SOURCE_DIR = Path("ATHLTH/Brand/AppIconSource")
-EXPECTED_SHA256 = "fa63dc29de29939d50d45da6ea740b2c9dce9649ec0d9bb8c3d8954b606839c4"
 
 
-def load_master_icon() -> bytes:
-    parts = sorted(SOURCE_DIR.glob("part*.txt"))
-    if not parts:
-        raise SystemExit(f"No app-icon source parts found in {SOURCE_DIR}")
+def load_source_rgb() -> bytes:
+    encoded = SOURCE_PATH.read_text(encoding="utf-8").strip()
+    compressed = base64.b64decode(encoded, validate=True)
+    raw = zlib.decompress(compressed)
 
-    encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
-    payload = base64.b64decode(encoded, validate=True)
-
-    if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise SystemExit("ATHLTH master app icon is not a PNG.")
-
-    width, height = struct.unpack(">II", payload[16:24])
-    if (width, height) != (1024, 1024):
-        raise SystemExit(f"ATHLTH master app icon must be 1024x1024, got {width}x{height}.")
-
-    digest = hashlib.sha256(payload).hexdigest()
-    if digest != EXPECTED_SHA256:
+    expected_bytes = SOURCE_SIZE * SOURCE_SIZE * 3
+    if len(raw) != expected_bytes:
         raise SystemExit(
-            "ATHLTH master app icon checksum mismatch: "
-            f"expected {EXPECTED_SHA256}, got {digest}"
+            f"ATHLTH icon source has {len(raw)} bytes; expected {expected_bytes}."
         )
 
-    return payload
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != EXPECTED_SOURCE_SHA256:
+        raise SystemExit(
+            "ATHLTH icon source checksum mismatch: "
+            f"expected {EXPECTED_SOURCE_SHA256}, got {digest}"
+        )
+
+    return raw
+
+
+def resize_bilinear(source: bytes) -> list[bytes]:
+    src = memoryview(source)
+
+    x_lookup: list[tuple[int, int, int]] = []
+    for x in range(SIZE):
+        source_x = (x + 0.5) * SOURCE_SIZE / SIZE - 0.5
+        x0 = max(0, min(SOURCE_SIZE - 1, int(source_x)))
+        x1 = min(SOURCE_SIZE - 1, x0 + 1)
+        fraction = max(0.0, min(1.0, source_x - x0))
+        x_lookup.append((x0, x1, int(round(fraction * 256))))
+
+    rows: list[bytes] = []
+    for y in range(SIZE):
+        source_y = (y + 0.5) * SOURCE_SIZE / SIZE - 0.5
+        y0 = max(0, min(SOURCE_SIZE - 1, int(source_y)))
+        y1 = min(SOURCE_SIZE - 1, y0 + 1)
+        fy = int(round(max(0.0, min(1.0, source_y - y0)) * 256))
+
+        base0 = y0 * SOURCE_SIZE * 3
+        base1 = y1 * SOURCE_SIZE * 3
+        row = bytearray(SIZE * 3)
+
+        for x, (x0, x1, fx) in enumerate(x_lookup):
+            i00 = base0 + x0 * 3
+            i01 = base0 + x1 * 3
+            i10 = base1 + x0 * 3
+            i11 = base1 + x1 * 3
+            output = x * 3
+
+            for channel in range(3):
+                upper = (
+                    src[i00 + channel] * (256 - fx)
+                    + src[i01 + channel] * fx
+                    + 128
+                ) >> 8
+                lower = (
+                    src[i10 + channel] * (256 - fx)
+                    + src[i11 + channel] * fx
+                    + 128
+                ) >> 8
+                row[output + channel] = (
+                    upper * (256 - fy) + lower * fy + 128
+                ) >> 8
+
+        rows.append(bytes(row))
+
+    return rows
+
+
+def png_payload(rows: list[bytes]) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + kind
+            + data
+            + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+        )
+
+    scanlines = b"".join(b"\x00" + row for row in rows)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(
+            b"IHDR",
+            struct.pack(">IIBBBBB", SIZE, SIZE, 8, 2, 0, 0, 0),
+        )
+        + chunk(b"IDAT", zlib.compress(scanlines, level=9))
+        + chunk(b"IEND", b"")
+    )
 
 
 def write_icon(path: Path, payload: bytes) -> None:
@@ -44,10 +114,13 @@ def write_icon(path: Path, payload: bytes) -> None:
 
 
 def main() -> None:
-    payload = load_master_icon()
+    source = load_source_rgb()
+    rows = resize_bilinear(source)
+    payload = png_payload(rows)
 
-    # Keep the approved premium ATHLTH mark consistent across iPhone/iPad,
-    # dark/tinted Home Screen appearances and Apple Watch.
+    # The approved premium folded-A mark is intentionally identical across
+    # normal, dark, tinted, and Apple Watch appearances so ATHLTH keeps one
+    # recognizable identity everywhere.
     write_icon(IOS_DIR / "AppIcon.png", payload)
     write_icon(IOS_DIR / "AppIcon-dark.png", payload)
     write_icon(IOS_DIR / "AppIcon-tinted.png", payload)
