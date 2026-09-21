@@ -46,6 +46,7 @@ jobs:
           if [ -z "$LOCATION" ]; then
             echo "::error::Supabase did not return an Apple authorization redirect."
             cat "$HEADERS"
+            cat "$BODY"
             exit 1
           fi
 
