@@ -622,7 +622,7 @@ struct OnboardingFlowView: View {
                 connectionRow(
                     title: "Apple Health",
                     subtitle: health.hasRequestedAuthorization
-                        ? "Connected"
+                        ? "Health access requested"
                         : "Workouts, heart rate, sleep, activity and recovery",
                     icon: "heart.fill",
                     connected: health.hasRequestedAuthorization
@@ -640,6 +640,21 @@ struct OnboardingFlowView: View {
                         healthRequestInProgress = false
                     }
                 }
+            }
+
+            if let healthError = health.authorizationError {
+                Label(healthError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 4)
+            } else if let backgroundError = health.backgroundSyncError {
+                Label(
+                    "Health access is active, but background sync needs attention: \(backgroundError)",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 4)
             }
 
             OnboardingCard {
