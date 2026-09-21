@@ -40,6 +40,12 @@ final class SupabaseAccountService: ObservableObject {
     func signInWithApple(
         credential: ASAuthorizationAppleIDCredential
     ) async throws -> BackendUserBootstrap {
+        guard let rawNonce = appleRawNonce else {
+            throw SupabaseAccountError.missingAppleNonce
+        }
+
+        defer { appleRawNonce = nil }
+
         guard let idToken = credential.identityToken
             .flatMap({ String(data: $0, encoding: .utf8) })
         else {
