@@ -8,6 +8,8 @@ struct EmailAuthView: View {
     let onAuthenticated: (BackendUserBootstrap) -> Void
 
     @State private var mode: EmailAuthMode = .signIn
+    @State private var firstName = ""
+    @State private var lastName = ""
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
@@ -49,6 +51,8 @@ struct EmailAuthView: View {
             }
             .onChange(of: mode) {
                 errorMessage = nil
+                firstName = ""
+                lastName = ""
                 password = ""
                 confirmPassword = ""
                 acceptedLegal = false
@@ -97,6 +101,32 @@ struct EmailAuthView: View {
 
             OnboardingCard {
                 VStack(spacing: 14) {
+                    if mode == .createAccount {
+                        HStack(spacing: 12) {
+                            TextField("First name", text: $firstName)
+                                .textContentType(.givenName)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled()
+                                .padding(14)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                                }
+
+                            TextField("Last name", text: $lastName)
+                                .textContentType(.familyName)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled()
+                                .padding(14)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                                }
+                        }
+                    }
+
                     TextField("Email address", text: $email)
                         .textContentType(.emailAddress)
                         .keyboardType(.emailAddress)
@@ -245,6 +275,14 @@ struct EmailAuthView: View {
         }
 
         if mode == .createAccount {
+            let cleanFirstName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanLastName = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !cleanFirstName.isEmpty, !cleanLastName.isEmpty else {
+                errorMessage = "Enter your first and last name."
+                return
+            }
+
             guard password == confirmPassword else {
                 errorMessage = "The passwords do not match."
                 return
@@ -273,7 +311,9 @@ struct EmailAuthView: View {
                 case .createAccount:
                     let outcome = try await accountService.signUp(
                         email: cleanEmail,
-                        password: password
+                        password: password,
+                        firstName: firstName,
+                        lastName: lastName
                     )
 
                     switch outcome {
