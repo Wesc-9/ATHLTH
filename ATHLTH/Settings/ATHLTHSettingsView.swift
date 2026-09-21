@@ -154,16 +154,15 @@ struct ATHLTHSettingsView: View {
                     connected: health.hasRequestedAuthorization
                 )
 
-                Button {
-                    watchConnection.connect()
+                NavigationLink {
+                    AppleWatchConnectionView()
                 } label: {
                     integrationRow(
                         .appleWatch,
-                        subtitle: watchConnection.state.subtitle,
+                        subtitle: watchConnection.statusText,
                         connected: watchConnection.isReady
                     )
                 }
-                .buttonStyle(.plain)
 
                 NavigationLink {
                     SpotifySettingsView()
