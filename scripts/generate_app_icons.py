@@ -1,71 +1,57 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import struct
-import zlib
 from pathlib import Path
-
-SIZE = 1024
 
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
+SOURCE_DIR = Path("ATHLTH/Brand/AppIconSource")
+EXPECTED_SHA256 = "fa63dc29de29939d50d45da6ea740b2c9dce9649ec0d9bb8c3d8954b606839c4"
 
 
-def write_png(path: Path, background: tuple[int, int, int], foreground: tuple[int, int, int]) -> None:
-    width = height = SIZE
-    cx = width / 2
-    top = height * 0.235
-    bottom = height * 0.735
-    outer_half = width * 0.255
-    inner_half_bottom = width * 0.135
-    inner_half_top = width * 0.032
+def load_master_icon() -> bytes:
+    parts = sorted(SOURCE_DIR.glob("part*.txt"))
+    if not parts:
+        raise SystemExit(f"No app-icon source parts found in {SOURCE_DIR}")
 
-    rows = []
-    for y in range(height):
-        row = bytearray()
-        if y < top or y > bottom:
-            row.extend(background * width)
-        else:
-            progress = (y - top) / (bottom - top)
-            outer = outer_half * progress
-            inner = inner_half_top + (inner_half_bottom - inner_half_top) * progress
+    encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
+    payload = base64.b64decode(encoded, validate=True)
 
-            for x in range(width):
-                dx = abs(x - cx)
-                is_mark = inner <= dx <= outer
-                row.extend(foreground if is_mark else background)
+    if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise SystemExit("ATHLTH master app icon is not a PNG.")
 
-        rows.append(b"\x00" + bytes(row))
+    width, height = struct.unpack(">II", payload[16:24])
+    if (width, height) != (1024, 1024):
+        raise SystemExit(f"ATHLTH master app icon must be 1024x1024, got {width}x{height}.")
 
-    raw = b"".join(rows)
-
-    def chunk(kind: bytes, data: bytes) -> bytes:
-        return (
-            struct.pack(">I", len(data))
-            + kind
-            + data
-            + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    digest = hashlib.sha256(payload).hexdigest()
+    if digest != EXPECTED_SHA256:
+        raise SystemExit(
+            "ATHLTH master app icon checksum mismatch: "
+            f"expected {EXPECTED_SHA256}, got {digest}"
         )
 
-    payload = (
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
-        + chunk(b"IDAT", zlib.compress(raw, level=9))
-        + chunk(b"IEND", b"")
-    )
+    return payload
 
+
+def write_icon(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(payload)
 
 
 def main() -> None:
-    # iPhone/iPad: explicit default, dark and grayscale tinted variants.
-    # The mark is intentionally bright with enough contrast that it can't
-    # disappear into dark/tinted Home Screen icon appearances.
-    write_png(IOS_DIR / "AppIcon.png", (24, 22, 20), (250, 250, 248))
-    write_png(IOS_DIR / "AppIcon-dark.png", (46, 43, 39), (255, 255, 255))
-    write_png(IOS_DIR / "AppIcon-tinted.png", (96, 96, 96), (248, 248, 248))
+    payload = load_master_icon()
+
+    # Keep the approved premium ATHLTH mark consistent across iPhone/iPad,
+    # dark/tinted Home Screen appearances and Apple Watch.
+    write_icon(IOS_DIR / "AppIcon.png", payload)
+    write_icon(IOS_DIR / "AppIcon-dark.png", payload)
+    write_icon(IOS_DIR / "AppIcon-tinted.png", payload)
+    write_icon(WATCH_DIR / "AppIcon.png", payload)
 
     ios_contents = {
         "images": [
@@ -96,10 +82,6 @@ def main() -> None:
         json.dumps(ios_contents, indent=2) + "\n",
         encoding="utf-8",
     )
-
-    # watchOS guidance recommends avoiding a pure-black background because
-    # the circular icon can visually disappear into the Watch UI.
-    write_png(WATCH_DIR / "AppIcon.png", (47, 56, 50), (252, 252, 250))
 
     watch_contents = {
         "images": [
