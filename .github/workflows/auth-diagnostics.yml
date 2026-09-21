@@ -30,3 +30,35 @@ jobs:
             mailer_autoconfirm,
             phone_autoconfirm
           }'
+
+
+      - name: Inspect Apple OAuth client ID
+        shell: bash
+        env:
+          SUPABASE_URL: https://hnkybbzxffvyhzrstqdo.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_rBJpdMowyqt7A25eRd32dg_x7Szon8p
+        run: |
+          set -euo pipefail
+          HEADERS="$(mktemp)"
+          curl -sS -D "$HEADERS" -o /dev/null             -H "apikey: $SUPABASE_PUBLISHABLE_KEY"             "$SUPABASE_URL/auth/v1/authorize?provider=apple&redirect_to=athlth%3A%2F%2Fauth%2Fconfirm"
+
+          LOCATION="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit}' "$HEADERS")"
+          if [ -z "$LOCATION" ]; then
+            echo "::error::Supabase did not return an Apple authorization redirect."
+            cat "$HEADERS"
+            exit 1
+          fi
+
+          CLIENT_ID="$(python3 - "$LOCATION" <<'PY'
+          import sys
+          from urllib.parse import urlparse, parse_qs
+          location = sys.argv[1]
+          print(parse_qs(urlparse(location).query).get("client_id", [""])[0])
+          PY
+          )"
+
+          echo "Configured first Apple client ID: $CLIENT_ID"
+          if [ -z "$CLIENT_ID" ]; then
+            echo "::error::No Apple client_id was present in the Supabase redirect."
+            exit 1
+          fi
