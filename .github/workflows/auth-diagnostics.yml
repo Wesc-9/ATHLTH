@@ -24,12 +24,7 @@ jobs:
           set -euo pipefail
           RESPONSE="$(curl -fsS             -H "apikey: $SUPABASE_PUBLISHABLE_KEY"             "$SUPABASE_URL/auth/v1/settings")"
 
-          echo "$RESPONSE" | jq '{
-            disable_signup,
-            external_apple_enabled: (.external.apple // false),
-            mailer_autoconfirm,
-            phone_autoconfirm
-          }'
+          echo "$RESPONSE" | jq .
 
       - name: Inspect Apple OAuth client ID
         shell: bash
