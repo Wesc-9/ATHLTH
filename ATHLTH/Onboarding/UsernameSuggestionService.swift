@@ -203,7 +203,7 @@ enum UsernameGenerator {
             .joined()
 
         let fallback = ascii.isEmpty ? "athlete" : ascii
-        return String(fallback.prefix(12))
+        return String(fallback.prefix(18))
     }
 
     static func candidatePool(for base: String) -> [String] {
