@@ -35,6 +35,7 @@ struct ATHLTHApp: App {
 }
 
 struct AppRootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var accountService: SupabaseAccountService
@@ -56,9 +57,19 @@ struct AppRootView: View {
             }
         }
         .task {
-            if let bootstrap = try? await accountService.restoreCurrentUser() {
-                appSession.applyBackendBootstrap(bootstrap)
+            do {
+                if let bootstrap = try await accountService.restoreCurrentUser() {
+                    appSession.applyBackendBootstrap(bootstrap)
+                } else if appSession.signedIn && !accountService.hasPersistedSession {
+                    appSession.resetOnboardingForPreview()
+                }
+            } catch {
+                if !accountService.hasPersistedSession {
+                    appSession.resetOnboardingForPreview()
+                }
             }
+
+            watchConnection.connect()
 
             await subscriptionStore.start()
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
@@ -69,6 +80,18 @@ struct AppRootView: View {
                 allowed: appSession.canAccess(.backgroundHealthSync)
             )
             await health.refreshAll()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+
+            // Refresh pairing/install state whenever ATHLTH returns to the
+            // foreground, for example after installing the Watch app.
+            watchConnection.connect()
+
+            guard health.hasRequestedAuthorization else { return }
+            Task {
+                await health.refreshAll()
+            }
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
             appSession.applyStoreKitEntitlement(entitlement)
