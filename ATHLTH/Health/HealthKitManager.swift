@@ -13,11 +13,22 @@ final class HealthKitManager: ObservableObject {
     @Published var authorizationError: String?
     @Published private(set) var backgroundDeliveryTestResult: String?
     @Published private(set) var routeCapabilityTestResult: String?
+    @Published private(set) var lastSuccessfulRefreshAt: Date?
+    @Published private(set) var backgroundSyncError: String?
 
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
     private let authorizationFlagKey = "athlth.healthAuthorizationRequested"
+
+    init() {
+        // Apple recommends installing observer queries as early as possible
+        // so HealthKit can deliver background updates immediately after launch.
+        if UserDefaults.standard.bool(forKey: authorizationFlagKey),
+           HKHealthStore.isHealthDataAvailable() {
+            startBackgroundObservers()
+        }
+    }
 
     var hasRequestedAuthorization: Bool {
         UserDefaults.standard.bool(forKey: authorizationFlagKey)
@@ -89,6 +100,8 @@ final class HealthKitManager: ObservableObject {
     func configureBackgroundSync(allowed: Bool) async {
         guard healthDataAvailable else { return }
 
+        backgroundSyncError = nil
+
         guard allowed else {
             await disableBackgroundSync()
             return
@@ -118,12 +131,26 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
+        var failures: [String] = []
+
         for (type, frequency) in registrations {
-            _ = await withCheckedContinuation { continuation in
-                healthStore.enableBackgroundDelivery(for: type, frequency: frequency) { success, _ in
-                    continuation.resume(returning: success)
+            let result: (Bool, String?) = await withCheckedContinuation { continuation in
+                healthStore.enableBackgroundDelivery(for: type, frequency: frequency) { success, error in
+                    continuation.resume(
+                        returning: (success, error?.localizedDescription)
+                    )
                 }
             }
+
+            if !result.0 {
+                failures.append(
+                    result.1 ?? "HealthKit rejected background delivery for \(type.identifier)."
+                )
+            }
+        }
+
+        if !failures.isEmpty {
+            backgroundSyncError = failures.joined(separator: "\n")
         }
     }
 
@@ -174,6 +201,7 @@ final class HealthKitManager: ObservableObject {
             sleep = try await fetchLatestSleep()
             heart = try await fetchHeartSummary()
             await refreshPersonalDetails()
+            lastSuccessfulRefreshAt = Date()
         } catch {
             authorizationError = error.localizedDescription
         }
