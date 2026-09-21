@@ -295,6 +295,16 @@ final class AppSessionStore: ObservableObject {
         defaults.set(true, forKey: "session.onboardingCompleted")
     }
 
+    func clearAfterAccountDeletion() {
+        resetOnboardingForPreview()
+        profile = PreviewData.profile
+        activePlan = nil
+        savedRoutes = []
+        challenges = []
+        previewModeEnabled = false
+        usernameSeed = profile.displayName
+    }
+
     func resetOnboardingForPreview() {
         signedIn = false
         onboardingCompleted = false
