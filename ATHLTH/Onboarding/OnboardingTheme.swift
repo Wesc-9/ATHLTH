@@ -90,3 +90,20 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
+
+
+extension View {
+    func onboardingSurface(cornerRadius: CGFloat = 22) -> some View {
+        self
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(
+                OnboardingTheme.card,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(OnboardingTheme.border, lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(0.18), radius: 18, x: 0, y: 10)
+    }
+}
