@@ -257,9 +257,7 @@ struct ATHLTHSettingsView: View {
                 }
 
                 NavigationLink {
-                    Text("Account deletion will remove ATHLTH cloud data after confirmation. Health data in Apple Health is managed separately.")
-                        .padding()
-                        .navigationTitle("Delete Account")
+                    DeleteAccountView()
                 } label: {
                     Label("Delete account", systemImage: "trash")
                         .foregroundStyle(.red)
@@ -286,11 +284,21 @@ struct ATHLTHSettingsView: View {
                 }
 
                 LabeledContent("Preview mode", value: session.previewModeEnabled ? "Enabled" : "Disabled")
-                LabeledContent("App version", value: "0.1.0")
+                LabeledContent("App version", value: appVersion)
             }
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var appVersion: String {
+        let version = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "—"
+        let build = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleVersion"
+        ) as? String ?? "—"
+        return "\(version) (\(build))"
     }
 
     @ViewBuilder
