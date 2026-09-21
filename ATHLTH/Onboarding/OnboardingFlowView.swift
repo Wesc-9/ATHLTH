@@ -205,18 +205,10 @@ struct OnboardingFlowView: View {
     }
 
     private var accountStep: some View {
-        VStack(spacing: 22) {
-            Spacer().frame(height: 18)
+        VStack(spacing: 20) {
+            Spacer().frame(height: 4)
 
-            ZStack {
-                Circle()
-                    .fill(OnboardingTheme.green.opacity(0.10))
-                    .frame(width: 88, height: 88)
-
-                Image(systemName: "figure.run")
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundStyle(OnboardingTheme.green)
-            }
+            accountHeroArtwork
 
             VStack(spacing: 8) {
                 Text("Welcome to ATHLTH")
@@ -290,6 +282,165 @@ struct OnboardingFlowView: View {
             }
             .multilineTextAlignment(.center)
         }
+    }
+
+    private var accountHeroArtwork: some View {
+        GeometryReader { proxy in
+            ZStack {
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                OnboardingTheme.green.opacity(0.20),
+                                Color.white.opacity(0.96),
+                                OnboardingTheme.green.opacity(0.07)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Circle()
+                    .fill(OnboardingTheme.green.opacity(0.09))
+                    .frame(width: 190, height: 190)
+                    .offset(x: -proxy.size.width * 0.31, y: 44)
+
+                Circle()
+                    .fill(Color.white.opacity(0.72))
+                    .frame(width: 120, height: 120)
+                    .offset(x: proxy.size.width * 0.34, y: -58)
+
+                Path { path in
+                    path.move(
+                        to: CGPoint(
+                            x: proxy.size.width * 0.12,
+                            y: proxy.size.height * 0.73
+                        )
+                    )
+                    path.addCurve(
+                        to: CGPoint(
+                            x: proxy.size.width * 0.84,
+                            y: proxy.size.height * 0.31
+                        ),
+                        control1: CGPoint(
+                            x: proxy.size.width * 0.34,
+                            y: proxy.size.height * 0.48
+                        ),
+                        control2: CGPoint(
+                            x: proxy.size.width * 0.58,
+                            y: proxy.size.height * 0.70
+                        )
+                    )
+                }
+                .stroke(
+                    OnboardingTheme.green.opacity(0.42),
+                    style: StrokeStyle(
+                        lineWidth: 3,
+                        lineCap: .round,
+                        dash: [7, 7]
+                    )
+                )
+
+                Circle()
+                    .fill(OnboardingTheme.green)
+                    .frame(width: 9, height: 9)
+                    .position(
+                        x: proxy.size.width * 0.12,
+                        y: proxy.size.height * 0.73
+                    )
+
+                Circle()
+                    .fill(OnboardingTheme.green)
+                    .frame(width: 9, height: 9)
+                    .position(
+                        x: proxy.size.width * 0.84,
+                        y: proxy.size.height * 0.31
+                    )
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("TRAIN • RECOVER • PROGRESS")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.2)
+                            .foregroundStyle(OnboardingTheme.green)
+
+                        Spacer()
+
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.88))
+                                .frame(width: 86, height: 86)
+                                .shadow(
+                                    color: Color.black.opacity(0.06),
+                                    radius: 18,
+                                    x: 0,
+                                    y: 10
+                                )
+
+                            Image(systemName: "figure.run")
+                                .font(.system(size: 42, weight: .semibold))
+                                .foregroundStyle(OnboardingTheme.green)
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 10) {
+                        heroChip(
+                            title: "Recovery",
+                            systemImage: "heart.fill"
+                        )
+
+                        heroChip(
+                            title: "Progress",
+                            systemImage: "chart.line.uptrend.xyaxis"
+                        )
+
+                        Spacer()
+
+                        heroChip(
+                            title: "Apple Watch",
+                            systemImage: "applewatch"
+                        )
+                    }
+                }
+                .padding(20)
+            }
+        }
+        .frame(height: 210)
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(OnboardingTheme.border, lineWidth: 1)
+        }
+        .shadow(
+            color: Color.black.opacity(0.05),
+            radius: 20,
+            x: 0,
+            y: 10
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "ATHLTH illustration showing training, recovery, progress and Apple Watch"
+        )
+    }
+
+    private func heroChip(
+        title: String,
+        systemImage: String
+    ) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(
+                Color.white.opacity(0.90),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            }
     }
 
     private var usernameStep: some View {
