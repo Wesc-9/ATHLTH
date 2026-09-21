@@ -145,6 +145,26 @@ final class SupabaseAccountService: ObservableObject {
         passwordRecoveryPending = false
     }
 
+    func deleteAccount() async throws {
+        guard currentUserID != nil else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        let response: DeleteAccountResponse = try await client.functions.invoke(
+            "delete-account",
+            options: FunctionInvokeOptions(
+                body: ["confirm": true]
+            )
+        )
+
+        guard response.deleted else {
+            throw SupabaseAccountError.accountDeletionFailed
+        }
+
+        try? await client.auth.signOut()
+        passwordRecoveryPending = false
+    }
+
     func restoreCurrentUser() async throws -> BackendUserBootstrap? {
         guard currentUserID != nil else { return nil }
         return try await loadCurrentUser()
@@ -224,11 +244,16 @@ final class SupabaseAccountService: ObservableObject {
     }
 }
 
+private struct DeleteAccountResponse: Decodable {
+    let deleted: Bool
+}
+
 enum SupabaseAccountError: LocalizedError {
     case notAuthenticated
     case missingAppleNonce
     case missingAppleIDToken
     case invalidAppleCredential
+    case accountDeletionFailed
 
     var errorDescription: String? {
         switch self {
@@ -240,6 +265,8 @@ enum SupabaseAccountError: LocalizedError {
             return "Apple did not return a valid sign-in token."
         case .invalidAppleCredential:
             return "Apple returned an invalid sign-in credential."
+        case .accountDeletionFailed:
+            return "ATHLTH could not confirm that your account was deleted. Please try again."
         }
     }
 }
