@@ -29,6 +29,50 @@ final class WatchRouteStore: NSObject, ObservableObject {
         session.activate()
     }
 
+    private func connectivityAck(probeID: String) -> [String: Any] {
+        [
+            WatchTransferMetadataKey.kind: WatchTransferKind.connectivityAck.rawValue,
+            WatchTransferMetadataKey.probeID: probeID,
+            WatchTransferMetadataKey.sentAt: Date().timeIntervalSince1970
+        ]
+    }
+
+    private func handleConnectivityProbe(
+        _ payload: [String: Any],
+        replyHandler: (([String: Any]) -> Void)? = nil
+    ) -> Bool {
+        guard
+            payload[WatchTransferMetadataKey.kind] as? String
+                == WatchTransferKind.connectivityProbe.rawValue
+        else {
+            return false
+        }
+
+        let probeID = payload[WatchTransferMetadataKey.probeID] as? String
+            ?? UUID().uuidString
+        let ack = connectivityAck(probeID: probeID)
+
+        if let replyHandler {
+            replyHandler(ack)
+        } else if WCSession.default.activationState == .activated {
+            WCSession.default.transferUserInfo(ack)
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.connectionText = "Connected to iPhone"
+        }
+
+        return true
+    }
+
+    private func announceWatchLaunchIfPossible(_ session: WCSession) {
+        guard session.activationState == .activated else { return }
+
+        session.transferUserInfo(
+            connectivityAck(probeID: "watch-launch")
+        )
+    }
+
     private var storageURL: URL? {
         fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first?
@@ -125,19 +169,44 @@ extension WatchRouteStore: WCSessionDelegate {
                     : "Connecting to iPhone"
             }
         }
+
+        if activationState == .activated {
+            announceWatchLaunchIfPossible(session)
+        }
     }
 
     func session(
         _ session: WCSession,
         didReceiveMessage message: [String: Any]
     ) {
+        if handleConnectivityProbe(message) {
+            return
+        }
+
         handleWorkoutCommand(message)
+    }
+
+    func session(
+        _ session: WCSession,
+        didReceiveMessage message: [String: Any],
+        replyHandler: @escaping ([String: Any]) -> Void
+    ) {
+        if handleConnectivityProbe(message, replyHandler: replyHandler) {
+            return
+        }
+
+        handleWorkoutCommand(message)
+        replyHandler([:])
     }
 
     func session(
         _ session: WCSession,
         didReceiveUserInfo userInfo: [String: Any] = [:]
     ) {
+        if handleConnectivityProbe(userInfo) {
+            return
+        }
+
         handleWorkoutCommand(userInfo)
     }
 
