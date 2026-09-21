@@ -1,4 +1,5 @@
 import AuthenticationServices
+import CryptoKit
 import Foundation
 import Supabase
 
@@ -15,6 +16,8 @@ final class SupabaseAccountService: ObservableObject {
     @Published private(set) var passwordRecoveryPending = false
 
     private let client: SupabaseClient
+    private var appleRawNonce: String?
+
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
     }
@@ -24,7 +27,10 @@ final class SupabaseAccountService: ObservableObject {
     }
 
     func prepareAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {
+        let rawNonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        appleRawNonce = rawNonce
         request.requestedScopes = [.email, .fullName]
+        request.nonce = Self.sha256(rawNonce)
     }
 
     func signInWithApple(
@@ -40,7 +46,8 @@ final class SupabaseAccountService: ObservableObject {
             _ = try await client.auth.signInWithIdToken(
                 credentials: OpenIDConnectCredentials(
                     provider: .apple,
-                    idToken: idToken
+                    idToken: idToken,
+                    nonce: rawNonce
                 )
             )
         } catch {
@@ -244,6 +251,12 @@ final class SupabaseAccountService: ObservableObject {
             .execute()
     }
 
+    private static func sha256(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
     private static func appleSignInMessage(for error: Error) -> String {
         let technicalMessage = error.localizedDescription
         let lowered = technicalMessage.lowercased()
@@ -273,6 +286,7 @@ private struct DeleteAccountResponse: Decodable {
 
 enum SupabaseAccountError: LocalizedError {
     case notAuthenticated
+    case missingAppleNonce
     case missingAppleIDToken
     case invalidAppleCredential
     case accountDeletionFailed
@@ -282,6 +296,8 @@ enum SupabaseAccountError: LocalizedError {
         switch self {
         case .notAuthenticated:
             return "No authenticated ATHLTH user is available."
+        case .missingAppleNonce:
+            return "Apple sign-in could not be securely validated. Please try again."
         case .missingAppleIDToken:
             return "Apple did not return a valid sign-in token."
         case .invalidAppleCredential:
