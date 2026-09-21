@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - restore/v1-athlth-plus
+      - release/v1.2
     paths:
       - .github/testflight-trigger
 
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   testflight:
@@ -205,6 +205,25 @@ jobs:
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Publish GitHub release
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v1.2.0"
+          TITLE="ATHLTH 1.2.0"
+          NOTES=        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-testflight-diagnostics
+          path: |
+            ~/Library/Logs/DiagnosticReports
+            ${{ runner.temp }}/export
+          if-no-files-found: ignore
+ATHLTH 1.2.0\n\n• New cinematic onboarding and sign-in experience\n• Account deletion flow\n• Improved Apple Watch pairing and connection verification\n• Correct ATHLTH branding across iPhone and Apple Watch\n• ATHLTH+ foundation retained'
+          gh release create "$TAG"             --target "$GITHUB_SHA"             --title "$TITLE"             --notes "$NOTES"
 
       - name: Upload diagnostics
         if: failure()
