@@ -171,13 +171,28 @@ enum UsernameGenerator {
             .applyingTransform(.stripDiacritics, reverse: false)
             ?? value
 
-        let firstWord = latin
-            .split(whereSeparator: { $0.isWhitespace || $0 == "@" || $0 == "." || $0 == "-" })
+        let identityPart = latin
+            .split(separator: "@", maxSplits: 1, omittingEmptySubsequences: true)
             .first
             .map(String.init)
-            ?? "athlete"
+            ?? latin
 
-        let ascii = firstWord
+        let words = identityPart
+            .split(whereSeparator: {
+                $0.isWhitespace || $0 == "." || $0 == "-" || $0 == "_" || $0 == "+"
+            })
+            .map(String.init)
+
+        let preferredWords: [String]
+        if words.count >= 2 {
+            preferredWords = [words.first!, words.last!]
+        } else {
+            preferredWords = words
+        }
+
+        let combined = preferredWords.joined()
+
+        let ascii = combined
             .lowercased()
             .unicodeScalars
             .filter { scalar in
