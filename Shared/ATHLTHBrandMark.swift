@@ -7,17 +7,17 @@ enum ATHLTHBrandSize {
 
     var markWidth: CGFloat {
         switch self {
-        case .compact: return 28
-        case .watch: return 34
-        case .standard: return 44
+        case .compact: return 30
+        case .watch: return 36
+        case .standard: return 48
         }
     }
 
     var markHeight: CGFloat {
         switch self {
-        case .compact: return 19
-        case .watch: return 23
-        case .standard: return 30
+        case .compact: return 22
+        case .watch: return 26
+        case .standard: return 34
         }
     }
 
@@ -40,21 +40,50 @@ enum ATHLTHBrandSize {
 
 struct ATHLTHMarkShape: Shape {
     func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let strokeWidth = max(rect.width * 0.16, 2)
-        let inset = strokeWidth / 2
-
-        path.move(to: CGPoint(x: inset, y: rect.maxY - inset))
-        path.addLine(to: CGPoint(x: rect.midX, y: inset))
-        path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.maxY - inset))
-
-        return path.strokedPath(
-            .init(
-                lineWidth: strokeWidth,
-                lineCap: .butt,
-                lineJoin: .miter
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(
+                x: rect.minX + rect.width * x,
+                y: rect.minY + rect.height * y
             )
-        )
+        }
+
+        var path = Path()
+
+        // Left ribbon.
+        path.move(to: p(0.04, 1.00))
+        path.addLine(to: p(0.50, 0.00))
+        path.addLine(to: p(0.61, 0.24))
+        path.addLine(to: p(0.27, 1.00))
+        path.closeSubpath()
+
+        // Right ribbon with the slightly inset top edge that gives the
+        // ATHLTH mark its folded-paper construction.
+        path.move(to: p(0.50, 0.00))
+        path.addLine(to: p(0.96, 1.00))
+        path.addLine(to: p(0.73, 1.00))
+        path.addLine(to: p(0.43, 0.34))
+        path.closeSubpath()
+
+        return path
+    }
+}
+
+private struct ATHLTHFoldShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(
+                x: rect.minX + rect.width * x,
+                y: rect.minY + rect.height * y
+            )
+        }
+
+        var path = Path()
+        path.move(to: p(0.55, 0.20))
+        path.addLine(to: p(0.69, 0.49))
+        path.addLine(to: p(0.61, 0.67))
+        path.addLine(to: p(0.47, 0.37))
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -64,10 +93,15 @@ struct ATHLTHBrandMark: View {
 
     var body: some View {
         VStack(spacing: size == .watch ? 2 : 3) {
-            ATHLTHMarkShape()
-                .fill(Color.primary)
-                .frame(width: size.markWidth, height: size.markHeight)
-                .accessibilityHidden(true)
+            ZStack {
+                ATHLTHMarkShape()
+                    .fill(Color.primary)
+
+                ATHLTHFoldShape()
+                    .fill(Color.black.opacity(0.34))
+            }
+            .frame(width: size.markWidth, height: size.markHeight)
+            .accessibilityHidden(true)
 
             Text("ATHLTH")
                 .font(.system(size: size.wordmarkSize, weight: .black))
