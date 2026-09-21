@@ -225,35 +225,38 @@ struct OnboardingFlowView: View {
                     .clipped()
                     .ignoresSafeArea()
 
+                // Keep the hero photo close to the source artwork. These overlays
+                // only add enough contrast for the white brand and sign-in controls.
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.42),
-                        Color.black.opacity(0.10),
+                        Color.black.opacity(0.30),
+                        Color.black.opacity(0.07),
                         Color.clear
                     ],
                     startPoint: .top,
-                    endPoint: UnitPoint(x: 0.5, y: 0.38)
+                    endPoint: UnitPoint(x: 0.5, y: 0.34)
                 )
                 .ignoresSafeArea()
 
                 LinearGradient(
                     colors: [
                         Color.clear,
-                        Color.black.opacity(0.08),
-                        Color.black.opacity(0.72)
+                        Color.black.opacity(0.04),
+                        Color.black.opacity(0.42)
                     ],
-                    startPoint: UnitPoint(x: 0.5, y: 0.52),
+                    startPoint: UnitPoint(x: 0.5, y: 0.62),
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     accountBrand
-                        .padding(.top, 26)
+                        .padding(.top, 18)
 
-                    Spacer(minLength: 220)
+                    Spacer(minLength: 190)
 
                     accountSignInPanel
+                        .frame(maxWidth: 520)
 
                     if let authenticationError {
                         Label(
@@ -268,34 +271,34 @@ struct OnboardingFlowView: View {
                     }
 
                     accountLegal
-                        .padding(.top, 18)
+                        .padding(.top, 14)
                         .padding(.bottom, max(10, proxy.safeAreaInsets.bottom + 6))
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, max(8, proxy.safeAreaInsets.top))
+                .padding(.horizontal, 22)
+                .padding(.top, max(6, proxy.safeAreaInsets.top))
             }
         }
         .ignoresSafeArea(edges: .top)
     }
 
     private var accountBrand: some View {
-        VStack(spacing: 9) {
+        VStack(spacing: 8) {
             ATHLTHMarkShape()
                 .fill(.white)
-                .frame(width: 58, height: 40)
-                .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 4)
+                .frame(width: 54, height: 38)
+                .shadow(color: .black.opacity(0.20), radius: 8, x: 0, y: 4)
 
             Text("ATHLTH")
-                .font(.system(size: 31, weight: .medium, design: .default))
-                .tracking(9.5)
+                .font(.system(size: 30, weight: .medium, design: .default))
+                .tracking(8.8)
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .fixedSize()
 
             Text("PROGRESS LIVES HERE.")
-                .font(.system(size: 11, weight: .medium))
-                .tracking(3.9)
-                .foregroundStyle(.white.opacity(0.86))
+                .font(.system(size: 10.5, weight: .medium))
+                .tracking(3.4)
+                .foregroundStyle(.white.opacity(0.90))
                 .lineLimit(1)
                 .fixedSize()
         }
@@ -305,7 +308,7 @@ struct OnboardingFlowView: View {
 
     private var accountSignInPanel: some View {
         VStack(spacing: 12) {
-            SignInWithAppleButton(.continue) { request in
+            SignInWithAppleButton(.signIn) { request in
                 authenticationError = nil
                 accountService.prepareAppleSignIn(request)
             } onCompletion: { result in
