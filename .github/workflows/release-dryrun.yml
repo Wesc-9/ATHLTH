@@ -43,6 +43,13 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Verify deterministic app icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/generate_app_icons.py
+          git diff --exit-code --             ATHLTH/Assets.xcassets/AppIcon.appiconset             ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset
+
       - name: Generate Xcode project
         run: xcodegen generate
 
@@ -170,7 +177,18 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :Entitlements" "$WATCH_PROFILE"
 
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$IOS_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit.background-delivery" "$IOS_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.applesignin:0" "$IOS_ENT" | grep -qx "Default"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
+
+          /usr/libexec/PlistBuddy -c "Print :WKCompanionAppBundleIdentifier" "$WATCH_APP/Info.plist" | grep -qx "com.wesc9.athlth"
+          /usr/libexec/PlistBuddy -c "Print :WKBackgroundModes:0" "$WATCH_APP/Info.plist" | grep -qx "workout-processing"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes:0:CFBundleURLSchemes:0" "$APP/Info.plist" | grep -qx "athlth"
+
+          ICON=$(find "$APP" -maxdepth 1 -name 'AppIcon*.png' -print -quit)
+          test -n "$ICON"
+          test -s "$ICON"
+          echo "Release capabilities, Watch companion metadata and compiled app icon verified."
 
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_APP/Info.plist")
