@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - restore/v1-athlth-plus
+      - release/v1.2
     paths:
-      - .github/workflows/release-dryrun.yml
+      - .github/release-trigger
 
 permissions:
   contents: read
