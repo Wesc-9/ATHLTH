@@ -30,23 +30,31 @@ struct OnboardingFlowView: View {
     private let usernameService = SupabaseUsernameAvailabilityService()
 
     var body: some View {
-        VStack(spacing: 0) {
-            progressHeader
+        ZStack {
+            OnboardingBackground()
+                .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 22) {
-                    content
+            if step == .account {
+                accountStep
+            } else {
+                VStack(spacing: 0) {
+                    progressHeader
+
+                    ScrollView {
+                        VStack(spacing: 22) {
+                            content
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 28)
+                        .frame(maxWidth: 680)
+                        .frame(maxWidth: .infinity)
+                    }
+
+                    footer
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 28)
-                .frame(maxWidth: 680)
-                .frame(maxWidth: .infinity)
             }
-
-            footer
         }
-        .background(OnboardingBackground().ignoresSafeArea())
         .foregroundStyle(.white)
         .preferredColorScheme(.dark)
         .task {
@@ -207,109 +215,165 @@ struct OnboardingFlowView: View {
     }
 
     private var accountStep: some View {
-        VStack(spacing: 18) {
-            ZStack(alignment: .bottomLeading) {
+        GeometryReader { proxy in
+            ZStack {
                 OnboardingHeroPhoto()
-                    .frame(height: 390)
-                    .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-                    .overlay {
-                        LinearGradient(
-                            colors: [
-                                Color.black.opacity(0.02),
-                                Color.clear,
-                                Color.black.opacity(0.66)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                    .clipped()
+                    .ignoresSafeArea()
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.42),
+                        Color.black.opacity(0.10),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: UnitPoint(x: 0.5, y: 0.38)
+                )
+                .ignoresSafeArea()
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.08),
+                        Color.black.opacity(0.72)
+                    ],
+                    startPoint: UnitPoint(x: 0.5, y: 0.52),
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    accountBrand
+                        .padding(.top, 26)
+
+                    Spacer(minLength: 220)
+
+                    accountSignInPanel
+
+                    if let authenticationError {
+                        Label(
+                            authenticationError,
+                            systemImage: "exclamationmark.circle.fill"
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 30, style: .continuous)
-                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                    }
-                    .shadow(color: .black.opacity(0.26), radius: 24, x: 0, y: 14)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("PROGRESS LIVES HERE.")
-                        .font(.caption.weight(.bold))
-                        .tracking(2.0)
-                        .foregroundStyle(.white.opacity(0.82))
-
-                    Text("Training, health and recovery — together.")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.white)
-                }
-                .padding(20)
-            }
-
-            VStack(spacing: 12) {
-                SignInWithAppleButton(.continue) { request in
-                    authenticationError = nil
-                    accountService.prepareAppleSignIn(request)
-                } onCompletion: { result in
-                    handleAppleAuthorization(result)
-                }
-                .signInWithAppleButtonStyle(.black)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .disabled(appleSignInInProgress)
-
-                Button {
-                    showingEmailAuth = true
-                } label: {
-                    Label("Continue with Email", systemImage: "envelope")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.black.opacity(0.88))
-                .background(Color.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.72), lineWidth: 1)
-                }
-            }
-            .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .background(Color.white.opacity(0.48), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(Color.white.opacity(0.40), lineWidth: 1)
-            }
-            .shadow(color: Color.black.opacity(0.20), radius: 20, x: 0, y: 12)
-
-            if let authenticationError {
-                Label(authenticationError, systemImage: "exclamationmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            VStack(spacing: 7) {
-                Text("By continuing, you agree to ATHLTH’s")
-                    .font(.caption2)
-                    .foregroundStyle(OnboardingTheme.mutedText)
-
-                HStack(spacing: 14) {
-                    Button("Terms of Service") {
-                        legalDocument = .terms
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 6)
+                        .padding(.top, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    Text("·")
-                        .foregroundStyle(OnboardingTheme.faintText)
-
-                    Button("Privacy Policy") {
-                        legalDocument = .privacy
-                    }
+                    accountLegal
+                        .padding(.top, 18)
+                        .padding(.bottom, max(10, proxy.safeAreaInsets.bottom + 6))
                 }
-                .font(.caption2.weight(.semibold))
-                .tint(.white)
+                .padding(.horizontal, 24)
+                .padding(.top, max(8, proxy.safeAreaInsets.top))
             }
-            .multilineTextAlignment(.center)
         }
+        .ignoresSafeArea(edges: .top)
+    }
+
+    private var accountBrand: some View {
+        VStack(spacing: 9) {
+            ATHLTHMarkShape()
+                .fill(.white)
+                .frame(width: 58, height: 40)
+                .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 4)
+
+            Text("ATHLTH")
+                .font(.system(size: 31, weight: .medium, design: .default))
+                .tracking(9.5)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .fixedSize()
+
+            Text("PROGRESS LIVES HERE.")
+                .font(.system(size: 11, weight: .medium))
+                .tracking(3.9)
+                .foregroundStyle(.white.opacity(0.86))
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("ATHLTH. Progress lives here.")
+    }
+
+    private var accountSignInPanel: some View {
+        VStack(spacing: 12) {
+            SignInWithAppleButton(.continue) { request in
+                authenticationError = nil
+                accountService.prepareAppleSignIn(request)
+            } onCompletion: { result in
+                handleAppleAuthorization(result)
+            }
+            .signInWithAppleButtonStyle(.black)
+            .frame(maxWidth: .infinity)
+            .frame(height: 58)
+            .clipShape(Capsule())
+            .disabled(appleSignInInProgress)
+
+            Button {
+                showingEmailAuth = true
+            } label: {
+                Label("Continue with Email", systemImage: "envelope")
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .background(
+                Color.white.opacity(0.10),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(Color.white.opacity(0.82), lineWidth: 1.25)
+            }
+        }
+        .padding(16)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 30, style: .continuous)
+        )
+        .background(
+            Color.white.opacity(0.20),
+            in: RoundedRectangle(cornerRadius: 30, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(Color.white.opacity(0.42), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.28), radius: 24, x: 0, y: 14)
+    }
+
+    private var accountLegal: some View {
+        VStack(spacing: 8) {
+            Text("By continuing, you agree to ATHLTH’s")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.66))
+
+            HStack(spacing: 12) {
+                Button("Terms of Service") {
+                    legalDocument = .terms
+                }
+
+                Text("·")
+                    .foregroundStyle(.white.opacity(0.48))
+
+                Button("Privacy Policy") {
+                    legalDocument = .privacy
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .tint(.white)
+        }
+        .multilineTextAlignment(.center)
     }
 
     private var usernameStep: some View {
