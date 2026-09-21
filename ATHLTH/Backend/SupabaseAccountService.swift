@@ -102,10 +102,26 @@ final class SupabaseAccountService: ObservableObject {
         return try await loadCurrentUser()
     }
 
-    func signUp(email: String, password: String) async throws -> EmailSignUpOutcome {
+    func signUp(
+        email: String,
+        password: String,
+        firstName: String,
+        lastName: String
+    ) async throws -> EmailSignUpOutcome {
+        let cleanFirstName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanLastName = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fullName = [cleanFirstName, cleanLastName]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
         let response = try await client.auth.signUp(
             email: email,
             password: password,
+            data: [
+                "full_name": .string(fullName),
+                "given_name": .string(cleanFirstName),
+                "family_name": .string(cleanLastName)
+            ],
             redirectTo: Self.emailConfirmationURL
         )
 
