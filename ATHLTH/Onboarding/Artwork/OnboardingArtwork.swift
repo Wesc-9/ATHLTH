@@ -31,25 +31,7 @@ enum OnboardingArtworkKind {
 }
 
 struct OnboardingHeroPhoto: View {
-    private static let image: UIImage? = {
-        let encoded = [
-            OnboardingHeroDataPart0.value,
-            OnboardingHeroDataPart1.value,
-            OnboardingHeroDataPart2.value,
-            OnboardingHeroDataPart3.value
-        ]
-        .joined()
-        .replacingOccurrences(of: "\n", with: "")
-
-        guard
-            let data = Data(base64Encoded: encoded),
-            let image = UIImage(data: data)
-        else {
-            return nil
-        }
-
-        return image
-    }()
+    private static let image = UIImage(named: "OnboardingHero")
 
     var body: some View {
         Group {
