@@ -31,7 +31,6 @@ jobs:
             phone_autoconfirm
           }'
 
-
       - name: Inspect Apple OAuth client ID
         shell: bash
         env:
@@ -40,7 +39,9 @@ jobs:
         run: |
           set -euo pipefail
           HEADERS="$(mktemp)"
-          curl -sS -D "$HEADERS" -o /dev/null             -H "apikey: $SUPABASE_PUBLISHABLE_KEY"             "$SUPABASE_URL/auth/v1/authorize?provider=apple&redirect_to=athlth%3A%2F%2Fauth%2Fconfirm"
+          BODY="$(mktemp)"
+
+          curl -sS -D "$HEADERS" -o "$BODY"             -H "apikey: $SUPABASE_PUBLISHABLE_KEY"             "$SUPABASE_URL/auth/v1/authorize?provider=apple"
 
           LOCATION="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit}' "$HEADERS")"
           if [ -z "$LOCATION" ]; then
