@@ -26,6 +26,10 @@ final class SupabaseAccountService: ObservableObject {
         client.auth.currentUser?.id
     }
 
+    var hasPersistedSession: Bool {
+        client.auth.currentSession != nil
+    }
+
     func prepareAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {
         let rawNonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         appleRawNonce = rawNonce
@@ -180,6 +184,12 @@ final class SupabaseAccountService: ObservableObject {
     }
 
     func restoreCurrentUser() async throws -> BackendUserBootstrap? {
+        guard hasPersistedSession else { return nil }
+
+        // Force Supabase to validate/refresh the stored session before
+        // trusting locally persisted ATHLTH sign-in state.
+        _ = try await client.auth.session
+
         guard currentUserID != nil else { return nil }
         return try await loadCurrentUser()
     }
