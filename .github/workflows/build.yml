@@ -23,6 +23,13 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
       - name: Install XcodeGen
         run: brew install xcodegen
+      - name: Verify deterministic app icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/generate_app_icons.py
+          git diff --exit-code --             ATHLTH/Assets.xcassets/AppIcon.appiconset             ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset
+
       - name: Generate Xcode project
         run: xcodegen generate
       - name: Build for iOS Simulator
