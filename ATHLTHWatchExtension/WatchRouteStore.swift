@@ -5,6 +5,7 @@ import WatchConnectivity
 final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var routes: [WatchRouteTransfer] = []
     @Published private(set) var connectionText = "Connecting to iPhone"
+    @Published private(set) var companionLinked = false
 
     private let fileManager = FileManager.default
 
@@ -59,6 +60,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
 
         DispatchQueue.main.async { [weak self] in
+            self?.companionLinked = true
             self?.connectionText = "Connected to iPhone"
         }
 
@@ -165,8 +167,11 @@ extension WatchRouteStore: WCSessionDelegate {
                 self?.connectionText = error.localizedDescription
             } else {
                 self?.connectionText = activationState == .activated
-                    ? "Connected to iPhone"
+                    ? "Ready for iPhone"
                     : "Connecting to iPhone"
+                if activationState != .activated {
+                    self?.companionLinked = false
+                }
             }
         }
 
@@ -208,6 +213,19 @@ extension WatchRouteStore: WCSessionDelegate {
         }
 
         handleWorkoutCommand(userInfo)
+    }
+
+
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        DispatchQueue.main.async { [weak self] in
+            if session.isReachable {
+                self?.companionLinked = true
+                self?.connectionText = "Connected to iPhone"
+            } else if session.activationState == .activated,
+                      self?.companionLinked != true {
+                self?.connectionText = "Ready for iPhone"
+            }
+        }
     }
 
     func session(_ session: WCSession, didReceive file: WCSessionFile) {
