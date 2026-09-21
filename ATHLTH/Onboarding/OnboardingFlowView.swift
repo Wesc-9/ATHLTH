@@ -379,109 +379,160 @@ struct OnboardingFlowView: View {
     }
 
     private var usernameStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            OnboardingSceneCard(kind: .username)
+        VStack(alignment: .leading, spacing: 20) {
+            usernameIdentityHeader
 
             onboardingTitle(
                 "Choose your username",
-                subtitle: "This is how friends will find you. Every ATHLTH username is unique."
+                subtitle: "Your username is your ATHLTH identity. Friends can use it to find you, and you can change it later."
             )
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Username")
-                    .font(.subheadline)
-                    .foregroundStyle(OnboardingTheme.mutedText)
+            OnboardingCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("Username")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
 
-                TextField("@username", text: $username)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(.title2.weight(.semibold))
-                    .padding(16)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(OnboardingTheme.border, lineWidth: 1)
-                    }
-                    .shadow(color: Color.black.opacity(0.035), radius: 10, x: 0, y: 5)
-                    .onChange(of: username) {
-                        username = UsernameGenerator.normalizedTypedUsername(username)
+                        Spacer()
+
+                        Text("UNIQUE TO YOU")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.2)
+                            .foregroundStyle(OnboardingTheme.green)
                     }
 
-                if let title = usernameValidation.title, !username.isEmpty {
-                    Label(title, systemImage: usernameValidation.systemImage)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(
-                            usernameValidation == .available
-                                ? Color.green
-                                : usernameValidation == .checking
-                                    ? Color.secondary
-                                    : Color.red
-                        )
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    TextField("@username", text: $username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.title2.weight(.semibold))
+                        .padding(.horizontal, 16)
+                        .frame(height: 58)
                         .background(
-                            usernameValidation == .available
-                                ? Color.green.opacity(0.10)
-                                : Color.secondary.opacity(0.08),
-                            in: RoundedRectangle(cornerRadius: 14)
+                            Color.black.opacity(0.20),
+                            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
                         )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                                .stroke(
+                                    usernameValidation == .available
+                                        ? OnboardingTheme.green.opacity(0.62)
+                                        : OnboardingTheme.border,
+                                    lineWidth: 1
+                                )
+                        }
+                        .onChange(of: username) {
+                            username = UsernameGenerator.normalizedTypedUsername(username)
+                        }
+
+                    if let title = usernameValidation.title, !username.isEmpty {
+                        Label(title, systemImage: usernameValidation.systemImage)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(
+                                usernameValidation == .available
+                                    ? OnboardingTheme.green
+                                    : usernameValidation == .checking
+                                        ? OnboardingTheme.mutedText
+                                        : Color.red
+                            )
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                usernameValidation == .available
+                                    ? OnboardingTheme.green.opacity(0.11)
+                                    : Color.white.opacity(0.055),
+                                in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            )
+                    }
+
+                    HStack(spacing: 18) {
+                        validationRule(
+                            "3–20 characters",
+                            passed: (3...20).contains(username.count)
+                        )
+                        validationRule(
+                            "a–z, 0–9, _",
+                            passed: username.isEmpty ? false : UsernameGenerator.hasValidCharacters(username)
+                        )
+                    }
+                    .font(.caption)
+
+                    Text("You can change your username later in your profile.")
+                        .font(.caption)
+                        .foregroundStyle(OnboardingTheme.faintText)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                validationRule(
-                    "3–20 characters",
-                    passed: (3...20).contains(username.count)
-                )
-                validationRule(
-                    "Only a–z, 0–9 and _",
-                    passed: username.isEmpty ? false : UsernameGenerator.hasValidCharacters(username)
-                )
-
-                Text("Can be changed later")
-                    .font(.caption.italic())
-                    .foregroundStyle(OnboardingTheme.mutedText)
-                    .padding(.leading, 36)
-            }
-            .font(.caption)
-
             if !usernameSuggestions.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Suggestions for you")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(OnboardingTheme.mutedText)
+                VStack(alignment: .leading, spacing: 11) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Suggestions for you")
+                            .font(.headline)
 
-                    VStack(spacing: 9) {
+                        Spacer()
+
+                        Text("BASED ON YOUR NAME")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.0)
+                            .foregroundStyle(OnboardingTheme.mutedText)
+                    }
+
+                    VStack(spacing: 10) {
                         ForEach(usernameSuggestions, id: \.self) { suggestion in
                             Button {
                                 username = suggestion
                             } label: {
-                                HStack {
-                                    Text("@\(suggestion)")
-                                        .font(.callout.weight(.medium))
+                                HStack(spacing: 13) {
+                                    Text("@")
+                                        .font(.headline.weight(.bold))
+                                        .foregroundStyle(OnboardingTheme.green)
+                                        .frame(width: 38, height: 38)
+                                        .background(
+                                            OnboardingTheme.green.opacity(0.12),
+                                            in: Circle()
+                                        )
+
+                                    Text(suggestion)
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(.white)
 
                                     Spacer()
 
-                                    Image(systemName: username == suggestion ? "checkmark.circle.fill" : "plus")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(OnboardingTheme.mutedText)
-                                        .frame(width: 34, height: 34)
-                                        .background(.ultraThinMaterial, in: Circle())
+                                    Image(
+                                        systemName: username == suggestion
+                                            ? "checkmark.circle.fill"
+                                            : "arrow.up.right"
+                                    )
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(
+                                        username == suggestion
+                                            ? OnboardingTheme.green
+                                            : OnboardingTheme.mutedText
+                                    )
                                 }
                                 .padding(.horizontal, 14)
-                                .frame(height: 46)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                .frame(height: 58)
+                                .background(
+                                    username == suggestion
+                                        ? OnboardingTheme.green.opacity(0.10)
+                                        : Color.white.opacity(0.075),
+                                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                )
                                 .overlay {
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .stroke(
+                                            username == suggestion
+                                                ? OnboardingTheme.green.opacity(0.48)
+                                                : OnboardingTheme.border,
+                                            lineWidth: 1
+                                        )
                                 }
                             }
                             .buttonStyle(.plain)
                         }
                     }
                 }
-                .padding(.top, 2)
             }
 
             if let usernameClaimError {
@@ -490,6 +541,70 @@ struct OnboardingFlowView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    private var usernameIdentityHeader: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.12),
+                            OnboardingTheme.green.opacity(0.12),
+                            OnboardingTheme.warmHighlight.opacity(0.08),
+                            Color.black.opacity(0.08)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Circle()
+                .fill(OnboardingTheme.green.opacity(0.12))
+                .frame(width: 150, height: 150)
+                .offset(x: 150, y: -44)
+                .blur(radius: 6)
+
+            HStack(spacing: 17) {
+                ATHLTHMarkShape()
+                    .fill(.white)
+                    .frame(width: 48, height: 33)
+                    .padding(14)
+                    .background(
+                        Color.white.opacity(0.09),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.13), lineWidth: 1)
+                    }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("YOUR ATHLTH IDENTITY")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.7)
+                        .foregroundStyle(OnboardingTheme.green)
+
+                    Text("Make it yours.")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.white)
+
+                    Text("One username across training, friends and challenges.")
+                        .font(.caption)
+                        .foregroundStyle(OnboardingTheme.mutedText)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(18)
+        }
+        .frame(height: 118)
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.20), radius: 20, x: 0, y: 10)
     }
 
     private var goalsStep: some View {
