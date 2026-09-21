@@ -69,14 +69,14 @@ struct ATHLTHBrandMark: View {
                 .frame(width: size.markWidth, height: size.markHeight)
                 .accessibilityHidden(true)
 
-            Text("VTHLTH")
+            Text("ATHLTH")
                 .font(.system(size: size.wordmarkSize, weight: .black))
                 .tracking(size.tracking)
                 .lineLimit(1)
                 .fixedSize()
 
             if showTagline {
-                Text("MOVE BETTER   LIVE LONGER")
+                Text("PROGRESS LIVES HERE.")
                     .font(.system(size: 6.5, weight: .semibold))
                     .tracking(1.55)
                     .foregroundStyle(.secondary)
