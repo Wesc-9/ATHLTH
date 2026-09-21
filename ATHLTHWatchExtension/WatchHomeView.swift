@@ -53,9 +53,9 @@ struct WatchHomeView: View {
                         HStack(spacing: 0) {
                             todayMetric(
                                 icon: "iphone",
-                                value: routeStore.connectionText == "Connected to iPhone"
+                                value: routeStore.companionLinked
                                     ? "Ready"
-                                    : "—",
+                                    : "Waiting",
                                 label: "iPhone"
                             )
 
@@ -110,16 +110,16 @@ struct WatchHomeView: View {
                 HStack(spacing: 4) {
                     Circle()
                         .fill(
-                            routeStore.connectionText == "Connected to iPhone"
+                            routeStore.companionLinked
                                 ? WatchTheme.green
                                 : Color.secondary
                         )
                         .frame(width: 6, height: 6)
 
                     Text(
-                        routeStore.connectionText == "Connected to iPhone"
+                        routeStore.companionLinked
                             ? "Connected"
-                            : "Connecting"
+                            : "Ready"
                     )
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(WatchTheme.muted)
