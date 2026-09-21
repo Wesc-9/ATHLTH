@@ -89,6 +89,8 @@ enum WatchTransferKind: String {
     case route
     case workoutResult
     case workoutCommand
+    case connectivityProbe
+    case connectivityAck
 }
 
 enum WatchTransferMetadataKey {
@@ -97,4 +99,6 @@ enum WatchTransferMetadataKey {
     static let title = "title"
     static let payload = "payload"
     static let command = "command"
+    static let probeID = "probeID"
+    static let sentAt = "sentAt"
 }
