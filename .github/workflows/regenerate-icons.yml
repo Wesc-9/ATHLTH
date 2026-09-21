@@ -1,0 +1,36 @@
+name: Regenerate ATHLTH App Icons
+
+on:
+  push:
+    branches:
+      - release/v1.3
+    paths:
+      - .github/icon-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate iPhone and Apple Watch icons
+        run: python3 scripts/generate_app_icons.py
+
+      - name: Commit generated icon assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add             ATHLTH/Assets.xcassets/AppIcon.appiconset             ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset
+
+          if git diff --cached --quiet; then
+            echo "Icon assets are already current."
+            exit 0
+          fi
+
+          git commit -m "Regenerate visible ATHLTH app icons"
+          git push
