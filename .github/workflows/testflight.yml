@@ -213,17 +213,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v1.2.0"
-          TITLE="ATHLTH 1.2.0"
-          NOTES=        uses: actions/upload-artifact@v4
-        with:
-          name: athlth-testflight-diagnostics
-          path: |
-            ~/Library/Logs/DiagnosticReports
-            ${{ runner.temp }}/export
-          if-no-files-found: ignore
-ATHLTH 1.2.0\n\n• New cinematic onboarding and sign-in experience\n• Account deletion flow\n• Improved Apple Watch pairing and connection verification\n• Correct ATHLTH branding across iPhone and Apple Watch\n• ATHLTH+ foundation retained'
-          gh release create "$TAG"             --target "$GITHUB_SHA"             --title "$TITLE"             --notes "$NOTES"
+          gh release create "v1.2.0" \
+            --target "$GITHUB_SHA" \
+            --title "ATHLTH 1.2.0" \
+            --notes-file - <<'EOF'
+          ATHLTH 1.2.0
+
+          - New cinematic onboarding and sign-in experience
+          - Account deletion flow
+          - Improved Apple Watch pairing and connection verification
+          - Correct ATHLTH branding across iPhone and Apple Watch
+          - ATHLTH+ foundation retained
+          EOF
 
       - name: Upload diagnostics
         if: failure()
