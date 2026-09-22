@@ -42,7 +42,9 @@ final class TrophyStore: ObservableObject {
     func refresh(
         health: HealthKitManager,
         strength: StrengthWorkoutStore,
-        goals: GoalStore
+        goals: GoalStore,
+        challenges: ChallengeStore? = nil,
+        currentUserID: UUID? = nil
     ) async {
         guard !isRefreshing else { return }
         isRefreshing = true
@@ -52,6 +54,76 @@ final class TrophyStore: ObservableObject {
         let strengthSnapshot = strength.trophySnapshot()
         let completedGoals = goals.goals.filter { $0.status == .completed }
         let completedGoalCount = completedGoals.count
+
+        let allChallenges = challenges?.challenges ?? []
+        let userChallenges: [ATHLTHChallenge]
+        if let currentUserID {
+            userChallenges = allChallenges.filter { challenge in
+                challenge.creatorID == currentUserID ||
+                challenge.participants.contains(where: { $0.userID == currentUserID })
+            }
+        } else {
+            userChallenges = []
+        }
+
+        let participationDates = userChallenges
+            .map(\.createdAt)
+            .sorted()
+
+        var winDates: [Date] = []
+        var routeWinDates: [Date] = []
+        var strengthWinDates: [Date] = []
+
+        if let currentUserID, let challenges {
+            for challenge in userChallenges where challenge.status == .completed {
+                guard let entry = challenges.leaderboard(for: challenge.id).first(where: {
+                    $0.participant.userID == currentUserID
+                }),
+                entry.rank == 1
+                else {
+                    continue
+                }
+
+                let date = challenge.rules.endsAt
+                    ?? entry.bestAttempt?.submittedAt
+                    ?? challenge.createdAt
+                winDates.append(date)
+
+                if challenge.rules.scoring == .fastestRoute {
+                    routeWinDates.append(date)
+                }
+
+                if challenge.sport == .strength {
+                    strengthWinDates.append(date)
+                }
+            }
+        }
+
+        winDates.sort()
+        routeWinDates.sort()
+        strengthWinDates.sort()
+
+        let createdChallenges = currentUserID.map { userID in
+            allChallenges.filter { $0.creatorID == userID }.sorted { $0.createdAt < $1.createdAt }
+        } ?? []
+
+        var uniqueInvitees = Set<String>()
+        var inviteThresholdDates: [Int: Date] = [:]
+
+        for challenge in createdChallenges {
+            for participant in challenge.participants where participant.state != .creator {
+                let identity = participant.userID?.uuidString
+                    ?? participant.username?.lowercased()
+                    ?? participant.displayName.lowercased()
+                uniqueInvitees.insert(identity)
+
+                for threshold in [1, 5, 10]
+                where inviteThresholdDates[threshold] == nil &&
+                        uniqueInvitees.count >= threshold {
+                    inviteThresholdDates[threshold] = challenge.createdAt
+                }
+            }
+        }
 
         var resolved: [TrophyProgressItem] = []
 
@@ -102,6 +174,28 @@ final class TrophyStore: ObservableObject {
                         .sorted { $0.0 < $1.0 }
                     guard sorted.count >= count else { return nil }
                     return sorted[count - 1].0
+                }
+
+            case TrophyCatalog.challengeParticipation.id:
+                value = Double(participationDates.count)
+                evidence = { threshold in
+                    let count = Int(threshold)
+                    guard participationDates.count >= count else { return nil }
+                    return participationDates[count - 1]
+                }
+
+            case TrophyCatalog.challengeWins.id:
+                value = Double(winDates.count)
+                evidence = { threshold in
+                    let count = Int(threshold)
+                    guard winDates.count >= count else { return nil }
+                    return winDates[count - 1]
+                }
+
+            case TrophyCatalog.friendsChallenged.id:
+                value = Double(uniqueInvitees.count)
+                evidence = { threshold in
+                    inviteThresholdDates[Int(threshold)]
                 }
 
             default:
@@ -161,6 +255,28 @@ final class TrophyStore: ObservableObject {
                 icon: "dumbbell.fill",
                 source: .athlth,
                 unlockedAt: strengthSnapshot.firstWeightedSetDate
+            )
+        )
+
+        resolved.append(
+            signature(
+                id: "signature.route-rival",
+                title: "Route Rival",
+                subtitle: "Win an ATHLTH Challenge on a specific verified route.",
+                icon: "point.topleft.down.to.point.bottomright.curvepath",
+                source: .challenge,
+                unlockedAt: routeWinDates.first
+            )
+        )
+
+        resolved.append(
+            signature(
+                id: "signature.strength-rival",
+                title: "Strength Rival",
+                subtitle: "Win a strength challenge against your competition.",
+                icon: "dumbbell.fill",
+                source: .challenge,
+                unlockedAt: strengthWinDates.first
             )
         )
 
