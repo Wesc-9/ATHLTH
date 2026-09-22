@@ -1041,54 +1041,102 @@ struct OnboardingFlowView: View {
 
     private var readyStep: some View {
         VStack(spacing: 0) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 76))
-                .foregroundStyle(OnboardingTheme.success)
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(OnboardingTheme.success.opacity(0.10))
+                        .frame(width: 82, height: 82)
 
-            Text("You’re ready")
-                .font(.largeTitle.weight(.bold))
-                .padding(.top, 16)
+                    Circle()
+                        .stroke(OnboardingTheme.success.opacity(0.16), lineWidth: 1)
+                        .frame(width: 82, height: 82)
 
-            Text("ATHLTH is ready around your goal.")
-                .font(.subheadline)
-                .foregroundStyle(OnboardingTheme.mutedText)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(OnboardingTheme.success)
+                }
+
+                Text("SETUP COMPLETE")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.8)
+                    .foregroundStyle(OnboardingTheme.success)
+                    .padding(.top, 4)
+
+                Text("You’re ready")
+                    .font(.system(size: 38, weight: .bold))
+                    .foregroundStyle(OnboardingTheme.primaryText)
+
+                Text(readyGoalMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(OnboardingTheme.mutedText)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .frame(maxWidth: 330)
+            }
+            .padding(.top, 14)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("YOUR SETUP")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.25)
+                    .foregroundStyle(OnboardingTheme.faintText)
+                    .padding(.bottom, 12)
+
+                if let selectedGoal {
+                    readySetupRow(
+                        title: "Primary goal",
+                        value: selectedGoal.title,
+                        icon: selectedGoal.systemImage,
+                        tint: OnboardingTheme.accent,
+                        complete: true
+                    )
+                }
+
+                if healthReadyForSummary {
+                    Divider()
+                        .padding(.leading, 44)
+
+                    readySetupRow(
+                        title: "Apple Health",
+                        value: "Health data connected",
+                        icon: "heart.fill",
+                        tint: Color(red: 0.90, green: 0.25, blue: 0.34),
+                        complete: true
+                    )
+                }
+
+                if watchConnection.isReady {
+                    Divider()
+                        .padding(.leading, 44)
+
+                    readySetupRow(
+                        title: "Apple Watch",
+                        value: "Watch connection verified",
+                        icon: "applewatch",
+                        tint: OnboardingTheme.accent,
+                        complete: true
+                    )
+                }
+            }
+            .padding(18)
+            .background(
+                OnboardingTheme.card,
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(OnboardingTheme.border, lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.045), radius: 18, x: 0, y: 9)
+            .padding(.top, 30)
+
+            Text("You can update your goals and connections anytime in ATHLTH.")
+                .font(.caption2)
+                .foregroundStyle(OnboardingTheme.faintText)
                 .multilineTextAlignment(.center)
-                .padding(.top, 8)
-
-            if let selectedGoal {
-                HStack(spacing: 9) {
-                    Image(systemName: selectedGoal.systemImage)
-                        .foregroundStyle(OnboardingTheme.accent)
-
-                    Text(selectedGoal.title)
-                        .font(.subheadline.weight(.semibold))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(OnboardingTheme.accent.opacity(0.09), in: Capsule())
-                .padding(.top, 18)
-            }
-
-            if healthReadyForSummary || watchConnection.isReady {
-                HStack(spacing: 10) {
-                    if healthReadyForSummary {
-                        readyStatusChip(
-                            title: "Apple Health",
-                            icon: "heart.fill"
-                        )
-                    }
-
-                    if watchConnection.isReady {
-                        readyStatusChip(
-                            title: "Apple Watch",
-                            icon: "applewatch"
-                        )
-                    }
-                }
                 .padding(.top, 14)
-            }
 
-            Spacer(minLength: 92)
+            Spacer(minLength: 54)
 
             Button {
                 if session.subscriptionAccess.trialIsActive &&
@@ -1118,9 +1166,82 @@ struct OnboardingFlowView: View {
                     .padding(.top, 10)
             }
 
-            Spacer(minLength: 70)
+            Spacer(minLength: 34)
         }
         .frame(maxWidth: .infinity, minHeight: 600)
+    }
+
+    private var readyGoalMessage: String {
+        guard let selectedGoal else {
+            return "Your ATHLTH setup is complete."
+        }
+
+        switch selectedGoal {
+        case .loseWeight:
+            return "ATHLTH is ready to help you build consistent habits around your body-weight goal."
+        case .buildMuscle:
+            return "ATHLTH is ready to help you train with more structure and track your progress."
+        case .getStronger:
+            return "ATHLTH is ready to help you build strength and see your progress over time."
+        case .improveEndurance:
+            return "ATHLTH is ready to help you build fitness, stamina and consistency."
+        case .runBetter:
+            return "ATHLTH is ready to help you run farther, faster and with better insight."
+        case .moveMore:
+            return "ATHLTH is ready to help you move more and build a more active routine."
+        case .recoverySleep:
+            return "ATHLTH is ready to help you understand recovery, sleep and readiness."
+        case .mobility:
+            return "ATHLTH is ready to help you move better and build lasting mobility."
+        case .event:
+            return "ATHLTH is ready to help you prepare with purpose for what’s ahead."
+        case .maintainHealth:
+            return "ATHLTH is ready to help you stay active and maintain your fitness."
+        }
+    }
+
+    private func readySetupRow(
+        title: String,
+        value: String,
+        icon: String,
+        tint: Color,
+        complete: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 32, height: 32)
+                .background(
+                    tint.opacity(0.09),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(OnboardingTheme.faintText)
+
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(OnboardingTheme.primaryText)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            if complete {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(OnboardingTheme.success)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        OnboardingTheme.success.opacity(0.10),
+                        in: Circle()
+                    )
+            }
+        }
+        .padding(.vertical, 9)
     }
 
     private var healthReadyForSummary: Bool {
@@ -1130,35 +1251,6 @@ struct OnboardingFlowView: View {
         health.heart.latestHeartRate != nil ||
         health.heart.restingHeartRate != nil ||
         health.heart.hrvMilliseconds != nil
-    }
-
-    private func readyStatusChip(
-        title: String,
-        icon: String
-    ) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: icon)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(OnboardingTheme.success)
-
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(OnboardingTheme.primaryText)
-
-            Image(systemName: "checkmark")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(OnboardingTheme.success)
-        }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 8)
-        .background(
-            OnboardingTheme.card,
-            in: Capsule()
-        )
-        .overlay {
-            Capsule()
-                .stroke(OnboardingTheme.border, lineWidth: 1)
-        }
     }
 
     private var footer: some View {
