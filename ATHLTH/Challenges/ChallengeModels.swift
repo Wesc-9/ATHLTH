@@ -241,6 +241,28 @@ struct ChallengeAttempt: Identifiable, Codable, Hashable {
     var ineligibilityReason: String?
 }
 
+struct ChallengeMeetupCheckIn: Identifiable, Codable, Hashable {
+    let id: UUID
+    let participantID: UUID
+    let checkedInAt: Date
+    let distanceFromMeetupMeters: Double?
+    let verifiedNearMeetup: Bool
+
+    init(
+        id: UUID = UUID(),
+        participantID: UUID,
+        checkedInAt: Date = Date(),
+        distanceFromMeetupMeters: Double? = nil,
+        verifiedNearMeetup: Bool = false
+    ) {
+        self.id = id
+        self.participantID = participantID
+        self.checkedInAt = checkedInAt
+        self.distanceFromMeetupMeters = distanceFromMeetupMeters
+        self.verifiedNearMeetup = verifiedNearMeetup
+    }
+}
+
 struct ATHLTHChallenge: Identifiable, Codable, Hashable {
     let id: UUID
     var creatorID: UUID
@@ -252,6 +274,7 @@ struct ATHLTHChallenge: Identifiable, Codable, Hashable {
     var participants: [ChallengeParticipant]
     var rules: ATHLTHChallengeRules
     var attempts: [ChallengeAttempt]
+    var checkIns: [ChallengeMeetupCheckIn]
 
     var visibility: ProfileVisibility
     var rulesLockedAt: Date?
@@ -266,6 +289,7 @@ struct ATHLTHChallenge: Identifiable, Codable, Hashable {
         participants: [ChallengeParticipant],
         rules: ATHLTHChallengeRules,
         attempts: [ChallengeAttempt] = [],
+        checkIns: [ChallengeMeetupCheckIn] = [],
         visibility: ProfileVisibility = .friends,
         rulesLockedAt: Date? = nil
     ) {
@@ -278,6 +302,7 @@ struct ATHLTHChallenge: Identifiable, Codable, Hashable {
         self.participants = participants
         self.rules = rules
         self.attempts = attempts
+        self.checkIns = checkIns
         self.visibility = visibility
         self.rulesLockedAt = rulesLockedAt
     }
