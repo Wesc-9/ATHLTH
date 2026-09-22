@@ -182,7 +182,7 @@ struct OnboardingFlowView: View {
                     Capsule()
                         .fill(
                             index <= step.rawValue
-                                ? OnboardingTheme.green
+                                ? OnboardingTheme.accent
                                 : Color.white.opacity(0.12)
                         )
                         .frame(height: 5)
@@ -399,7 +399,7 @@ struct OnboardingFlowView: View {
                         Text("UNIQUE TO YOU")
                             .font(.caption2.weight(.bold))
                             .tracking(1.2)
-                            .foregroundStyle(OnboardingTheme.green)
+                            .foregroundStyle(OnboardingTheme.accent)
                     }
 
                     TextField("@username", text: $username)
@@ -416,7 +416,7 @@ struct OnboardingFlowView: View {
                             RoundedRectangle(cornerRadius: 17, style: .continuous)
                                 .stroke(
                                     usernameValidation == .available
-                                        ? OnboardingTheme.green.opacity(0.62)
+                                        ? OnboardingTheme.success.opacity(0.62)
                                         : OnboardingTheme.border,
                                     lineWidth: 1
                                 )
@@ -430,7 +430,7 @@ struct OnboardingFlowView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(
                                 usernameValidation == .available
-                                    ? OnboardingTheme.green
+                                    ? OnboardingTheme.success
                                     : usernameValidation == .checking
                                         ? OnboardingTheme.mutedText
                                         : Color.red
@@ -440,7 +440,7 @@ struct OnboardingFlowView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
                                 usernameValidation == .available
-                                    ? OnboardingTheme.green.opacity(0.11)
+                                    ? OnboardingTheme.success.opacity(0.11)
                                     : Color.white.opacity(0.055),
                                 in: RoundedRectangle(cornerRadius: 13, style: .continuous)
                             )
@@ -483,10 +483,10 @@ struct OnboardingFlowView: View {
                                 HStack(spacing: 13) {
                                     Text("@")
                                         .font(.headline.weight(.bold))
-                                        .foregroundStyle(OnboardingTheme.green)
+                                        .foregroundStyle(OnboardingTheme.accent)
                                         .frame(width: 38, height: 38)
                                         .background(
-                                            OnboardingTheme.green.opacity(0.12),
+                                            OnboardingTheme.accent.opacity(0.12),
                                             in: Circle()
                                         )
 
@@ -504,7 +504,7 @@ struct OnboardingFlowView: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(
                                         username == suggestion
-                                            ? OnboardingTheme.green
+                                            ? OnboardingTheme.accent
                                             : OnboardingTheme.mutedText
                                     )
                                 }
@@ -512,7 +512,7 @@ struct OnboardingFlowView: View {
                                 .frame(height: 58)
                                 .background(
                                     username == suggestion
-                                        ? OnboardingTheme.green.opacity(0.10)
+                                        ? OnboardingTheme.accent.opacity(0.10)
                                         : Color.white.opacity(0.075),
                                     in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                                 )
@@ -520,7 +520,7 @@ struct OnboardingFlowView: View {
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                                         .stroke(
                                             username == suggestion
-                                                ? OnboardingTheme.green.opacity(0.48)
+                                                ? OnboardingTheme.accent.opacity(0.48)
                                                 : OnboardingTheme.border,
                                             lineWidth: 1
                                         )
@@ -547,7 +547,7 @@ struct OnboardingFlowView: View {
                     LinearGradient(
                         colors: [
                             Color.white.opacity(0.12),
-                            OnboardingTheme.green.opacity(0.12),
+                            OnboardingTheme.accent.opacity(0.12),
                             OnboardingTheme.warmHighlight.opacity(0.08),
                             Color.black.opacity(0.08)
                         ],
@@ -557,7 +557,7 @@ struct OnboardingFlowView: View {
                 )
 
             Circle()
-                .fill(OnboardingTheme.green.opacity(0.12))
+                .fill(OnboardingTheme.accent.opacity(0.12))
                 .frame(width: 150, height: 150)
                 .offset(x: 150, y: -44)
                 .blur(radius: 6)
@@ -580,7 +580,7 @@ struct OnboardingFlowView: View {
                     Text("YOUR ATHLTH IDENTITY")
                         .font(.caption2.weight(.bold))
                         .tracking(1.7)
-                        .foregroundStyle(OnboardingTheme.green)
+                        .foregroundStyle(OnboardingTheme.accent)
 
                     Text("Make it yours.")
                         .font(.title2.weight(.bold))
@@ -621,7 +621,7 @@ struct OnboardingFlowView: View {
                         HStack(spacing: 14) {
                             Image(systemName: goal.systemImage)
                                 .font(.title2)
-                                .foregroundStyle(OnboardingTheme.green)
+                                .foregroundStyle(OnboardingTheme.accent)
                                 .frame(width: 38)
 
                             VStack(alignment: .leading, spacing: 4) {
@@ -638,20 +638,20 @@ struct OnboardingFlowView: View {
                             Spacer()
 
                             Image(systemName: selectedGoal == goal ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selectedGoal == goal ? OnboardingTheme.green : Color.secondary)
+                                .foregroundStyle(selectedGoal == goal ? OnboardingTheme.accent : Color.secondary)
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
                             selectedGoal == goal
-                                ? Color.green.opacity(0.10)
+                                ? OnboardingTheme.accent.opacity(0.10)
                                 : Color.white.opacity(0.07),
                             in: RoundedRectangle(cornerRadius: 18)
                         )
                         .overlay {
                             RoundedRectangle(cornerRadius: 18)
                                 .stroke(
-                                    selectedGoal == goal ? OnboardingTheme.green.opacity(0.42) : OnboardingTheme.border,
+                                    selectedGoal == goal ? OnboardingTheme.accent.opacity(0.42) : OnboardingTheme.border,
                                     lineWidth: 1
                                 )
                         }
@@ -691,10 +691,10 @@ struct OnboardingFlowView: View {
                             }
                             .padding(.horizontal, 12)
                             .frame(minHeight: 44)
-                            .foregroundStyle(interests.contains(interest) ? OnboardingTheme.green : Color.primary)
+                            .foregroundStyle(interests.contains(interest) ? OnboardingTheme.accent : Color.primary)
                             .background(
                                 interests.contains(interest)
-                                    ? OnboardingTheme.green.opacity(0.10)
+                                    ? OnboardingTheme.accent.opacity(0.10)
                                     : Color.white.opacity(0.10),
                                 in: RoundedRectangle(cornerRadius: 14)
                             )
@@ -819,7 +819,7 @@ struct OnboardingFlowView: View {
                 OnboardingCard {
                     HStack(spacing: 12) {
                         Image(systemName: "sparkles")
-                            .foregroundStyle(OnboardingTheme.green)
+                            .foregroundStyle(OnboardingTheme.accent)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text("7-day ATHLTH+ trial active")
@@ -836,7 +836,7 @@ struct OnboardingFlowView: View {
             OnboardingCard {
                 Label("Private by default", systemImage: "lock.shield.fill")
                     .font(.headline)
-                    .foregroundStyle(OnboardingTheme.green)
+                    .foregroundStyle(OnboardingTheme.accent)
 
                 Text("Connecting Apple Health does not publish health data. Social sharing is controlled separately.")
                     .font(.caption)
@@ -853,7 +853,7 @@ struct OnboardingFlowView: View {
 
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 76))
-                .foregroundStyle(OnboardingTheme.green)
+                .foregroundStyle(OnboardingTheme.success)
 
             Text("You’re ready")
                 .font(.largeTitle.weight(.bold))
@@ -868,14 +868,14 @@ struct OnboardingFlowView: View {
             if let selectedGoal {
                 HStack(spacing: 9) {
                     Image(systemName: selectedGoal.systemImage)
-                        .foregroundStyle(OnboardingTheme.green)
+                        .foregroundStyle(OnboardingTheme.accent)
 
                     Text(selectedGoal.title)
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
-                .background(OnboardingTheme.green.opacity(0.09), in: Capsule())
+                .background(OnboardingTheme.accent.opacity(0.09), in: Capsule())
                 .padding(.top, 18)
             }
 
@@ -1001,7 +1001,7 @@ struct OnboardingFlowView: View {
             title,
             systemImage: passed ? "checkmark.circle.fill" : "circle"
         )
-        .foregroundStyle(passed ? OnboardingTheme.green : Color.secondary)
+        .foregroundStyle(passed ? OnboardingTheme.success : Color.secondary)
     }
 
     private func loadUsernameSuggestions() async {
@@ -1091,7 +1091,7 @@ struct OnboardingFlowView: View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(connected ? OnboardingTheme.green : Color.secondary)
+                .foregroundStyle(connected ? OnboardingTheme.success : Color.secondary)
                 .frame(width: 34)
 
             VStack(alignment: .leading, spacing: 3) {
