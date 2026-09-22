@@ -339,7 +339,7 @@ struct SocialFeedItem: Identifiable, Hashable {
     let activity: SocialActivityRecord
     let actor: SocialProfileCard
     let reactions: [SocialActivityReactionRecord]
-    let trainingPartners: [SocialWorkoutParticipantRecord]
+    let trainingPartners: [SocialWorkoutParticipantRecord] = []
 }
 
 struct SocialInboxEvent: Identifiable, Codable, Hashable {
