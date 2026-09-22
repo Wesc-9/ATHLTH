@@ -66,7 +66,11 @@ struct SubscriptionOfferView: View {
                                     .stroke(OnboardingTheme.border, lineWidth: 1)
                             }
                     }
-                    .accessibilityLabel("Close and continue free trial")
+                    .accessibilityLabel(
+                        session.subscriptionAccess.trialIsActive
+                            ? "Close and continue free trial"
+                            : "Close"
+                    )
                 }
             }
         }
@@ -313,7 +317,11 @@ struct SubscriptionOfferView: View {
                 .foregroundStyle(OnboardingTheme.mutedText)
                 .multilineTextAlignment(.center)
 
-            Button("Continue free trial") {
+            Button(
+                session.subscriptionAccess.trialIsActive
+                    ? "Continue free trial"
+                    : "Not now"
+            ) {
                 dismiss()
             }
             .font(.subheadline.weight(.semibold))
