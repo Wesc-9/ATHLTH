@@ -5,7 +5,7 @@ struct EmailAuthView: View {
     @EnvironmentObject private var accountService: SupabaseAccountService
     @EnvironmentObject private var session: AppSessionStore
 
-    let onAuthenticated: (BackendUserBootstrap) -> Void
+    let onAuthenticated: (BackendUserBootstrap, String?) -> Void
 
     @State private var mode: EmailAuthMode = .signIn
     @State private var firstName = ""
@@ -306,12 +306,13 @@ struct EmailAuthView: View {
                         password: password
                     )
 
-                    if bootstrap.profile.username == nil,
-                       bootstrap.profile.displayName == nil {
-                        session.setUsernameSeed(cleanEmail)
-                    }
+                    let usernameSeedFallback =
+                        bootstrap.profile.username == nil &&
+                        bootstrap.profile.displayName == nil
+                            ? cleanEmail
+                            : nil
 
-                    onAuthenticated(bootstrap)
+                    onAuthenticated(bootstrap, usernameSeedFallback)
                     dismiss()
 
                 case .createAccount:
@@ -328,12 +329,13 @@ struct EmailAuthView: View {
                         confirmationSent = true
 
                     case .authenticated(let bootstrap):
-                        if bootstrap.profile.username == nil,
-                           bootstrap.profile.displayName == nil {
-                            session.setUsernameSeed(cleanEmail)
-                        }
+                        let usernameSeedFallback =
+                            bootstrap.profile.username == nil &&
+                            bootstrap.profile.displayName == nil
+                                ? cleanEmail
+                                : nil
 
-                        onAuthenticated(bootstrap)
+                        onAuthenticated(bootstrap, usernameSeedFallback)
                         dismiss()
                     }
                 }
