@@ -9,6 +9,7 @@ struct ATHLTHApp: App {
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
     @StateObject private var goals = GoalStore()
     @StateObject private var notifications = ATHLTHNotificationStore()
+    @StateObject private var challengeStore = ChallengeStore()
     @StateObject private var trophies = TrophyStore()
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
@@ -27,6 +28,7 @@ struct ATHLTHApp: App {
                 .environmentObject(strengthWorkout)
                 .environmentObject(goals)
                 .environmentObject(notifications)
+                .environmentObject(challengeStore)
                 .environmentObject(trophies)
                 .environmentObject(spotifyPlayback)
                 .environmentObject(watchConnection)
@@ -51,6 +53,7 @@ struct AppRootView: View {
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
@@ -94,6 +97,7 @@ struct AppRootView: View {
                 strength: strengthWorkout
             )
             notifications.syncGoalEvents(from: goals.goals)
+            challengeStore.refreshStatuses()
             await refreshTrophiesAndNotifications()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -111,6 +115,7 @@ struct AppRootView: View {
                     strength: strengthWorkout
                 )
                 notifications.syncGoalEvents(from: goals.goals)
+                challengeStore.refreshStatuses()
                 await refreshTrophiesAndNotifications()
             }
         }
@@ -156,6 +161,12 @@ struct AppRootView: View {
                     strength: strengthWorkout
                 )
                 notifications.syncGoalEvents(from: goals.goals)
+                await challengeStore.ingestWatchWorkout(
+                    result,
+                    health: health,
+                    userID: appSession.profile.userID,
+                    displayName: appSession.profile.displayName
+                )
                 await refreshTrophiesAndNotifications()
                 watchConnection.clearCompletedWorkout()
             }
@@ -163,6 +174,11 @@ struct AppRootView: View {
         .onChange(of: strengthWorkout.completedWorkout) { _, workout in
             guard let workout else { return }
             notifications.recordStrengthWorkout(workout)
+            challengeStore.ingestStrengthWorkout(
+                workout,
+                userID: appSession.profile.userID,
+                displayName: appSession.profile.displayName
+            )
 
             Task {
                 await refreshTrophiesAndNotifications()
