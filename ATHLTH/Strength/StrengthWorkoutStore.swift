@@ -13,6 +13,45 @@ final class StrengthWorkoutStore: ObservableObject {
         workoutHistory = Self.loadWorkoutHistory()
     }
 
+    func trophySnapshot() -> TrophyStrengthSnapshot {
+        let completed = workoutHistory
+            .filter(\.isFinished)
+            .sorted { $0.startedAt < $1.startedAt }
+
+        let thresholds = [10, 25, 50, 100]
+        var reachedAt: [Int: Date] = [:]
+
+        for (index, workout) in completed.enumerated() {
+            let count = index + 1
+            if thresholds.contains(count) {
+                reachedAt[count] = workout.endedAt ?? workout.startedAt
+            }
+        }
+
+        let firstWeightedSetDate = completed
+            .flatMap { workout in
+                workout.exercises.flatMap { exercise in
+                    exercise.sets.compactMap { set -> Date? in
+                        guard set.isCompleted,
+                              let weight = set.completedWeightKilograms,
+                              weight > 0
+                        else {
+                            return nil
+                        }
+
+                        return set.completedAt ?? workout.endedAt ?? workout.startedAt
+                    }
+                }
+            }
+            .min()
+
+        return TrophyStrengthSnapshot(
+            completedWorkoutCount: completed.count,
+            workoutCountReachedAt: reachedAt,
+            firstWeightedSetDate: firstWeightedSetDate
+        )
+    }
+
     var personalRecords: [StrengthPersonalRecord] {
         var bestSetByExercise: [String: (name: String, weight: Double, reps: Int, date: Date)] = [:]
         var bestEstimatedOneRepMax: (name: String, value: Double, weight: Double, reps: Int, date: Date)?
