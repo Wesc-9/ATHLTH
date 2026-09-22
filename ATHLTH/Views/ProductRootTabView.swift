@@ -1079,11 +1079,11 @@ struct ATHLTHProgressView: View {
                 }
                 .chartYScale(domain: 0...15000)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: [0, 5000, 10000, 15000]) {
+                    AxisMarks(position: .leading, values: [0, 5000, 10000, 15000]) { value in
                         AxisGridLine().foregroundStyle(Color.black.opacity(0.045))
                         AxisValueLabel {
-                            if let value = $0.as(Double.self) {
-                                Text(value == 0 ? "0" : "\(Int(value / 1000))K")
+                            if let amount = value.as(Int.self) {
+                                Text(amount == 0 ? "0" : "\(amount / 1000)K")
                                     .font(.system(size: 8))
                             }
                         }
