@@ -4,6 +4,7 @@ struct AdvancedPlannerView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     @State private var showingSessionEditor = false
+    @State private var showingPlanCreation = false
     @State private var selectedDayID: UUID?
 
     var body: some View {
@@ -104,7 +105,7 @@ struct AdvancedPlannerView: View {
                 )
 
                 Button("Create Training Plan") {
-                    session.createStarterPlan()
+                    showingPlanCreation = true
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.green)
@@ -114,6 +115,9 @@ struct AdvancedPlannerView: View {
             if let selectedDayID {
                 SessionEditorView(dayID: selectedDayID)
             }
+        }
+        .sheet(isPresented: $showingPlanCreation) {
+            TrainingPlanCreationView()
         }
     }
 
@@ -180,6 +184,7 @@ struct AdvancedPlannerView: View {
 struct TrainingPlanManagerView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var goalStore: GoalStore
 
     @State private var showingPlanEditor = false
 
@@ -249,6 +254,59 @@ struct TrainingPlanManagerView: View {
                                         Image(systemName: "trash")
                                     }
                                     .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .padding(.top, 10)
+                    }
+                }
+
+                ATHLTHCard {
+                    HStack {
+                        ATHLTHSectionHeader(
+                            title: "Linked Goals",
+                            actionTitle: "Edit Plan"
+                        )
+
+                        Spacer()
+
+                        Text(
+                            "\(goalStore.goals.filter { $0.linkedTrainingPlanID == plan.id }.count)"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                    }
+
+                    let linked = goalStore.goals.filter {
+                        $0.linkedTrainingPlanID == plan.id
+                    }
+
+                    if linked.isEmpty {
+                        Text("No goals are linked to this plan yet.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(linked) { goal in
+                                HStack {
+                                    Image(systemName: goal.category.systemImage)
+                                        .foregroundStyle(.green)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(goal.title)
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(
+                                            "\(goal.completedMilestones) of \(goal.milestones.count) milestones"
+                                        )
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    Text("\(Int((goal.progress * 100).rounded()))%")
+                                        .font(.caption.bold())
                                 }
                             }
                         }
@@ -390,9 +448,179 @@ struct TrainingPlanManagerView: View {
     }
 }
 
+struct TrainingPlanCreationView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var goalStore: GoalStore
+
+    @State private var title = "My Training Plan"
+    @State private var summary = ""
+    @State private var weekCount = 4
+    @State private var customWeeks = 12
+    @State private var useCustomWeeks = false
+    @State private var startDate = Calendar.current.startOfDay(for: Date())
+    @State private var visibility: ProfileVisibility = .privateOnly
+    @State private var selectedGoalIDs: Set<UUID> = []
+
+    private let quickDurations = [1, 3, 4, 8, 12, 16, 24]
+
+    private var resolvedWeeks: Int {
+        useCustomWeeks ? customWeeks : weekCount
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Plan") {
+                    TextField("Plan name", text: $title)
+                    TextField(
+                        "What are you training for?",
+                        text: $summary,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+
+                    DatePicker(
+                        "Starts",
+                        selection: $startDate,
+                        displayedComponents: .date
+                    )
+
+                    Picker("Visibility", selection: $visibility) {
+                        ForEach(ProfileVisibility.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                }
+
+                Section("Length") {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.adaptive(minimum: 78), spacing: 8)
+                        ],
+                        spacing: 8
+                    ) {
+                        ForEach(quickDurations, id: \.self) { weeks in
+                            Button {
+                                weekCount = weeks
+                                useCustomWeeks = false
+                            } label: {
+                                VStack(spacing: 3) {
+                                    Text("\(weeks)")
+                                        .font(.headline)
+                                    Text(weeks == 1 ? "week" : "weeks")
+                                        .font(.caption2)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 9)
+                                .foregroundStyle(
+                                    !useCustomWeeks && weekCount == weeks
+                                        ? .white
+                                        : .primary
+                                )
+                                .background(
+                                    !useCustomWeeks && weekCount == weeks
+                                        ? Color.green
+                                        : Color(.tertiarySystemGroupedBackground),
+                                    in: RoundedRectangle(cornerRadius: 12)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Toggle("Custom plan length", isOn: $useCustomWeeks)
+
+                    if useCustomWeeks {
+                        Stepper(
+                            "\(customWeeks) weeks",
+                            value: $customWeeks,
+                            in: 1...52
+                        )
+                    }
+
+                    Text(
+                        resolvedWeeks >= 12
+                            ? "About \(Int((Double(resolvedWeeks) / 4.345).rounded())) months of training."
+                            : "\(resolvedWeeks * 7) planned calendar days."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                if !goalStore.goals.isEmpty {
+                    Section("Connect Goals") {
+                        ForEach(goalStore.goals) { goal in
+                            Toggle(
+                                isOn: Binding(
+                                    get: { selectedGoalIDs.contains(goal.id) },
+                                    set: { enabled in
+                                        if enabled {
+                                            selectedGoalIDs.insert(goal.id)
+                                        } else {
+                                            selectedGoalIDs.remove(goal.id)
+                                        }
+                                    }
+                                )
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(goal.title)
+                                    Text(goal.category.title)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    Text("Every week starts empty. Add exactly the strength, running, walking, mobility or recovery sessions you want to each day.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("New Training Plan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        session.createTrainingPlan(
+                            title: title,
+                            summary: summary,
+                            weekCount: resolvedWeeks,
+                            startDate: startDate,
+                            visibility: visibility
+                        )
+
+                        if let planID = session.activePlan?.id {
+                            goalStore.setLinkedPlan(
+                                planID,
+                                goalIDs: selectedGoalIDs
+                            )
+                        }
+
+                        dismiss()
+                    }
+                    .disabled(
+                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                }
+            }
+        }
+    }
+}
+
 struct PlanMetadataEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var goalStore: GoalStore
 
     let plan: TrainingPlan
 
@@ -402,6 +630,7 @@ struct PlanMetadataEditorView: View {
     @State private var tags: String
     @State private var startDateEnabled: Bool
     @State private var startDate: Date
+    @State private var selectedGoalIDs: Set<UUID> = []
 
     init(plan: TrainingPlan) {
         self.plan = plan
@@ -448,6 +677,38 @@ struct PlanMetadataEditorView: View {
                     .textInputAutocapitalization(.never)
                 }
 
+                Section("Goals") {
+                    if goalStore.goals.isEmpty {
+                        Text("Create a Goal in Progress to connect it to this training plan.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(goalStore.goals) { goal in
+                            Toggle(
+                                isOn: Binding(
+                                    get: {
+                                        selectedGoalIDs.contains(goal.id)
+                                    },
+                                    set: { enabled in
+                                        if enabled {
+                                            selectedGoalIDs.insert(goal.id)
+                                        } else {
+                                            selectedGoalIDs.remove(goal.id)
+                                        }
+                                    }
+                                )
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(goal.title)
+                                    Text(goal.category.title)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Section {
                     Text(
                         "Changing a plan creates a new local version. Shared-plan backend sync can use this version number later."
@@ -458,6 +719,13 @@ struct PlanMetadataEditorView: View {
             }
             .navigationTitle("Edit Plan")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                selectedGoalIDs = Set(
+                    goalStore.goals
+                        .filter { $0.linkedTrainingPlanID == plan.id }
+                        .map(\.id)
+                )
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -475,6 +743,10 @@ struct PlanMetadataEditorView: View {
                             startDate: startDateEnabled
                                 ? Calendar.current.startOfDay(for: startDate)
                                 : nil
+                        )
+                        goalStore.setLinkedPlan(
+                            plan.id,
+                            goalIDs: selectedGoalIDs
                         )
                         dismiss()
                     }
