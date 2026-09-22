@@ -15,6 +15,7 @@ struct OnboardingFlowView: View {
     @State private var step: OnboardingStep = .account
     @State private var username = ""
     @State private var selectedGoal: AchievementGoal?
+    @State private var selectedGoalFocus: GoalFocusArea?
     @State private var interests: Set<ATHLTHInterest> = []
     @State private var allowPersonalizedOffers = false
     @State private var importedHealthDetails: HealthProfileBasics = .empty
@@ -645,99 +646,245 @@ struct OnboardingFlowView: View {
     }
 
     private var goalsStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 24) {
             onboardingTitle(
-                "What do you want to achieve?",
-                subtitle: "Choose the goal that matters most right now."
+                "What matters most right now?",
+                subtitle: "Start with one focus. We’ll tailor ATHLTH around it."
             )
 
-            VStack(spacing: 10) {
-                ForEach(AchievementGoal.allCases) { goal in
-                    Button {
-                        selectedGoal = goal
-                    } label: {
-                        HStack(spacing: 14) {
-                            Image(systemName: goal.systemImage)
-                                .font(.title2)
-                                .foregroundStyle(OnboardingTheme.accent)
-                                .frame(width: 38)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("CHOOSE A FOCUS")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.25)
+                    .foregroundStyle(OnboardingTheme.faintText)
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(goal.title)
-                                    .font(.headline)
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)
+                    ],
+                    spacing: 12
+                ) {
+                    ForEach(GoalFocusArea.allCases) { focus in
+                        let selected = selectedGoalFocus == focus
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.20)) {
+                                if selectedGoalFocus != focus {
+                                    selectedGoal = nil
+                                }
+                                selectedGoalFocus = focus
+                            }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: focus.systemImage)
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(
+                                            selected
+                                                ? OnboardingTheme.accent
+                                                : OnboardingTheme.primaryText
+                                        )
+                                        .frame(width: 38, height: 38)
+                                        .background(
+                                            selected
+                                                ? OnboardingTheme.accent.opacity(0.12)
+                                                : OnboardingTheme.subtleFill,
+                                            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                        )
+
+                                    Spacer()
+
+                                    if selected {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 17, weight: .semibold))
+                                            .foregroundStyle(OnboardingTheme.accent)
+                                    }
+                                }
+
+                                Text(focus.title)
+                                    .font(.subheadline.weight(.bold))
                                     .foregroundStyle(OnboardingTheme.primaryText)
+                                    .multilineTextAlignment(.leading)
 
-                                Text(goal.subtitle)
+                                Text(focus.subtitle)
                                     .font(.caption)
                                     .foregroundStyle(OnboardingTheme.mutedText)
                                     .multilineTextAlignment(.leading)
+                                    .lineLimit(2)
                             }
-
-                            Spacer()
-
-                            Image(systemName: selectedGoal == goal ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selectedGoal == goal ? OnboardingTheme.accent : Color.secondary)
+                            .padding(15)
+                            .frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
+                            .background(
+                                selected
+                                    ? OnboardingTheme.selectedFill
+                                    : OnboardingTheme.card,
+                                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .stroke(
+                                        selected
+                                            ? OnboardingTheme.accent.opacity(0.42)
+                                            : OnboardingTheme.border,
+                                        lineWidth: selected ? 1.2 : 1
+                                    )
+                            }
+                            .shadow(
+                                color: selected
+                                    ? OnboardingTheme.accent.opacity(0.06)
+                                    : Color.black.opacity(0.035),
+                                radius: 12,
+                                x: 0,
+                                y: 6
+                            )
                         }
-                        .padding(14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            selectedGoal == goal
-                                ? OnboardingTheme.accent.opacity(0.10)
-                                : OnboardingTheme.card,
-                            in: RoundedRectangle(cornerRadius: 18)
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 18)
-                                .stroke(
-                                    selectedGoal == goal ? OnboardingTheme.accent.opacity(0.42) : OnboardingTheme.border,
-                                    lineWidth: 1
-                                )
-                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Anything else you're interested in?")
-                    .font(.title3.weight(.bold))
+            if let selectedGoalFocus {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(goalDetailPrompt(for: selectedGoalFocus))
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(OnboardingTheme.primaryText)
 
-                Text("Choose what you’re interested in to personalize your ATHLTH experience.")
-                    .font(.subheadline)
-                    .foregroundStyle(OnboardingTheme.mutedText)
+                        Spacer()
+
+                        Text("ONE GOAL")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.0)
+                            .foregroundStyle(OnboardingTheme.faintText)
+                    }
+
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 150), spacing: 10)],
+                        spacing: 10
+                    ) {
+                        ForEach(selectedGoalFocus.goals) { goal in
+                            let selected = selectedGoal == goal
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.16)) {
+                                    selectedGoal = goal
+                                }
+                            } label: {
+                                HStack(spacing: 9) {
+                                    Image(systemName: goal.systemImage)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(
+                                            selected
+                                                ? OnboardingTheme.accent
+                                                : OnboardingTheme.mutedText
+                                        )
+
+                                    Text(goal.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(OnboardingTheme.primaryText)
+                                        .multilineTextAlignment(.leading)
+                                        .lineLimit(2)
+
+                                    Spacer(minLength: 4)
+
+                                    Image(
+                                        systemName: selected
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                    )
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(
+                                        selected
+                                            ? OnboardingTheme.accent
+                                            : OnboardingTheme.faintText
+                                    )
+                                }
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 50)
+                                .background(
+                                    selected
+                                        ? OnboardingTheme.selectedFill
+                                        : OnboardingTheme.card,
+                                    in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                        .stroke(
+                                            selected
+                                                ? OnboardingTheme.accent.opacity(0.36)
+                                                : OnboardingTheme.border,
+                                            lineWidth: 1
+                                        )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .transition(
+                    .opacity.combined(
+                        with: .move(edge: .top)
+                    )
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Also interested in")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(OnboardingTheme.primaryText)
+
+                    Text("Optional")
+                        .font(.caption)
+                        .foregroundStyle(OnboardingTheme.faintText)
+
+                    Spacer()
+                }
 
                 LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 140), spacing: 10)],
-                    spacing: 10
+                    columns: [GridItem(.adaptive(minimum: 120), spacing: 9)],
+                    spacing: 9
                 ) {
                     ForEach(ATHLTHInterest.allCases) { interest in
+                        let selected = interests.contains(interest)
+
                         Button {
                             toggleInterest(interest)
                         } label: {
-                            HStack(spacing: 8) {
+                            HStack(spacing: 7) {
                                 Image(systemName: interest.systemImage)
+                                    .font(.system(size: 13, weight: .semibold))
+
                                 Text(interest.title)
-                                    .font(.subheadline.weight(.semibold))
-                                Spacer(minLength: 0)
-                                if interests.contains(interest) {
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.82)
+
+                                if selected {
                                     Image(systemName: "checkmark")
-                                        .font(.caption.weight(.bold))
+                                        .font(.system(size: 10, weight: .bold))
                                 }
                             }
+                            .foregroundStyle(
+                                selected
+                                    ? OnboardingTheme.accent
+                                    : OnboardingTheme.primaryText
+                            )
                             .padding(.horizontal, 12)
-                            .frame(minHeight: 44)
-                            .foregroundStyle(interests.contains(interest) ? OnboardingTheme.accent : Color.primary)
+                            .frame(minHeight: 40)
+                            .frame(maxWidth: .infinity)
                             .background(
-                                interests.contains(interest)
-                                    ? OnboardingTheme.accent.opacity(0.10)
+                                selected
+                                    ? OnboardingTheme.selectedFill
                                     : OnboardingTheme.card,
-                                in: RoundedRectangle(cornerRadius: 14)
+                                in: Capsule()
                             )
                             .overlay {
-                                RoundedRectangle(cornerRadius: 14)
+                                Capsule()
                                     .stroke(
-                                        interests.contains(interest)
-                                            ? OnboardingTheme.accent.opacity(0.36)
+                                        selected
+                                            ? OnboardingTheme.accent.opacity(0.34)
                                             : OnboardingTheme.border,
                                         lineWidth: 1
                                     )
@@ -747,7 +894,19 @@ struct OnboardingFlowView: View {
                     }
                 }
             }
+        }
+    }
 
+    private func goalDetailPrompt(for focus: GoalFocusArea) -> String {
+        switch focus {
+        case .strengthBody:
+            return "What would you like to change?"
+        case .performance:
+            return "What would you like to improve?"
+        case .healthMovement:
+            return "What would feel better day to day?"
+        case .recovery:
+            return "What would you like to recover?"
         }
     }
 
@@ -1036,44 +1195,37 @@ struct OnboardingFlowView: View {
     }
 
     private var personalizedOffersFooter: some View {
-        Toggle(isOn: $allowPersonalizedOffers) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(spacing: 7) {
+            HStack(spacing: 10) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(OnboardingTheme.accent)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 28, height: 28)
                     .background(
-                        OnboardingTheme.accent.opacity(0.12),
+                        OnboardingTheme.accent.opacity(0.10),
                         in: Circle()
                     )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Make offers more relevant")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(OnboardingTheme.primaryText)
+                Text("Personalize offers from my selections")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(OnboardingTheme.primaryText)
 
-                    Text("Use your selected goals and interests to personalize ATHLTH offers.")
-                        .font(.caption)
-                        .foregroundStyle(OnboardingTheme.mutedText)
-                        .fixedSize(horizontal: false, vertical: true)
+                Spacer()
 
-                    Text("Optional · Never uses Apple Health data.")
-                        .font(.caption2)
-                        .foregroundStyle(OnboardingTheme.faintText)
-                        .padding(.top, 1)
-                }
+                Toggle("", isOn: $allowPersonalizedOffers)
+                    .labelsHidden()
+                    .tint(OnboardingTheme.accent)
+                    .scaleEffect(0.88)
             }
+
+            Text("Optional · Uses only the goals and interests you choose here. Never Apple Health data.")
+                .font(.caption2)
+                .foregroundStyle(OnboardingTheme.faintText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 38)
         }
-        .tint(OnboardingTheme.accent)
-        .padding(14)
-        .background(
-            OnboardingTheme.card,
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(OnboardingTheme.border, lineWidth: 1)
-        }
+        .padding(.horizontal, 2)
+        .padding(.top, 2)
     }
 
     @ViewBuilder
