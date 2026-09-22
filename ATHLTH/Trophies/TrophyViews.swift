@@ -824,6 +824,8 @@ private extension TrophyCategory {
             return Color(red: 0.50, green: 0.39, blue: 0.92)
         case .recovery:
             return Color(red: 0.31, green: 0.70, blue: 0.75)
+        case .challenges:
+            return Color(red: 0.72, green: 0.38, blue: 0.92)
         }
     }
 
