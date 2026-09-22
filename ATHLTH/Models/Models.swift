@@ -6,6 +6,32 @@ struct WorkoutDetail {
     var route: [CLLocation] = []
     var averageHeartRate: Double?
     var maxHeartRate: Double?
+    var stepCount: Double?
+    var averageRunningSpeedMetersPerSecond: Double?
+    var averageRunningPowerWatts: Double?
+    var averageRunningStrideLengthMeters: Double?
+    var averageRunningVerticalOscillationCentimeters: Double?
+    var averageRunningGroundContactTimeMilliseconds: Double?
+    var averageCyclingSpeedMetersPerSecond: Double?
+    var averageCyclingPowerWatts: Double?
+    var swimmingStrokeCount: Double?
+}
+
+struct TrainingHealthSummary: Equatable {
+    var stepsToday: Double?
+    var activeEnergyKilocaloriesToday: Double?
+    var basalEnergyKilocaloriesToday: Double?
+    var exerciseMinutesToday: Double?
+    var distanceWalkingRunningMetersToday: Double?
+    var distanceCyclingMetersToday: Double?
+    var distanceSwimmingMetersToday: Double?
+    var flightsClimbedToday: Double?
+    var vo2Max: Double?
+    var walkingHeartRateAverage: Double?
+    var oxygenSaturationPercent: Double?
+    var respiratoryRate: Double?
+
+    static let empty = TrainingHealthSummary()
 }
 
 struct WorkoutSummary: Identifiable, Hashable {
@@ -40,7 +66,16 @@ struct WorkoutSummary: Identifiable, Hashable {
 enum WorkoutActivity: String, Codable, CaseIterable, Hashable {
     case running = "Running"
     case walking = "Walking"
+    case cycling = "Cycling"
+    case swimming = "Swimming"
+    case hiking = "Hiking"
     case strength = "Strength"
+    case hiit = "HIIT"
+    case rowing = "Rowing"
+    case elliptical = "Elliptical"
+    case stairClimbing = "Stair Climbing"
+    case yoga = "Yoga"
+    case coreTraining = "Core Training"
     case other = "Workout"
 
     init(healthKitType: HKWorkoutActivityType) {
@@ -49,8 +84,26 @@ enum WorkoutActivity: String, Codable, CaseIterable, Hashable {
             self = .running
         case .walking:
             self = .walking
+        case .cycling:
+            self = .cycling
+        case .swimming:
+            self = .swimming
+        case .hiking:
+            self = .hiking
         case .traditionalStrengthTraining, .functionalStrengthTraining:
             self = .strength
+        case .highIntensityIntervalTraining:
+            self = .hiit
+        case .rowing:
+            self = .rowing
+        case .elliptical:
+            self = .elliptical
+        case .stairClimbing:
+            self = .stairClimbing
+        case .yoga:
+            self = .yoga
+        case .coreTraining:
+            self = .coreTraining
         default:
             self = .other
         }
@@ -60,7 +113,16 @@ enum WorkoutActivity: String, Codable, CaseIterable, Hashable {
         switch self {
         case .running: return "figure.run"
         case .walking: return "figure.walk"
+        case .cycling: return "figure.outdoor.cycle"
+        case .swimming: return "figure.pool.swim"
+        case .hiking: return "figure.hiking"
         case .strength: return "dumbbell.fill"
+        case .hiit: return "figure.highintensity.intervaltraining"
+        case .rowing: return "figure.rower"
+        case .elliptical: return "figure.elliptical"
+        case .stairClimbing: return "figure.stair.stepper"
+        case .yoga: return "figure.yoga"
+        case .coreTraining: return "figure.core.training"
         case .other: return "figure.mixed.cardio"
         }
     }
