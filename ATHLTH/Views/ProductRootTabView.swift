@@ -442,9 +442,18 @@ struct ATHLTHTrainView: View {
         }
 
         ATHLTHCard {
-            HStack {
-                ATHLTHSectionHeader(title: "Routes & Challenges", actionTitle: "See All")
+            HStack(spacing: 10) {
+                Text("Routes & Challenges")
+                    .font(.title3.weight(.semibold))
+
                 Spacer()
+
+                NavigationLink {
+                    SavedRoutesView()
+                } label: {
+                    Text("See All")
+                        .font(.caption.weight(.semibold))
+                }
 
                 NavigationLink {
                     RunRouteBuilderView()
