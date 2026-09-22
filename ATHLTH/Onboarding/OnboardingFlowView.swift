@@ -10,6 +10,7 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var accountService: SupabaseAccountService
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var step: OnboardingStep = .account
     @State private var username = ""
@@ -28,6 +29,7 @@ struct OnboardingFlowView: View {
     @State private var authenticationError: String?
     @State private var appleSignInInProgress = false
     @State private var onboardingCompletionError: String?
+    @State private var showingWatchInstallHelp = false
 
     private let usernameService = SupabaseUsernameAvailabilityService()
 
@@ -94,6 +96,10 @@ struct OnboardingFlowView: View {
             guard step == .username else { return }
             await validateUsernameAfterTyping()
         }
+        .onChange(of: scenePhase) {
+            guard scenePhase == .active, step == .connections else { return }
+            watchConnection.refreshStatus()
+        }
         .sheet(item: $legalDocument) { document in
             NavigationStack {
                 LegalDocumentView(kind: document)
@@ -104,6 +110,12 @@ struct OnboardingFlowView: View {
                             }
                         }
                     }
+            }
+        }
+        .sheet(isPresented: $showingWatchInstallHelp) {
+            WatchInstallHelpView {
+                showingWatchInstallHelp = false
+                watchConnection.refreshStatus()
             }
         }
         .sheet(
@@ -757,10 +769,10 @@ struct OnboardingFlowView: View {
                         subtitle: watchConnection.statusText,
                         icon: "applewatch",
                         complete: watchConnection.isReady,
-                        actionTitle: watchConnection.isReady ? "Verified" : "Check",
-                        actionDisabled: watchConnection.isReady
+                        actionTitle: watchSetupActionTitle,
+                        actionDisabled: watchSetupActionDisabled
                     ) {
-                        watchConnection.connect()
+                        handleWatchSetupAction()
                     }
                 }
             }
@@ -1096,6 +1108,39 @@ struct OnboardingFlowView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var watchSetupActionTitle: String {
+        switch watchConnection.state {
+        case .ready:
+            return "Verified"
+        case .appNotInstalled:
+            return "Install"
+        case .checking:
+            return "Checking"
+        case .unsupported, .notPaired:
+            return "Check"
+        }
+    }
+
+    private var watchSetupActionDisabled: Bool {
+        switch watchConnection.state {
+        case .ready, .checking:
+            return true
+        case .unsupported, .notPaired, .appNotInstalled:
+            return false
+        }
+    }
+
+    private func handleWatchSetupAction() {
+        switch watchConnection.state {
+        case .appNotInstalled:
+            showingWatchInstallHelp = true
+        case .ready:
+            break
+        case .checking, .unsupported, .notPaired:
+            watchConnection.connect()
+        }
+    }
+
     private var connectionsPrivacyFooter: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "lock.shield.fill")
@@ -1272,3 +1317,111 @@ struct OnboardingFlowView: View {
         )
     }
 }
+
+private struct WatchInstallHelpView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let onCheckAgain: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: "applewatch")
+                        .font(.system(size: 42, weight: .medium))
+                        .foregroundStyle(OnboardingTheme.accent)
+
+                    Text("Install ATHLTH on Apple Watch")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.white)
+
+                    Text("ATHLTH includes a companion Watch app. Install it from the Watch app on this iPhone.")
+                        .font(.subheadline)
+                        .foregroundStyle(OnboardingTheme.mutedText)
+                }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    watchInstallStep(
+                        number: "1",
+                        title: "Open the Watch app",
+                        detail: "On this iPhone, open Apple’s Watch app and choose My Watch."
+                    )
+
+                    watchInstallStep(
+                        number: "2",
+                        title: "Find ATHLTH",
+                        detail: "Scroll to Available Apps and tap Install next to ATHLTH."
+                    )
+
+                    watchInstallStep(
+                        number: "3",
+                        title: "Return to ATHLTH",
+                        detail: "When installation finishes, come back here and verify the connection."
+                    )
+                }
+                .padding(18)
+                .background(
+                    Color.white.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                }
+
+                Spacer()
+
+                Button {
+                    onCheckAgain()
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text("I installed it — Check again")
+                            .font(.headline)
+                        Image(systemName: "arrow.clockwise")
+                        Spacer()
+                    }
+                }
+                .buttonStyle(OnboardingPrimaryButtonStyle())
+
+                Button("Not now") {
+                    dismiss()
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(OnboardingTheme.mutedText)
+                .frame(maxWidth: .infinity)
+            }
+            .padding(24)
+            .background(OnboardingBackground().ignoresSafeArea())
+            .navigationTitle("Apple Watch")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func watchInstallStep(
+        number: String,
+        title: String,
+        detail: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(number)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.black)
+                .frame(width: 28, height: 28)
+                .background(OnboardingTheme.accent, in: Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(OnboardingTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
