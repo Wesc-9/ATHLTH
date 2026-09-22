@@ -20,6 +20,7 @@ final class HealthKitManager: ObservableObject {
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
+    private var profilePerformanceCache: (stats: ProfilePerformanceStats, generatedAt: Date)?
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
     private let currentAuthorizationVersion = 2
@@ -413,6 +414,124 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    func profilePerformanceStats(
+        forceRefresh: Bool = false
+    ) async throws -> ProfilePerformanceStats {
+        if !forceRefresh,
+           let cached = profilePerformanceCache,
+           Date().timeIntervalSince(cached.generatedAt) < 600 {
+            return cached.stats
+        }
+
+        let allWorkouts = try await fetchAllWorkouts()
+        let workoutsByDate = allWorkouts.sorted { $0.startDate < $1.startDate }
+
+        let longestWorkout = allWorkouts.max { lhs, rhs in
+            lhs.duration < rhs.duration
+        }
+
+        let longestDistanceWorkout = allWorkouts
+            .filter { ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) > 0 }
+            .max { lhs, rhs in
+                (lhs.totalDistance?.doubleValue(for: .meter()) ?? 0) <
+                (rhs.totalDistance?.doubleValue(for: .meter()) ?? 0)
+            }
+
+        let runningWorkouts = workoutsByDate.filter {
+            $0.workoutActivityType == .running &&
+            ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) > 0
+        }
+
+        let longestRun = runningWorkouts.max { lhs, rhs in
+            (lhs.totalDistance?.doubleValue(for: .meter()) ?? 0) <
+            (rhs.totalDistance?.doubleValue(for: .meter()) ?? 0)
+        }
+
+        let totalRunningDistance = runningWorkouts.reduce(0.0) { partial, workout in
+            partial + (workout.totalDistance?.doubleValue(for: .meter()) ?? 0)
+        }
+
+        var fastestOneK: TimedDistancePerformanceRecord?
+        var fastestFiveK: TimedDistancePerformanceRecord?
+        var fastestMarathon: TimedDistancePerformanceRecord?
+
+        for workout in runningWorkouts {
+            let reportedDistance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0
+            guard reportedDistance >= 1_000,
+                  let route = try? await fetchRoute(for: workout),
+                  route.count >= 2
+            else {
+                continue
+            }
+
+            if let duration = fastestSegmentDuration(
+                in: route,
+                targetDistance: 1_000
+            ),
+               fastestOneK == nil || duration < fastestOneK!.duration {
+                fastestOneK = TimedDistancePerformanceRecord(
+                    distanceMeters: 1_000,
+                    duration: duration,
+                    date: workout.startDate,
+                    workoutID: workout.uuid
+                )
+            }
+
+            if reportedDistance >= 5_000,
+               let duration = fastestSegmentDuration(
+                    in: route,
+                    targetDistance: 5_000
+               ),
+               fastestFiveK == nil || duration < fastestFiveK!.duration {
+                fastestFiveK = TimedDistancePerformanceRecord(
+                    distanceMeters: 5_000,
+                    duration: duration,
+                    date: workout.startDate,
+                    workoutID: workout.uuid
+                )
+            }
+
+            if reportedDistance >= 42_195,
+               let duration = fastestSegmentDuration(
+                    in: route,
+                    targetDistance: 42_195
+               ),
+               fastestMarathon == nil || duration < fastestMarathon!.duration {
+                fastestMarathon = TimedDistancePerformanceRecord(
+                    distanceMeters: 42_195,
+                    duration: duration,
+                    date: workout.startDate,
+                    workoutID: workout.uuid
+                )
+            }
+        }
+
+        let stats = ProfilePerformanceStats(
+            fastestOneKilometer: fastestOneK,
+            fastestFiveKilometers: fastestFiveK,
+            fastestMarathon: fastestMarathon,
+            longestWorkoutDuration: longestWorkout?.duration,
+            longestWorkoutDate: longestWorkout?.startDate,
+            longestWorkoutActivity: longestWorkout.map {
+                WorkoutActivity(healthKitType: $0.workoutActivityType)
+            },
+            longestWorkoutDistanceMeters: longestDistanceWorkout?.totalDistance?
+                .doubleValue(for: .meter()),
+            longestWorkoutDistanceDate: longestDistanceWorkout?.startDate,
+            longestWorkoutDistanceActivity: longestDistanceWorkout.map {
+                WorkoutActivity(healthKitType: $0.workoutActivityType)
+            },
+            longestRunMeters: longestRun?.totalDistance?.doubleValue(for: .meter()),
+            longestRunDate: longestRun?.startDate,
+            totalWorkoutCount: allWorkouts.count,
+            totalTrainingDuration: allWorkouts.reduce(0) { $0 + $1.duration },
+            totalRunningDistanceMeters: totalRunningDistance
+        )
+
+        profilePerformanceCache = (stats, Date())
+        return stats
+    }
+
     func personalRecords() async throws -> [HealthPersonalRecord] {
         let workouts = try await fetchAllWorkouts()
         var records: [HealthPersonalRecord] = []
@@ -448,7 +567,7 @@ final class HealthKitManager: ObservableObject {
 
         for workout in fiveKCandidates {
             guard let route = try? await fetchRoute(for: workout),
-                  let duration = fastestFiveKilometerDuration(in: route)
+                  let duration = fastestSegmentDuration(in: route, targetDistance: 5_000)
             else {
                 continue
             }
@@ -1504,10 +1623,11 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
-    private func fastestFiveKilometerDuration(
-        in locations: [CLLocation]
+    private func fastestSegmentDuration(
+        in locations: [CLLocation],
+        targetDistance: Double
     ) -> TimeInterval? {
-        let targetDistance = 5_000.0
+        guard targetDistance > 0 else { return nil }
 
         let points = locations
             .filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 65 }
@@ -1530,7 +1650,7 @@ final class HealthKitManager: ObservableObject {
             let distance = current.distance(from: previous)
             let speed = distance / elapsed
 
-            // Reject implausible running GPS jumps while preserving legitimate sparse samples.
+            // Reject GPS jumps that would imply a non-running speed.
             let acceptedDistance = distance >= 0 && speed <= 12.5 ? distance : 0
             cumulativeDistance[index] = cumulativeDistance[index - 1] + acceptedDistance
         }
@@ -1559,13 +1679,13 @@ final class HealthKitManager: ObservableObject {
                 cumulativeDistance[previousEndIndex] - cumulativeDistance[startIndex]
             let distanceAtEnd =
                 cumulativeDistance[endIndex] - cumulativeDistance[startIndex]
-            let segmentDistance = distanceAtEnd - distanceBeforeEnd
+            let finalSegmentDistance = distanceAtEnd - distanceBeforeEnd
 
             let fraction: Double
-            if segmentDistance > 0 {
+            if finalSegmentDistance > 0 {
                 fraction = min(
                     max(
-                        (targetDistance - distanceBeforeEnd) / segmentDistance,
+                        (targetDistance - distanceBeforeEnd) / finalSegmentDistance,
                         0
                     ),
                     1
@@ -1574,16 +1694,15 @@ final class HealthKitManager: ObservableObject {
                 fraction = 1
             }
 
-            let segmentTime = points[endIndex].timestamp.timeIntervalSince(
+            let finalSegmentTime = points[endIndex].timestamp.timeIntervalSince(
                 points[previousEndIndex].timestamp
             )
             let interpolatedEnd = points[previousEndIndex].timestamp.addingTimeInterval(
-                segmentTime * fraction
+                finalSegmentTime * fraction
             )
             let duration = interpolatedEnd.timeIntervalSince(points[startIndex].timestamp)
 
-            // Ignore corrupt or physically implausible records.
-            guard duration >= 600, duration <= 18_000 else { continue }
+            guard duration > 0 else { continue }
 
             if bestDuration == nil || duration < bestDuration! {
                 bestDuration = duration
