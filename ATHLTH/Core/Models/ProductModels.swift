@@ -281,6 +281,7 @@ struct ExerciseSnapshot: Codable, Hashable {
     var primaryMuscles: [String]
     var equipment: [String]
     var imageURL: URL?
+    var videoURL: URL? = nil
 }
 
 struct Exercise: Identifiable, Codable, Hashable {
@@ -294,6 +295,7 @@ struct Exercise: Identifiable, Codable, Hashable {
     var equipment: [String]
     var imageURL: URL?
     var isVisibleOutsideOwnerLibrary: Bool
+    var videoURL: URL? = nil
 
     var snapshot: ExerciseSnapshot {
         ExerciseSnapshot(
@@ -301,7 +303,8 @@ struct Exercise: Identifiable, Codable, Hashable {
             instructions: instructions,
             primaryMuscles: primaryMuscles,
             equipment: equipment,
-            imageURL: imageURL
+            imageURL: imageURL,
+            videoURL: videoURL
         )
     }
 }
