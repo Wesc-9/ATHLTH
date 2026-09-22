@@ -258,7 +258,7 @@ struct SubscriptionOfferView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                Text("No subscription starts automatically. If you subscribe now, the App Store subscription starts now.")
+                Text("No subscription starts automatically. If you subscribe now, the App Store subscription starts now and auto-renews until canceled.")
                     .font(.caption2)
                     .foregroundStyle(OnboardingTheme.faintText)
                     .multilineTextAlignment(.center)
