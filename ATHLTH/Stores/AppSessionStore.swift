@@ -363,7 +363,8 @@ final class AppSessionStore: ObservableObject {
             weeks: [makeEmptyWeek(number: 1)],
             tags: [],
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            startDate: Calendar.current.startOfDay(for: Date())
         )
     }
 
@@ -460,7 +461,8 @@ final class AppSessionStore: ObservableObject {
         title: String,
         summary: String,
         visibility: ProfileVisibility,
-        tags: [String]
+        tags: [String],
+        startDate: Date?
     ) {
         guard var plan = activePlan else { return }
 
@@ -473,6 +475,7 @@ final class AppSessionStore: ObservableObject {
         plan.tags = tags
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             .filter { !$0.isEmpty }
+        plan.startDate = startDate
         plan.updatedAt = Date()
         plan.version += 1
         activePlan = plan
@@ -493,7 +496,8 @@ final class AppSessionStore: ObservableObject {
             spotifyPlaylist: source.spotifyPlaylist,
             spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            startDate: nil
         )
 
         planTemplates.insert(template, at: 0)
@@ -517,7 +521,8 @@ final class AppSessionStore: ObservableObject {
             spotifyPlaylist: template.spotifyPlaylist,
             spotifyAutoplayOnWorkoutStart: template.spotifyAutoplayOnWorkoutStart,
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            startDate: Calendar.current.startOfDay(for: Date())
         )
     }
 
