@@ -452,10 +452,19 @@ struct ATHLTHTrainView: View {
             HStack {
                 ATHLTHSectionHeader(title: "Routes & Challenges", actionTitle: "See All")
                 Spacer()
+
+                NavigationLink {
+                    RunRouteBuilderView()
+                } label: {
+                    Label("Create", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+
                 Button {
                     showingFileImporter = true
                 } label: {
-                    Label("Import GPX", systemImage: "square.and.arrow.down")
+                    Label("GPX", systemImage: "square.and.arrow.down")
                 }
                 .buttonStyle(.bordered)
             }
@@ -523,7 +532,7 @@ struct ATHLTHTrainView: View {
                 ContentUnavailableView(
                     "No routes yet",
                     systemImage: "map",
-                    description: Text("Import a GPX route or create one later.")
+                    description: Text("Create an A-to-B running route or import GPX.")
                 )
                 .frame(height: 190)
             }
