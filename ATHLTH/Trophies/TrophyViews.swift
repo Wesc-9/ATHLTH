@@ -690,6 +690,8 @@ struct TrophyDetailView: View {
             return "Built from training detail recorded directly inside ATHLTH."
         case .goal:
             return "Built from the milestones and completion state of an ATHLTH Goal."
+        case .challenge:
+            return "Built from ATHLTH Challenge participation, verified results and final leaderboards."
         case .mixed:
             return "Built from multiple verified ATHLTH data sources."
         }
