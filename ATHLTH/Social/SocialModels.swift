@@ -631,6 +631,31 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         source = "ATHLTH"
     }
 
+    init(watchResult: WatchWorkoutResult) {
+        id = watchResult.healthKitWorkoutUUID ?? watchResult.id
+        title = "\(watchResult.kind.title) completed"
+
+        switch watchResult.kind {
+        case .running:
+            activity = .running
+        case .walking:
+            activity = .walking
+        case .strength:
+            activity = .strength
+        }
+
+        startDate = watchResult.startedAt
+        endDate = watchResult.endedAt
+        duration = watchResult.duration
+        distanceMeters = watchResult.distanceMeters > 0
+            ? watchResult.distanceMeters
+            : nil
+        activeEnergyKilocalories = watchResult.activeCalories > 0
+            ? watchResult.activeCalories
+            : nil
+        source = "Apple Watch"
+    }
+
     var summaryText: String {
         let minutes = max(Int((duration / 60).rounded()), 0)
         let time = minutes >= 60
