@@ -1,23 +1,25 @@
 import SwiftUI
 
 enum OnboardingTheme {
-    static let accent = Color(red: 0.88, green: 0.66, blue: 0.43)
-    static let success = Color(red: 0.43, green: 0.72, blue: 0.52)
+    static let accent = Color(red: 0.78, green: 0.58, blue: 0.37)
+    static let success = Color(red: 0.34, green: 0.56, blue: 0.43)
 
-    // Compatibility aliases for surfaces that have not yet moved to the
-    // semantic palette. Brand/selection UI should use accent; positive
-    // state feedback should use success.
     static let green = success
     static let deepGreen = Color(red: 0.23, green: 0.50, blue: 0.34)
     static let warmHighlight = accent
 
-    static let canvasTop = Color(red: 0.12, green: 0.105, blue: 0.095)
-    static let canvasBottom = Color(red: 0.035, green: 0.035, blue: 0.035)
-    static let card = Color.white.opacity(0.10)
-    static let cardStrong = Color.white.opacity(0.16)
-    static let border = Color.white.opacity(0.15)
-    static let mutedText = Color.white.opacity(0.66)
-    static let faintText = Color.white.opacity(0.42)
+    static let canvasTop = Color(red: 0.985, green: 0.979, blue: 0.966)
+    static let canvasBottom = Color(red: 0.958, green: 0.948, blue: 0.928)
+    static let primaryText = Color(red: 0.08, green: 0.08, blue: 0.09)
+    static let mutedText = Color.black.opacity(0.58)
+    static let faintText = Color.black.opacity(0.40)
+
+    static let card = Color.white
+    static let cardStrong = Color.white
+    static let subtleFill = Color.black.opacity(0.035)
+    static let selectedFill = accent.opacity(0.095)
+    static let border = Color.black.opacity(0.075)
+    static let strongBorder = Color.black.opacity(0.12)
 }
 
 struct OnboardingBackground: View {
@@ -26,7 +28,7 @@ struct OnboardingBackground: View {
             LinearGradient(
                 colors: [
                     OnboardingTheme.canvasTop,
-                    Color(red: 0.075, green: 0.067, blue: 0.061),
+                    Color.white,
                     OnboardingTheme.canvasBottom
                 ],
                 startPoint: .topLeading,
@@ -35,22 +37,12 @@ struct OnboardingBackground: View {
 
             RadialGradient(
                 colors: [
-                    OnboardingTheme.warmHighlight.opacity(0.13),
+                    OnboardingTheme.accent.opacity(0.065),
                     Color.clear
                 ],
                 center: .topTrailing,
-                startRadius: 20,
+                startRadius: 15,
                 endRadius: 430
-            )
-
-            RadialGradient(
-                colors: [
-                    OnboardingTheme.green.opacity(0.07),
-                    Color.clear
-                ],
-                center: .bottomLeading,
-                startRadius: 10,
-                endRadius: 360
             )
         }
     }
@@ -63,7 +55,6 @@ struct OnboardingCard<Content: View>: View {
         content
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .background(
                 OnboardingTheme.card,
                 in: RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -72,7 +63,7 @@ struct OnboardingCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(OnboardingTheme.border, lineWidth: 1)
             }
-            .shadow(color: Color.black.opacity(0.18), radius: 18, x: 0, y: 10)
+            .shadow(color: Color.black.opacity(0.055), radius: 20, x: 0, y: 10)
     }
 }
 
@@ -84,24 +75,18 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity)
             .background(
-                Color.black.opacity(configuration.isPressed ? 0.76 : 0.94),
+                OnboardingTheme.primaryText.opacity(configuration.isPressed ? 0.78 : 0.98),
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
-            }
-            .shadow(color: Color.black.opacity(0.20), radius: 14, x: 0, y: 8)
+            .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 8)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
-
 extension View {
     func onboardingSurface(cornerRadius: CGFloat = 22) -> some View {
         self
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .background(
                 OnboardingTheme.card,
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -110,6 +95,6 @@ extension View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(OnboardingTheme.border, lineWidth: 1)
             }
-            .shadow(color: Color.black.opacity(0.18), radius: 18, x: 0, y: 10)
+            .shadow(color: Color.black.opacity(0.055), radius: 18, x: 0, y: 9)
     }
 }
