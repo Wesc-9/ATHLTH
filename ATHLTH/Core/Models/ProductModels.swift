@@ -386,6 +386,13 @@ struct TrainingRoute: Identifiable, Codable, Hashable {
     var elevationGainMeters: Double?
     var importedFilename: String?
     var createdAt: Date
+
+    // Optional route-builder metadata. Kept optional so previously saved
+    // GPX routes continue to decode without migration.
+    var startName: String? = nil
+    var endName: String? = nil
+    var expectedTravelTimeSeconds: TimeInterval? = nil
+    var routeSource: String? = nil
 }
 
 struct ActivityRecord: Identifiable, Codable, Hashable {
