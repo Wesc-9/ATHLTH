@@ -69,7 +69,7 @@ struct AppRootView: View {
     @State private var queuedWorkoutReviewIDs: Set<UUID> = []
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
 
-    var body: some View {
+    private var lifecycleContent: some View {
         Group {
             if appSession.previewModeEnabled {
                 ProductRootTabView()
@@ -303,6 +303,10 @@ struct AppRootView: View {
                 }
             }
         }
+    }
+
+    var body: some View {
+        lifecycleContent
         .onOpenURL { url in
             Task {
                 do {
