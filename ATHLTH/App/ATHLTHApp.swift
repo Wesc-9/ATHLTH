@@ -9,6 +9,7 @@ struct ATHLTHApp: App {
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
     @StateObject private var goals = GoalStore()
     @StateObject private var notifications = ATHLTHNotificationStore()
+    @StateObject private var trophies = TrophyStore()
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
     @StateObject private var workoutMirroring = WorkoutMirroringStore()
@@ -26,6 +27,7 @@ struct ATHLTHApp: App {
                 .environmentObject(strengthWorkout)
                 .environmentObject(goals)
                 .environmentObject(notifications)
+                .environmentObject(trophies)
                 .environmentObject(spotifyPlayback)
                 .environmentObject(watchConnection)
                 .environmentObject(workoutMirroring)
@@ -49,6 +51,7 @@ struct AppRootView: View {
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
 
@@ -91,6 +94,7 @@ struct AppRootView: View {
                 strength: strengthWorkout
             )
             notifications.syncGoalEvents(from: goals.goals)
+            await refreshTrophiesAndNotifications()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -107,6 +111,7 @@ struct AppRootView: View {
                     strength: strengthWorkout
                 )
                 notifications.syncGoalEvents(from: goals.goals)
+                await refreshTrophiesAndNotifications()
             }
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
@@ -151,15 +156,24 @@ struct AppRootView: View {
                     strength: strengthWorkout
                 )
                 notifications.syncGoalEvents(from: goals.goals)
+                await refreshTrophiesAndNotifications()
                 watchConnection.clearCompletedWorkout()
             }
         }
         .onChange(of: strengthWorkout.completedWorkout) { _, workout in
             guard let workout else { return }
             notifications.recordStrengthWorkout(workout)
+
+            Task {
+                await refreshTrophiesAndNotifications()
+            }
         }
         .onChange(of: goals.goals) { _, updatedGoals in
             notifications.syncGoalEvents(from: updatedGoals)
+
+            Task {
+                await refreshTrophiesAndNotifications()
+            }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
             guard signedIn else { return }
@@ -179,6 +193,19 @@ struct AppRootView: View {
                     authCallbackError = error.localizedDescription
                 }
             }
+        }
+        .sheet(
+            item: Binding(
+                get: { trophies.pendingReveal },
+                set: { value in
+                    if value == nil {
+                        trophies.dismissCurrentReveal()
+                    }
+                }
+            )
+        ) { unlock in
+            TrophyUnlockRevealView(unlock: unlock)
+                .environmentObject(trophies)
         }
         .sheet(
             isPresented: Binding(
@@ -212,6 +239,15 @@ struct AppRootView: View {
         } message: {
             Text(authCallbackError ?? "Authentication could not be completed.")
         }
+    }
+
+    private func refreshTrophiesAndNotifications() async {
+        await trophies.refresh(
+            health: health,
+            strength: strengthWorkout,
+            goals: goals
+        )
+        notifications.syncTrophyEvents(from: trophies.unlocks)
     }
 
     private func submitLatestStoreProofIfPossible() async {
