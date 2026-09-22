@@ -101,6 +101,20 @@ final class ATHLTHNotificationStore: ObservableObject {
         }
     }
 
+    func syncTrophyEvents(from unlocks: [TrophyUnlockRecord]) {
+        for unlock in unlocks where unlock.unlockedAt >= activationDate {
+            add(
+                ATHLTHNotificationDraft(
+                    eventKey: "trophy-\(unlock.stageKey)-unlocked",
+                    kind: .achievement,
+                    title: "Trophy unlocked",
+                    message: "\(unlock.title) · \(unlock.stageTitle). Verified by \(unlock.verificationSource.title).",
+                    createdAt: unlock.unlockedAt
+                )
+            )
+        }
+    }
+
     func recordWatchWorkout(_ result: WatchWorkoutResult) {
         let distanceText: String
         if result.distanceMeters >= 1 {
