@@ -76,9 +76,12 @@ struct OnboardingFlowView: View {
             importedHealthDetails = health.personalDetails
         }
         .sheet(isPresented: $showingEmailAuth) {
-            EmailAuthView { bootstrap in
+            EmailAuthView { bootstrap, usernameSeedFallback in
                 session.applyBackendBootstrap(bootstrap, method: .email)
-                routeAuthenticatedUser(bootstrap)
+                routeAuthenticatedUser(
+                    bootstrap,
+                    usernameSeedFallback: usernameSeedFallback
+                )
             }
         }
         .task(id: step) {
