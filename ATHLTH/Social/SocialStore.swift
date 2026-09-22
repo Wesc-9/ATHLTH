@@ -18,8 +18,8 @@ final class SocialStore: ObservableObject {
     private var profileCache: [UUID: SocialFriendProfile] = [:]
     private let activationDate: Date
 
-    init(service: SupabaseSocialService = SupabaseSocialService()) {
-        self.service = service
+    init() {
+        self.service = SupabaseSocialService()
 
         let defaults = UserDefaults.standard
         let key = "athlth.social.activationDate"
