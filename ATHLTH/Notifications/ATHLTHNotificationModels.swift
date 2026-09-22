@@ -44,6 +44,7 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
     var readAt: Date?
     var goalID: UUID?
     var workoutID: UUID?
+    var challengeID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -54,7 +55,8 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
         createdAt: Date = Date(),
         readAt: Date? = nil,
         goalID: UUID? = nil,
-        workoutID: UUID? = nil
+        workoutID: UUID? = nil,
+        challengeID: UUID? = nil
     ) {
         self.id = id
         self.eventKey = eventKey
@@ -65,6 +67,7 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
         self.readAt = readAt
         self.goalID = goalID
         self.workoutID = workoutID
+        self.challengeID = challengeID
     }
 
     var isUnread: Bool { readAt == nil }
@@ -78,6 +81,7 @@ struct ATHLTHNotificationDraft: Hashable {
     let createdAt: Date
     let goalID: UUID?
     let workoutID: UUID?
+    let challengeID: UUID?
 
     init(
         eventKey: String,
@@ -86,7 +90,8 @@ struct ATHLTHNotificationDraft: Hashable {
         message: String,
         createdAt: Date = Date(),
         goalID: UUID? = nil,
-        workoutID: UUID? = nil
+        workoutID: UUID? = nil,
+        challengeID: UUID? = nil
     ) {
         self.eventKey = eventKey
         self.kind = kind
@@ -95,5 +100,6 @@ struct ATHLTHNotificationDraft: Hashable {
         self.createdAt = createdAt
         self.goalID = goalID
         self.workoutID = workoutID
+        self.challengeID = challengeID
     }
 }
