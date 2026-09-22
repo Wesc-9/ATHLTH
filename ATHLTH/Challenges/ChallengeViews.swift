@@ -1230,6 +1230,7 @@ private struct ChallengeReviewCard: View {
 struct ChallengeDetailView: View {
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
+    @StateObject private var locationStore = ChallengeLocationStore()
 
     let challengeID: UUID
 
@@ -1598,20 +1599,40 @@ struct ChallengeDetailView: View {
                     .foregroundStyle(.green)
                 } else {
                     Button {
-                        challenges.checkIn(
-                            challengeID: challenge.id,
-                            participantID: participant.id
-                        )
+                        Task {
+                            let location = await locationStore.requestCurrentLocation()
+                            challenges.checkIn(
+                                challengeID: challenge.id,
+                                participantID: participant.id,
+                                currentLocation: location
+                            )
+                        }
                     } label: {
-                        Label("I'm here", systemImage: "mappin.circle.fill")
+                        HStack {
+                            if locationStore.isLocating {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+                            Label(
+                                locationStore.isLocating ? "Checking location…" : "I'm here",
+                                systemImage: "mappin.circle.fill"
+                            )
                             .frame(maxWidth: .infinity)
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.green)
+                    .disabled(locationStore.isLocating)
                 }
             }
 
-            Text("Check-in is explicit. ATHLTH does not continuously expose your live location to other participants.")
+            if let error = locationStore.lastError {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+
+            Text("Check-in is explicit. ATHLTH requests a one-time location only when you press “I'm here”; it does not continuously expose your live location to other participants.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
