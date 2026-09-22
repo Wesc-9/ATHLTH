@@ -10,6 +10,7 @@ struct ATHLTHApp: App {
     @StateObject private var goals = GoalStore()
     @StateObject private var notifications = ATHLTHNotificationStore()
     @StateObject private var challengeStore = ChallengeStore()
+    @StateObject private var social = SocialStore()
     @StateObject private var trophies = TrophyStore()
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
@@ -29,6 +30,7 @@ struct ATHLTHApp: App {
                 .environmentObject(goals)
                 .environmentObject(notifications)
                 .environmentObject(challengeStore)
+                .environmentObject(social)
                 .environmentObject(trophies)
                 .environmentObject(spotifyPlayback)
                 .environmentObject(watchConnection)
@@ -46,6 +48,7 @@ struct AppRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var appSession: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var accountService: SupabaseAccountService
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var subscriptionBackend: SubscriptionBackendService
@@ -54,6 +57,7 @@ struct AppRootView: View {
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var challengeStore: ChallengeStore
+    @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
@@ -87,6 +91,10 @@ struct AppRootView: View {
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
             await submitLatestStoreProofIfPossible()
 
+            if appSession.signedIn {
+                await refreshSocialCore()
+            }
+
             guard health.hasRequestedAuthorization else { return }
             await health.configureBackgroundSync(
                 allowed: appSession.canAccess(.backgroundHealthSync)
@@ -103,6 +111,7 @@ struct AppRootView: View {
                 currentUserID: appSession.profile.userID
             )
             await refreshTrophiesAndNotifications()
+            await syncSocialOwnedData()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -111,8 +120,13 @@ struct AppRootView: View {
             // foreground, for example after installing the Watch app.
             watchConnection.connect()
 
-            guard health.hasRequestedAuthorization else { return }
             Task {
+                if appSession.signedIn {
+                    await refreshSocialCore()
+                }
+
+                guard health.hasRequestedAuthorization else { return }
+
                 await health.refreshAll()
                 await goals.refreshAutomaticMilestones(
                     health: health,
@@ -125,6 +139,7 @@ struct AppRootView: View {
                     currentUserID: appSession.profile.userID
                 )
                 await refreshTrophiesAndNotifications()
+                await syncSocialOwnedData()
             }
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
@@ -176,6 +191,12 @@ struct AppRootView: View {
                     displayName: appSession.profile.displayName
                 )
                 await refreshTrophiesAndNotifications()
+                await social.syncChallenges(challengeStore)
+                await social.publishWorkout(
+                    result: result,
+                    visibility: settings.defaultActivityVisibility
+                )
+                await syncSocialOwnedData()
                 watchConnection.clearCompletedWorkout()
             }
         }
@@ -189,7 +210,13 @@ struct AppRootView: View {
             )
 
             Task {
+                await social.syncChallenges(challengeStore)
+                await social.publishStrengthWorkout(
+                    workout,
+                    visibility: settings.defaultActivityVisibility
+                )
                 await refreshTrophiesAndNotifications()
+                await syncSocialOwnedData()
             }
         }
         .onChange(of: challengeStore.challenges) { _, updatedChallenges in
@@ -199,14 +226,52 @@ struct AppRootView: View {
             )
 
             Task {
+                await social.syncChallenges(challengeStore)
+                await social.publishChallenges(
+                    updatedChallenges,
+                    visibility: settings.defaultActivityVisibility
+                )
                 await refreshTrophiesAndNotifications()
+                await syncSocialOwnedData()
             }
         }
         .onChange(of: goals.goals) { _, updatedGoals in
             notifications.syncGoalEvents(from: updatedGoals)
 
             Task {
+                await social.publishCompletedGoals(
+                    updatedGoals,
+                    visibility: settings.defaultActivityVisibility
+                )
                 await refreshTrophiesAndNotifications()
+                await syncSocialOwnedData()
+            }
+        }
+        .onChange(of: appSession.profile.presence) { _, presence in
+            guard appSession.signedIn else { return }
+
+            Task {
+                await social.syncPresence(presence)
+            }
+        }
+        .onChange(of: settings.profileVisibility) { _, visibility in
+            guard appSession.signedIn else { return }
+
+            Task {
+                await social.updateCorePrivacy(
+                    profileVisibility: visibility,
+                    shareTrainingPresence: settings.shareTrainingPresence
+                )
+            }
+        }
+        .onChange(of: settings.shareTrainingPresence) { _, sharePresence in
+            guard appSession.signedIn else { return }
+
+            Task {
+                await social.updateCorePrivacy(
+                    profileVisibility: settings.profileVisibility,
+                    shareTrainingPresence: sharePresence
+                )
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
@@ -215,6 +280,10 @@ struct AppRootView: View {
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
             Task {
                 await submitLatestStoreProofIfPossible()
+                await refreshSocialCore()
+                if health.hasRequestedAuthorization {
+                    await syncSocialOwnedData()
+                }
             }
         }
         .onOpenURL { url in
@@ -273,6 +342,33 @@ struct AppRootView: View {
         } message: {
             Text(authCallbackError ?? "Authentication could not be completed.")
         }
+    }
+
+    private func refreshSocialCore() async {
+        await social.refresh(
+            challengeStore: challengeStore,
+            notificationStore: notifications
+        )
+        await social.updateCorePrivacy(
+            profileVisibility: settings.profileVisibility,
+            shareTrainingPresence: settings.shareTrainingPresence
+        )
+        await social.syncPresence(appSession.profile.presence)
+    }
+
+    private func syncSocialOwnedData() async {
+        guard appSession.signedIn else { return }
+
+        if let stats = try? await health.profilePerformanceStats() {
+            await social.syncOwnPerformance(stats)
+        }
+
+        await social.syncOwnTrophies(trophies.showcaseTrophies)
+        await social.publishTrophyUnlocks(
+            trophies.unlocks,
+            visibility: settings.defaultActivityVisibility
+        )
+        await social.syncChallenges(challengeStore)
     }
 
     private func refreshTrophiesAndNotifications() async {
