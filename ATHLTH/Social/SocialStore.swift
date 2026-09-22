@@ -10,6 +10,11 @@ final class SocialStore: ObservableObject {
     @Published private(set) var feed: [SocialFeedItem] = []
     @Published private(set) var blockedUsers: [SocialBlockedUser] = []
     @Published private(set) var inboxEvents: [SocialInboxEvent] = []
+    @Published private(set) var workoutSessions: [SocialWorkoutSessionRecord] = []
+    @Published private(set) var workoutParticipants: [SocialWorkoutParticipantRecord] = []
+    @Published private(set) var workoutInvites: [SocialWorkoutInviteDisplay] = []
+    @Published private(set) var activeWorkoutSession: SocialWorkoutSessionRecord?
+    @Published private(set) var activeWorkoutParticipants: [SocialWorkoutParticipantRecord] = []
     @Published private(set) var privacy: SocialPrivacySettings?
     @Published private(set) var isRefreshing = false
     @Published var errorMessage: String?
@@ -65,6 +70,8 @@ final class SocialStore: ObservableObject {
             async let blockedTask = service.loadBlockedUsers()
             async let inboxTask = service.loadInboxEvents()
             async let remoteChallengesTask = service.loadRemoteChallenges()
+            async let workoutSessionsTask = service.loadWorkoutSessions()
+            async let workoutParticipantsTask = service.loadWorkoutParticipants()
 
             let cards = try await cardsTask
             let friendships = try await friendshipsTask
@@ -74,6 +81,8 @@ final class SocialStore: ObservableObject {
             let blocked = try await blockedTask
             let inbox = try await inboxTask
             let remoteChallenges = try await remoteChallengesTask
+            let workoutSessions = try await workoutSessionsTask
+            let workoutParticipants = try await workoutParticipantsTask
 
             applyRelationships(
                 cards: cards,
@@ -85,6 +94,11 @@ final class SocialStore: ObservableObject {
             self.feed = feed
             blockedUsers = blocked
             inboxEvents = inbox
+            applyWorkoutSessions(
+                sessions: workoutSessions,
+                participants: workoutParticipants,
+                cards: cards
+            )
 
             if let challengeStore {
                 challengeStore.mergeRemoteChallenges(remoteChallenges)
@@ -321,6 +335,141 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func beginWorkoutWithFriends(
+        title: String,
+        kind: WorkoutKind,
+        friends: [SocialProfileCard],
+        creatorName: String,
+        creatorUsername: String?
+    ) async {
+        guard !friends.isEmpty else {
+            activeWorkoutSession = nil
+            activeWorkoutParticipants = []
+            return
+        }
+
+        errorMessage = nil
+
+        do {
+            if let activeWorkoutSession,
+               activeWorkoutSession.status == .active,
+               activeWorkoutSession.creatorID == currentUserID {
+                try? await service.cancelWorkoutSession(activeWorkoutSession.id)
+            }
+
+            let session = try await service.createWorkoutSession(
+                title: title,
+                workoutKind: kind,
+                creatorName: creatorName,
+                creatorUsername: creatorUsername,
+                friends: friends
+            )
+
+            activeWorkoutSession = session
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func finishActiveWorkout(
+        sourceWorkoutID: UUID,
+        endedAt: Date
+    ) async {
+        guard let activeWorkoutSession,
+              activeWorkoutSession.creatorID == currentUserID,
+              activeWorkoutSession.status == .active
+        else {
+            return
+        }
+
+        do {
+            try await service.completeWorkoutSession(
+                sessionID: activeWorkoutSession.id,
+                sourceWorkoutID: sourceWorkoutID,
+                endedAt: endedAt
+            )
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func acceptWorkoutInvite(_ invite: SocialWorkoutInviteDisplay) async {
+        await resolveWorkoutInvite(invite, state: .accepted)
+    }
+
+    func declineWorkoutInvite(_ invite: SocialWorkoutInviteDisplay) async {
+        await resolveWorkoutInvite(invite, state: .declined)
+    }
+
+    func publishWorkout(
+        _ workout: SocialPublishableWorkout,
+        visibility: ProfileVisibility,
+        caption: String? = nil
+    ) async -> Bool {
+        errorMessage = nil
+
+        do {
+            let linkedSession = workoutSessions.first {
+                $0.creatorID == currentUserID &&
+                $0.sourceWorkoutID == workout.id
+            }
+
+            let acceptedPartners: [SocialWorkoutParticipantRecord]
+            if let linkedSession {
+                acceptedPartners = workoutParticipants.filter {
+                    $0.sessionID == linkedSession.id &&
+                    $0.userID != currentUserID &&
+                    $0.state == .accepted
+                }
+            } else {
+                acceptedPartners = []
+            }
+
+            var metadata: [String: String] = [
+                "workout_id": workout.id.uuidString,
+                "kind": workout.activity.rawValue,
+                "source": workout.source
+            ]
+
+            if !acceptedPartners.isEmpty {
+                metadata["with_names"] = acceptedPartners
+                    .map(\.displayNameSnapshot)
+                    .joined(separator: ", ")
+                metadata["with_count"] = "\(acceptedPartners.count)"
+            }
+
+            let cleanCaption = caption?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if let cleanCaption, !cleanCaption.isEmpty {
+                metadata["caption"] = cleanCaption
+            }
+
+            try await service.publishWorkoutActivity(
+                eventKey: "workout-\(workout.id.uuidString)",
+                title: workout.title,
+                subtitle: workout.summaryText,
+                metadata: metadata,
+                visibility: visibility,
+                workoutSessionID: linkedSession?.id
+            )
+
+            feed = try await service.loadFeed()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func isWorkoutPublished(_ workoutID: UUID) async -> Bool {
+        (try? await service.isActivityPublished(
+            eventKey: "workout-\(workoutID.uuidString)"
+        )) ?? false
+    }
+
     func syncChallenges(_ challengeStore: ChallengeStore) async {
         guard service.currentUserID != nil else { return }
 
@@ -479,6 +628,86 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    private func resolveWorkoutInvite(
+        _ invite: SocialWorkoutInviteDisplay,
+        state: SocialWorkoutParticipantState
+    ) async {
+        errorMessage = nil
+
+        do {
+            try await service.respondToWorkoutInvite(
+                participantID: invite.participant.id,
+                state: state
+            )
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func applyWorkoutSessions(
+        sessions: [SocialWorkoutSessionRecord],
+        participants: [SocialWorkoutParticipantRecord],
+        cards: [SocialProfileCard]
+    ) {
+        workoutSessions = sessions
+        workoutParticipants = participants
+
+        guard let currentUserID else {
+            workoutInvites = []
+            activeWorkoutSession = nil
+            activeWorkoutParticipants = []
+            return
+        }
+
+        let cardsByID = Dictionary(
+            uniqueKeysWithValues: cards.map { ($0.userID, $0) }
+        )
+        let sessionsByID = Dictionary(
+            uniqueKeysWithValues: sessions.map { ($0.id, $0) }
+        )
+
+        workoutInvites = participants
+            .filter {
+                $0.userID == currentUserID &&
+                $0.state == .invited
+            }
+            .compactMap { participant in
+                guard let session = sessionsByID[participant.sessionID],
+                      session.status == .active
+                else {
+                    return nil
+                }
+
+                return SocialWorkoutInviteDisplay(
+                    session: session,
+                    participant: participant,
+                    creator: cardsByID[session.creatorID]
+                )
+            }
+            .sorted { $0.session.createdAt > $1.session.createdAt }
+
+        activeWorkoutSession = sessions
+            .filter {
+                $0.creatorID == currentUserID &&
+                $0.status == .active
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+            .first
+
+        if let activeWorkoutSession {
+            activeWorkoutParticipants = participants
+                .filter { $0.sessionID == activeWorkoutSession.id }
+                .sorted { lhs, rhs in
+                    if lhs.state == .creator { return true }
+                    if rhs.state == .creator { return false }
+                    return lhs.displayNameSnapshot < rhs.displayNameSnapshot
+                }
+        } else {
+            activeWorkoutParticipants = []
+        }
+    }
+
     private func resolve(
         _ request: SocialFriendRequestDisplay,
         status: SocialFriendRequestState
@@ -589,6 +818,11 @@ final class SocialStore: ObservableObject {
         feed = []
         blockedUsers = []
         inboxEvents = []
+        workoutSessions = []
+        workoutParticipants = []
+        workoutInvites = []
+        activeWorkoutSession = nil
+        activeWorkoutParticipants = []
         privacy = nil
         profileCache = [:]
     }
