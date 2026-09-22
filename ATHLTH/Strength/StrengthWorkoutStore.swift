@@ -323,6 +323,52 @@ final class StrengthWorkoutStore: ObservableObject {
         currentSetIndex = 0
     }
 
+    func goalEvidence(
+        for rule: GoalAutomationRule,
+        since startDate: Date
+    ) -> GoalAutomationEvidence? {
+        guard rule.metric == .strengthWeightKilograms,
+              let exerciseName = rule.exerciseName?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased(),
+              !exerciseName.isEmpty
+        else {
+            return nil
+        }
+
+        var best: (weight: Double, date: Date)?
+
+        for workout in workoutHistory where workout.startedAt >= startDate && workout.isFinished {
+            for exercise in workout.exercises
+            where exercise.exercise.name
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased() == exerciseName {
+                for set in exercise.sets {
+                    guard set.isCompleted,
+                          let weight = set.completedWeightKilograms,
+                          weight > 0
+                    else {
+                        continue
+                    }
+
+                    let date = set.completedAt ?? workout.endedAt ?? workout.startedAt
+
+                    if best == nil || weight > best!.weight {
+                        best = (weight, date)
+                    }
+                }
+            }
+        }
+
+        guard let best else { return nil }
+
+        return GoalAutomationEvidence(
+            currentValue: best.weight,
+            evidenceDate: best.date,
+            description: "\(Self.formattedKilograms(best.weight)) kg · \(rule.exerciseName ?? "Strength")"
+        )
+    }
+
     func attachHealthMetrics(_ metrics: LinkedHealthWorkoutMetrics) {
         if var activeWorkout {
             activeWorkout.healthMetrics = metrics
