@@ -300,6 +300,7 @@ struct SocialActivityRecord: Identifiable, Codable, Hashable {
     let metadata: [String: String]?
     let visibility: String
     let eventKey: String?
+    let workoutSessionID: UUID?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -311,6 +312,7 @@ struct SocialActivityRecord: Identifiable, Codable, Hashable {
         case metadata
         case visibility
         case eventKey = "event_key"
+        case workoutSessionID = "workout_session_id"
         case createdAt = "created_at"
     }
 }
@@ -337,6 +339,7 @@ struct SocialFeedItem: Identifiable, Hashable {
     let activity: SocialActivityRecord
     let actor: SocialProfileCard
     let reactions: [SocialActivityReactionRecord]
+    let trainingPartners: [SocialWorkoutParticipantRecord]
 }
 
 struct SocialInboxEvent: Identifiable, Codable, Hashable {
@@ -504,5 +507,140 @@ struct BackendChallengeCheckIn: Codable, Hashable {
         case checkedInAt = "checked_in_at"
         case distanceFromMeetupMeters = "distance_from_meetup_meters"
         case verifiedNearMeetup = "verified_near_meetup"
+    }
+}
+
+
+enum SocialWorkoutSessionStatus: String, Codable, Hashable {
+    case active
+    case completed
+    case cancelled
+}
+
+enum SocialWorkoutParticipantState: String, Codable, Hashable {
+    case creator
+    case invited
+    case accepted
+    case declined
+}
+
+struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
+    let id: UUID
+    let creatorID: UUID
+    let title: String
+    let workoutKind: String
+    var status: SocialWorkoutSessionStatus
+    let startedAt: Date
+    var endedAt: Date?
+    var sourceWorkoutID: UUID?
+    let createdAt: Date
+    var updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case creatorID = "creator_id"
+        case title
+        case workoutKind = "workout_kind"
+        case status
+        case startedAt = "started_at"
+        case endedAt = "ended_at"
+        case sourceWorkoutID = "source_workout_id"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct SocialWorkoutParticipantRecord: Identifiable, Codable, Hashable {
+    let id: UUID
+    let sessionID: UUID
+    let userID: UUID
+    let invitedBy: UUID
+    var state: SocialWorkoutParticipantState
+    let displayNameSnapshot: String
+    let usernameSnapshot: String?
+    let invitedAt: Date
+    var respondedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case sessionID = "session_id"
+        case userID = "user_id"
+        case invitedBy = "invited_by"
+        case state
+        case displayNameSnapshot = "display_name_snapshot"
+        case usernameSnapshot = "username_snapshot"
+        case invitedAt = "invited_at"
+        case respondedAt = "responded_at"
+    }
+}
+
+struct SocialWorkoutInviteDisplay: Identifiable, Hashable {
+    var id: UUID { participant.id }
+
+    let session: SocialWorkoutSessionRecord
+    let participant: SocialWorkoutParticipantRecord
+    let creator: SocialProfileCard?
+}
+
+struct SocialWorkoutStartSelection: Hashable {
+    let title: String
+    let workoutKind: String
+    let friends: [SocialProfileCard]
+
+    var isGroupWorkout: Bool {
+        !friends.isEmpty
+    }
+}
+
+struct SocialPublishableWorkout: Identifiable, Hashable {
+    let id: UUID
+    let title: String
+    let activity: WorkoutActivity
+    let startDate: Date
+    let endDate: Date
+    let duration: TimeInterval
+    let distanceMeters: Double?
+    let activeEnergyKilocalories: Double?
+    let source: String
+
+    init(summary: WorkoutSummary) {
+        id = summary.id
+        title = summary.activity.rawValue
+        activity = summary.activity
+        startDate = summary.startDate
+        endDate = summary.endDate
+        duration = summary.duration
+        distanceMeters = summary.distanceMeters
+        activeEnergyKilocalories = summary.activeEnergyKilocalories
+        source = "Apple Health"
+    }
+
+    init(strengthWorkout: StrengthWorkoutLog) {
+        id = strengthWorkout.id
+        title = strengthWorkout.title
+        activity = .strength
+        startDate = strengthWorkout.startedAt
+        endDate = strengthWorkout.endedAt ?? strengthWorkout.startedAt
+        duration = max(
+            (strengthWorkout.endedAt ?? strengthWorkout.startedAt)
+                .timeIntervalSince(strengthWorkout.startedAt),
+            0
+        )
+        distanceMeters = nil
+        activeEnergyKilocalories = nil
+        source = "ATHLTH"
+    }
+
+    var summaryText: String {
+        let minutes = max(Int((duration / 60).rounded()), 0)
+        let time = minutes >= 60
+            ? "\(minutes / 60)h \(minutes % 60)m"
+            : "\(minutes) min"
+
+        if let distanceMeters, distanceMeters > 0 {
+            return String(format: "%.2f km · %@", distanceMeters / 1_000, time)
+        }
+
+        return time
     }
 }
