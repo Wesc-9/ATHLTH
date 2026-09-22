@@ -296,6 +296,95 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    func personalRecords() async throws -> [HealthPersonalRecord] {
+        let workouts = try await fetchAllWorkouts()
+        var records: [HealthPersonalRecord] = []
+
+        if let workout = workouts
+            .filter({ $0.workoutActivityType == .running && $0.totalDistance != nil })
+            .max(by: {
+                ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) <
+                ($1.totalDistance?.doubleValue(for: .meter()) ?? 0)
+            }),
+           let distance = workout.totalDistance?.doubleValue(for: .meter()),
+           distance > 0 {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .longestRun,
+                    value: distance,
+                    date: workout.startDate
+                )
+            )
+        }
+
+        if let workout = workouts
+            .filter({ $0.workoutActivityType == .cycling && $0.totalDistance != nil })
+            .max(by: {
+                ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) <
+                ($1.totalDistance?.doubleValue(for: .meter()) ?? 0)
+            }),
+           let distance = workout.totalDistance?.doubleValue(for: .meter()),
+           distance > 0 {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .longestRide,
+                    value: distance,
+                    date: workout.startDate
+                )
+            )
+        }
+
+        if let workout = workouts
+            .filter({
+                ($0.workoutActivityType == .walking || $0.workoutActivityType == .hiking) &&
+                $0.totalDistance != nil
+            })
+            .max(by: {
+                ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) <
+                ($1.totalDistance?.doubleValue(for: .meter()) ?? 0)
+            }),
+           let distance = workout.totalDistance?.doubleValue(for: .meter()),
+           distance > 0 {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .longestWalkOrHike,
+                    value: distance,
+                    date: workout.startDate
+                )
+            )
+        }
+
+        if let workout = workouts.max(by: { $0.duration < $1.duration }),
+           workout.duration > 0 {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .longestWorkout,
+                    value: workout.duration,
+                    date: workout.startDate
+                )
+            )
+        }
+
+        if let workout = workouts
+            .filter({ $0.totalEnergyBurned != nil })
+            .max(by: {
+                ($0.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0) <
+                ($1.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0)
+            }),
+           let calories = workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()),
+           calories > 0 {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .mostActiveCalories,
+                    value: calories,
+                    date: workout.startDate
+                )
+            )
+        }
+
+        return records
+    }
+
     func refreshPersonalDetails() async {
         guard healthDataAvailable else {
             personalDetails = .empty
@@ -477,6 +566,29 @@ final class HealthKitManager: ObservableObject {
             averageCyclingPowerWatts: (try? await cyclingPowerTask) ?? nil,
             swimmingStrokeCount: (try? await swimmingStrokeTask) ?? nil
         )
+    }
+
+    private func fetchAllWorkouts() async throws -> [HKWorkout] {
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<[HKWorkout], Error>) in
+
+            let query = HKSampleQuery(
+                sampleType: HKObjectType.workoutType(),
+                predicate: nil,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [sort]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: (samples as? [HKWorkout]) ?? [])
+                }
+            }
+
+            healthStore.execute(query)
+        }
     }
 
     private func fetchWorkouts(
