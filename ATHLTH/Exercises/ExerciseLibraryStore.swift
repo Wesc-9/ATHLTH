@@ -133,10 +133,17 @@ final class ExerciseLibraryStore: ObservableObject {
         primaryMuscles: [String],
         secondaryMuscles: [String],
         equipment: [String],
-        isVisibleOutsideOwnerLibrary: Bool
+        isVisibleOutsideOwnerLibrary: Bool,
+        imageData: Data? = nil,
+        videoURL: URL? = nil
     ) -> ExerciseLibraryEntry {
+        let exerciseID = UUID()
+        let imageURL = imageData.flatMap {
+            try? saveCustomImageData($0, exerciseID: exerciseID)
+        }
+
         let exercise = Exercise(
-            id: UUID(),
+            id: exerciseID,
             origin: .custom,
             ownerID: ownerID,
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -144,8 +151,9 @@ final class ExerciseLibraryStore: ObservableObject {
             primaryMuscles: primaryMuscles.cleanExerciseStrings,
             secondaryMuscles: secondaryMuscles.cleanExerciseStrings,
             equipment: equipment.cleanExerciseStrings,
-            imageURL: nil,
-            isVisibleOutsideOwnerLibrary: isVisibleOutsideOwnerLibrary
+            imageURL: imageURL,
+            isVisibleOutsideOwnerLibrary: isVisibleOutsideOwnerLibrary,
+            videoURL: videoURL
         )
 
         let entry = ExerciseLibraryEntry(
@@ -158,7 +166,7 @@ final class ExerciseLibraryStore: ObservableObject {
             category: "custom",
             difficulty: nil,
             bodyPart: primaryMuscles.cleanExerciseStrings.first,
-            imageStartURL: nil,
+            imageStartURL: imageURL,
             imagePeakURL: nil
         )
 
@@ -200,6 +208,12 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     func deleteCustomExercise(_ id: UUID) {
+        if let entry = customExercises.first(where: { $0.id == id }),
+           let imageURL = entry.exercise.imageURL,
+           imageURL.isFileURL {
+            try? FileManager.default.removeItem(at: imageURL)
+        }
+
         customExercises.removeAll { $0.id == id }
         persistCustomExercises()
     }
@@ -241,6 +255,27 @@ final class ExerciseLibraryStore: ObservableObject {
             imageStartURL: startURL ?? mainURL,
             imagePeakURL: peakURL
         )
+    }
+
+    private func saveCustomImageData(
+        _ data: Data,
+        exerciseID: UUID
+    ) throws -> URL {
+        guard let directory = Self.customMediaDirectory else {
+            throw ExerciseLibraryError.storageUnavailable
+        }
+
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+
+        let url = directory
+            .appendingPathComponent(exerciseID.uuidString)
+            .appendingPathExtension("image")
+
+        try data.write(to: url, options: .atomic)
+        return url
     }
 
     private func loadCachedRepDB() {
@@ -341,6 +376,13 @@ final class ExerciseLibraryStore: ObservableObject {
         )
     }
 
+    private static var customMediaDirectory: URL? {
+        storageDirectory?.appendingPathComponent(
+            "CustomMedia",
+            isDirectory: true
+        )
+    }
+
     private static func stableUUID(for string: String) -> UUID {
         let digest = SHA256.hash(data: Data(string.utf8))
         let hex = digest.prefix(16)
@@ -360,11 +402,14 @@ final class ExerciseLibraryStore: ObservableObject {
 
 enum ExerciseLibraryError: LocalizedError {
     case httpStatus(Int)
+    case storageUnavailable
 
     var errorDescription: String? {
         switch self {
         case .httpStatus(let status):
             return "RepDB exercise library returned HTTP \(status)."
+        case .storageUnavailable:
+            return "ATHLTH could not store the custom exercise media."
         }
     }
 }
