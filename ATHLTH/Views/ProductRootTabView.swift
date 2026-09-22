@@ -759,6 +759,7 @@ private enum ProgressPeriod: String, CaseIterable, Identifiable {
 
 struct ATHLTHProgressView: View {
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
 
     @State private var period: ProgressPeriod = .week
     @State private var progressSnapshot: HealthProgressSnapshot?
@@ -1180,14 +1181,22 @@ struct ATHLTHProgressView: View {
     }
 
     private var personalRecordsCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        let healthRecords = Array(personalRecords.prefix(2))
+        let strengthRecords = Array(
+            strengthWorkout.personalRecords
+                .filter { $0.kind == .heaviestSet }
+                .prefix(2)
+        )
+        let totalRecordCount = personalRecords.count + strengthWorkout.personalRecords.count
+
+        return VStack(alignment: .leading, spacing: 13) {
             HStack {
                 Text("Personal Records")
                     .font(.headline)
                 Spacer()
 
-                if personalRecords.count > 3 {
-                    Text("+\(personalRecords.count - 3)")
+                if totalRecordCount > healthRecords.count + strengthRecords.count {
+                    Text("+\(totalRecordCount - healthRecords.count - strengthRecords.count)")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(green)
                 }
@@ -1197,7 +1206,7 @@ struct ATHLTHProgressView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if personalRecords.isEmpty {
+            if healthRecords.isEmpty && strengthRecords.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Image(systemName: "trophy")
                         .font(.title3)
@@ -1206,17 +1215,31 @@ struct ATHLTHProgressView: View {
                     Text("No records yet")
                         .font(.caption.weight(.semibold))
 
-                    Text("ATHLTH will surface verified records from your Apple Health workouts.")
+                    Text("ATHLTH will surface verified records from Apple Health and strength workouts you log in ATHLTH.")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 8)
             } else {
-                ForEach(Array(personalRecords.prefix(3))) { record in
+                ForEach(healthRecords) { record in
                     recordRow(
                         record.kind.title,
                         value: record.formattedValue,
+                        date: record.date.formatted(.dateTime.month(.abbreviated).day().year()),
+                        icon: record.kind.systemImage
+                    )
+                }
+
+                if !healthRecords.isEmpty && !strengthRecords.isEmpty {
+                    Divider()
+                        .overlay(Color.black.opacity(0.05))
+                }
+
+                ForEach(strengthRecords) { record in
+                    recordRow(
+                        record.title,
+                        value: record.value,
                         date: record.date.formatted(.dateTime.month(.abbreviated).day().year()),
                         icon: record.kind.systemImage
                     )
