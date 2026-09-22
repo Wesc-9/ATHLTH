@@ -316,6 +316,9 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     var targetRPE: Double?
     var restSeconds: Int?
     var notes: String?
+    var targetRIR: Double? = nil
+    var supersetGroupID: UUID? = nil
+    var progression: StrengthProgressionRule? = nil
 }
 
 struct PlannedSession: Identifiable, Codable, Hashable {
@@ -329,6 +332,7 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var routeID: UUID?
     var exercises: [PlannedExercise]
     var notes: String?
+    var runningWorkout: RunningWorkoutTemplate? = nil
 }
 
 struct TrainingPlanDay: Identifiable, Codable, Hashable {
