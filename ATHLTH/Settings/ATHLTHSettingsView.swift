@@ -124,6 +124,12 @@ struct ATHLTHSettingsView: View {
                 Toggle("Hide route start/end when sharing", isOn: $settings.hideRouteStartAndEnd)
                 Toggle("Share heart rate by default", isOn: $settings.shareHeartRateByDefault)
 
+                NavigationLink {
+                    SocialPrivacySettingsView()
+                } label: {
+                    Label("Social privacy controls", systemImage: "person.2.badge.gearshape")
+                }
+
                 Toggle(
                     "Personalized ATHLTH offers",
                     isOn: Binding(
@@ -248,9 +254,7 @@ struct ATHLTHSettingsView: View {
                 }
 
                 NavigationLink {
-                    Text("Blocked users and social safety controls will live here.")
-                        .padding()
-                        .navigationTitle("Blocked Users")
+                    BlockedUsersView()
                 } label: {
                     Label("Blocked users", systemImage: "person.crop.circle.badge.xmark")
                 }
