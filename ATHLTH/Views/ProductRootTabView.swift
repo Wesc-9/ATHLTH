@@ -419,9 +419,9 @@ struct ATHLTHTrainView: View {
                 actionTitle: watchConnection.isReady ? "Apple Watch" : "Connect Watch"
             )
             HStack {
-                ForEach([WorkoutKind.running, .walking, .strength, .custom]) { kind in
+                ForEach([WorkoutKind.running, .walking, .strength]) { kind in
                     Button {
-                        startQuickWorkoutOnWatch(kind)
+                        handleQuickStart(kind)
                     } label: {
                         VStack(spacing: 7) {
                             Image(systemName: kind.systemImage)
@@ -434,15 +434,8 @@ struct ATHLTHTrainView: View {
                         .frame(maxWidth: .infinity, minHeight: 76)
                     }
                     .buttonStyle(.plain)
-                    .disabled(
-                        watchWorkoutKind(for: kind) == nil ||
-                        !watchConnection.isReady ||
-                        watchConnection.workoutLaunchInProgress
-                    )
-                    .opacity(
-                        watchWorkoutKind(for: kind) == nil ||
-                        !watchConnection.isReady ? 0.45 : 1
-                    )
+                    .disabled(!quickStartAvailable(kind))
+                    .opacity(quickStartAvailable(kind) ? 1 : 0.45)
                 }
             }
             .padding(.top, 10)
@@ -588,6 +581,37 @@ struct ATHLTHTrainView: View {
         case .mobility, .recovery, .custom:
             return nil
         }
+    }
+
+    private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
+        if kind == .strength {
+            return strengthWorkout.activeWorkout == nil
+        }
+
+        return watchWorkoutKind(for: kind) != nil &&
+            watchConnection.isReady &&
+            !watchConnection.workoutLaunchInProgress
+    }
+
+    private func handleQuickStart(_ kind: WorkoutKind) {
+        if kind == .strength {
+            selectedStrengthSession = PlannedSession(
+                id: UUID(),
+                title: "Freestyle Strength",
+                kind: .strength,
+                scheduledStart: nil,
+                durationMinutes: nil,
+                targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil,
+                routeID: nil,
+                exercises: [],
+                notes: "Freestyle gym session",
+                runningWorkout: nil
+            )
+            return
+        }
+
+        startQuickWorkoutOnWatch(kind)
     }
 
     private func startQuickWorkoutOnWatch(_ kind: WorkoutKind) {
