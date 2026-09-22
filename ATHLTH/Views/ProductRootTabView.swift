@@ -2091,26 +2091,14 @@ struct ATHLTHProfileView: View {
                         Spacer()
                     }
 
-                    HStack {
-                        NavigationLink {
-                            SocialHubView(initialTab: .friends)
-                        } label: {
+                    NavigationLink {
+                        SocialHubView(initialTab: .friends)
+                    } label: {
+                        HStack {
                             profileStat("\(social.friends.count)", "Friends")
                         }
-                        .buttonStyle(.plain)
-
-                        profileStat(
-                            "\(performanceStats?.totalWorkoutCount ?? 0)",
-                            "Workouts"
-                        )
-
-                        NavigationLink {
-                            ChallengeHubView()
-                        } label: {
-                            profileStat("\(challengeStore.challenges.count)", "Challenges")
-                        }
-                        .buttonStyle(.plain)
                     }
+                    .buttonStyle(.plain)
 
                     HStack(spacing: 12) {
                         summaryCard(icon: "target", value: "\(goalStore.goals.count)", title: "Goals", tint: .green)
