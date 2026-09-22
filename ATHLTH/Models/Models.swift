@@ -155,6 +155,73 @@ struct HealthPersonalRecord: Identifiable, Equatable {
     }
 }
 
+struct TimedDistancePerformanceRecord: Equatable, Hashable {
+    let distanceMeters: Double
+    let duration: TimeInterval
+    let date: Date
+    let workoutID: UUID
+
+    var formattedTime: String {
+        let seconds = max(Int(duration.rounded()), 0)
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        let remainingSeconds = seconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
+        }
+
+        return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+
+    var formattedPace: String {
+        guard distanceMeters > 0 else { return "—" }
+
+        let paceSeconds = duration / (distanceMeters / 1_000)
+        let minutes = Int(paceSeconds) / 60
+        let seconds = Int(paceSeconds.rounded()) % 60
+        return String(format: "%d:%02d /km", minutes, seconds)
+    }
+}
+
+struct ProfilePerformanceStats: Equatable, Hashable {
+    let fastestOneKilometer: TimedDistancePerformanceRecord?
+    let fastestFiveKilometers: TimedDistancePerformanceRecord?
+    let fastestMarathon: TimedDistancePerformanceRecord?
+
+    let longestWorkoutDuration: TimeInterval?
+    let longestWorkoutDate: Date?
+    let longestWorkoutActivity: WorkoutActivity?
+
+    let longestWorkoutDistanceMeters: Double?
+    let longestWorkoutDistanceDate: Date?
+    let longestWorkoutDistanceActivity: WorkoutActivity?
+
+    let longestRunMeters: Double?
+    let longestRunDate: Date?
+
+    let totalWorkoutCount: Int
+    let totalTrainingDuration: TimeInterval
+    let totalRunningDistanceMeters: Double
+
+    static let empty = ProfilePerformanceStats(
+        fastestOneKilometer: nil,
+        fastestFiveKilometers: nil,
+        fastestMarathon: nil,
+        longestWorkoutDuration: nil,
+        longestWorkoutDate: nil,
+        longestWorkoutActivity: nil,
+        longestWorkoutDistanceMeters: nil,
+        longestWorkoutDistanceDate: nil,
+        longestWorkoutDistanceActivity: nil,
+        longestRunMeters: nil,
+        longestRunDate: nil,
+        totalWorkoutCount: 0,
+        totalTrainingDuration: 0,
+        totalRunningDistanceMeters: 0
+    )
+}
+
 struct WorkoutSummary: Identifiable, Hashable {
     let id: UUID
     let activity: WorkoutActivity
