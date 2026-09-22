@@ -131,6 +131,116 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    func createCompletedWorkoutSession(
+        workout: SocialPublishableWorkout,
+        creatorName: String,
+        creatorUsername: String?,
+        friends: [SocialProfileCard]
+    ) async throws -> SocialWorkoutSessionRecord {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        let session = SocialWorkoutSessionRecord(
+            id: UUID(),
+            creatorID: currentUserID,
+            title: workout.title,
+            workoutKind: workout.activity.rawValue,
+            status: .completed,
+            startedAt: workout.startDate,
+            endedAt: workout.endDate,
+            sourceWorkoutID: workout.id,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+
+        try await client
+            .from("social_workout_sessions")
+            .insert(WorkoutSessionWrite(record: session))
+            .execute()
+
+        var participants: [WorkoutParticipantWrite] = [
+            WorkoutParticipantWrite(
+                id: UUID(),
+                sessionID: session.id,
+                userID: currentUserID,
+                invitedBy: currentUserID,
+                state: SocialWorkoutParticipantState.creator.rawValue,
+                displayNameSnapshot: creatorName,
+                usernameSnapshot: creatorUsername,
+                invitedAt: Date(),
+                respondedAt: Date()
+            )
+        ]
+
+        participants.append(
+            contentsOf: friends.map { friend in
+                WorkoutParticipantWrite(
+                    id: UUID(),
+                    sessionID: session.id,
+                    userID: friend.userID,
+                    invitedBy: currentUserID,
+                    state: SocialWorkoutParticipantState.invited.rawValue,
+                    displayNameSnapshot: friend.resolvedName,
+                    usernameSnapshot: friend.username,
+                    invitedAt: Date(),
+                    respondedAt: nil
+                )
+            }
+        )
+
+        try await client
+            .from("social_workout_participants")
+            .insert(participants)
+            .execute()
+
+        return session
+    }
+
+    func addWorkoutParticipants(
+        sessionID: UUID,
+        friends: [SocialProfileCard],
+        creatorID: UUID
+    ) async throws {
+        guard !friends.isEmpty else { return }
+
+        let writes = friends.map { friend in
+            WorkoutParticipantWrite(
+                id: UUID(),
+                sessionID: sessionID,
+                userID: friend.userID,
+                invitedBy: creatorID,
+                state: SocialWorkoutParticipantState.invited.rawValue,
+                displayNameSnapshot: friend.resolvedName,
+                usernameSnapshot: friend.username,
+                invitedAt: Date(),
+                respondedAt: nil
+            )
+        }
+
+        try await client
+            .from("social_workout_participants")
+            .insert(writes)
+            .execute()
+    }
+
+    func workoutActivity(for workoutID: UUID) async throws -> SocialActivityRecord? {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        let rows: [SocialActivityRecord] = try await client
+            .from("social_activities")
+            .select()
+            .eq("actor_id", value: currentUserID)
+            .eq("event_key", value: "workout-\(workoutID.uuidString)")
+            .limit(1)
+            .execute()
+            .value
+
+        return rows.first
+    }
+
     func isActivityPublished(eventKey: String) async throws -> Bool {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
@@ -160,25 +270,38 @@ extension SupabaseSocialService {
             throw SocialServiceError.notAuthenticated
         }
 
-        guard try await !isActivityPublished(eventKey: eventKey) else {
-            return
-        }
-
-        try await client
-            .from("social_activities")
-            .insert(
-                WorkoutActivityInsert(
-                    actorID: currentUserID,
-                    kind: "workout",
-                    title: title,
-                    subtitle: subtitle,
-                    metadata: metadata,
-                    visibility: visibility.rawValue,
-                    eventKey: eventKey,
-                    workoutSessionID: workoutSessionID
+        if try await isActivityPublished(eventKey: eventKey) {
+            try await client
+                .from("social_activities")
+                .update(
+                    WorkoutActivityUpdate(
+                        title: title,
+                        subtitle: subtitle,
+                        metadata: metadata,
+                        visibility: visibility.rawValue,
+                        workoutSessionID: workoutSessionID
+                    )
                 )
-            )
-            .execute()
+                .eq("actor_id", value: currentUserID)
+                .eq("event_key", value: eventKey)
+                .execute()
+        } else {
+            try await client
+                .from("social_activities")
+                .insert(
+                    WorkoutActivityInsert(
+                        actorID: currentUserID,
+                        kind: "workout",
+                        title: title,
+                        subtitle: subtitle,
+                        metadata: metadata,
+                        visibility: visibility.rawValue,
+                        eventKey: eventKey,
+                        workoutSessionID: workoutSessionID
+                    )
+                )
+                .execute()
+        }
     }
 }
 
@@ -265,6 +388,22 @@ private struct WorkoutSessionCompletionWrite: Encodable {
         case status
         case endedAt = "ended_at"
         case sourceWorkoutID = "source_workout_id"
+    }
+}
+
+private struct WorkoutActivityUpdate: Encodable {
+    let title: String
+    let subtitle: String?
+    let metadata: [String: String]
+    let visibility: String
+    let workoutSessionID: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case subtitle
+        case metadata
+        case visibility
+        case workoutSessionID = "workout_session_id"
     }
 }
 
