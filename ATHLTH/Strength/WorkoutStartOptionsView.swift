@@ -2,15 +2,21 @@ import SwiftUI
 
 struct WorkoutStartOptionsView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var social: SocialStore
 
     let session: PlannedSession
     let watchConnected: Bool
     let linkedSpotifyPlaylist: SpotifyPlaylistReference?
     let spotifyAutoplayEnabled: Bool
-    let onStart: (WorkoutCaptureDevice, StrengthTrackingMode) -> Void
+    let onStart: (
+        WorkoutCaptureDevice,
+        StrengthTrackingMode,
+        [SocialProfileCard]
+    ) -> Void
 
     @State private var captureDevice: WorkoutCaptureDevice
     @State private var trackingMode: StrengthTrackingMode
+    @State private var selectedFriendIDs: Set<UUID> = []
 
     init(
         session: PlannedSession,
@@ -19,7 +25,11 @@ struct WorkoutStartOptionsView: View {
         defaultTracking: StrengthTrackingPreference,
         linkedSpotifyPlaylist: SpotifyPlaylistReference?,
         spotifyAutoplayEnabled: Bool,
-        onStart: @escaping (WorkoutCaptureDevice, StrengthTrackingMode) -> Void
+        onStart: @escaping (
+            WorkoutCaptureDevice,
+            StrengthTrackingMode,
+            [SocialProfileCard]
+        ) -> Void
     ) {
         self.session = session
         self.watchConnected = watchConnected
@@ -109,6 +119,12 @@ struct WorkoutStartOptionsView: View {
                         .padding(.top, 12)
                     }
 
+                    ATHLTHCard {
+                        WorkoutFriendPicker(
+                            selectedFriendIDs: $selectedFriendIDs
+                        )
+                    }
+
                     if let playlist = linkedSpotifyPlaylist {
                         ATHLTHCard {
                             HStack(spacing: 12) {
@@ -148,7 +164,14 @@ struct WorkoutStartOptionsView: View {
                     }
 
                     Button {
-                        onStart(captureDevice, trackingMode)
+                        let selectedFriends = social.friends.filter {
+                            selectedFriendIDs.contains($0.userID)
+                        }
+                        onStart(
+                            captureDevice,
+                            trackingMode,
+                            selectedFriends
+                        )
                         dismiss()
                     } label: {
                         Label(
@@ -166,6 +189,11 @@ struct WorkoutStartOptionsView: View {
             }
             .navigationTitle("Start Workout")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                if social.friends.isEmpty {
+                    await social.refresh()
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
