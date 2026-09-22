@@ -4,6 +4,8 @@ import SwiftUI
 struct ATHLTHApp: App {
     @StateObject private var health = HealthKitManager()
     @StateObject private var trainingPlan = TrainingPlanStore()
+    @StateObject private var exerciseLibrary = ExerciseLibraryStore()
+    @StateObject private var runningWorkoutLibrary = RunningWorkoutLibraryStore()
     @StateObject private var appSession = AppSessionStore()
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
@@ -24,6 +26,8 @@ struct ATHLTHApp: App {
             AppRootView()
                 .environmentObject(health)
                 .environmentObject(trainingPlan)
+                .environmentObject(exerciseLibrary)
+                .environmentObject(runningWorkoutLibrary)
                 .environmentObject(appSession)
                 .environmentObject(settings)
                 .environmentObject(strengthWorkout)
