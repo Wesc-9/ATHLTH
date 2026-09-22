@@ -96,6 +96,7 @@ struct HealthProgressSnapshot: Equatable {
 
 enum HealthPersonalRecordKind: String, Hashable {
     case longestRun
+    case fastest5K
     case longestRide
     case longestWalkOrHike
     case longestWorkout
@@ -104,6 +105,7 @@ enum HealthPersonalRecordKind: String, Hashable {
     var title: String {
         switch self {
         case .longestRun: return "Longest Run"
+        case .fastest5K: return "Fastest 5K"
         case .longestRide: return "Longest Ride"
         case .longestWalkOrHike: return "Longest Walk / Hike"
         case .longestWorkout: return "Longest Workout"
@@ -114,6 +116,7 @@ enum HealthPersonalRecordKind: String, Hashable {
     var systemImage: String {
         switch self {
         case .longestRun: return "figure.run"
+        case .fastest5K: return "stopwatch.fill"
         case .longestRide: return "figure.outdoor.cycle"
         case .longestWalkOrHike: return "figure.hiking"
         case .longestWorkout: return "clock.fill"
@@ -133,6 +136,12 @@ struct HealthPersonalRecord: Identifiable, Equatable {
         switch kind {
         case .longestRun, .longestRide, .longestWalkOrHike:
             return String(format: "%.1f km", value / 1_000)
+
+        case .fastest5K:
+            let totalSeconds = max(Int(value.rounded()), 0)
+            let minutes = totalSeconds / 60
+            let seconds = totalSeconds % 60
+            return String(format: "%d:%02d", minutes, seconds)
 
         case .longestWorkout:
             let totalMinutes = Int((value / 60).rounded())
