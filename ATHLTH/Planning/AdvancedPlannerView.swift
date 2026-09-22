@@ -858,7 +858,7 @@ struct SessionEditorView: View {
             notes: nil,
             targetRIR: nil,
             supersetGroupID: nil,
-            progression: .none
+            progression: StrengthProgressionRule.none
         )
 
         plannedExercises.append(planned)
