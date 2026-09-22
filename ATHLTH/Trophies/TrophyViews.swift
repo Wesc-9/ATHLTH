@@ -750,13 +750,21 @@ struct TrophyUnlockRevealView: View {
                         .foregroundStyle(unlock.category.trophyAccent)
 
                     Label(
-                        "ATHLTH · \(unlock.verificationSource.title.uppercased())",
+                        "ATHLTH · VERIFIED · \(unlock.verificationSource.title.uppercased())",
                         systemImage: "checkmark.seal.fill"
                     )
                     .font(.caption.bold())
                     .tracking(0.8)
                     .foregroundStyle(.white.opacity(0.66))
                     .padding(.top, 6)
+
+                    Text(
+                        unlock.unlockedAt.formatted(
+                            .dateTime.day().month(.wide).year()
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.48))
                 }
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
@@ -774,6 +782,7 @@ struct TrophyUnlockRevealView: View {
         .onAppear {
             revealed = true
         }
+        .sensoryFeedback(.success, trigger: revealed)
     }
 }
 
