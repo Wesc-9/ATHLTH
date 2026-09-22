@@ -24,7 +24,6 @@ struct OnboardingFlowView: View {
     @State private var usernameSuggestions: [String] = []
     @State private var usernameValidation: UsernameValidationState = .idle
     @State private var usernameClaimError: String?
-    @State private var showPaidPlansBeforeHome = false
     @State private var showingSubscriptionOffer = false
     @State private var authenticationError: String?
     @State private var appleSignInInProgress = false
@@ -118,7 +117,7 @@ struct OnboardingFlowView: View {
                 watchConnection.refreshStatus()
             }
         }
-        .sheet(
+        .fullScreenCover(
             isPresented: $showingSubscriptionOffer,
             onDismiss: {
                 Task {
@@ -870,10 +869,53 @@ struct OnboardingFlowView: View {
                 .padding(.top, 18)
             }
 
-            Spacer(minLength: 48)
+            if session.subscriptionAccess.trialIsActive {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(OnboardingTheme.accent)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            OnboardingTheme.accent.opacity(0.12),
+                            in: Circle()
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Your 7-day ATHLTH+ trial is active")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+
+                        if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
+                            Text("Free access through \(trialEndsAt.formatted(date: .abbreviated, time: .omitted)). No subscription starts automatically.")
+                                .font(.caption)
+                                .foregroundStyle(OnboardingTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text("No subscription starts automatically.")
+                                .font(.caption)
+                                .foregroundStyle(OnboardingTheme.mutedText)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(14)
+                .background(
+                    Color.white.opacity(0.06),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                }
+                .padding(.top, 24)
+            }
+
+            Spacer(minLength: 44)
 
             Button {
-                if showPaidPlansBeforeHome {
+                if session.subscriptionAccess.trialIsActive &&
+                    !subscriptionStore.hasActiveSubscription {
                     showingSubscriptionOffer = true
                 } else {
                     Task {
@@ -883,7 +925,7 @@ struct OnboardingFlowView: View {
             } label: {
                 HStack {
                     Spacer()
-                    Text("Start ATHLTH")
+                    Text("Continue")
                         .font(.headline)
                     Image(systemName: "arrow.right")
                     Spacer()
@@ -892,6 +934,16 @@ struct OnboardingFlowView: View {
             }
             .buttonStyle(OnboardingPrimaryButtonStyle())
 
+            if session.subscriptionAccess.trialIsActive &&
+                !subscriptionStore.hasActiveSubscription {
+                Text("Next: choose ATHLTH+ Monthly or Yearly, or close the offer to continue your free trial.")
+                    .font(.caption2)
+                    .foregroundStyle(OnboardingTheme.faintText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 9)
+            }
+
             if let onboardingCompletionError {
                 Label(onboardingCompletionError, systemImage: "exclamationmark.circle.fill")
                     .font(.caption)
@@ -899,48 +951,7 @@ struct OnboardingFlowView: View {
                     .padding(.top, 10)
             }
 
-            Spacer(minLength: 110)
-
-            if session.subscriptionAccess.trialIsActive {
-                VStack(spacing: 5) {
-                    Text("7-day ATHLTH+ trial active")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(OnboardingTheme.mutedText)
-
-                    if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
-                        Text("Paid access until \(trialEndsAt.formatted(date: .abbreviated, time: .omitted))")
-                            .font(.caption2)
-                            .foregroundStyle(OnboardingTheme.faintText)
-                    }
-
-                    Button {
-                        showPaidPlansBeforeHome.toggle()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(
-                                systemName: showPaidPlansBeforeHome
-                                    ? "checkmark.square.fill"
-                                    : "square"
-                            )
-                            .foregroundStyle(
-                                showPaidPlansBeforeHome
-                                    ? Color.green
-                                    : Color.secondary
-                            )
-
-                            Text("Keep my ATHLTH+ benefits after the trial")
-                                .font(.caption2.weight(.semibold))
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 5)
-
-                    Text("See Monthly and Yearly plans before entering ATHLTH.")
-                        .font(.caption2)
-                        .foregroundStyle(OnboardingTheme.faintText)
-                }
-                .multilineTextAlignment(.center)
-            }
+            Spacer(minLength: 80)
         }
         .frame(maxWidth: .infinity, minHeight: 600)
     }
