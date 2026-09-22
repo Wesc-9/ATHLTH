@@ -306,6 +306,13 @@ struct ChallengeCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+
+    let preselectedFriends: [SocialProfileCard]
+
+    init(preselectedFriends: [SocialProfileCard] = []) {
+        self.preselectedFriends = preselectedFriends
+    }
 
     @State private var step = 0
     @State private var sport: ATHLTHChallengeSport = .running
@@ -329,7 +336,6 @@ struct ChallengeCreationView: View {
     @State private var endsAt = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
     @State private var allowMultipleAttempts = true
 
-    @State private var inviteUsername = ""
     @State private var invitees: [ChallengeParticipant] = []
 
     @State private var meetupEnabled = false
@@ -373,6 +379,15 @@ struct ChallengeCreationView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+            }
+            .task {
+                if social.friends.isEmpty {
+                    await social.refresh()
+                }
+
+                if invitees.isEmpty && !preselectedFriends.isEmpty {
+                    invitees = preselectedFriends.map(challengeParticipant)
                 }
             }
             .onChange(of: sport) { _, newSport in
@@ -599,30 +614,105 @@ struct ChallengeCreationView: View {
                 state: "You · Creator"
             )
 
-            ForEach(invitees) { participant in
-                participantRow(
-                    name: participant.displayName,
-                    username: participant.username ?? "",
-                    state: "Invited"
-                )
-            }
+            if !invitees.isEmpty {
+                Text("SELECTED")
+                    .font(.caption2.bold())
+                    .tracking(1.1)
+                    .foregroundStyle(.secondary)
 
-            HStack {
-                TextField("@username", text: $inviteUsername)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
+                ForEach(invitees) { participant in
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(.green.opacity(0.10))
+                            .frame(width: 42, height: 42)
+                            .overlay {
+                                Image(systemName: "person.fill")
+                                    .foregroundStyle(.green)
+                            }
 
-                Button("Add") {
-                    addInvitee()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(participant.displayName)
+                                .font(.subheadline.weight(.semibold))
+                            if let username = participant.username, !username.isEmpty {
+                                Text("@\(username)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        Button {
+                            invitees.removeAll { $0.userID == participant.userID }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding()
+                    .challengeCard()
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
-                .disabled(cleanInviteUsername.isEmpty)
             }
 
-            Text("The challenge model supports multiple participants from day one. Account-to-account delivery will bind these username invites to the friend service when social sync is enabled.")
-                .challengeHint()
+            Text("FRIENDS")
+                .font(.caption2.bold())
+                .tracking(1.1)
+                .foregroundStyle(.secondary)
+
+            if social.friends.isEmpty {
+                VStack(spacing: 10) {
+                    Text("Add friends before sending a challenge.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    NavigationLink {
+                        SocialHubView(initialTab: .discover)
+                    } label: {
+                        Label("Find Friends", systemImage: "person.badge.plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .challengeCard()
+            } else {
+                ForEach(social.friends) { friend in
+                    Button {
+                        toggleFriend(friend)
+                    } label: {
+                        HStack(spacing: 12) {
+                            SocialAvatar(profile: friend, size: 42)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(friend.resolvedName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                Text(friend.usernameLabel)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(
+                                systemName: invitees.contains(where: { $0.userID == friend.userID })
+                                    ? "checkmark.circle.fill"
+                                    : "circle"
+                            )
+                            .foregroundStyle(
+                                invitees.contains(where: { $0.userID == friend.userID })
+                                    ? .green
+                                    : .secondary
+                            )
+                        }
+                        .padding()
+                        .challengeCard()
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
 
             Picker("Visibility", selection: $visibility) {
                 Text("Friends").tag(ProfileVisibility.friends)
@@ -868,28 +958,21 @@ struct ChallengeCreationView: View {
         }
     }
 
-    private var cleanInviteUsername: String {
-        inviteUsername
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
-            .lowercased()
+    private func challengeParticipant(_ friend: SocialProfileCard) -> ChallengeParticipant {
+        ChallengeParticipant(
+            userID: friend.userID,
+            username: friend.username,
+            displayName: friend.resolvedName,
+            state: .invited
+        )
     }
 
-    private func addInvitee() {
-        let username = cleanInviteUsername
-        guard !username.isEmpty,
-              !invitees.contains(where: { $0.username == username })
-        else {
-            return
+    private func toggleFriend(_ friend: SocialProfileCard) {
+        if invitees.contains(where: { $0.userID == friend.userID }) {
+            invitees.removeAll { $0.userID == friend.userID }
+        } else {
+            invitees.append(challengeParticipant(friend))
         }
-
-        invitees.append(
-            ChallengeParticipant(
-                username: username,
-                displayName: "@\(username)"
-            )
-        )
-        inviteUsername = ""
     }
 
     private func createChallenge() {
@@ -1169,6 +1252,11 @@ struct ChallengeDetailView: View {
                 ScrollView {
                     VStack(spacing: 18) {
                         detailHero(challenge)
+
+                        if currentParticipant?.state == .invited {
+                            invitationResponseCard(challenge)
+                        }
+
                         leaderboardCard(challenge)
                         rulesCard(challenge)
 
@@ -1234,6 +1322,44 @@ struct ChallengeDetailView: View {
                 )
             }
         }
+    }
+
+    private func invitationResponseCard(_ challenge: ATHLTHChallenge) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("You’ve been challenged")
+                .font(.headline)
+
+            Text("Accept to join the leaderboard. Declining removes you from active competition.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button("Decline") {
+                    guard let currentParticipant else { return }
+                    challenges.setParticipantState(
+                        challengeID: challenge.id,
+                        participantID: currentParticipant.id,
+                        state: .declined
+                    )
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+
+                Button("Accept Challenge") {
+                    guard let currentParticipant else { return }
+                    challenges.setParticipantState(
+                        challengeID: challenge.id,
+                        participantID: currentParticipant.id,
+                        state: .accepted
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding()
+        .challengeCard()
     }
 
     private func detailHero(_ challenge: ATHLTHChallenge) -> some View {
