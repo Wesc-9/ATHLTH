@@ -6,14 +6,18 @@ final class TrophyStore: ObservableObject {
     @Published private(set) var unlocks: [TrophyUnlockRecord] = []
     @Published private(set) var showcaseIDs: [String] = []
     @Published private(set) var isRefreshing = false
+    @Published private(set) var pendingReveal: TrophyUnlockRecord?
 
     private var hasInitializedShowcase = false
+    private var revealQueue: [TrophyUnlockRecord] = []
+    private let activationDate: Date
 
     init() {
         let persisted = Self.loadState()
         unlocks = persisted.unlocks
         showcaseIDs = persisted.showcaseIDs
         hasInitializedShowcase = persisted.hasInitializedShowcase
+        activationDate = Self.loadOrCreateActivationDate()
     }
 
     var unlockedCount: Int {
@@ -256,6 +260,14 @@ final class TrophyStore: ObservableObject {
         persist()
     }
 
+    func dismissCurrentReveal() {
+        if !revealQueue.isEmpty {
+            revealQueue.removeFirst()
+        }
+
+        pendingReveal = revealQueue.first
+    }
+
     func unlockRecordsSince(_ date: Date) -> [TrophyUnlockRecord] {
         unlocks
             .filter { $0.unlockedAt >= date }
@@ -384,18 +396,26 @@ final class TrophyStore: ObservableObject {
     ) {
         guard !unlocks.contains(where: { $0.stageKey == stageKey }) else { return }
 
-        unlocks.append(
-            TrophyUnlockRecord(
-                stageKey: stageKey,
-                trophyID: trophyID,
-                stageTitle: stageTitle,
-                title: title,
-                rarity: rarity,
-                category: category,
-                verificationSource: source,
-                unlockedAt: unlockedAt
-            )
+        let record = TrophyUnlockRecord(
+            stageKey: stageKey,
+            trophyID: trophyID,
+            stageTitle: stageTitle,
+            title: title,
+            rarity: rarity,
+            category: category,
+            verificationSource: source,
+            unlockedAt: unlockedAt
         )
+
+        unlocks.append(record)
+
+        if unlockedAt >= activationDate {
+            revealQueue.append(record)
+
+            if pendingReveal == nil {
+                pendingReveal = revealQueue.first
+            }
+        }
     }
 
     private static func collectionSort(_ lhs: TrophyProgressItem, _ rhs: TrophyProgressItem) -> Bool {
@@ -444,6 +464,19 @@ final class TrophyStore: ObservableObject {
         }
 
         return state
+    }
+
+    private static func loadOrCreateActivationDate() -> Date {
+        let defaults = UserDefaults.standard
+        let key = "athlth.trophies.activationDate"
+
+        if let existing = defaults.object(forKey: key) as? Date {
+            return existing
+        }
+
+        let now = Date()
+        defaults.set(now, forKey: key)
+        return now
     }
 
     private static var stateURL: URL? {
