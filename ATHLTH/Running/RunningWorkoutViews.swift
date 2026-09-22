@@ -764,7 +764,7 @@ struct RunningWorkoutBlockRow: View {
             }
         case .rpe:
             if let rpe = step.intensity.rpe {
-                pieces.append("RPE \(rpe, specifier: "%.1f")")
+                pieces.append(String(format: "RPE %.1f", rpe))
             }
         }
 
