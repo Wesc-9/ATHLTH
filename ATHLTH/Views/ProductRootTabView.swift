@@ -762,6 +762,8 @@ struct ATHLTHProgressView: View {
 
     @State private var period: ProgressPeriod = .week
     @State private var progressSnapshot: HealthProgressSnapshot?
+    @State private var monthlySnapshot: HealthProgressSnapshot?
+    @State private var consistencySnapshot: HealthProgressSnapshot?
     @State private var progressLoading = false
     @State private var progressError: String?
 
@@ -808,12 +810,17 @@ struct ATHLTHProgressView: View {
             }
             .background(canvas.ignoresSafeArea())
             .refreshable {
-                await loadProgressData()
+                async let selected: Void = loadProgressData()
+                async let support: Void = loadSupportingProgressData()
+                _ = await (selected, support)
             }
             .toolbar(.hidden, for: .navigationBar)
         }
         .task(id: period) {
             await loadProgressData()
+        }
+        .task {
+            await loadSupportingProgressData()
         }
     }
 
@@ -1128,30 +1135,44 @@ struct ATHLTHProgressView: View {
 
                     Image(systemName: "flame.fill")
                         .font(.system(size: 38))
-                        .foregroundStyle(green)
+                        .foregroundStyle(workoutStreak > 0 ? green : Color.secondary.opacity(0.45))
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("12 days")
+                    Text(workoutStreak > 0 ? "\(workoutStreak) days" : "No streak")
                         .font(.title2.weight(.bold))
-                    Text("Keep it going!")
+                    Text(workoutStreak > 0 ? "Keep it going!" : "A workout today starts one.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
             }
 
-            HStack(spacing: 8) {
-                ForEach(0..<6, id: \.self) { index in
-                    Image(systemName: index < 4 ? "checkmark" : "")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            index < 4 ? green : Color.black.opacity(0.055),
-                            in: Circle()
-                        )
+            HStack(spacing: 6) {
+                ForEach(currentWeekDays, id: \.self) { day in
+                    VStack(spacing: 5) {
+                        Image(systemName: isWorkoutDay(day) ? "checkmark" : "")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 27, height: 27)
+                            .background(
+                                isWorkoutDay(day)
+                                    ? green
+                                    : Color.black.opacity(0.055),
+                                in: Circle()
+                            )
+
+                        Text(day.formatted(.dateTime.weekday(.narrow)))
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
+
+            Text("\(workoutDaysThisWeek) active \(workoutDaysThisWeek == 1 ? "day" : "days") this week")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .padding(16)
         .progressReferenceCard()
@@ -1175,7 +1196,7 @@ struct ATHLTHProgressView: View {
                 Text("Monthly Stats")
                     .font(.headline)
                 Spacer()
-                Text("March 2025")
+                Text(Date().formatted(.dateTime.month(.wide).year()))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Image(systemName: "chevron.right")
@@ -1190,10 +1211,37 @@ struct ATHLTHProgressView: View {
                 ],
                 spacing: 14
             ) {
-                statTile(icon: "dumbbell.fill", tint: green, value: "20", label: "Workouts", change: "33%")
-                statTile(icon: "shoeprints.fill", tint: blue, value: "248,736", label: "Steps", change: "18%")
-                statTile(icon: "moon.fill", tint: purple, value: "7h 18m", label: "Avg. Sleep", change: "6%")
-                statTile(icon: "leaf.fill", tint: green, value: "85", label: "Avg. Recovery", change: "12%")
+                statTile(
+                    icon: "dumbbell.fill",
+                    tint: green,
+                    value: monthlySnapshot.map { String($0.workoutCount) } ?? "—",
+                    label: "Workouts",
+                    change: monthlySnapshot?.workoutChangePercent
+                )
+
+                statTile(
+                    icon: "shoeprints.fill",
+                    tint: blue,
+                    value: formattedSteps(monthlySnapshot?.totalSteps),
+                    label: "Steps",
+                    change: monthlySnapshot?.totalStepsChangePercent
+                )
+
+                statTile(
+                    icon: "moon.fill",
+                    tint: purple,
+                    value: monthlySnapshot?.averageSleepDuration.map { $0.shortDuration } ?? "—",
+                    label: "Avg. Sleep",
+                    change: monthlySnapshot?.sleepChangePercent
+                )
+
+                statTile(
+                    icon: "clock.fill",
+                    tint: green,
+                    value: monthlySnapshot.map { $0.trainingDuration.shortDuration } ?? "—",
+                    label: "Training",
+                    change: monthlySnapshot?.trainingDurationChangePercent
+                )
             }
         }
         .padding(16)
@@ -1510,6 +1558,139 @@ struct ATHLTHProgressView: View {
         )
     }
 
+    private var currentWeekDays: [Date] {
+        let calendar = Calendar.current
+        let start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start
+            ?? calendar.startOfDay(for: Date())
+
+        return (0..<7).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: start)
+        }
+    }
+
+    private var workoutDaysThisWeek: Int {
+        currentWeekDays.filter(isWorkoutDay).count
+    }
+
+    private func isWorkoutDay(_ date: Date) -> Bool {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: date)
+        return consistencySnapshot?.activeWorkoutDays.contains {
+            calendar.isDate($0, inSameDayAs: day)
+        } ?? false
+    }
+
+    private var workoutStreak: Int {
+        guard let days = consistencySnapshot?.activeWorkoutDays, !days.isEmpty else {
+            return 0
+        }
+
+        let calendar = Calendar.current
+        let active = Set(days.map { calendar.startOfDay(for: $0) })
+        let today = calendar.startOfDay(for: Date())
+
+        var cursor: Date
+        if active.contains(today) {
+            cursor = today
+        } else if let yesterday = calendar.date(byAdding: .day, value: -1, to: today),
+                  active.contains(yesterday) {
+            cursor = yesterday
+        } else {
+            return 0
+        }
+
+        var streak = 0
+
+        while active.contains(cursor) {
+            streak += 1
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else {
+                break
+            }
+            cursor = previous
+        }
+
+        return streak
+    }
+
+    private var monthlyRange: (
+        start: Date,
+        end: Date,
+        previousStart: Date,
+        previousEnd: Date
+    ) {
+        let calendar = Calendar.current
+        let now = Date()
+        let start = calendar.dateInterval(of: .month, for: now)?.start
+            ?? calendar.startOfDay(for: now)
+        let previousStart = calendar.date(byAdding: .month, value: -1, to: start)
+            ?? start.addingTimeInterval(-2_592_000)
+        let elapsed = now.timeIntervalSince(start)
+        let previousBoundary = calendar.date(byAdding: .month, value: 1, to: previousStart)
+            ?? start
+        let previousEnd = min(
+            previousStart.addingTimeInterval(elapsed),
+            previousBoundary
+        )
+
+        return (
+            start: start,
+            end: now,
+            previousStart: previousStart,
+            previousEnd: previousEnd
+        )
+    }
+
+    private var consistencyRange: (
+        start: Date,
+        end: Date,
+        previousStart: Date,
+        previousEnd: Date
+    ) {
+        let calendar = Calendar.current
+        let now = Date()
+        let start = calendar.date(byAdding: .day, value: -90, to: calendar.startOfDay(for: now))
+            ?? now.addingTimeInterval(-7_776_000)
+        let previousStart = calendar.date(byAdding: .day, value: -90, to: start)
+            ?? start.addingTimeInterval(-7_776_000)
+
+        return (
+            start: start,
+            end: now,
+            previousStart: previousStart,
+            previousEnd: start
+        )
+    }
+
+    private func loadSupportingProgressData() async {
+        guard health.healthDataAvailable, health.hasRequestedAuthorization else {
+            monthlySnapshot = nil
+            consistencySnapshot = nil
+            return
+        }
+
+        let month = monthlyRange
+        let consistency = consistencyRange
+
+        async let monthly = health.progressSnapshot(
+            startDate: month.start,
+            endDate: month.end,
+            previousStartDate: month.previousStart,
+            previousEndDate: month.previousEnd,
+            grouping: .week
+        )
+
+        async let consistencyData = health.progressSnapshot(
+            startDate: consistency.start,
+            endDate: consistency.end,
+            previousStartDate: consistency.previousStart,
+            previousEndDate: consistency.previousEnd,
+            grouping: .day
+        )
+
+        monthlySnapshot = try? await monthly
+        consistencySnapshot = try? await consistencyData
+    }
+
     private func loadProgressData() async {
         guard health.healthDataAvailable else {
             progressSnapshot = nil
@@ -1574,7 +1755,7 @@ struct ATHLTHProgressView: View {
         tint: Color,
         value: String,
         label: String,
-        change: String
+        change: Double?
     ) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)
@@ -1585,17 +1766,24 @@ struct ATHLTHProgressView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(value)
                     .font(.subheadline.weight(.bold))
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.72)
                     .lineLimit(1)
                 Text(label)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
-                HStack(spacing: 2) {
-                    Image(systemName: "arrow.up")
-                    Text(change)
+
+                if let change {
+                    HStack(spacing: 2) {
+                        Image(systemName: change >= 0 ? "arrow.up" : "arrow.down")
+                        Text("\(abs(change), specifier: "%.0f")%")
+                    }
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(change >= 0 ? green : Color.orange)
+                } else {
+                    Text("—")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
                 }
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(green)
             }
 
             Spacer(minLength: 0)
