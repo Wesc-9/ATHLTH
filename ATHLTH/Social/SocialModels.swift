@@ -41,6 +41,18 @@ struct SocialProfileCard: Identifiable, Codable, Hashable {
     }
 }
 
+struct SocialProfileDetailRecord: Codable, Hashable {
+    let userID: UUID
+    let bio: String?
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case bio
+        case updatedAt = "updated_at"
+    }
+}
+
 struct SocialFriendshipRecord: Identifiable, Codable, Hashable {
     let id: UUID
     let userA: UUID
