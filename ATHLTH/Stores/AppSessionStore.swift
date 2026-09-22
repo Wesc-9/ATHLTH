@@ -5,7 +5,6 @@ final class AppSessionStore: ObservableObject {
     @Published var profile: UserProfile
     @Published var activePlan: TrainingPlan?
     @Published var savedRoutes: [TrainingRoute]
-    @Published var challenges: [RouteChallenge]
     @Published var previewModeEnabled: Bool
     @Published var signedIn: Bool
     @Published var onboardingCompleted: Bool
@@ -23,15 +22,13 @@ final class AppSessionStore: ObservableObject {
     init(
         profile: UserProfile = PreviewData.profile,
         activePlan: TrainingPlan? = PreviewData.trainingPlan,
-        savedRoutes: [TrainingRoute] = [PreviewData.route],
-        challenges: [RouteChallenge] = [PreviewData.challenge],
+        savedRoutes: [TrainingRoute] = [],
         previewModeEnabled: Bool = false,
         defaults: UserDefaults = .standard
     ) {
         self.profile = profile
         self.activePlan = activePlan
         self.savedRoutes = savedRoutes
-        self.challenges = challenges
         self.previewModeEnabled = previewModeEnabled
         self.defaults = defaults
         self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? profile.displayName
@@ -300,7 +297,6 @@ final class AppSessionStore: ObservableObject {
         profile = PreviewData.profile
         activePlan = nil
         savedRoutes = []
-        challenges = []
         previewModeEnabled = false
         usernameSeed = profile.displayName
     }
