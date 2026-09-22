@@ -45,6 +45,10 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
     var goalID: UUID?
     var workoutID: UUID?
     var challengeID: UUID?
+    var backendEventID: UUID?
+    var socialEventKind: String?
+    var socialEntityType: String?
+    var socialEntityID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -56,7 +60,11 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
         readAt: Date? = nil,
         goalID: UUID? = nil,
         workoutID: UUID? = nil,
-        challengeID: UUID? = nil
+        challengeID: UUID? = nil,
+        backendEventID: UUID? = nil,
+        socialEventKind: String? = nil,
+        socialEntityType: String? = nil,
+        socialEntityID: UUID? = nil
     ) {
         self.id = id
         self.eventKey = eventKey
@@ -68,6 +76,10 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
         self.goalID = goalID
         self.workoutID = workoutID
         self.challengeID = challengeID
+        self.backendEventID = backendEventID
+        self.socialEventKind = socialEventKind
+        self.socialEntityType = socialEntityType
+        self.socialEntityID = socialEntityID
     }
 
     var isUnread: Bool { readAt == nil }
@@ -82,6 +94,10 @@ struct ATHLTHNotificationDraft: Hashable {
     let goalID: UUID?
     let workoutID: UUID?
     let challengeID: UUID?
+    let backendEventID: UUID?
+    let socialEventKind: String?
+    let socialEntityType: String?
+    let socialEntityID: UUID?
 
     init(
         eventKey: String,
@@ -91,7 +107,11 @@ struct ATHLTHNotificationDraft: Hashable {
         createdAt: Date = Date(),
         goalID: UUID? = nil,
         workoutID: UUID? = nil,
-        challengeID: UUID? = nil
+        challengeID: UUID? = nil,
+        backendEventID: UUID? = nil,
+        socialEventKind: String? = nil,
+        socialEntityType: String? = nil,
+        socialEntityID: UUID? = nil
     ) {
         self.eventKey = eventKey
         self.kind = kind
@@ -101,5 +121,9 @@ struct ATHLTHNotificationDraft: Hashable {
         self.goalID = goalID
         self.workoutID = workoutID
         self.challengeID = challengeID
+        self.backendEventID = backendEventID
+        self.socialEventKind = socialEventKind
+        self.socialEntityType = socialEntityType
+        self.socialEntityID = socialEntityID
     }
 }
