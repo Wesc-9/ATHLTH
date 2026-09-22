@@ -610,7 +610,7 @@ struct OnboardingFlowView: View {
 
             onboardingTitle(
                 "What do you want to achieve?",
-                subtitle: "Choose the goal that matters most right now. You can change it later."
+                subtitle: "Choose the goal that matters most right now."
             )
 
             VStack(spacing: 10) {
@@ -660,14 +660,11 @@ struct OnboardingFlowView: View {
                 }
             }
 
-            Divider()
-                .padding(.vertical, 4)
-
             VStack(alignment: .leading, spacing: 10) {
                 Text("Anything else you're interested in?")
                     .font(.title3.weight(.bold))
 
-                Text("Choose all that apply. These help ATHLTH prioritize features, content and future plans for you.")
+                Text("Choose what you’re interested in to personalize your ATHLTH experience.")
                     .font(.subheadline)
                     .foregroundStyle(OnboardingTheme.mutedText)
 
@@ -704,22 +701,6 @@ struct OnboardingFlowView: View {
                 }
             }
 
-            OnboardingCard {
-                Toggle(isOn: $allowPersonalizedOffers) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Allow ATHLTH to use the goals and interests you choose to personalize ATHLTH offers.")
-                            .font(.subheadline.weight(.semibold))
-
-                        Text("Optional. You can continue without enabling this and change it later in Settings.")
-                            .font(.caption)
-                            .foregroundStyle(OnboardingTheme.mutedText)
-                    }
-                }
-            }
-
-            Text("This applies only to goals and interests you choose in ATHLTH. Apple Health / HealthKit data is not used for offer targeting.")
-                .font(.caption.italic())
-                .foregroundStyle(OnboardingTheme.mutedText)
         }
     }
 
@@ -974,6 +955,8 @@ struct OnboardingFlowView: View {
                     step = .connections
                 }
 
+                personalizedOffersFooter
+
             case .connections:
                 footerButton(title: "Continue") {
                     saveProfileData()
@@ -992,6 +975,47 @@ struct OnboardingFlowView: View {
             Rectangle()
                 .fill(Color.white.opacity(0.10))
                 .frame(height: 1)
+        }
+    }
+
+    private var personalizedOffersFooter: some View {
+        Toggle(isOn: $allowPersonalizedOffers) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(OnboardingTheme.accent)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        OnboardingTheme.accent.opacity(0.12),
+                        in: Circle()
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Make offers more relevant")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+
+                    Text("Use your selected goals and interests to personalize ATHLTH offers.")
+                        .font(.caption)
+                        .foregroundStyle(OnboardingTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text("Optional · Never uses Apple Health data.")
+                        .font(.caption2)
+                        .foregroundStyle(OnboardingTheme.faintText)
+                        .padding(.top, 1)
+                }
+            }
+        }
+        .tint(OnboardingTheme.accent)
+        .padding(14)
+        .background(
+            Color.white.opacity(0.07),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(OnboardingTheme.border, lineWidth: 1)
         }
     }
 
