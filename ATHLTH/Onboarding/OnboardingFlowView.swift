@@ -29,6 +29,7 @@ struct OnboardingFlowView: View {
     @State private var appleSignInInProgress = false
     @State private var onboardingCompletionError: String?
     @State private var showingWatchInstallHelp = false
+    @FocusState private var usernameFieldFocused: Bool
 
     private let usernameService = SupabaseUsernameAvailabilityService()
 
@@ -53,6 +54,7 @@ struct OnboardingFlowView: View {
                         .frame(maxWidth: 680)
                         .frame(maxWidth: .infinity)
                     }
+                    .scrollDismissesKeyboard(.interactively)
 
                     footer
                 }
@@ -60,6 +62,15 @@ struct OnboardingFlowView: View {
         }
         .foregroundStyle(step == .account ? Color.white : OnboardingTheme.primaryText)
         .preferredColorScheme(step == .account ? .dark : .light)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    usernameFieldFocused = false
+                }
+                .fontWeight(.semibold)
+            }
+        }
         .task {
             if session.signedIn, !session.onboardingCompleted {
                 if let bootstrap = try? await accountService.loadCurrentUser() {
@@ -89,7 +100,10 @@ struct OnboardingFlowView: View {
             case .username:
                 await loadUsernameSuggestions()
             case .connections:
+                usernameFieldFocused = false
                 watchConnection.refreshStatus()
+            case .goals, .ready:
+                usernameFieldFocused = false
             default:
                 break
             }
@@ -437,6 +451,11 @@ struct OnboardingFlowView: View {
                     TextField("@username", text: $username)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .submitLabel(.done)
+                        .focused($usernameFieldFocused)
+                        .onSubmit {
+                            usernameFieldFocused = false
+                        }
                         .font(.title2.weight(.semibold))
                         .padding(.horizontal, 16)
                         .frame(height: 58)
