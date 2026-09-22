@@ -2300,6 +2300,8 @@ struct ATHLTHProfileView: View {
                         isLoading: performanceStatsLoading
                     )
 
+                    WorkoutHistoryPreviewSection()
+
                     ProfileChallengesSection()
 
                     ATHLTHCard {
