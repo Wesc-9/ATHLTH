@@ -727,6 +727,10 @@ struct OnboardingFlowView: View {
                 subtitle: "Bring workouts, recovery and health data into ATHLTH."
             )
 
+            Text("Optional — connect now or set this up anytime in Settings.")
+                .font(.caption)
+                .foregroundStyle(OnboardingTheme.faintText)
+
             OnboardingCard {
                 VStack(spacing: 0) {
                     connectionRow(
@@ -736,8 +740,11 @@ struct OnboardingFlowView: View {
                             : "Workouts, heart rate, sleep, activity and recovery",
                         icon: "heart.fill",
                         complete: health.hasRequestedAuthorization,
-                        actionTitle: health.hasRequestedAuthorization ? "Settings" : "Set up",
-                        actionDisabled: healthRequestInProgress
+                        actionTitle: healthRequestInProgress
+                            ? "Setting up…"
+                            : health.hasRequestedAuthorization ? "Settings" : "Set up",
+                        actionDisabled: healthRequestInProgress,
+                        actionLoading: healthRequestInProgress
                     ) {
                         if health.hasRequestedAuthorization {
                             if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
@@ -770,7 +777,8 @@ struct OnboardingFlowView: View {
                         icon: "applewatch",
                         complete: watchConnection.isReady,
                         actionTitle: watchSetupActionTitle,
-                        actionDisabled: watchSetupActionDisabled
+                        actionDisabled: watchSetupActionDisabled,
+                        actionLoading: watchConnection.state == .checking
                     ) {
                         handleWatchSetupAction()
                     }
@@ -1115,17 +1123,19 @@ struct OnboardingFlowView: View {
         case .appNotInstalled:
             return "Install"
         case .checking:
-            return "Checking"
-        case .unsupported, .notPaired:
-            return "Check"
+            return "Checking…"
+        case .notPaired:
+            return "Not paired"
+        case .unsupported:
+            return "Unavailable"
         }
     }
 
     private var watchSetupActionDisabled: Bool {
         switch watchConnection.state {
-        case .ready, .checking:
+        case .ready, .checking, .notPaired, .unsupported:
             return true
-        case .unsupported, .notPaired, .appNotInstalled:
+        case .appNotInstalled:
             return false
         }
     }
@@ -1134,10 +1144,8 @@ struct OnboardingFlowView: View {
         switch watchConnection.state {
         case .appNotInstalled:
             showingWatchInstallHelp = true
-        case .ready:
+        case .ready, .checking, .unsupported, .notPaired:
             break
-        case .checking, .unsupported, .notPaired:
-            watchConnection.connect()
         }
     }
 
@@ -1187,6 +1195,7 @@ struct OnboardingFlowView: View {
         complete: Bool,
         actionTitle: String,
         actionDisabled: Bool = false,
+        actionLoading: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         HStack(spacing: 14) {
@@ -1212,14 +1221,23 @@ struct OnboardingFlowView: View {
 
             Spacer(minLength: 8)
 
-            Button(actionTitle) {
+            Button {
                 action()
+            } label: {
+                HStack(spacing: 6) {
+                    if actionLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+
+                    Text(actionTitle)
+                }
             }
             .font(.caption.weight(.semibold))
             .buttonStyle(.bordered)
             .tint(complete ? OnboardingTheme.success : OnboardingTheme.accent)
             .disabled(actionDisabled)
-            .opacity(actionDisabled ? 0.72 : 1)
+            .opacity(actionDisabled && !actionLoading ? 0.72 : 1)
         }
         .frame(minHeight: 76)
     }
