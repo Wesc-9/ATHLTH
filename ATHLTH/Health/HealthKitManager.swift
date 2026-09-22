@@ -419,6 +419,110 @@ final class HealthKitManager: ObservableObject {
         return records
     }
 
+    func goalEvidence(
+        for rule: GoalAutomationRule,
+        since startDate: Date
+    ) async throws -> GoalAutomationEvidence? {
+        let endDate = Date()
+
+        switch rule.metric {
+        case .bodyWeightKilograms, .bodyWeightChangeKilograms:
+            guard let sample = try await latestQuantity(
+                identifier: .bodyMass,
+                unit: HKUnit.gramUnit(with: .kilo),
+                startDate: startDate
+            ) else {
+                return nil
+            }
+
+            return GoalAutomationEvidence(
+                currentValue: sample.0,
+                evidenceDate: sample.1,
+                description: String(format: "Apple Health weight: %.1f kg", sample.0)
+            )
+
+        case .singleWorkoutDistanceMeters:
+            let workouts = try await fetchWorkouts(
+                startDate: startDate,
+                endDate: endDate
+            )
+            let candidates = workouts.filter { workoutMatchesGoalActivity($0, filter: rule.activity) }
+
+            guard let workout = candidates
+                .filter({ $0.totalDistance != nil })
+                .max(by: {
+                    ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) <
+                    ($1.totalDistance?.doubleValue(for: .meter()) ?? 0)
+                }),
+                let distance = workout.totalDistance?.doubleValue(for: .meter())
+            else {
+                return nil
+            }
+
+            return GoalAutomationEvidence(
+                currentValue: distance,
+                evidenceDate: workout.endDate,
+                description: String(
+                    format: "%@ workout: %.2f km",
+                    rule.activity?.title ?? "Tracked",
+                    distance / 1_000
+                )
+            )
+
+        case .workoutCount:
+            let workouts = try await fetchWorkouts(
+                startDate: startDate,
+                endDate: endDate
+            )
+            let candidates = workouts.filter { workoutMatchesGoalActivity($0, filter: rule.activity) }
+
+            guard !candidates.isEmpty else { return nil }
+
+            return GoalAutomationEvidence(
+                currentValue: Double(candidates.count),
+                evidenceDate: candidates.map(\.endDate).max() ?? endDate,
+                description: "\(candidates.count) qualifying workouts since this goal started"
+            )
+
+        case .dailySteps:
+            let values = try await dailyCumulativeQuantities(
+                identifier: .stepCount,
+                unit: .count(),
+                startDate: startDate,
+                endDate: endDate
+            )
+
+            guard let best = values.max(by: { $0.value < $1.value }) else {
+                return nil
+            }
+
+            return GoalAutomationEvidence(
+                currentValue: best.value,
+                evidenceDate: best.key,
+                description: "\(Int(best.value.rounded())) steps in one day"
+            )
+
+        case .sleepDurationSeconds:
+            let values = try await sleepDurationsByWakeDay(
+                startDate: startDate,
+                endDate: endDate
+            )
+
+            guard let best = values.max(by: { $0.value < $1.value }) else {
+                return nil
+            }
+
+            return GoalAutomationEvidence(
+                currentValue: best.value,
+                evidenceDate: best.key,
+                description: best.value.shortDuration + " sleep"
+            )
+
+        case .strengthWeightKilograms, .manualProgress:
+            return nil
+        }
+    }
+
     func refreshPersonalDetails() async {
         guard healthDataAvailable else {
             personalDetails = .empty
@@ -600,6 +704,24 @@ final class HealthKitManager: ObservableObject {
             averageCyclingPowerWatts: (try? await cyclingPowerTask) ?? nil,
             swimmingStrokeCount: (try? await swimmingStrokeTask) ?? nil
         )
+    }
+
+    private func workoutMatchesGoalActivity(
+        _ workout: HKWorkout,
+        filter: GoalActivityFilter?
+    ) -> Bool {
+        switch filter ?? .any {
+        case .any:
+            return true
+        case .running:
+            return workout.workoutActivityType == .running
+        case .walking:
+            return workout.workoutActivityType == .walking
+        case .cycling:
+            return workout.workoutActivityType == .cycling
+        case .hiking:
+            return workout.workoutActivityType == .hiking
+        }
     }
 
     private func fetchAllWorkouts() async throws -> [HKWorkout] {
@@ -1140,6 +1262,50 @@ final class HealthKitManager: ObservableObject {
 
                 continuation.resume(
                     returning: quantity?.doubleValue(for: unit)
+                )
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    private func latestQuantity(
+        identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        startDate: Date
+    ) async throws -> (Double, Date)? {
+        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+            return nil
+        }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: startDate,
+            end: Date(),
+            options: .strictStartDate
+        )
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<(Double, Date)?, Error>) in
+
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: 1,
+                sortDescriptors: [sort]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let sample = samples?.first as? HKQuantitySample else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                continuation.resume(
+                    returning: (sample.quantity.doubleValue(for: unit), sample.endDate)
                 )
             }
 
