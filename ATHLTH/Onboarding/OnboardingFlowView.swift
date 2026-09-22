@@ -431,27 +431,29 @@ struct OnboardingFlowView: View {
     }
 
     private var usernameStep: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 26) {
             onboardingTitle(
                 "Choose your username",
                 subtitle: "This is how friends will find you across ATHLTH."
             )
 
-            OnboardingCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Text("Username")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(OnboardingTheme.primaryText)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("USERNAME")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.35)
+                        .foregroundStyle(OnboardingTheme.mutedText)
 
-                        Spacer()
+                    Spacer()
 
-                        Text("UNIQUE TO YOU")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.2)
-                            .foregroundStyle(OnboardingTheme.accent)
-                    }
+                    Text("ATHLTH ID")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.15)
+                        .foregroundStyle(OnboardingTheme.accent)
+                }
+                .padding(.horizontal, 2)
 
+                HStack(spacing: 12) {
                     TextField("@username", text: $username)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -460,122 +462,169 @@ struct OnboardingFlowView: View {
                         .onSubmit {
                             usernameFieldFocused = false
                         }
-                        .font(.title2.weight(.semibold))
-                        .padding(.horizontal, 16)
-                        .frame(height: 58)
-                        .background(
-                            OnboardingTheme.subtleFill,
-                            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                                .stroke(
-                                    usernameValidation == .available
-                                        ? OnboardingTheme.success.opacity(0.62)
-                                        : OnboardingTheme.border,
-                                    lineWidth: 1
-                                )
-                        }
+                        .font(.system(size: 23, weight: .semibold))
+                        .foregroundStyle(OnboardingTheme.primaryText)
                         .onChange(of: username) {
                             username = UsernameGenerator.normalizedTypedUsername(username)
                         }
 
-                    if let title = usernameValidation.title, !username.isEmpty {
-                        Label(title, systemImage: usernameValidation.systemImage)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(
-                                usernameValidation == .available
-                                    ? OnboardingTheme.success
-                                    : usernameValidation == .checking
-                                        ? OnboardingTheme.mutedText
-                                        : Color.red
-                            )
-                            .padding(.horizontal, 13)
-                            .padding(.vertical, 10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                usernameValidation == .available
-                                    ? OnboardingTheme.success.opacity(0.11)
-                                    : OnboardingTheme.subtleFill,
-                                in: RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            )
-                    }
+                    if !username.isEmpty {
+                        Group {
+                            switch usernameValidation {
+                            case .checking:
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(OnboardingTheme.accent)
 
-                    HStack(spacing: 18) {
-                        validationRule(
-                            "3–20 characters",
-                            passed: (3...20).contains(username.count)
-                        )
-                        validationRule(
-                            "a–z, 0–9, _",
-                            passed: username.isEmpty ? false : UsernameGenerator.hasValidCharacters(username)
-                        )
-                    }
-                    .font(.caption)
+                            case .available:
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(OnboardingTheme.success)
+                                    .frame(width: 30, height: 30)
+                                    .background(
+                                        OnboardingTheme.success.opacity(0.11),
+                                        in: Circle()
+                                    )
 
+                            case .taken, .invalid:
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.red)
+                                    .frame(width: 30, height: 30)
+                                    .background(
+                                        Color.red.opacity(0.08),
+                                        in: Circle()
+                                    )
+
+                            case .idle:
+                                EmptyView()
+                            }
+                        }
+                    }
                 }
+                .padding(.horizontal, 18)
+                .frame(height: 66)
+                .background(
+                    OnboardingTheme.card,
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(
+                            usernameFieldFocused
+                                ? OnboardingTheme.accent.opacity(0.52)
+                                : usernameValidation == .available
+                                    ? OnboardingTheme.success.opacity(0.34)
+                                    : OnboardingTheme.border,
+                            lineWidth: usernameFieldFocused ? 1.25 : 1
+                        )
+                }
+                .shadow(
+                    color: usernameFieldFocused
+                        ? OnboardingTheme.accent.opacity(0.09)
+                        : Color.black.opacity(0.045),
+                    radius: usernameFieldFocused ? 18 : 12,
+                    x: 0,
+                    y: 7
+                )
+
+                HStack(spacing: 8) {
+                    Text("3–20 characters · letters, numbers & _")
+                        .font(.caption)
+                        .foregroundStyle(OnboardingTheme.faintText)
+
+                    Spacer()
+
+                    if let title = usernameValidation.title, !username.isEmpty {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(
+                                    usernameValidation == .available
+                                        ? OnboardingTheme.success
+                                        : usernameValidation == .checking
+                                            ? OnboardingTheme.accent
+                                            : Color.red
+                                )
+                                .frame(width: 5, height: 5)
+
+                            Text(title)
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(
+                            usernameValidation == .available
+                                ? OnboardingTheme.success
+                                : usernameValidation == .checking
+                                    ? OnboardingTheme.mutedText
+                                    : Color.red
+                        )
+                    }
+                }
+                .padding(.horizontal, 3)
             }
 
             if !usernameSuggestions.isEmpty {
-                VStack(alignment: .leading, spacing: 11) {
+                VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .firstTextBaseline) {
                         Text("Suggestions for you")
-                            .font(.headline)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(OnboardingTheme.primaryText)
 
                         Spacer()
 
                         Text("BASED ON YOUR NAME")
                             .font(.caption2.weight(.bold))
-                            .tracking(1.0)
-                            .foregroundStyle(OnboardingTheme.mutedText)
+                            .tracking(0.9)
+                            .foregroundStyle(OnboardingTheme.faintText)
                     }
 
-                    VStack(spacing: 10) {
-                        ForEach(usernameSuggestions, id: \.self) { suggestion in
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.adaptive(minimum: 145), spacing: 10)
+                        ],
+                        spacing: 10
+                    ) {
+                        ForEach(Array(usernameSuggestions.prefix(4)), id: \.self) { suggestion in
                             Button {
                                 username = suggestion
                             } label: {
-                                HStack(spacing: 13) {
+                                HStack(spacing: 8) {
                                     Text("@")
-                                        .font(.headline.weight(.bold))
+                                        .font(.caption.weight(.bold))
                                         .foregroundStyle(OnboardingTheme.accent)
-                                        .frame(width: 38, height: 38)
-                                        .background(
-                                            OnboardingTheme.accent.opacity(0.12),
-                                            in: Circle()
-                                        )
 
                                     Text(suggestion)
-                                        .font(.body.weight(.semibold))
+                                        .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(OnboardingTheme.primaryText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.78)
 
-                                    Spacer()
+                                    Spacer(minLength: 4)
 
                                     Image(
                                         systemName: username == suggestion
-                                            ? "checkmark.circle.fill"
+                                            ? "checkmark"
                                             : "plus"
                                     )
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(
                                         username == suggestion
                                             ? OnboardingTheme.accent
                                             : OnboardingTheme.mutedText
                                     )
                                 }
-                                .padding(.horizontal, 14)
-                                .frame(height: 58)
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 46)
                                 .background(
                                     username == suggestion
-                                        ? OnboardingTheme.accent.opacity(0.10)
+                                        ? OnboardingTheme.selectedFill
                                         : OnboardingTheme.card,
-                                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                                 )
                                 .overlay {
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 15, style: .continuous)
                                         .stroke(
                                             username == suggestion
-                                                ? OnboardingTheme.accent.opacity(0.48)
+                                                ? OnboardingTheme.accent.opacity(0.38)
                                                 : OnboardingTheme.border,
                                             lineWidth: 1
                                         )
