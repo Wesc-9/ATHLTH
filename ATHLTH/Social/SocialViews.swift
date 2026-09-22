@@ -219,13 +219,84 @@ struct SocialHubView: View {
     private var requestsContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                if social.incomingRequests.isEmpty && social.outgoingRequests.isEmpty {
+                if social.incomingRequests.isEmpty &&
+                    social.outgoingRequests.isEmpty &&
+                    social.workoutInvites.isEmpty {
                     ContentUnavailableView(
-                        "No friend requests",
+                        "No requests",
                         systemImage: "person.crop.circle.badge.checkmark",
-                        description: Text("New requests will appear here.")
+                        description: Text("Friend and workout invitations will appear here.")
                     )
                     .padding(.vertical, 50)
+                }
+
+                if !social.workoutInvites.isEmpty {
+                    sectionTitle("Train Together")
+
+                    ForEach(social.workoutInvites) { invite in
+                        VStack(alignment: .leading, spacing: 11) {
+                            HStack(spacing: 12) {
+                                if let creator = invite.creator {
+                                    SocialAvatar(profile: creator, size: 46)
+                                } else {
+                                    Image(systemName: "person.fill")
+                                        .foregroundStyle(.green)
+                                        .frame(width: 46, height: 46)
+                                        .background(
+                                            .green.opacity(0.10),
+                                            in: Circle()
+                                        )
+                                }
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(
+                                        invite.creator?.resolvedName
+                                            ?? "A friend"
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+
+                                    Text(invite.session.title)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+
+                                    Text(
+                                        invite.session.startedAt.formatted(
+                                            date: .abbreviated,
+                                            time: .shortened
+                                        )
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+                            }
+
+                            HStack(spacing: 8) {
+                                Button("Decline") {
+                                    Task {
+                                        await social.declineWorkoutInvite(invite)
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .frame(maxWidth: .infinity)
+
+                                Button("Join") {
+                                    Task {
+                                        await social.acceptWorkoutInvite(invite)
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.green)
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            Color(.secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 17)
+                        )
+                    }
                 }
 
                 if !social.incomingRequests.isEmpty {
@@ -446,6 +517,23 @@ private struct SocialActivityCard: View {
                     Text(subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                }
+
+                if let names = item.activity.metadata?["with_names"],
+                   !names.isEmpty {
+                    Label(
+                        "with \(names)",
+                        systemImage: "person.2.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+                }
+
+                if let caption = item.activity.metadata?["caption"],
+                   !caption.isEmpty {
+                    Text(caption)
+                        .font(.subheadline)
+                        .padding(.top, 2)
                 }
             }
 
