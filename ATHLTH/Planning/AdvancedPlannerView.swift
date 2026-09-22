@@ -400,6 +400,8 @@ struct PlanMetadataEditorView: View {
     @State private var summary: String
     @State private var visibility: ProfileVisibility
     @State private var tags: String
+    @State private var startDateEnabled: Bool
+    @State private var startDate: Date
 
     init(plan: TrainingPlan) {
         self.plan = plan
@@ -407,6 +409,8 @@ struct PlanMetadataEditorView: View {
         _summary = State(initialValue: plan.summary)
         _visibility = State(initialValue: plan.visibility)
         _tags = State(initialValue: plan.tags.joined(separator: ", "))
+        _startDateEnabled = State(initialValue: plan.startDate != nil)
+        _startDate = State(initialValue: plan.startDate ?? Date())
     }
 
     var body: some View {
@@ -425,6 +429,16 @@ struct PlanMetadataEditorView: View {
                         ForEach(ProfileVisibility.allCases) { visibility in
                             Text(visibility.title).tag(visibility)
                         }
+                    }
+
+                    Toggle("Use calendar start date", isOn: $startDateEnabled)
+
+                    if startDateEnabled {
+                        DatePicker(
+                            "Plan starts",
+                            selection: $startDate,
+                            displayedComponents: .date
+                        )
                     }
 
                     TextField(
@@ -457,7 +471,10 @@ struct PlanMetadataEditorView: View {
                             visibility: visibility,
                             tags: tags
                                 .split(separator: ",")
-                                .map(String.init)
+                                .map(String.init),
+                            startDate: startDateEnabled
+                                ? Calendar.current.startOfDay(for: startDate)
+                                : nil
                         )
                         dismiss()
                     }
