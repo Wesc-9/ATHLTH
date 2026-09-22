@@ -219,6 +219,23 @@ struct ATHLTHSettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Toggle("Auto-pause outdoor workouts", isOn: $settings.autoPauseOutdoorWorkouts)
+
+                Toggle(
+                    "Publish completed workouts automatically",
+                    isOn: $settings.autoPublishCompletedWorkouts
+                )
+
+                if settings.autoPublishCompletedWorkouts {
+                    LabeledContent(
+                        "Automatic visibility",
+                        value: settings.defaultActivityVisibility.title
+                    )
+
+                    Text("The workout is still saved first and the post-workout review opens so you can add a description, effort and training partners or change visibility.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Toggle("Audio cues", isOn: $settings.audioCuesEnabled)
                 Toggle("Haptic cues on Apple Watch", isOn: $settings.hapticCuesEnabled)
             }
