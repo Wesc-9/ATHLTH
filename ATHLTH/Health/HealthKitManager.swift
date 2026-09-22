@@ -296,6 +296,123 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    func trophySnapshot() async throws -> TrophyHealthSnapshot {
+        let workouts = try await fetchAllWorkouts()
+            .sorted { $0.startDate < $1.startDate }
+
+        let workoutThresholds = [10, 50, 100, 250]
+        var workoutCountReachedAt: [Int: Date] = [:]
+
+        for (index, workout) in workouts.enumerated() {
+            let count = index + 1
+            if workoutThresholds.contains(count) {
+                workoutCountReachedAt[count] = workout.endDate
+            }
+        }
+
+        let runThresholds = [25_000, 100_000, 500_000, 1_000_000]
+        var runningDistanceReachedAt: [Int: Date] = [:]
+        var cumulativeRunDistance = 0.0
+        var longestRunMeters = 0.0
+        var firstFiveKDate: Date?
+        var firstHalfMarathonDate: Date?
+        var firstMarathonDate: Date?
+
+        for workout in workouts where workout.workoutActivityType == .running {
+            let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0
+            guard distance > 0 else { continue }
+
+            longestRunMeters = max(longestRunMeters, distance)
+            cumulativeRunDistance += distance
+
+            if firstFiveKDate == nil, distance >= 5_000 {
+                firstFiveKDate = workout.endDate
+            }
+
+            if firstHalfMarathonDate == nil, distance >= 21_097.5 {
+                firstHalfMarathonDate = workout.endDate
+            }
+
+            if firstMarathonDate == nil, distance >= 42_195 {
+                firstMarathonDate = workout.endDate
+            }
+
+            for threshold in runThresholds
+            where runningDistanceReachedAt[threshold] == nil &&
+                    cumulativeRunDistance >= Double(threshold) {
+                runningDistanceReachedAt[threshold] = workout.endDate
+            }
+        }
+
+        let calendar = Calendar.current
+        let workoutDays = Array(
+            Set(workouts.map { calendar.startOfDay(for: $0.startDate) })
+        )
+        .sorted()
+
+        let streakThresholds = [3, 7, 14, 30]
+        var workoutStreakReachedAt: [Int: Date] = [:]
+        var longestStreak = 0
+        var currentStreak = 0
+        var previousDay: Date?
+
+        for day in workoutDays {
+            if let previousDay,
+               calendar.dateComponents([.day], from: previousDay, to: day).day == 1 {
+                currentStreak += 1
+            } else {
+                currentStreak = 1
+            }
+
+            longestStreak = max(longestStreak, currentStreak)
+
+            for threshold in streakThresholds
+            where workoutStreakReachedAt[threshold] == nil &&
+                    currentStreak >= threshold {
+                workoutStreakReachedAt[threshold] = day
+            }
+
+            previousDay = day
+        }
+
+        let historicalStart = calendar.date(
+            from: DateComponents(year: 2000, month: 1, day: 1)
+        ) ?? Date(timeIntervalSince1970: 946_684_800)
+        let sleepByDay = try await sleepDurationsByWakeDay(
+            startDate: historicalStart,
+            endDate: Date()
+        )
+        let qualifyingSleepDays = sleepByDay
+            .filter { $0.value >= 7 * 3_600 }
+            .map(\.key)
+            .sorted()
+
+        let sleepThresholds = [7, 30, 100]
+        var qualifyingSleepNightsReachedAt: [Int: Date] = [:]
+
+        for (index, day) in qualifyingSleepDays.enumerated() {
+            let count = index + 1
+            if sleepThresholds.contains(count) {
+                qualifyingSleepNightsReachedAt[count] = day
+            }
+        }
+
+        return TrophyHealthSnapshot(
+            workoutCount: workouts.count,
+            workoutCountReachedAt: workoutCountReachedAt,
+            totalRunningDistanceMeters: cumulativeRunDistance,
+            runningDistanceReachedAt: runningDistanceReachedAt,
+            longestRunMeters: longestRunMeters,
+            firstFiveKDate: firstFiveKDate,
+            firstHalfMarathonDate: firstHalfMarathonDate,
+            firstMarathonDate: firstMarathonDate,
+            longestWorkoutStreakDays: longestStreak,
+            workoutStreakReachedAt: workoutStreakReachedAt,
+            qualifyingSleepNights: qualifyingSleepDays.count,
+            qualifyingSleepNightsReachedAt: qualifyingSleepNightsReachedAt
+        )
+    }
+
     func personalRecords() async throws -> [HealthPersonalRecord] {
         let workouts = try await fetchAllWorkouts()
         var records: [HealthPersonalRecord] = []
