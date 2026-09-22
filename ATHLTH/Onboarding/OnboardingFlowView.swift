@@ -661,6 +661,15 @@ struct OnboardingFlowView: View {
                                     : OnboardingTheme.card,
                                 in: RoundedRectangle(cornerRadius: 14)
                             )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(
+                                        interests.contains(interest)
+                                            ? OnboardingTheme.accent.opacity(0.36)
+                                            : OnboardingTheme.border,
+                                        lineWidth: 1
+                                    )
+                            }
                         }
                         .buttonStyle(.plain)
                     }
