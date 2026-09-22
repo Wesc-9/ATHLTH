@@ -20,6 +20,27 @@ final class ChallengeStore: ObservableObject {
         challenges.first { $0.id == id }
     }
 
+    func mergeRemoteChallenges(_ remote: [ATHLTHChallenge]) {
+        var changed = false
+
+        for remoteChallenge in remote {
+            if let index = challenges.firstIndex(where: { $0.id == remoteChallenge.id }) {
+                if challenges[index] != remoteChallenge {
+                    challenges[index] = remoteChallenge
+                    changed = true
+                }
+            } else {
+                challenges.append(remoteChallenge)
+                changed = true
+            }
+        }
+
+        if changed {
+            refreshStatuses()
+            persist()
+        }
+    }
+
     func add(_ challenge: ATHLTHChallenge) {
         challenges.append(challenge)
         refreshStatuses()
