@@ -216,6 +216,25 @@ final class SupabaseAccountService: ObservableObject {
         return try await loadCurrentUser()
     }
 
+    func currentUserNameSeed() async -> String? {
+        guard let user = try? await client.auth.user() else {
+            return nil
+        }
+
+        for key in ["given_name", "first_name", "full_name", "name"] {
+            guard case let .string(value)? = user.userMetadata[key] else {
+                continue
+            }
+
+            let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !clean.isEmpty {
+                return clean
+            }
+        }
+
+        return nil
+    }
+
     func loadCurrentUser() async throws -> BackendUserBootstrap {
         guard let userID = currentUserID else {
             throw SupabaseAccountError.notAuthenticated
