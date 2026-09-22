@@ -127,7 +127,7 @@ struct ExerciseLibraryView: View {
                     } label: {
                         filterChip(
                             selectedBodyPart == "All"
-                                ? "Body part"
+                                ? "Muscle group"
                                 : selectedBodyPart,
                             active: selectedBodyPart != "All"
                         )
