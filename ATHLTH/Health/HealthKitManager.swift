@@ -261,6 +261,12 @@ final class HealthKitManager: ObservableObject {
         }
     }
 
+    func workoutHistory() async throws -> [WorkoutSummary] {
+        try await fetchAllWorkouts()
+            .map(WorkoutSummary.init)
+            .sorted { $0.startDate > $1.startDate }
+    }
+
     func progressSnapshot(
         startDate: Date,
         endDate: Date,
