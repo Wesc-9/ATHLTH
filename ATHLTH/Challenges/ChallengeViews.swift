@@ -1691,7 +1691,6 @@ struct ManualStrengthAttemptView: View {
                                 LabeledContent("Required weight") {
                                     Text("\(fixed, specifier: "%.1f") kg")
                                 }
-                                weightKg = fixed
                             } else {
                                 numericField(
                                     title: "Weight",
@@ -1775,13 +1774,26 @@ struct ManualStrengthAttemptView: View {
         }
     }
 
+    private var effectiveWeight: Double? {
+        guard let challenge else {
+            return weightKg > 0 ? weightKg : nil
+        }
+
+        if challenge.rules.scoring == .mostReps,
+           let fixed = challenge.rules.fixedWeightKilograms {
+            return fixed
+        }
+
+        return weightKg > 0 ? weightKg : nil
+    }
+
     private func submit() {
         do {
             try challenges.submitManualStrengthAttempt(
                 challengeID: challengeID,
                 participantID: participant.id,
                 participantName: participant.displayName,
-                weightKilograms: weightKg > 0 ? weightKg : nil,
+                weightKilograms: effectiveWeight,
                 reps: reps > 0 ? reps : nil,
                 volumeKilograms: volumeKg > 0 ? volumeKg : nil,
                 note: note
