@@ -3,6 +3,7 @@ import UserNotifications
 
 struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var social: SocialStore
 
     var body: some View {
         List {
@@ -74,52 +75,118 @@ struct ATHLTHNotificationCenterView: View {
         notifications.authorizationStatus == .denied
     }
 
+    @ViewBuilder
     private func notificationRow(_ item: ATHLTHNotificationItem) -> some View {
-        Button {
-            notifications.markRead(item.id)
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: item.kind.systemImage)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(iconTint(item.kind))
-                        .frame(width: 40, height: 40)
-                        .background(
-                            iconTint(item.kind).opacity(0.10),
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        )
-
-                    if item.isUnread {
-                        Circle()
-                            .fill(.red)
-                            .frame(width: 8, height: 8)
-                            .overlay {
-                                Circle().stroke(.white, lineWidth: 1.5)
-                            }
+        if hasDestination(item) {
+            NavigationLink {
+                notificationDestination(item)
+                    .onAppear {
+                        markOpened(item)
                     }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.subheadline.weight(item.isUnread ? .bold : .semibold))
-                        .foregroundStyle(.primary)
-
-                    Text(item.message)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(item.createdAt, style: .relative)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-
-                Spacer()
+            } label: {
+                notificationLabel(item)
             }
-            .contentShape(Rectangle())
-            .padding(.vertical, 5)
+            .buttonStyle(.plain)
+        } else {
+            Button {
+                markOpened(item)
+            } label: {
+                notificationLabel(item)
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+    }
+
+    private func notificationLabel(_ item: ATHLTHNotificationItem) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: item.kind.systemImage)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(iconTint(item.kind))
+                    .frame(width: 40, height: 40)
+                    .background(
+                        iconTint(item.kind).opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
+
+                if item.isUnread {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 8, height: 8)
+                        .overlay {
+                            Circle().stroke(.white, lineWidth: 1.5)
+                        }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.subheadline.weight(item.isUnread ? .bold : .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(item.message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(item.createdAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 5)
+    }
+
+    private func hasDestination(_ item: ATHLTHNotificationItem) -> Bool {
+        if item.challengeID != nil || item.goalID != nil {
+            return true
+        }
+
+        if item.kind == .achievement {
+            return true
+        }
+
+        switch item.socialEventKind {
+        case "friend_request", "friend_accepted", "reaction":
+            return true
+        default:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private func notificationDestination(_ item: ATHLTHNotificationItem) -> some View {
+        if let challengeID = item.challengeID {
+            ChallengeDetailView(challengeID: challengeID)
+        } else if let goalID = item.goalID {
+            GoalDetailView(goalID: goalID)
+        } else if item.kind == .achievement {
+            TrophyCollectionView()
+        } else {
+            switch item.socialEventKind {
+            case "friend_request":
+                SocialHubView(initialTab: .requests)
+            case "friend_accepted":
+                SocialHubView(initialTab: .friends)
+            case "reaction":
+                SocialHubView(initialTab: .feed)
+            default:
+                SocialHubView(initialTab: .feed)
+            }
+        }
+    }
+
+    private func markOpened(_ item: ATHLTHNotificationItem) {
+        notifications.markRead(item.id)
+
+        if let backendEventID = item.backendEventID {
+            Task {
+                await social.markBackendInboxRead(backendEventID)
+            }
+        }
     }
 
     private func iconTint(_ kind: ATHLTHNotificationKind) -> Color {
