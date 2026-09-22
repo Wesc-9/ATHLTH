@@ -8,6 +8,7 @@ struct ATHLTHApp: App {
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
     @StateObject private var goals = GoalStore()
+    @StateObject private var notifications = ATHLTHNotificationStore()
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
     @StateObject private var workoutMirroring = WorkoutMirroringStore()
@@ -24,6 +25,7 @@ struct ATHLTHApp: App {
                 .environmentObject(settings)
                 .environmentObject(strengthWorkout)
                 .environmentObject(goals)
+                .environmentObject(notifications)
                 .environmentObject(spotifyPlayback)
                 .environmentObject(watchConnection)
                 .environmentObject(workoutMirroring)
@@ -46,6 +48,7 @@ struct AppRootView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
     @State private var authCallbackError: String?
 
@@ -87,6 +90,7 @@ struct AppRootView: View {
                 health: health,
                 strength: strengthWorkout
             )
+            notifications.syncGoalEvents(from: goals.goals)
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -102,6 +106,7 @@ struct AppRootView: View {
                     health: health,
                     strength: strengthWorkout
                 )
+                notifications.syncGoalEvents(from: goals.goals)
             }
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
@@ -137,14 +142,24 @@ struct AppRootView: View {
                 )
             }
 
+            notifications.recordWatchWorkout(result)
+
             Task {
                 await health.refreshAll()
                 await goals.refreshAutomaticMilestones(
                     health: health,
                     strength: strengthWorkout
                 )
+                notifications.syncGoalEvents(from: goals.goals)
                 watchConnection.clearCompletedWorkout()
             }
+        }
+        .onChange(of: strengthWorkout.completedWorkout) { _, workout in
+            guard let workout else { return }
+            notifications.recordStrengthWorkout(workout)
+        }
+        .onChange(of: goals.goals) { _, updatedGoals in
+            notifications.syncGoalEvents(from: updatedGoals)
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
             guard signedIn else { return }
