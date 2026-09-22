@@ -749,92 +749,506 @@ struct ATHLTHRecoveryView: View {
 }
 
 struct ATHLTHProgressView: View {
-    private let weekly = [2, 4, 3, 5, 2, 4, 3]
+    private let accent = Color(red: 0.20, green: 0.66, blue: 0.42)
+    private let warmAccent = Color(red: 0.79, green: 0.61, blue: 0.42)
+    private let canvas = Color(red: 0.965, green: 0.972, blue: 0.968)
+
+    private let performance: [ProgressTrendPoint] = [
+        .init(label: "W1", value: 18.2),
+        .init(label: "W2", value: 21.4),
+        .init(label: "W3", value: 19.8),
+        .init(label: "W4", value: 26.6),
+        .init(label: "W5", value: 24.1),
+        .init(label: "W6", value: 29.8),
+        .init(label: "W7", value: 31.2),
+        .init(label: "W8", value: 32.4)
+    ]
+
+    private let consistency: [ProgressConsistencyDay] = [
+        .init(day: "M", completed: true),
+        .init(day: "T", completed: true),
+        .init(day: "W", completed: false),
+        .init(day: "T", completed: true),
+        .init(day: "F", completed: true),
+        .init(day: "S", completed: true),
+        .init(day: "S", completed: false)
+    ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
-                    ATHLTHPageHeader(title: "Your Progress", subtitle: "Small steps. Big results.")
-
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Weekly Overview", actionTitle: "This week")
-                        HStack {
-                            ATHLTHMetric(title: "Workouts", value: "5", icon: "dumbbell.fill")
-                            ATHLTHMetric(title: "Steps/day", value: "8,432", icon: "shoeprints.fill", tint: .blue)
-                            ATHLTHMetric(title: "Sleep/day", value: "7h 24m", icon: "moon.fill", tint: .purple)
-                            ATHLTHMetric(title: "Recovery", value: "82", icon: "leaf.fill")
-                        }
-                        .padding(.top, 12)
+                VStack(spacing: 16) {
+                    progressHeader
+                    primaryGoalCard
+                    weeklySnapshot
+                    performanceCard
+                    HStack(alignment: .top, spacing: 12) {
+                        personalBestsCard
+                        consistencyCard
                     }
-
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Workouts Completed")
-                        Chart {
-                            ForEach(Array(weekly.enumerated()), id: \.offset) { index, value in
-                                BarMark(
-                                    x: .value("Day", index),
-                                    y: .value("Workouts", value)
-                                )
-                                .foregroundStyle(.green.gradient)
-                            }
-                        }
-                        .frame(height: 190)
-                        .padding(.top, 12)
-                    }
-
-                    HStack(spacing: 12) {
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Consistency Streak")
-                            Label("12 days", systemImage: "flame.fill")
-                                .font(.title2.weight(.bold))
-                                .foregroundStyle(.green)
-                                .padding(.top, 10)
-                            Text("Keep it going.")
-                                .foregroundStyle(.secondary)
-                        }
-
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Personal Records")
-                            VStack(alignment: .leading, spacing: 8) {
-                                Label("Squat · 100 kg", systemImage: "dumbbell.fill")
-                                Label("Longest run · 7.2 km", systemImage: "figure.run")
-                                Label("Fastest 5K · 24:18", systemImage: "stopwatch.fill")
-                            }
-                            .font(.subheadline)
-                            .padding(.top, 10)
-                        }
-                    }
-
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Achievements", actionTitle: "See All")
-                        HStack {
-                            achievement(icon: "dumbbell.fill", title: "10 Workouts")
-                            achievement(icon: "shoeprints.fill", title: "50K Steps")
-                            achievement(icon: "mountain.2.fill", title: "New PR")
-                        }
-                        .padding(.top, 10)
-                    }
+                    milestonesCard
                 }
-                .padding()
-                .frame(maxWidth: 900)
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 30)
+                .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
+            .background(canvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
-    @ViewBuilder
-    private func achievement(icon: String, title: String) -> some View {
-        VStack(spacing: 8) {
+    private var progressHeader: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("ATHLTH")
+                        .font(.title3.weight(.black))
+                        .tracking(6)
+
+                    Text("MOVE BETTER · LIVE LONGER")
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(1.8)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 42, height: 42)
+                    .background(.white.opacity(0.88), in: Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                    }
+            }
+
+            Text("Progress")
+                .font(.system(size: 34, weight: .bold))
+                .padding(.top, 14)
+
+            Text("Your goals. Your momentum.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var primaryGoalCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("PRIMARY GOAL")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.4)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(accent)
+                        .frame(width: 6, height: 6)
+                    Text("ON TRACK")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(accent)
+                }
+            }
+
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "flag.checkered")
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 48, height: 48)
+                    .background(accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Oslo Marathon")
+                        .font(.title2.weight(.bold))
+
+                    Text("19 Sep 2027 · Marathon")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("178")
+                        .font(.title2.weight(.bold))
+                    Text("days left")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Plan progress")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Text("34%")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(accent)
+                }
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.black.opacity(0.06))
+
+                        Capsule()
+                            .fill(accent)
+                            .frame(width: proxy.size.width * 0.34)
+                    }
+                }
+                .frame(height: 8)
+            }
+
+            HStack(spacing: 8) {
+                goalMetric("3 / 4", "Runs this week")
+                goalMetric("16 km", "Long run")
+                goalMetric("32.4 km", "Weekly volume")
+            }
+
+            Divider()
+                .overlay(Color.black.opacity(0.06))
+
+            VStack(spacing: 10) {
+                secondaryGoalRow(
+                    icon: "scalemass.fill",
+                    title: "Reach 82 kg",
+                    detail: "86.4 kg now",
+                    progress: "41%"
+                )
+
+                secondaryGoalRow(
+                    icon: "stopwatch.fill",
+                    title: "5K under 25:00",
+                    detail: "Current best 27:12",
+                    progress: "68%"
+                )
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [.white, Color(red: 0.985, green: 0.992, blue: 0.987)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Color.black.opacity(0.055), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.055), radius: 22, x: 0, y: 10)
+    }
+
+    private var weeklySnapshot: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("This week")
+                    .font(.title3.weight(.bold))
+
+                Spacer()
+
+                Text("MON – SUN")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.9)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 0) {
+                progressMetric(icon: "figure.run", value: "5", label: "Workouts")
+                progressMetric(icon: "point.topleft.down.to.point.bottomright.curvepath", value: "32.4", label: "km")
+                progressMetric(icon: "clock.fill", value: "4h 38m", label: "Training")
+                progressMetric(icon: "checkmark.circle.fill", value: "86%", label: "Consistency")
+            }
+        }
+        .padding(18)
+        .progressSurface()
+    }
+
+    private var performanceCard: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Performance")
+                        .font(.title3.weight(.bold))
+                    Text("Weekly running distance")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("32.4 km")
+                        .font(.headline)
+                    Text("↑ 8% vs last week")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(accent)
+                }
+            }
+
+            Chart(performance) { point in
+                AreaMark(
+                    x: .value("Week", point.label),
+                    y: .value("Distance", point.value)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            accent.opacity(0.24),
+                            accent.opacity(0.02)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+                LineMark(
+                    x: .value("Week", point.label),
+                    y: .value("Distance", point.value)
+                )
+                .foregroundStyle(accent)
+                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+
+                PointMark(
+                    x: .value("Week", point.label),
+                    y: .value("Distance", point.value)
+                )
+                .foregroundStyle(accent)
+                .symbolSize(18)
+            }
+            .chartYScale(domain: 0...36)
+            .chartYAxis(.hidden)
+            .chartXAxis {
+                AxisMarks(values: .automatic) {
+                    AxisGridLine().foregroundStyle(Color.black.opacity(0.035))
+                    AxisValueLabel()
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(height: 180)
+
+            HStack(spacing: 8) {
+                Label("8 week trend", systemImage: "calendar")
+                Spacer()
+                Label("Best week · 32.4 km", systemImage: "arrow.up.right")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .progressSurface()
+    }
+
+    private var personalBestsCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text("Personal bests")
+                    .font(.headline)
+                Spacer()
+                Image(systemName: "trophy.fill")
+                    .foregroundStyle(warmAccent)
+            }
+
+            recordRow("5K", value: "27:12", icon: "stopwatch.fill")
+            recordRow("Longest run", value: "18.6 km", icon: "figure.run")
+            recordRow("Squat", value: "100 kg", icon: "dumbbell.fill")
+        }
+        .padding(16)
+        .progressSurface()
+    }
+
+    private var consistencyCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text("Consistency")
+                    .font(.headline)
+                Spacer()
+                Text("12 day streak")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(accent)
+            }
+
+            HStack(spacing: 7) {
+                ForEach(consistency) { item in
+                    VStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(item.completed ? accent : Color.black.opacity(0.055))
+                            .frame(height: item.completed ? 42 : 25)
+                            .frame(maxHeight: 44, alignment: .bottom)
+
+                        Text(item.day)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: 58, alignment: .bottom)
+                }
+            }
+
+            Text("5 of 7 planned sessions completed")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .progressSurface()
+    }
+
+    private var milestonesCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text("Recent milestones")
+                    .font(.headline)
+                Spacer()
+                Text("3 NEW")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.8)
+                    .foregroundStyle(accent)
+            }
+
+            HStack(spacing: 10) {
+                milestone(icon: "flame.fill", title: "12 day", detail: "streak")
+                milestone(icon: "figure.run", title: "100 km", detail: "this month")
+                milestone(icon: "trophy.fill", title: "New PR", detail: "5K")
+            }
+        }
+        .padding(18)
+        .progressSurface()
+    }
+
+    private func goalMetric(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(.subheadline.weight(.bold))
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black.opacity(0.025), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func secondaryGoalRow(
+        icon: String,
+        title: String,
+        detail: String,
+        progress: String
+    ) -> some View {
+        HStack(spacing: 11) {
             Image(systemName: icon)
-                .font(.title)
-                .foregroundStyle(.green)
-                .frame(width: 58, height: 58)
-                .background(.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
-            Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(warmAccent)
+                .frame(width: 30, height: 30)
+                .background(warmAccent.opacity(0.10), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(progress)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(accent)
+        }
+    }
+
+    private func progressMetric(
+        icon: String,
+        value: String,
+        label: String
+    ) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(accent)
+            Text(value)
+                .font(.subheadline.weight(.bold))
+                .minimumScaleFactor(0.75)
+                .lineLimit(1)
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func recordRow(_ title: String, value: String, icon: String) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 27, height: 27)
+                .background(accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.caption.weight(.bold))
+        }
+    }
+
+    private func milestone(icon: String, title: String, detail: String) -> some View {
+        VStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 40, height: 40)
+                .background(accent.opacity(0.09), in: Circle())
+
+            Text(title)
+                .font(.caption.weight(.bold))
+            Text(detail)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct ProgressTrendPoint: Identifiable {
+    let id = UUID()
+    let label: String
+    let value: Double
+}
+
+private struct ProgressConsistencyDay: Identifiable {
+    let id = UUID()
+    let day: String
+    let completed: Bool
+}
+
+private extension View {
+    func progressSurface() -> some View {
+        self
+            .background(
+                Color.white,
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.035), radius: 16, x: 0, y: 7)
     }
 }
 
