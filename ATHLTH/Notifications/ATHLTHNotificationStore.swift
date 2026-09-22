@@ -33,7 +33,11 @@ final class ATHLTHNotificationStore: ObservableObject {
             createdAt: draft.createdAt,
             goalID: draft.goalID,
             workoutID: draft.workoutID,
-            challengeID: draft.challengeID
+            challengeID: draft.challengeID,
+            backendEventID: draft.backendEventID,
+            socialEventKind: draft.socialEventKind,
+            socialEntityType: draft.socialEntityType,
+            socialEntityID: draft.socialEntityID
         )
 
         items.insert(item, at: 0)
@@ -384,10 +388,28 @@ final class ATHLTHNotificationStore: ObservableObject {
         content.title = item.title
         content.body = item.message
         content.sound = .default
-        content.userInfo = [
+        var userInfo: [String: String] = [
             "athlthEventKey": item.eventKey,
             "athlthNotificationID": item.id.uuidString
         ]
+
+        if let challengeID = item.challengeID {
+            userInfo["athlthChallengeID"] = challengeID.uuidString
+        }
+
+        if let goalID = item.goalID {
+            userInfo["athlthGoalID"] = goalID.uuidString
+        }
+
+        if let backendEventID = item.backendEventID {
+            userInfo["athlthBackendEventID"] = backendEventID.uuidString
+        }
+
+        if let socialEventKind = item.socialEventKind {
+            userInfo["athlthSocialEventKind"] = socialEventKind
+        }
+
+        content.userInfo = userInfo
 
         let request = UNNotificationRequest(
             identifier: item.eventKey,
