@@ -8,8 +8,8 @@ enum OnboardingTheme {
     static let deepGreen = Color(red: 0.23, green: 0.50, blue: 0.34)
     static let warmHighlight = accent
 
-    static let canvasTop = Color(red: 0.985, green: 0.979, blue: 0.966)
-    static let canvasBottom = Color(red: 0.958, green: 0.948, blue: 0.928)
+    static let canvasTop = Color.white
+    static let canvasBottom = Color(red: 0.985, green: 0.980, blue: 0.970)
     static let primaryText = Color(red: 0.08, green: 0.08, blue: 0.09)
     static let mutedText = Color.black.opacity(0.58)
     static let faintText = Color.black.opacity(0.40)
