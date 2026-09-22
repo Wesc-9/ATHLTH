@@ -333,6 +333,37 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func publishStrengthWorkout(
+        _ workout: StrengthWorkoutLog,
+        visibility: ProfileVisibility = .friends
+    ) async {
+        guard let endedAt = workout.endedAt,
+              endedAt >= activationDate
+        else {
+            return
+        }
+
+        let volume = workout.totalVolumeKilograms > 0
+            ? String(format: "%.0f kg volume", workout.totalVolumeKilograms)
+            : "\(workout.totalCompletedSets) sets"
+
+        do {
+            try await service.publishActivity(
+                eventKey: "strength-workout-\(workout.id.uuidString)",
+                kind: "workout",
+                title: workout.title,
+                subtitle: volume,
+                metadata: [
+                    "workout_id": workout.id.uuidString,
+                    "kind": "strength"
+                ],
+                visibility: visibility
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func publishWorkout(
         result: WatchWorkoutResult,
         visibility: ProfileVisibility = .friends
