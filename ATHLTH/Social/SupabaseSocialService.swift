@@ -1,8 +1,7 @@
 import Foundation
 import Supabase
 
-@MainActor
-final class SupabaseSocialService: ObservableObject {
+final class SupabaseSocialService {
     private let client: SupabaseClient
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
