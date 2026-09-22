@@ -710,29 +710,49 @@ struct OnboardingFlowView: View {
 
             onboardingTitle(
                 "Connect your health",
-                subtitle: "Bring your health and training data into ATHLTH."
+                subtitle: "Bring workouts, recovery and health data into ATHLTH."
             )
 
             OnboardingCard {
-                connectionRow(
-                    title: "Apple Health",
-                    subtitle: health.hasRequestedAuthorization
-                        ? "Health access requested"
-                        : "Workouts, heart rate, sleep, activity and recovery",
-                    icon: "heart.fill",
-                    connected: health.hasRequestedAuthorization
-                ) {
-                    Task {
-                        healthRequestInProgress = true
-                        await health.requestAuthorization()
+                VStack(spacing: 0) {
+                    connectionRow(
+                        title: "Apple Health",
+                        subtitle: health.hasRequestedAuthorization
+                            ? "Health permissions reviewed"
+                            : "Workouts, heart rate, sleep, activity and recovery",
+                        icon: "heart.fill",
+                        complete: health.hasRequestedAuthorization,
+                        actionTitle: health.hasRequestedAuthorization ? "Reviewed" : "Set up",
+                        actionDisabled: health.hasRequestedAuthorization || healthRequestInProgress
+                    ) {
+                        Task {
+                            healthRequestInProgress = true
+                            await health.requestAuthorization()
 
-                        await health.configureBackgroundSync(
-                            allowed: session.canAccess(.backgroundHealthSync)
-                        )
+                            await health.configureBackgroundSync(
+                                allowed: session.canAccess(.backgroundHealthSync)
+                            )
 
-                        await health.refreshPersonalDetails()
-                        importedHealthDetails = health.personalDetails
-                        healthRequestInProgress = false
+                            await health.refreshPersonalDetails()
+                            importedHealthDetails = health.personalDetails
+                            healthRequestInProgress = false
+                        }
+                    }
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.09))
+                        .frame(height: 1)
+                        .padding(.vertical, 4)
+
+                    connectionRow(
+                        title: "Apple Watch",
+                        subtitle: watchConnection.statusText,
+                        icon: "applewatch",
+                        complete: watchConnection.isReady,
+                        actionTitle: watchConnection.isReady ? "Verified" : "Check",
+                        actionDisabled: watchConnection.isReady
+                    ) {
+                        watchConnection.connect()
                     }
                 }
             }
@@ -744,7 +764,7 @@ struct OnboardingFlowView: View {
                     .padding(.horizontal, 4)
             } else if let backgroundError = health.backgroundSyncError {
                 Label(
-                    "Health access is active, but background sync needs attention: \(backgroundError)",
+                    "Health access is set up, but background sync needs attention: \(backgroundError)",
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(.caption)
@@ -752,77 +772,39 @@ struct OnboardingFlowView: View {
                 .padding(.horizontal, 4)
             }
 
-            OnboardingCard {
-                connectionRow(
-                    title: "Apple Watch",
-                    subtitle: watchConnection.statusText,
-                    icon: "applewatch",
-                    connected: watchConnection.isReady
-                ) {
-                    watchConnection.connect()
-                }
-            }
-
             if importedHealthDetails.hasAnyValue {
-                OnboardingCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Imported from Apple Health")
-                            .font(.headline)
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(OnboardingTheme.success)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            OnboardingTheme.success.opacity(0.10),
+                            in: Circle()
+                        )
 
-                        if let birthDate = importedHealthDetails.dateOfBirth {
-                            LabeledContent(
-                                "Date of birth",
-                                value: birthDate.formatted(date: .abbreviated, time: .omitted)
-                            )
-                        }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Health details imported")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
 
-                        if let sex = importedHealthDetails.healthSex {
-                            LabeledContent("Sex", value: sex.title)
-                        }
-
-                        if let weight = importedHealthDetails.weightKilograms {
-                            LabeledContent(
-                                "Weight",
-                                value: String(format: "%.1f kg", weight)
-                            )
-                        }
-
-                        if let height = importedHealthDetails.heightCentimeters {
-                            LabeledContent("Height", value: "\(Int(height)) cm")
-                        }
+                        Text(importedHealthSummary)
+                            .font(.caption)
+                            .foregroundStyle(OnboardingTheme.mutedText)
+                            .lineLimit(2)
                     }
-                    .font(.subheadline)
+
+                    Spacer(minLength: 0)
                 }
-            }
-
-            if session.subscriptionAccess.state == .trial,
-               session.subscriptionAccess.trialIsActive {
-                OnboardingCard {
-                    HStack(spacing: 12) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(OnboardingTheme.accent)
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("7-day ATHLTH+ trial active")
-                                .font(.subheadline.weight(.semibold))
-
-                            Text("Background Health sync is included during your trial.")
-                                .font(.caption)
-                                .foregroundStyle(OnboardingTheme.mutedText)
-                        }
-                    }
+                .padding(14)
+                .background(
+                    Color.white.opacity(0.06),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(OnboardingTheme.border, lineWidth: 1)
                 }
-            }
-
-            OnboardingCard {
-                Label("Private by default", systemImage: "lock.shield.fill")
-                    .font(.headline)
-                    .foregroundStyle(OnboardingTheme.accent)
-
-                Text("Connecting Apple Health does not publish health data. Social sharing is controlled separately.")
-                    .font(.caption)
-                    .foregroundStyle(OnboardingTheme.mutedText)
-                    .padding(.top, 6)
             }
         }
     }
@@ -962,6 +944,8 @@ struct OnboardingFlowView: View {
                     saveProfileData()
                     step = .ready
                 }
+
+                connectionsPrivacyFooter
 
             case .ready:
                 EmptyView()
@@ -1104,37 +1088,87 @@ struct OnboardingFlowView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var connectionsPrivacyFooter: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "lock.shield.fill")
+                .font(.caption)
+                .foregroundStyle(OnboardingTheme.accent)
+                .padding(.top, 1)
+
+            Text("Your Health data stays private. Connecting Apple Health never publishes it to your profile or friends.")
+                .font(.caption2)
+                .foregroundStyle(OnboardingTheme.faintText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+    }
+
+    private var importedHealthSummary: String {
+        var parts: [String] = []
+
+        if let birthDate = importedHealthDetails.dateOfBirth {
+            parts.append("Born \(birthDate.formatted(date: .abbreviated, time: .omitted))")
+        }
+
+        if let weight = importedHealthDetails.weightKilograms {
+            parts.append(String(format: "%.1f kg", weight))
+        }
+
+        if let height = importedHealthDetails.heightCentimeters {
+            parts.append("\(Int(height)) cm")
+        }
+
+        if let sex = importedHealthDetails.healthSex {
+            parts.append(sex.title)
+        }
+
+        return parts.isEmpty ? "Apple Health data is available to ATHLTH." : parts.joined(separator: " · ")
+    }
+
     @ViewBuilder
     private func connectionRow(
         title: String,
         subtitle: String,
         icon: String,
-        connected: Bool,
+        complete: Bool,
+        actionTitle: String,
+        actionDisabled: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(connected ? OnboardingTheme.success : Color.secondary)
-                .frame(width: 34)
+                .foregroundStyle(complete ? OnboardingTheme.success : OnboardingTheme.accent)
+                .frame(width: 42, height: 42)
+                .background(
+                    (complete ? OnboardingTheme.success : OnboardingTheme.accent).opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
+                    .foregroundStyle(.white)
+
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(OnboardingTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            Button(connected ? "Connected" : "Connect") {
+            Button(actionTitle) {
                 action()
             }
+            .font(.caption.weight(.semibold))
             .buttonStyle(.bordered)
-            .disabled(healthRequestInProgress && title == "Apple Health")
+            .tint(complete ? OnboardingTheme.success : OnboardingTheme.accent)
+            .disabled(actionDisabled)
+            .opacity(actionDisabled ? 0.72 : 1)
         }
-        .frame(minHeight: 72)
+        .frame(minHeight: 76)
     }
 
     private func routeAuthenticatedUser(_ bootstrap: BackendUserBootstrap) {
