@@ -3,7 +3,12 @@ import Foundation
 @MainActor
 final class AppSessionStore: ObservableObject {
     @Published var profile: UserProfile
-    @Published var activePlan: TrainingPlan?
+    @Published var activePlan: TrainingPlan? {
+        didSet {
+            persistActivePlan()
+        }
+    }
+    @Published private(set) var planTemplates: [TrainingPlan]
     @Published var savedRoutes: [TrainingRoute]
     @Published var previewModeEnabled: Bool
     @Published var signedIn: Bool
@@ -21,13 +26,14 @@ final class AppSessionStore: ObservableObject {
 
     init(
         profile: UserProfile = PreviewData.profile,
-        activePlan: TrainingPlan? = PreviewData.trainingPlan,
+        activePlan: TrainingPlan? = nil,
         savedRoutes: [TrainingRoute] = [],
         previewModeEnabled: Bool = false,
         defaults: UserDefaults = .standard
     ) {
         self.profile = profile
-        self.activePlan = activePlan
+        self.activePlan = activePlan ?? Self.loadActivePlan(from: defaults)
+        self.planTemplates = Self.loadPlanTemplates(from: defaults)
         self.savedRoutes = savedRoutes
         self.previewModeEnabled = previewModeEnabled
         self.defaults = defaults
@@ -448,6 +454,113 @@ final class AppSessionStore: ObservableObject {
         plan.updatedAt = Date()
         plan.version += 1
         activePlan = plan
+    }
+
+    func updateActivePlanMetadata(
+        title: String,
+        summary: String,
+        visibility: ProfileVisibility,
+        tags: [String]
+    ) {
+        guard var plan = activePlan else { return }
+
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else { return }
+
+        plan.title = cleanTitle
+        plan.summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        plan.visibility = visibility
+        plan.tags = tags
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+        plan.updatedAt = Date()
+        plan.version += 1
+        activePlan = plan
+    }
+
+    func saveActivePlanAsTemplate() {
+        guard let source = activePlan else { return }
+
+        let template = TrainingPlan(
+            id: UUID(),
+            ownerID: profile.userID,
+            title: source.title,
+            summary: source.summary,
+            visibility: .privateOnly,
+            version: 1,
+            weeks: source.weeks,
+            tags: source.tags,
+            spotifyPlaylist: source.spotifyPlaylist,
+            spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+
+        planTemplates.insert(template, at: 0)
+        persistPlanTemplates()
+    }
+
+    func usePlanTemplate(_ templateID: UUID) {
+        guard let template = planTemplates.first(where: { $0.id == templateID }) else {
+            return
+        }
+
+        activePlan = TrainingPlan(
+            id: UUID(),
+            ownerID: profile.userID,
+            title: template.title,
+            summary: template.summary,
+            visibility: .privateOnly,
+            version: 1,
+            weeks: template.weeks,
+            tags: template.tags,
+            spotifyPlaylist: template.spotifyPlaylist,
+            spotifyAutoplayOnWorkoutStart: template.spotifyAutoplayOnWorkoutStart,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    }
+
+    func deletePlanTemplate(_ templateID: UUID) {
+        planTemplates.removeAll { $0.id == templateID }
+        persistPlanTemplates()
+    }
+
+    private func persistActivePlan() {
+        guard let activePlan,
+              let data = try? JSONEncoder().encode(activePlan)
+        else {
+            defaults.removeObject(forKey: "session.activeTrainingPlan")
+            return
+        }
+
+        defaults.set(data, forKey: "session.activeTrainingPlan")
+    }
+
+    private func persistPlanTemplates() {
+        guard let data = try? JSONEncoder().encode(planTemplates) else {
+            return
+        }
+
+        defaults.set(data, forKey: "session.trainingPlanTemplates")
+    }
+
+    private static func loadActivePlan(from defaults: UserDefaults) -> TrainingPlan? {
+        guard let data = defaults.data(forKey: "session.activeTrainingPlan") else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(TrainingPlan.self, from: data)
+    }
+
+    private static func loadPlanTemplates(from defaults: UserDefaults) -> [TrainingPlan] {
+        guard let data = defaults.data(forKey: "session.trainingPlanTemplates"),
+              let plans = try? JSONDecoder().decode([TrainingPlan].self, from: data)
+        else {
+            return []
+        }
+
+        return plans
     }
 
     private func makeEmptyWeek(number: Int) -> TrainingPlanWeek {
