@@ -34,8 +34,8 @@ struct EmailAuthView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(OnboardingBackground().ignoresSafeArea())
-            .foregroundStyle(.white)
-            .preferredColorScheme(.dark)
+            .foregroundStyle(OnboardingTheme.primaryText)
+            .preferredColorScheme(.light)
             .navigationTitle("Email")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -108,7 +108,7 @@ struct EmailAuthView: View {
                                 .textInputAutocapitalization(.words)
                                 .autocorrectionDisabled()
                                 .padding(14)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                .background(OnboardingTheme.subtleFill, in: RoundedRectangle(cornerRadius: 14))
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 14)
                                         .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -119,7 +119,7 @@ struct EmailAuthView: View {
                                 .textInputAutocapitalization(.words)
                                 .autocorrectionDisabled()
                                 .padding(14)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                .background(OnboardingTheme.subtleFill, in: RoundedRectangle(cornerRadius: 14))
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 14)
                                         .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -133,7 +133,7 @@ struct EmailAuthView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .padding(14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                        .background(OnboardingTheme.subtleFill, in: RoundedRectangle(cornerRadius: 14))
                         .overlay {
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -142,7 +142,7 @@ struct EmailAuthView: View {
                     SecureField("Password", text: $password)
                         .textContentType(mode == .signIn ? .password : .newPassword)
                         .padding(14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                        .background(OnboardingTheme.subtleFill, in: RoundedRectangle(cornerRadius: 14))
                         .overlay {
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -152,7 +152,7 @@ struct EmailAuthView: View {
                         SecureField("Confirm password", text: $confirmPassword)
                             .textContentType(.newPassword)
                             .padding(14)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                            .background(OnboardingTheme.subtleFill, in: RoundedRectangle(cornerRadius: 14))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 14)
                                     .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -418,6 +418,7 @@ private struct PasswordResetRequestView: View {
             .scrollContentBackground(.hidden)
             .background(OnboardingBackground().ignoresSafeArea())
             .tint(OnboardingTheme.accent)
+            .preferredColorScheme(.light)
             .navigationTitle("Reset Password")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
