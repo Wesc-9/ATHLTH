@@ -213,6 +213,8 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
 
     @State private var selectedSection = 0
     @State private var showingFileImporter = false
@@ -318,6 +320,9 @@ struct ATHLTHTrainView: View {
                     await importGPX(result)
                 }
             }
+            .task {
+                await exerciseLibrary.refresh()
+            }
             .alert("ATHLTH", isPresented: Binding(
                 get: {
                     importMessage != nil ||
@@ -356,27 +361,55 @@ struct ATHLTHTrainView: View {
     private var todayContent: some View {
         if let plan = session.activePlan {
             ATHLTHCard {
-                ATHLTHSectionHeader(title: "Today's Plan", actionTitle: plan.title)
-                VStack(spacing: 14) {
-                    ForEach(Array((plan.weeks.first?.days.flatMap(\.sessions) ?? []).prefix(3))) { workout in
-                        HStack {
-                            Image(systemName: workout.kind.systemImage)
-                                .foregroundStyle(.green)
-                                .frame(width: 34)
-                            VStack(alignment: .leading) {
-                                Text(workout.title)
-                                    .font(.headline)
-                                Text("\(workout.durationMinutes ?? 0) min · \(workout.kind.title)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                ATHLTHSectionHeader(
+                    title: "Today's Plan",
+                    actionTitle: plan.title
+                )
+
+                let sessions = todaySessions(in: plan)
+
+                if sessions.isEmpty {
+                    Label(
+                        "No session planned today",
+                        systemImage: "leaf"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 10)
+                } else {
+                    VStack(spacing: 14) {
+                        ForEach(sessions) { workout in
+                            HStack {
+                                Image(systemName: workout.kind.systemImage)
+                                    .foregroundStyle(.green)
+                                    .frame(width: 34)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(workout.title)
+                                        .font(.headline)
+
+                                    Text(todaySessionSummary(workout))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                if workout.kind == .strength {
+                                    Button("Start") {
+                                        selectedStrengthSession = workout
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(.tertiary)
+                                }
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.tertiary)
                         }
                     }
+                    .padding(.top, 10)
                 }
-                .padding(.top, 10)
             }
         }
 
@@ -497,35 +530,40 @@ struct ATHLTHTrainView: View {
         }
 
         ATHLTHCard {
-            ATHLTHSectionHeader(title: "Exercises", actionTitle: "Library + Custom")
-            HStack {
-                exerciseChip(PreviewData.benchPress)
-                exerciseChip(PreviewData.customExercise)
+            ATHLTHSectionHeader(
+                title: "Workout Builder",
+                actionTitle: "Library"
+            )
+
+            HStack(spacing: 10) {
+                NavigationLink {
+                    ExerciseLibraryView()
+                } label: {
+                    builderTile(
+                        title: "Exercises",
+                        subtitle: exerciseLibrary.repDBExercises.isEmpty
+                            ? "RepDB + Custom"
+                            : "\(exerciseLibrary.repDBExercises.count) + custom",
+                        icon: "dumbbell.fill"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    RunningWorkoutLibraryView()
+                } label: {
+                    builderTile(
+                        title: "Running",
+                        subtitle: "\(runningWorkoutLibrary.allTemplates.count) workouts",
+                        icon: "figure.run"
+                    )
+                }
+                .buttonStyle(.plain)
             }
             .padding(.top, 10)
         }
 
-        if let workout = session.activePlan?.weeks.first?.days.first?.sessions.first {
-            Button {
-                if workout.kind == .strength {
-                    selectedStrengthSession = workout
-                } else {
-                    startPlanSpotifyIfNeeded()
-                    session.beginTrainingStatus(for: workout)
-                }
-            } label: {
-                Label(
-                    "Start Workout",
-                    systemImage: "play.fill"
-                )
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(.green)
-        }
+
     }
 
     private func watchWorkoutKind(
@@ -582,21 +620,97 @@ struct ATHLTHTrainView: View {
         }
     }
 
+    private func todaySessions(
+        in plan: TrainingPlan
+    ) -> [PlannedSession] {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: Date())
+        let dayIndex = ((weekday + 5) % 7) + 1
+
+        let week: TrainingPlanWeek?
+        if let startDate = plan.startDate {
+            let start = calendar.startOfDay(for: startDate)
+            let today = calendar.startOfDay(for: Date())
+            let days = max(
+                calendar.dateComponents(
+                    [.day],
+                    from: start,
+                    to: today
+                ).day ?? 0,
+                0
+            )
+            let weekIndex = min(
+                days / 7,
+                max(plan.weeks.count - 1, 0)
+            )
+            week = plan.weeks.indices.contains(weekIndex)
+                ? plan.weeks[weekIndex]
+                : plan.weeks.first
+        } else {
+            week = plan.weeks.first
+        }
+
+        return week?
+            .days
+            .first(where: { $0.dayIndex == dayIndex })?
+            .sessions ?? []
+    }
+
+    private func todaySessionSummary(
+        _ workout: PlannedSession
+    ) -> String {
+        var parts: [String] = []
+
+        if let running = workout.runningWorkout {
+            parts.append(running.type.title)
+            parts.append("\(running.blocks.count) blocks")
+        } else if let duration = workout.durationMinutes {
+            parts.append("\(duration) min")
+        }
+
+        if !workout.exercises.isEmpty {
+            parts.append("\(workout.exercises.count) exercises")
+        }
+
+        if workout.routeID != nil {
+            parts.append("Route")
+        }
+
+        return parts.isEmpty
+            ? workout.kind.title
+            : parts.joined(separator: " · ")
+    }
+
     @ViewBuilder
-    private func exerciseChip(_ exercise: Exercise) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Image(systemName: exercise.origin == .custom ? "person.crop.circle.badge.plus" : "dumbbell.fill")
+    private func builderTile(
+        title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Image(systemName: icon)
                 .font(.title2)
                 .foregroundStyle(.green)
-            Text(exercise.name)
+
+            Text(title)
                 .font(.subheadline.weight(.semibold))
-            Text(exercise.primaryMuscles.joined(separator: ", "))
-                .font(.caption)
+                .foregroundStyle(.primary)
+
+            Text(subtitle)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 100, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 100,
+            alignment: .leading
+        )
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
     }
 
     private func routeRegion(_ route: TrainingRoute) -> MKCoordinateRegion {
