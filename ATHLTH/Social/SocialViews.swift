@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum SocialHubTab: String, CaseIterable, Identifiable {
+enum SocialHubTab: String, CaseIterable, Identifiable {
     case feed
     case friends
     case requests
@@ -1154,7 +1154,7 @@ struct SocialAvatar: View {
 
 private struct SocialProfileRow<Accessory: View>: View {
     let profile: SocialProfileCard
-    @ViewBuilder let accessory: Accessory
+    let accessory: Accessory
 
     init(
         profile: SocialProfileCard,
