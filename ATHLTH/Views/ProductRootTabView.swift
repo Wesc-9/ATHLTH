@@ -2041,6 +2041,7 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var challengeStore: ChallengeStore
+    @EnvironmentObject private var goalStore: GoalStore
 
     @State private var performanceStats: ProfilePerformanceStats?
     @State private var performanceStatsLoading = false
@@ -2102,7 +2103,7 @@ struct ATHLTHProfileView: View {
                     }
 
                     HStack(spacing: 12) {
-                        summaryCard(icon: "bookmark.fill", value: "12", title: "Saved Plans", tint: .green)
+                        summaryCard(icon: "target", value: "\(goalStore.goals.count)", title: "Goals", tint: .green)
                         summaryCard(icon: "point.topleft.down.to.point.bottomright.curvepath", value: "\(session.savedRoutes.count)", title: "Saved Routes", tint: .blue)
                         summaryCard(icon: "trophy.fill", value: "\(trophyStore.unlockedCount)", title: "Trophies", tint: .orange)
                     }
@@ -2161,16 +2162,6 @@ struct ATHLTHProfileView: View {
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-
-                    Button {
-                    } label: {
-                        Image(systemName: "pencil")
-                    }
-
                     NavigationLink {
                         ATHLTHNotificationCenterView()
                     } label: {
