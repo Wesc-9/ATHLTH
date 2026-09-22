@@ -1,5 +1,6 @@
 import AuthenticationServices
 import SwiftUI
+import UIKit
 
 struct OnboardingFlowView: View {
     @EnvironmentObject private var session: AppSessionStore
@@ -8,6 +9,7 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var accountService: SupabaseAccountService
+    @Environment(\.openURL) private var openURL
 
     @State private var step: OnboardingStep = .account
     @State private var username = ""
@@ -722,20 +724,26 @@ struct OnboardingFlowView: View {
                             : "Workouts, heart rate, sleep, activity and recovery",
                         icon: "heart.fill",
                         complete: health.hasRequestedAuthorization,
-                        actionTitle: health.hasRequestedAuthorization ? "Reviewed" : "Set up",
-                        actionDisabled: health.hasRequestedAuthorization || healthRequestInProgress
+                        actionTitle: health.hasRequestedAuthorization ? "Settings" : "Set up",
+                        actionDisabled: healthRequestInProgress
                     ) {
-                        Task {
-                            healthRequestInProgress = true
-                            await health.requestAuthorization()
+                        if health.hasRequestedAuthorization {
+                            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                                openURL(settingsURL)
+                            }
+                        } else {
+                            Task {
+                                healthRequestInProgress = true
+                                await health.requestAuthorization()
 
-                            await health.configureBackgroundSync(
-                                allowed: session.canAccess(.backgroundHealthSync)
-                            )
+                                await health.configureBackgroundSync(
+                                    allowed: session.canAccess(.backgroundHealthSync)
+                                )
 
-                            await health.refreshPersonalDetails()
-                            importedHealthDetails = health.personalDetails
-                            healthRequestInProgress = false
+                                await health.refreshPersonalDetails()
+                                importedHealthDetails = health.personalDetails
+                                healthRequestInProgress = false
+                            }
                         }
                     }
 
