@@ -194,12 +194,12 @@ struct AppRootView: View {
                     userID: appSession.profile.userID,
                     displayName: appSession.profile.displayName
                 )
+                await social.finishActiveWorkout(
+                    sourceWorkoutID: result.healthKitWorkoutUUID ?? result.id,
+                    endedAt: result.endedAt
+                )
                 await refreshTrophiesAndNotifications()
                 await social.syncChallenges(challengeStore)
-                await social.publishWorkout(
-                    result: result,
-                    visibility: settings.defaultActivityVisibility
-                )
                 await syncSocialOwnedData()
                 watchConnection.clearCompletedWorkout()
             }
@@ -216,11 +216,13 @@ struct AppRootView: View {
             )
 
             Task {
+                if let endedAt = workout.endedAt {
+                    await social.finishActiveWorkout(
+                        sourceWorkoutID: workout.id,
+                        endedAt: endedAt
+                    )
+                }
                 await social.syncChallenges(challengeStore)
-                await social.publishStrengthWorkout(
-                    workout,
-                    visibility: settings.defaultActivityVisibility
-                )
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
             }
