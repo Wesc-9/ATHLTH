@@ -206,6 +206,8 @@ struct AppRootView: View {
         }
         .onChange(of: strengthWorkout.completedWorkout) { _, workout in
             guard let workout else { return }
+
+            appSession.applyStrengthProgression(from: workout)
             notifications.recordStrengthWorkout(workout)
             challengeStore.ingestStrengthWorkout(
                 workout,
