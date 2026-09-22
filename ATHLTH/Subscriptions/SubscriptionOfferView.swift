@@ -231,10 +231,14 @@ struct SubscriptionOfferView: View {
         Button {
             dismiss()
         } label: {
-            Text("Continue with free trial")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+            Text(
+                session.subscriptionAccess.trialIsActive
+                    ? "Continue with free trial"
+                    : "Not now"
+            )
+            .font(.subheadline.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
         }
         .buttonStyle(.bordered)
         .tint(OnboardingTheme.mutedText)
