@@ -502,7 +502,7 @@ struct OnboardingFlowView: View {
                                     Image(
                                         systemName: username == suggestion
                                             ? "checkmark.circle.fill"
-                                            : "arrow.up.right"
+                                            : "plus"
                                     )
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(
