@@ -183,16 +183,9 @@ enum UsernameGenerator {
             })
             .map(String.init)
 
-        let preferredWords: [String]
-        if words.count >= 2 {
-            preferredWords = [words.first!, words.last!]
-        } else {
-            preferredWords = words
-        }
+        let firstName = words.first ?? "athlete"
 
-        let combined = preferredWords.joined()
-
-        let ascii = combined
+        let ascii = firstName
             .lowercased()
             .unicodeScalars
             .filter { scalar in
