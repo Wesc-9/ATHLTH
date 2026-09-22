@@ -146,7 +146,7 @@ struct OnboardingFlowView: View {
 
                 Spacer()
 
-                ATHLTHBrandMark(size: .compact, showTagline: true)
+                ATHLTHBrandMark(size: .compact, showTagline: false)
 
                 Spacer()
 
@@ -384,7 +384,7 @@ struct OnboardingFlowView: View {
 
             onboardingTitle(
                 "Choose your username",
-                subtitle: "Your username is your ATHLTH identity. Friends can use it to find you, and you can change it later."
+                subtitle: "This is how friends will find you across ATHLTH."
             )
 
             OnboardingCard {
@@ -1004,7 +1004,7 @@ struct OnboardingFlowView: View {
             title,
             systemImage: passed ? "checkmark.circle.fill" : "circle"
         )
-        .foregroundStyle(passed ? Color.green : Color.secondary)
+        .foregroundStyle(passed ? OnboardingTheme.green : Color.secondary)
     }
 
     private func loadUsernameSuggestions() async {
