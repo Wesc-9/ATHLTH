@@ -32,7 +32,8 @@ final class ATHLTHNotificationStore: ObservableObject {
             message: draft.message,
             createdAt: draft.createdAt,
             goalID: draft.goalID,
-            workoutID: draft.workoutID
+            workoutID: draft.workoutID,
+            challengeID: draft.challengeID
         )
 
         items.insert(item, at: 0)
@@ -112,6 +113,70 @@ final class ATHLTHNotificationStore: ObservableObject {
                     createdAt: unlock.unlockedAt
                 )
             )
+        }
+    }
+
+    func syncChallengeEvents(
+        from challenges: [ATHLTHChallenge],
+        currentUserID: UUID
+    ) {
+        for challenge in challenges {
+            if challenge.creatorID == currentUserID,
+               challenge.createdAt >= activationDate {
+                add(
+                    ATHLTHNotificationDraft(
+                        eventKey: "challenge-\(challenge.id.uuidString)-created",
+                        kind: .social,
+                        title: "Challenge created",
+                        message: "\(challenge.title) is ready. Rules lock when it starts.",
+                        createdAt: challenge.createdAt,
+                        challengeID: challenge.id
+                    ),
+                    deliverSystemAlert: false
+                )
+            }
+
+            let currentParticipantID = challenge.participants.first {
+                $0.userID == currentUserID
+            }?.id
+
+            for attempt in challenge.attempts
+            where attempt.submittedAt >= activationDate &&
+                    attempt.participantID != currentParticipantID {
+                add(
+                    ATHLTHNotificationDraft(
+                        eventKey: "challenge-\(challenge.id.uuidString)-attempt-\(attempt.id.uuidString)",
+                        kind: .social,
+                        title: "New challenge result",
+                        message: "\(attempt.participantName) posted \(attempt.detail) in \(challenge.title).",
+                        createdAt: attempt.submittedAt,
+                        challengeID: challenge.id,
+                        workoutID: attempt.sourceWorkoutID
+                    )
+                )
+            }
+
+            if challenge.status == .completed,
+               let end = challenge.rules.endsAt,
+               end >= activationDate {
+                add(
+                    ATHLTHNotificationDraft(
+                        eventKey: "challenge-\(challenge.id.uuidString)-completed",
+                        kind: .social,
+                        title: "Challenge completed",
+                        message: "\(challenge.title) has finished. View the final leaderboard.",
+                        createdAt: end,
+                        challengeID: challenge.id
+                    )
+                )
+            }
+
+            Task {
+                await scheduleChallengeReminders(
+                    challenge,
+                    currentUserID: currentUserID
+                )
+            }
         }
     }
 
@@ -203,6 +268,106 @@ final class ATHLTHNotificationStore: ObservableObject {
     func refreshAuthorizationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         authorizationStatus = settings.authorizationStatus
+    }
+
+    private func scheduleChallengeReminders(
+        _ challenge: ATHLTHChallenge,
+        currentUserID: UUID
+    ) async {
+        await refreshAuthorizationStatus()
+
+        guard authorizationStatus == .authorized ||
+                authorizationStatus == .provisional ||
+                authorizationStatus == .ephemeral,
+              challenge.status != .completed,
+              challenge.status != .cancelled,
+              challenge.participants.contains(where: {
+                  $0.userID == currentUserID &&
+                  ($0.state == .creator || $0.state == .accepted)
+              })
+        else {
+            return
+        }
+
+        let now = Date()
+
+        let startReminder = challenge.rules.startsAt.addingTimeInterval(-3_600)
+        if startReminder > now {
+            let content = UNMutableNotificationContent()
+            content.title = "Challenge starts in 1 hour"
+            content.body = challenge.title
+            content.sound = .default
+            content.userInfo = [
+                "athlthChallengeID": challenge.id.uuidString
+            ]
+
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: startReminder.timeIntervalSince(now),
+                repeats: false
+            )
+
+            try? await UNUserNotificationCenter.current().add(
+                UNNotificationRequest(
+                    identifier: "challenge-\(challenge.id.uuidString)-start-1h",
+                    content: content,
+                    trigger: trigger
+                )
+            )
+        }
+
+        if let meetup = challenge.rules.meetup {
+            let meetupReminder = meetup.scheduledAt.addingTimeInterval(-3_600)
+
+            if meetupReminder > now {
+                let content = UNMutableNotificationContent()
+                content.title = "Meet & Train in 1 hour"
+                content.body = "\(challenge.title) · \(meetup.placeName)"
+                content.sound = .default
+                content.userInfo = [
+                    "athlthChallengeID": challenge.id.uuidString
+                ]
+
+                let trigger = UNTimeIntervalNotificationTrigger(
+                    timeInterval: meetupReminder.timeIntervalSince(now),
+                    repeats: false
+                )
+
+                try? await UNUserNotificationCenter.current().add(
+                    UNNotificationRequest(
+                        identifier: "challenge-\(challenge.id.uuidString)-meetup-1h",
+                        content: content,
+                        trigger: trigger
+                    )
+                )
+            }
+        }
+
+        if let endsAt = challenge.rules.endsAt {
+            let endReminder = endsAt.addingTimeInterval(-86_400)
+
+            if endReminder > now {
+                let content = UNMutableNotificationContent()
+                content.title = "Challenge ends tomorrow"
+                content.body = challenge.title
+                content.sound = .default
+                content.userInfo = [
+                    "athlthChallengeID": challenge.id.uuidString
+                ]
+
+                let trigger = UNTimeIntervalNotificationTrigger(
+                    timeInterval: endReminder.timeIntervalSince(now),
+                    repeats: false
+                )
+
+                try? await UNUserNotificationCenter.current().add(
+                    UNNotificationRequest(
+                        identifier: "challenge-\(challenge.id.uuidString)-end-24h",
+                        content: content,
+                        trigger: trigger
+                    )
+                )
+            }
+        }
     }
 
     private func deliverLocalNotification(for item: ATHLTHNotificationItem) async {
