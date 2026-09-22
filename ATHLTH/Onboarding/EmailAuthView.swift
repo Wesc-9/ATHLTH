@@ -305,6 +305,12 @@ struct EmailAuthView: View {
                         email: cleanEmail,
                         password: password
                     )
+
+                    if bootstrap.profile.username == nil,
+                       bootstrap.profile.displayName == nil {
+                        session.setUsernameSeed(cleanEmail)
+                    }
+
                     onAuthenticated(bootstrap)
                     dismiss()
 
@@ -322,6 +328,11 @@ struct EmailAuthView: View {
                         confirmationSent = true
 
                     case .authenticated(let bootstrap):
+                        if bootstrap.profile.username == nil,
+                           bootstrap.profile.displayName == nil {
+                            session.setUsernameSeed(cleanEmail)
+                        }
+
                         onAuthenticated(bootstrap)
                         dismiss()
                     }
