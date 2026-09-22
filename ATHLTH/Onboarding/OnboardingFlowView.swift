@@ -911,69 +911,109 @@ struct OnboardingFlowView: View {
     }
 
     private var connectionsStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            onboardingTitle(
-                "Connect your health",
-                subtitle: "Bring workouts, recovery and health data into ATHLTH."
-            )
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 8) {
+                onboardingTitle(
+                    "Connect your health",
+                    subtitle: "Bring your Apple ecosystem into ATHLTH."
+                )
 
-            Text("Optional — connect now or set this up anytime in Settings.")
-                .font(.caption)
-                .foregroundStyle(OnboardingTheme.faintText)
+                Text("Optional · Set it up now or anytime later in Settings.")
+                    .font(.caption)
+                    .foregroundStyle(OnboardingTheme.faintText)
+            }
 
-            OnboardingCard {
-                VStack(spacing: 0) {
-                    connectionRow(
-                        title: "Apple Health",
-                        subtitle: health.hasRequestedAuthorization
-                            ? "Health permissions reviewed"
-                            : "Workouts, heart rate, sleep, activity and recovery",
-                        icon: "heart.fill",
-                        complete: health.hasRequestedAuthorization,
-                        actionTitle: healthRequestInProgress
-                            ? "Setting up…"
-                            : health.hasRequestedAuthorization ? "Settings" : "Set up",
-                        actionDisabled: healthRequestInProgress,
-                        actionLoading: healthRequestInProgress
-                    ) {
-                        if health.hasRequestedAuthorization {
-                            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                                openURL(settingsURL)
-                            }
-                        } else {
-                            Task {
-                                healthRequestInProgress = true
-                                await health.requestAuthorization()
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("YOUR ECOSYSTEM")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.25)
+                        .foregroundStyle(OnboardingTheme.faintText)
 
-                                await health.configureBackgroundSync(
-                                    allowed: session.canAccess(.backgroundHealthSync)
-                                )
+                    Spacer()
 
-                                await health.refreshPersonalDetails()
-                                importedHealthDetails = health.personalDetails
-                                healthRequestInProgress = false
-                            }
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(OnboardingTheme.accent)
+
+                    Text("PRIVATE")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.9)
+                        .foregroundStyle(OnboardingTheme.accent)
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 8)
+
+                connectionRow(
+                    title: "Apple Health",
+                    subtitle: "Workouts, sleep, heart & activity",
+                    detail: importedHealthDetails.hasAnyValue
+                        ? "Profile details imported"
+                        : health.hasRequestedAuthorization
+                            ? "Health access reviewed"
+                            : nil,
+                    icon: "heart.fill",
+                    iconTint: Color(red: 0.90, green: 0.25, blue: 0.34),
+                    complete: health.hasRequestedAuthorization,
+                    actionTitle: healthRequestInProgress
+                        ? "Setting up…"
+                        : health.hasRequestedAuthorization ? "Settings" : "Connect",
+                    actionDisabled: healthRequestInProgress,
+                    actionLoading: healthRequestInProgress
+                ) {
+                    if health.hasRequestedAuthorization {
+                        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                            openURL(settingsURL)
+                        }
+                    } else {
+                        Task {
+                            healthRequestInProgress = true
+                            await health.requestAuthorization()
+
+                            await health.configureBackgroundSync(
+                                allowed: session.canAccess(.backgroundHealthSync)
+                            )
+
+                            await health.refreshPersonalDetails()
+                            importedHealthDetails = health.personalDetails
+                            healthRequestInProgress = false
                         }
                     }
+                }
 
-                    Rectangle()
-                        .fill(Color.black.opacity(0.07))
-                        .frame(height: 1)
-                        .padding(.vertical, 4)
+                Rectangle()
+                    .fill(OnboardingTheme.border)
+                    .frame(height: 1)
+                    .padding(.leading, 78)
 
-                    connectionRow(
-                        title: "Apple Watch",
-                        subtitle: watchConnection.statusText,
-                        icon: "applewatch",
-                        complete: watchConnection.isReady,
-                        actionTitle: watchSetupActionTitle,
-                        actionDisabled: watchSetupActionDisabled,
-                        actionLoading: watchConnection.state == .checking
-                    ) {
-                        handleWatchSetupAction()
-                    }
+                connectionRow(
+                    title: "Apple Watch",
+                    subtitle: "Start workouts and sync live data",
+                    detail: watchConnection.isReady
+                        ? "Watch connection verified"
+                        : watchConnection.state == .appNotInstalled
+                            ? "ATHLTH Watch app not installed"
+                            : nil,
+                    icon: "applewatch",
+                    iconTint: OnboardingTheme.accent,
+                    complete: watchConnection.isReady,
+                    actionTitle: watchSetupActionTitle,
+                    actionDisabled: watchSetupActionDisabled,
+                    actionLoading: watchConnection.state == .checking
+                ) {
+                    handleWatchSetupAction()
                 }
             }
+            .background(
+                OnboardingTheme.card,
+                in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .stroke(OnboardingTheme.border, lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.055), radius: 22, x: 0, y: 12)
 
             if let healthError = health.authorizationError {
                 Label(healthError, systemImage: "exclamationmark.triangle.fill")
@@ -982,7 +1022,7 @@ struct OnboardingFlowView: View {
                     .padding(.horizontal, 4)
             } else if let backgroundError = health.backgroundSyncError {
                 Label(
-                    "Health access is set up, but background sync needs attention: \(backgroundError)",
+                    "Background Health sync needs attention: \(backgroundError)",
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(.caption)
@@ -991,38 +1031,10 @@ struct OnboardingFlowView: View {
             }
 
             if importedHealthDetails.hasAnyValue {
-                HStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(OnboardingTheme.success)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            OnboardingTheme.success.opacity(0.10),
-                            in: Circle()
-                        )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Health details imported")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(OnboardingTheme.primaryText)
-
-                        Text(importedHealthSummary)
-                            .font(.caption)
-                            .foregroundStyle(OnboardingTheme.mutedText)
-                            .lineLimit(2)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-                .padding(14)
-                .background(
-                    OnboardingTheme.card,
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(OnboardingTheme.border, lineWidth: 1)
-                }
+                Text(importedHealthSummary)
+                    .font(.caption2)
+                    .foregroundStyle(OnboardingTheme.faintText)
+                    .padding(.horizontal, 4)
             }
         }
     }
@@ -1172,12 +1184,12 @@ struct OnboardingFlowView: View {
                 personalizedOffersFooter
 
             case .connections:
+                connectionsPrivacyFooter
+
                 footerButton(title: "Continue") {
                     saveProfileData()
                     step = .ready
                 }
-
-                connectionsPrivacyFooter
 
             case .ready:
                 EmptyView()
@@ -1347,19 +1359,31 @@ struct OnboardingFlowView: View {
     }
 
     private var connectionsPrivacyFooter: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .center, spacing: 11) {
             Image(systemName: "lock.shield.fill")
-                .font(.caption)
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(OnboardingTheme.accent)
-                .padding(.top, 1)
+                .frame(width: 32, height: 32)
+                .background(
+                    OnboardingTheme.accent.opacity(0.09),
+                    in: Circle()
+                )
 
-            Text("Your Health data stays private. Connecting Apple Health never publishes it to your profile or friends.")
-                .font(.caption2)
-                .foregroundStyle(OnboardingTheme.faintText)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Your health data stays private")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(OnboardingTheme.primaryText)
+
+                Text("Never published to your profile or shared with friends.")
+                    .font(.caption2)
+                    .foregroundStyle(OnboardingTheme.faintText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
+        .padding(.bottom, 2)
     }
 
     private var importedHealthSummary: String {
@@ -1388,32 +1412,60 @@ struct OnboardingFlowView: View {
     private func connectionRow(
         title: String,
         subtitle: String,
+        detail: String? = nil,
         icon: String,
+        iconTint: Color,
         complete: Bool,
         actionTitle: String,
         actionDisabled: Bool = false,
         actionLoading: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 15) {
             Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(complete ? OnboardingTheme.success : OnboardingTheme.accent)
-                .frame(width: 42, height: 42)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(iconTint)
+                .frame(width: 48, height: 48)
                 .background(
-                    (complete ? OnboardingTheme.success : OnboardingTheme.accent).opacity(0.10),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    iconTint.opacity(0.09),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(iconTint.opacity(0.12), lineWidth: 1)
+                }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(OnboardingTheme.primaryText)
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(OnboardingTheme.primaryText)
+
+                    if complete {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(OnboardingTheme.success)
+                    }
+                }
 
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(OnboardingTheme.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if let detail {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(complete ? OnboardingTheme.success : OnboardingTheme.accent)
+                            .frame(width: 5, height: 5)
+
+                        Text(detail)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(OnboardingTheme.faintText)
+                            .lineLimit(1)
+                    }
+                    .padding(.top, 1)
+                }
             }
 
             Spacer(minLength: 8)
@@ -1428,15 +1480,39 @@ struct OnboardingFlowView: View {
                     }
 
                     Text(actionTitle)
+                        .lineLimit(1)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    complete
+                        ? OnboardingTheme.success
+                        : OnboardingTheme.primaryText
+                )
+                .padding(.horizontal, 13)
+                .frame(minHeight: 36)
+                .background(
+                    complete
+                        ? OnboardingTheme.success.opacity(0.09)
+                        : OnboardingTheme.subtleFill,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(
+                            complete
+                                ? OnboardingTheme.success.opacity(0.18)
+                                : OnboardingTheme.border,
+                            lineWidth: 1
+                        )
                 }
             }
-            .font(.caption.weight(.semibold))
-            .buttonStyle(.bordered)
-            .tint(complete ? OnboardingTheme.success : OnboardingTheme.accent)
+            .buttonStyle(.plain)
             .disabled(actionDisabled)
-            .opacity(actionDisabled && !actionLoading ? 0.72 : 1)
+            .opacity(actionDisabled && !actionLoading ? 0.68 : 1)
         }
-        .frame(minHeight: 76)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 17)
+        .frame(minHeight: 92)
     }
 
     private func routeAuthenticatedUser(
