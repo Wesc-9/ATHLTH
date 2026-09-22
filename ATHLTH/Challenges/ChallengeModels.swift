@@ -293,5 +293,19 @@ struct ChallengeLeaderboardEntry: Identifiable, Hashable {
 
     let participant: ChallengeParticipant
     let bestAttempt: ChallengeAttempt?
+    let score: Double?
+    let attemptCount: Int
     let rank: Int?
+}
+
+struct ChallengeRunningEvidence: Hashable {
+    let startedAt: Date
+    let endedAt: Date
+    let durationSeconds: TimeInterval
+    let distanceMeters: Double
+    let routeMatchPercent: Double?
+    let score: Double
+    let detail: String
+    let isEligible: Bool
+    let ineligibilityReason: String?
 }
