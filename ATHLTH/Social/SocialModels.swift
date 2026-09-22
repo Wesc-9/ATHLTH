@@ -616,7 +616,7 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     }
 
     init(strengthWorkout: StrengthWorkoutLog) {
-        id = strengthWorkout.id
+        id = strengthWorkout.healthMetrics.healthKitWorkoutUUID ?? strengthWorkout.id
         title = strengthWorkout.title
         activity = .strength
         startDate = strengthWorkout.startedAt
