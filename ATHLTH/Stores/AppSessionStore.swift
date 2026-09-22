@@ -346,6 +346,167 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    func applyStrengthProgression(
+        from workout: StrengthWorkoutLog
+    ) {
+        guard workout.trackingMode == .advanced,
+              workout.isFinished,
+              let plannedSessionID = workout.plannedSessionID,
+              var plan = activePlan
+        else {
+            return
+        }
+
+        var changed = false
+
+        for weekIndex in plan.weeks.indices {
+            for dayIndex in plan.weeks[weekIndex].days.indices {
+                guard let sessionIndex = plan.weeks[weekIndex]
+                    .days[dayIndex]
+                    .sessions
+                    .firstIndex(where: { $0.id == plannedSessionID })
+                else {
+                    continue
+                }
+
+                for exerciseLog in workout.exercises {
+                    guard let plannedExerciseID = exerciseLog.plannedExerciseID,
+                          let plannedIndex = plan.weeks[weekIndex]
+                            .days[dayIndex]
+                            .sessions[sessionIndex]
+                            .exercises
+                            .firstIndex(where: { $0.id == plannedExerciseID })
+                    else {
+                        continue
+                    }
+
+                    var planned = plan.weeks[weekIndex]
+                        .days[dayIndex]
+                        .sessions[sessionIndex]
+                        .exercises[plannedIndex]
+
+                    guard let progression = planned.progression,
+                          progression.kind != .none,
+                          progression.applyWhenAllSetsCompleted,
+                          qualifiesForAutomaticProgression(
+                              planned: planned,
+                              completed: exerciseLog
+                          )
+                    else {
+                        continue
+                    }
+
+                    switch progression.kind {
+                    case .none:
+                        break
+
+                    case .addWeight:
+                        guard let current = planned.targetWeightKilograms else {
+                            continue
+                        }
+                        planned.targetWeightKilograms =
+                            current + max(progression.amount, 0)
+
+                    case .addReps:
+                        let increment = max(
+                            Int(progression.amount.rounded()),
+                            1
+                        )
+                        planned.reps = max(
+                            (planned.reps ?? 0) + increment,
+                            1
+                        )
+
+                    case .percentage:
+                        guard let current = planned.targetWeightKilograms else {
+                            continue
+                        }
+                        planned.targetWeightKilograms =
+                            current * (
+                                1 + max(progression.amount, 0) / 100
+                            )
+
+                    case .doubleProgression:
+                        let minimum = max(
+                            progression.minimumReps ?? planned.reps ?? 1,
+                            1
+                        )
+                        let maximum = max(
+                            progression.maximumReps ?? minimum,
+                            minimum
+                        )
+
+                        let achievedMaximum =
+                            exerciseLog.sets
+                            .filter(\.isCompleted)
+                            .allSatisfy {
+                                ($0.completedReps ?? 0) >= maximum
+                            }
+
+                        if achievedMaximum,
+                           let currentWeight = planned.targetWeightKilograms {
+                            planned.targetWeightKilograms =
+                                currentWeight + max(progression.amount, 0)
+                            planned.reps = minimum
+                        } else {
+                            planned.reps = min(
+                                max((planned.reps ?? minimum) + 1, minimum),
+                                maximum
+                            )
+                        }
+                    }
+
+                    plan.weeks[weekIndex]
+                        .days[dayIndex]
+                        .sessions[sessionIndex]
+                        .exercises[plannedIndex] = planned
+                    changed = true
+                }
+            }
+        }
+
+        guard changed else { return }
+
+        plan.version += 1
+        plan.updatedAt = Date()
+        activePlan = plan
+    }
+
+    private func qualifiesForAutomaticProgression(
+        planned: PlannedExercise,
+        completed: StrengthExerciseLog
+    ) -> Bool {
+        let completedSets = completed.sets.filter(\.isCompleted)
+
+        guard completedSets.count >= max(planned.sets, 1),
+              completedSets.allSatisfy({ $0.completedReps != nil })
+        else {
+            return false
+        }
+
+        if let targetReps = planned.reps {
+            guard completedSets.allSatisfy({
+                ($0.completedReps ?? 0) >= targetReps
+            }) else {
+                return false
+            }
+        }
+
+        if let targetWeight = planned.targetWeightKilograms {
+            guard completedSets.allSatisfy({
+                guard let completedWeight = $0.completedWeightKilograms else {
+                    return false
+                }
+
+                return completedWeight + 0.01 >= targetWeight
+            }) else {
+                return false
+            }
+        }
+
+        return true
+    }
+
     func addImportedRoute(_ route: TrainingRoute) {
         var ownedRoute = route
         ownedRoute.ownerID = profile.userID
