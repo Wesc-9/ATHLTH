@@ -7,6 +7,7 @@ struct ATHLTHApp: App {
     @StateObject private var appSession = AppSessionStore()
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
+    @StateObject private var goals = GoalStore()
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
     @StateObject private var workoutMirroring = WorkoutMirroringStore()
@@ -22,6 +23,7 @@ struct ATHLTHApp: App {
                 .environmentObject(appSession)
                 .environmentObject(settings)
                 .environmentObject(strengthWorkout)
+                .environmentObject(goals)
                 .environmentObject(spotifyPlayback)
                 .environmentObject(watchConnection)
                 .environmentObject(workoutMirroring)
@@ -43,6 +45,7 @@ struct AppRootView: View {
     @EnvironmentObject private var subscriptionBackend: SubscriptionBackendService
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var goals: GoalStore
 
     @State private var authCallbackError: String?
 
@@ -80,6 +83,10 @@ struct AppRootView: View {
                 allowed: appSession.canAccess(.backgroundHealthSync)
             )
             await health.refreshAll()
+            await goals.refreshAutomaticMilestones(
+                health: health,
+                strength: strengthWorkout
+            )
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -91,6 +98,10 @@ struct AppRootView: View {
             guard health.hasRequestedAuthorization else { return }
             Task {
                 await health.refreshAll()
+                await goals.refreshAutomaticMilestones(
+                    health: health,
+                    strength: strengthWorkout
+                )
             }
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
@@ -128,6 +139,10 @@ struct AppRootView: View {
 
             Task {
                 await health.refreshAll()
+                await goals.refreshAutomaticMilestones(
+                    health: health,
+                    strength: strengthWorkout
+                )
                 watchConnection.clearCompletedWorkout()
             }
         }
