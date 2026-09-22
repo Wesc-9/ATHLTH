@@ -34,6 +34,54 @@ struct TrainingHealthSummary: Equatable {
     static let empty = TrainingHealthSummary()
 }
 
+enum HealthProgressGrouping {
+    case day
+    case week
+    case month
+}
+
+struct HealthProgressBucket: Identifiable, Equatable {
+    var id: Date { startDate }
+
+    let startDate: Date
+    let endDate: Date
+    let workoutCount: Int
+    let averageDailySteps: Double?
+    let averageSleepDuration: TimeInterval?
+    let trainingDuration: TimeInterval
+}
+
+struct HealthProgressSnapshot: Equatable {
+    let startDate: Date
+    let endDate: Date
+    let workoutCount: Int
+    let averageDailySteps: Double?
+    let averageSleepDuration: TimeInterval?
+    let trainingDuration: TimeInterval
+    let buckets: [HealthProgressBucket]
+
+    let previousWorkoutCount: Int
+    let previousAverageDailySteps: Double?
+    let previousAverageSleepDuration: TimeInterval?
+
+    var workoutChangePercent: Double? {
+        Self.percentChange(current: Double(workoutCount), previous: Double(previousWorkoutCount))
+    }
+
+    var stepsChangePercent: Double? {
+        Self.percentChange(current: averageDailySteps, previous: previousAverageDailySteps)
+    }
+
+    var sleepChangePercent: Double? {
+        Self.percentChange(current: averageSleepDuration, previous: previousAverageSleepDuration)
+    }
+
+    private static func percentChange(current: Double?, previous: Double?) -> Double? {
+        guard let current, let previous, previous > 0 else { return nil }
+        return ((current - previous) / previous) * 100
+    }
+}
+
 struct WorkoutSummary: Identifiable, Hashable {
     let id: UUID
     let activity: WorkoutActivity
