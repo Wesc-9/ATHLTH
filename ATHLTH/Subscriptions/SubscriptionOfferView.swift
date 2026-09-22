@@ -58,9 +58,9 @@ struct SubscriptionOfferView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(OnboardingTheme.primaryText)
                             .frame(width: 34, height: 34)
-                            .background(.ultraThinMaterial, in: Circle())
+                            .background(OnboardingTheme.card, in: Circle())
                             .overlay {
                                 Circle()
                                     .stroke(OnboardingTheme.border, lineWidth: 1)
@@ -74,7 +74,7 @@ struct SubscriptionOfferView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
         .sheet(item: $legalDocument) { document in
             NavigationStack {
                 LegalDocumentView(kind: document)
@@ -152,7 +152,7 @@ struct SubscriptionOfferView: View {
         }
         .padding(16)
         .background(
-            Color.white.opacity(0.055),
+            OnboardingTheme.card,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
         .overlay {
@@ -245,7 +245,7 @@ struct SubscriptionOfferView: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(.bordered)
-        .tint(OnboardingTheme.mutedText)
+        .tint(OnboardingTheme.primaryText)
     }
 
     private var trialDisclosure: some View {
@@ -331,7 +331,7 @@ struct SubscriptionOfferView: View {
         .padding(20)
         .frame(maxWidth: .infinity)
         .background(
-            Color.white.opacity(0.07),
+            OnboardingTheme.card,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
         .overlay {
@@ -359,7 +359,7 @@ struct SubscriptionOfferView: View {
                     HStack(spacing: 8) {
                         Text(planTitle(for: product))
                             .font(.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(OnboardingTheme.primaryText)
 
                         if yearly {
                             Text("BEST VALUE")
@@ -374,7 +374,7 @@ struct SubscriptionOfferView: View {
 
                     Text(product.displayPrice + planSuffix(for: product))
                         .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(OnboardingTheme.primaryText)
 
                     if yearly {
                         if let equivalent = yearlyMonthlyEquivalent(for: product) {
@@ -402,7 +402,7 @@ struct SubscriptionOfferView: View {
             .background(
                 selected
                     ? OnboardingTheme.accent.opacity(0.11)
-                    : Color.white.opacity(0.07),
+                    : OnboardingTheme.card,
                 in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
             .overlay {
@@ -432,7 +432,7 @@ struct SubscriptionOfferView: View {
 
             Text(title)
                 .font(.subheadline)
-                .foregroundStyle(.white)
+                .foregroundStyle(OnboardingTheme.primaryText)
 
             Spacer(minLength: 0)
         }
