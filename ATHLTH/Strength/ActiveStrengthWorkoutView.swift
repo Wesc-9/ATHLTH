@@ -5,11 +5,14 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     @State private var reps = 8
     @State private var weightKilograms = 20.0
     @State private var rpe = 8.0
     @State private var showingFinishConfirmation = false
+    @State private var showingExerciseLibrary = false
+    @State private var pendingExercise: ExerciseLibraryEntry?
 
     var body: some View {
         NavigationStack {
@@ -18,6 +21,10 @@ struct ActiveStrengthWorkoutView: View {
                     ScrollView {
                         VStack(spacing: 18) {
                             workoutHeader(workout)
+
+                            if workout.trackingMode == .advanced {
+                                addExerciseCard(workout)
+                            }
 
                             if workout.trackingMode == .advanced,
                                let exercise = strength.currentExercise {
@@ -41,11 +48,43 @@ struct ActiveStrengthWorkoutView: View {
             .navigationTitle("Strength")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if strength.activeWorkout?.trackingMode == .advanced {
+                        Button {
+                            showingExerciseLibrary = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .accessibilityLabel("Add exercise")
+                    }
+
                     Button("Finish") {
                         showingFinishConfirmation = true
                     }
                     .disabled(strength.activeWorkout == nil)
+                }
+            }
+            .sheet(isPresented: $showingExerciseLibrary) {
+                NavigationStack {
+                    ExerciseLibraryView(
+                        selectionTitle: "Add to Active Workout"
+                    ) { entry in
+                        pendingExercise = entry
+                        showingExerciseLibrary = false
+                    }
+                }
+            }
+            .sheet(item: $pendingExercise) { entry in
+                FreestyleExercisePrescriptionView(entry: entry) {
+                    strength.appendExercise(
+                        entry.exercise,
+                        sets: $0,
+                        reps: $1,
+                        targetWeightKilograms: $2,
+                        restSeconds: $3
+                    )
+                    pendingExercise = nil
+                    loadDefaultsFromCurrentSet()
                 }
             }
             .confirmationDialog(
@@ -120,6 +159,40 @@ struct ActiveStrengthWorkoutView: View {
                             .font(.subheadline.weight(.semibold))
                     }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func addExerciseCard(_ workout: StrengthWorkoutLog) -> some View {
+        ATHLTHCard {
+            HStack(spacing: 12) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.green)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(
+                        workout.exercises.isEmpty
+                            ? "Choose your first exercise"
+                            : "Add another exercise"
+                    )
+                    .font(.headline)
+
+                    Text(
+                        "Pick from RepDB or your own exercises while the workout keeps running."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button("Add") {
+                    showingExerciseLibrary = true
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
             }
         }
     }
@@ -457,6 +530,101 @@ struct ActiveStrengthWorkoutView: View {
         reps = set.plannedReps ?? 8
         weightKilograms = set.plannedWeightKilograms ?? max(weightKilograms, 20)
         rpe = 8
+    }
+}
+
+private struct FreestyleExercisePrescriptionView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let entry: ExerciseLibraryEntry
+    let onAdd: (Int, Int?, Double?, Int?) -> Void
+
+    @State private var sets = 3
+    @State private var reps = 8
+    @State private var restSeconds = 90
+    @State private var useWeightTarget = false
+    @State private var weightKilograms = 20.0
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack(spacing: 12) {
+                        ExerciseArtwork(entry: entry, size: 62)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(entry.name)
+                                .font(.headline)
+
+                            Text(
+                                entry.exercise.primaryMuscles
+                                    .prefix(3)
+                                    .joined(separator: " · ")
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section("Prescription") {
+                    Stepper("Sets: \(sets)", value: $sets, in: 1...20)
+                    Stepper("Target reps: \(reps)", value: $reps, in: 1...100)
+                    Stepper(
+                        "Rest: \(restSeconds) sec",
+                        value: $restSeconds,
+                        in: 0...600,
+                        step: 15
+                    )
+
+                    Toggle("Target weight", isOn: $useWeightTarget)
+
+                    if useWeightTarget {
+                        HStack {
+                            Text("Weight")
+                            Spacer()
+                            TextField(
+                                "kg",
+                                value: $weightKilograms,
+                                format: .number.precision(.fractionLength(0...2))
+                            )
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 95)
+                            Text("kg")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    Text("You can log actual reps, weight and RPE set by set. The exercise is added immediately to the running workout.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Add Exercise")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        onAdd(
+                            sets,
+                            reps,
+                            useWeightTarget ? weightKilograms : nil,
+                            restSeconds
+                        )
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
