@@ -172,6 +172,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var preferredWorkoutCapture: WorkoutCapturePreference { didSet { persist() } }
     @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
+    @Published var autoPublishCompletedWorkouts: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
 
@@ -207,6 +208,7 @@ final class AppSettingsStore: ObservableObject {
         preferredWorkoutCapture = WorkoutCapturePreference(rawValue: defaults.string(forKey: "settings.preferredWorkoutCapture") ?? "") ?? .automatic
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
+        autoPublishCompletedWorkouts = defaults.object(forKey: "settings.autoPublishCompletedWorkouts") as? Bool ?? false
         audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
         hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
 
@@ -240,6 +242,7 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(preferredWorkoutCapture.rawValue, forKey: "settings.preferredWorkoutCapture")
         defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
+        defaults.set(autoPublishCompletedWorkouts, forKey: "settings.autoPublishCompletedWorkouts")
         defaults.set(audioCuesEnabled, forKey: "settings.audioCues")
         defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
 
