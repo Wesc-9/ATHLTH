@@ -764,6 +764,7 @@ struct ATHLTHProgressView: View {
     @State private var progressSnapshot: HealthProgressSnapshot?
     @State private var monthlySnapshot: HealthProgressSnapshot?
     @State private var consistencySnapshot: HealthProgressSnapshot?
+    @State private var personalRecords: [HealthPersonalRecord] = []
     @State private var progressLoading = false
     @State private var progressError: String?
 
@@ -1180,11 +1181,47 @@ struct ATHLTHProgressView: View {
 
     private var personalRecordsCard: some View {
         VStack(alignment: .leading, spacing: 13) {
-            compactHeader("Personal Records")
+            HStack {
+                Text("Personal Records")
+                    .font(.headline)
+                Spacer()
 
-            recordRow("Heaviest Squat", value: "100 kg", date: "Mar 28, 2025", icon: "dumbbell.fill")
-            recordRow("Longest Run", value: "7.2 km", date: "Mar 22, 2025", icon: "figure.run")
-            recordRow("Fastest 5K", value: "24:18", date: "Mar 10, 2025", icon: "stopwatch.fill")
+                if personalRecords.count > 3 {
+                    Text("+\(personalRecords.count - 3)")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(green)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+
+            if personalRecords.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Image(systemName: "trophy")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+
+                    Text("No records yet")
+                        .font(.caption.weight(.semibold))
+
+                    Text("ATHLTH will surface verified records from your Apple Health workouts.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 8)
+            } else {
+                ForEach(Array(personalRecords.prefix(3))) { record in
+                    recordRow(
+                        record.kind.title,
+                        value: record.formattedValue,
+                        date: record.date.formatted(.dateTime.month(.abbreviated).day().year()),
+                        icon: record.kind.systemImage
+                    )
+                }
+            }
         }
         .padding(16)
         .progressReferenceCard()
@@ -1665,6 +1702,7 @@ struct ATHLTHProgressView: View {
         guard health.healthDataAvailable, health.hasRequestedAuthorization else {
             monthlySnapshot = nil
             consistencySnapshot = nil
+            personalRecords = []
             return
         }
 
@@ -1687,8 +1725,11 @@ struct ATHLTHProgressView: View {
             grouping: .day
         )
 
+        async let records = health.personalRecords()
+
         monthlySnapshot = try? await monthly
         consistencySnapshot = try? await consistencyData
+        personalRecords = (try? await records) ?? []
     }
 
     private func loadProgressData() async {
