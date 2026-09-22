@@ -230,6 +230,21 @@ struct ATHLTHSettingsView: View {
                 Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
             }
 
+            Section("Exercise data") {
+                Link(destination: URL(string: "https://repdb.co")!) {
+                    Label(
+                        "Exercise data by RepDB (repdb.co)",
+                        systemImage: "arrow.up.right.square"
+                    )
+                }
+
+                Text(
+                    "ATHLTH uses the RepDB Free exercise catalog inside the app. RepDB content is attributed under the RepDB Free Tier License."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             Section("Legal") {
                 NavigationLink {
                     LegalDocumentView(kind: .terms)
