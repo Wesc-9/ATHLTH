@@ -458,9 +458,6 @@ struct OnboardingFlowView: View {
                     }
                     .font(.caption)
 
-                    Text("You can change your username later in your profile.")
-                        .font(.caption)
-                        .foregroundStyle(OnboardingTheme.faintText)
                 }
             }
 
