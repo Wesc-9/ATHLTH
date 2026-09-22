@@ -65,6 +65,9 @@ struct AppRootView: View {
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
+    @State private var pendingWorkoutReview: SocialPublishableWorkout?
+    @State private var queuedWorkoutReviewIDs: Set<UUID> = []
+    @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
 
     var body: some View {
         Group {
@@ -198,6 +201,9 @@ struct AppRootView: View {
                     sourceWorkoutID: result.healthKitWorkoutUUID ?? result.id,
                     endedAt: result.endedAt
                 )
+                await handleCompletedWorkoutReview(
+                    SocialPublishableWorkout(watchResult: result)
+                )
                 await refreshTrophiesAndNotifications()
                 await social.syncChallenges(challengeStore)
                 await syncSocialOwnedData()
@@ -218,10 +224,13 @@ struct AppRootView: View {
             Task {
                 if let endedAt = workout.endedAt {
                     await social.finishActiveWorkout(
-                        sourceWorkoutID: workout.id,
+                        sourceWorkoutID: workout.healthMetrics.healthKitWorkoutUUID ?? workout.id,
                         endedAt: endedAt
                     )
                 }
+                await handleCompletedWorkoutReview(
+                    SocialPublishableWorkout(strengthWorkout: workout)
+                )
                 await social.syncChallenges(challengeStore)
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
@@ -305,9 +314,19 @@ struct AppRootView: View {
                 }
             }
         }
+        .sheet(item: $pendingWorkoutReview) { workout in
+            PostWorkoutReviewView(
+                workout: workout,
+                wasAutoPublished: settings.autoPublishCompletedWorkouts
+            )
+        }
         .sheet(
             item: Binding(
-                get: { trophies.pendingReveal },
+                get: {
+                    pendingWorkoutReview == nil
+                        ? trophies.pendingReveal
+                        : nil
+                },
                 set: { value in
                     if value == nil {
                         trophies.dismissCurrentReveal()
@@ -350,6 +369,34 @@ struct AppRootView: View {
         } message: {
             Text(authCallbackError ?? "Authentication could not be completed.")
         }
+    }
+
+    private func handleCompletedWorkoutReview(
+        _ workout: SocialPublishableWorkout
+    ) async {
+        guard !queuedWorkoutReviewIDs.contains(workout.id) else {
+            return
+        }
+
+        if let lastQueuedWorkoutReview,
+           lastQueuedWorkoutReview.activity == workout.activity,
+           abs(
+               lastQueuedWorkoutReview.endDate.timeIntervalSince(workout.endDate)
+           ) < 90 {
+            return
+        }
+
+        queuedWorkoutReviewIDs.insert(workout.id)
+        lastQueuedWorkoutReview = workout
+
+        if settings.autoPublishCompletedWorkouts {
+            _ = await social.publishWorkout(
+                workout,
+                visibility: settings.defaultActivityVisibility
+            )
+        }
+
+        pendingWorkoutReview = workout
     }
 
     private func refreshSocialCore() async {
