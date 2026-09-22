@@ -34,6 +34,7 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSHealthShareUsageDescription: "ATHLTH reads workouts, sleep, heart rate, activity and related Health data to provide your training history, recovery insights and workout metrics."
         NSHealthUpdateUsageDescription: "ATHLTH saves workouts and related training data to Apple Health so workouts recorded with ATHLTH and Apple Watch stay in sync."
+        NSLocationWhenInUseUsageDescription: "ATHLTH uses your location only when you ask to verify a meetup check-in or when recording an outdoor workout."
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
