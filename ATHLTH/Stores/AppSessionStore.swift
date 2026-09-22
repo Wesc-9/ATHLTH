@@ -520,19 +520,57 @@ final class AppSessionStore: ObservableObject {
     }
 
     func createStarterPlan() {
+        createTrainingPlan(
+            title: "My Training Plan",
+            summary: "Flexible training plan",
+            weekCount: 1,
+            startDate: Calendar.current.startOfDay(for: Date())
+        )
+    }
+
+    func createTrainingPlan(
+        title: String,
+        summary: String,
+        weekCount: Int,
+        startDate: Date?,
+        visibility: ProfileVisibility = .privateOnly
+    ) {
+        let resolvedWeekCount = min(max(weekCount, 1), 52)
+
         activePlan = TrainingPlan(
             id: UUID(),
             ownerID: profile.userID,
-            title: "My Training Plan",
-            summary: "Flexible training plan",
-            visibility: .privateOnly,
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "My Training Plan"
+                : title.trimmingCharacters(in: .whitespacesAndNewlines),
+            summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
+            visibility: visibility,
             version: 1,
-            weeks: [makeEmptyWeek(number: 1)],
+            weeks: (1...resolvedWeekCount).map(makeEmptyWeek),
             tags: [],
             createdAt: Date(),
             updatedAt: Date(),
-            startDate: Calendar.current.startOfDay(for: Date())
+            startDate: startDate
         )
+    }
+
+    func setActivePlanWeekCount(_ weekCount: Int) {
+        guard var plan = activePlan else { return }
+
+        let resolved = min(max(weekCount, 1), 52)
+        let current = plan.weeks.count
+
+        if resolved > current {
+            for number in (current + 1)...resolved {
+                plan.weeks.append(makeEmptyWeek(number: number))
+            }
+        } else if resolved < current {
+            plan.weeks = Array(plan.weeks.prefix(resolved))
+        }
+
+        plan.updatedAt = Date()
+        plan.version += 1
+        activePlan = plan
     }
 
     func addWeekToActivePlan() {
