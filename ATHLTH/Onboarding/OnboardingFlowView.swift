@@ -869,49 +869,26 @@ struct OnboardingFlowView: View {
                 .padding(.top, 18)
             }
 
-            if session.subscriptionAccess.trialIsActive {
-                HStack(spacing: 12) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(OnboardingTheme.accent)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            OnboardingTheme.accent.opacity(0.12),
-                            in: Circle()
+            if importedHealthDetails.hasAnyValue || watchConnection.isReady {
+                HStack(spacing: 10) {
+                    if importedHealthDetails.hasAnyValue {
+                        readyStatusChip(
+                            title: "Apple Health",
+                            icon: "heart.fill"
                         )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Your 7-day ATHLTH+ trial is active")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-
-                        if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
-                            Text("Free access through \(trialEndsAt.formatted(date: .abbreviated, time: .omitted)). No subscription starts automatically.")
-                                .font(.caption)
-                                .foregroundStyle(OnboardingTheme.mutedText)
-                                .fixedSize(horizontal: false, vertical: true)
-                        } else {
-                            Text("No subscription starts automatically.")
-                                .font(.caption)
-                                .foregroundStyle(OnboardingTheme.mutedText)
-                        }
                     }
 
-                    Spacer(minLength: 0)
+                    if watchConnection.isReady {
+                        readyStatusChip(
+                            title: "Apple Watch",
+                            icon: "applewatch"
+                        )
+                    }
                 }
-                .padding(14)
-                .background(
-                    Color.white.opacity(0.06),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(OnboardingTheme.border, lineWidth: 1)
-                }
-                .padding(.top, 24)
+                .padding(.top, 14)
             }
 
-            Spacer(minLength: 44)
+            Spacer(minLength: 92)
 
             Button {
                 if session.subscriptionAccess.trialIsActive &&
@@ -934,16 +911,6 @@ struct OnboardingFlowView: View {
             }
             .buttonStyle(OnboardingPrimaryButtonStyle())
 
-            if session.subscriptionAccess.trialIsActive &&
-                !subscriptionStore.hasActiveSubscription {
-                Text("Next: choose ATHLTH+ Monthly or Yearly, or close the offer to continue your free trial.")
-                    .font(.caption2)
-                    .foregroundStyle(OnboardingTheme.faintText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 18)
-                    .padding(.top, 9)
-            }
-
             if let onboardingCompletionError {
                 Label(onboardingCompletionError, systemImage: "exclamationmark.circle.fill")
                     .font(.caption)
@@ -951,9 +918,38 @@ struct OnboardingFlowView: View {
                     .padding(.top, 10)
             }
 
-            Spacer(minLength: 80)
+            Spacer(minLength: 70)
         }
         .frame(maxWidth: .infinity, minHeight: 600)
+    }
+
+    private func readyStatusChip(
+        title: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(OnboardingTheme.success)
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+
+            Image(systemName: "checkmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(OnboardingTheme.success)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .background(
+            Color.white.opacity(0.06),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(OnboardingTheme.border, lineWidth: 1)
+        }
     }
 
     private var footer: some View {
