@@ -9,7 +9,11 @@ final class AppSessionStore: ObservableObject {
         }
     }
     @Published private(set) var planTemplates: [TrainingPlan]
-    @Published var savedRoutes: [TrainingRoute]
+    @Published var savedRoutes: [TrainingRoute] {
+        didSet {
+            persistSavedRoutes()
+        }
+    }
     @Published var previewModeEnabled: Bool
     @Published var signedIn: Bool
     @Published var onboardingCompleted: Bool
@@ -34,7 +38,9 @@ final class AppSessionStore: ObservableObject {
         self.profile = profile
         self.activePlan = activePlan ?? Self.loadActivePlan(from: defaults)
         self.planTemplates = Self.loadPlanTemplates(from: defaults)
-        self.savedRoutes = savedRoutes
+        self.savedRoutes = savedRoutes.isEmpty
+            ? Self.loadSavedRoutes(from: defaults)
+            : savedRoutes
         self.previewModeEnabled = previewModeEnabled
         self.defaults = defaults
         self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? profile.displayName
@@ -701,6 +707,24 @@ final class AppSessionStore: ObservableObject {
         }
 
         defaults.set(data, forKey: "session.activeTrainingPlan")
+    }
+
+    private func persistSavedRoutes() {
+        guard let data = try? JSONEncoder().encode(savedRoutes) else {
+            return
+        }
+
+        defaults.set(data, forKey: "session.savedRoutes")
+    }
+
+    private static func loadSavedRoutes(from defaults: UserDefaults) -> [TrainingRoute] {
+        guard let data = defaults.data(forKey: "session.savedRoutes"),
+              let routes = try? JSONDecoder().decode([TrainingRoute].self, from: data)
+        else {
+            return []
+        }
+
+        return routes.sorted { $0.createdAt > $1.createdAt }
     }
 
     private func persistPlanTemplates() {
