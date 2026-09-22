@@ -95,6 +95,8 @@ struct ATHLTHHomeView: View {
                         .padding(.top, 14)
                     }
 
+                    HomeActivitySection()
+
                     HStack(alignment: .top, spacing: 12) {
                         ATHLTHCard {
                             ATHLTHSectionHeader(title: "Train Today")
@@ -215,6 +217,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
+    @EnvironmentObject private var social: SocialStore
 
     @State private var selectedSection = 0
     @State private var showingFileImporter = false
@@ -223,6 +226,7 @@ struct ATHLTHTrainView: View {
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
     @State private var selectedStrengthSession: PlannedSession?
+    @State private var pendingQuickStartKind: WorkoutKind?
     @State private var showingStrengthWorkout = false
 
     private let gpxImporter = GPXRouteImporter()
@@ -275,9 +279,17 @@ struct ATHLTHTrainView: View {
                     spotifyAutoplayEnabled:
                         settings.spotifyAutoplayLinkedPlaylists &&
                         (session.activePlan?.spotifyAutoplayOnWorkoutStart ?? false)
-                ) { captureDevice, trackingMode in
-                    if captureDevice == .appleWatch {
-                        Task { @MainActor in
+                ) { captureDevice, trackingMode, selectedFriends in
+                    Task { @MainActor in
+                        await social.beginWorkoutWithFriends(
+                            title: workout.title,
+                            kind: .strength,
+                            friends: selectedFriends,
+                            creatorName: session.profile.displayName,
+                            creatorUsername: session.profile.username
+                        )
+
+                        if captureDevice == .appleWatch {
                             do {
                                 try await watchConnection.startWorkoutOnWatch(.strength)
                                 startPlanSpotifyIfNeeded()
@@ -292,17 +304,34 @@ struct ATHLTHTrainView: View {
                             } catch {
                                 watchTransferError = error.localizedDescription
                             }
+                        } else {
+                            startPlanSpotifyIfNeeded()
+                            session.beginTrainingStatus(for: workout)
+                            strengthWorkout.start(
+                                session: workout,
+                                watchSessionID: nil,
+                                trackingMode: trackingMode,
+                                captureDevice: .iPhone
+                            )
+                            showingStrengthWorkout = true
                         }
-                    } else {
-                        startPlanSpotifyIfNeeded()
-                        session.beginTrainingStatus(for: workout)
-                        strengthWorkout.start(
-                            session: workout,
-                            watchSessionID: nil,
-                            trackingMode: trackingMode,
-                            captureDevice: .iPhone
+                    }
+                }
+            }
+            .sheet(item: $pendingQuickStartKind) { kind in
+                QuickWorkoutStartSheet(
+                    kind: kind,
+                    watchConnected: watchConnection.isReady
+                ) { selectedFriends in
+                    Task { @MainActor in
+                        await social.beginWorkoutWithFriends(
+                            title: kind.title,
+                            kind: kind,
+                            friends: selectedFriends,
+                            creatorName: session.profile.displayName,
+                            creatorUsername: session.profile.username
                         )
-                        showingStrengthWorkout = true
+                        startQuickWorkoutOnWatch(kind)
                     }
                 }
             }
@@ -620,7 +649,7 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        startQuickWorkoutOnWatch(kind)
+        pendingQuickStartKind = kind
     }
 
     private func startQuickWorkoutOnWatch(_ kind: WorkoutKind) {
