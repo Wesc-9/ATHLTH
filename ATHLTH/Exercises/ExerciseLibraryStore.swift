@@ -26,7 +26,7 @@ final class ExerciseLibraryStore: ObservableObject {
     var bodyParts: [String] {
         Array(
             Set(
-                repDBExercises.compactMap { $0.bodyPart }
+                allExercises.compactMap { $0.bodyPart }
             )
         )
         .sorted()
@@ -35,7 +35,7 @@ final class ExerciseLibraryStore: ObservableObject {
     var equipmentOptions: [String] {
         Array(
             Set(
-                repDBExercises.flatMap { $0.exercise.equipment }
+                allExercises.flatMap { $0.exercise.equipment }
             )
         )
         .sorted()
