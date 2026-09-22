@@ -761,6 +761,7 @@ struct ATHLTHProgressView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var trophyStore: TrophyStore
 
     @State private var period: ProgressPeriod = .week
     @State private var progressSnapshot: HealthProgressSnapshot?
@@ -828,6 +829,11 @@ struct ATHLTHProgressView: View {
             await goalStore.refreshAutomaticMilestones(
                 health: health,
                 strength: strengthWorkout
+            )
+            await trophyStore.refresh(
+                health: health,
+                strength: strengthWorkout,
+                goals: goalStore
             )
         }
         .sheet(isPresented: $showingGoalCreation) {
@@ -1318,38 +1324,7 @@ struct ATHLTHProgressView: View {
     }
 
     private var achievementsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Achievements")
-                    .font(.headline)
-                Spacer()
-                Text("See All")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(green)
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 7) {
-                achievementBadge(icon: "dumbbell.fill", tint: green, title: "10", detail: "Workouts")
-                achievementBadge(icon: "shoeprints.fill", tint: blue, title: "50K", detail: "Steps Week")
-                achievementBadge(icon: "mountain.2.fill", tint: purple, title: "New PR", detail: "Strength")
-            }
-
-            Button {
-            } label: {
-                Text("View All Achievements")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(green)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 36)
-                    .background(green.opacity(0.07), in: Capsule())
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(16)
-        .progressReferenceCard()
+        TrophyProgressCard()
     }
 
     private var goalsCard: some View {
@@ -2044,7 +2019,7 @@ struct ATHLTHProgressView: View {
     }
 }
 
-private extension View {
+extension View {
     func progressReferenceCard() -> some View {
         self
             .background(
@@ -2062,6 +2037,7 @@ private extension View {
 struct ATHLTHProfileView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var trophyStore: TrophyStore
 
     var body: some View {
         NavigationStack {
@@ -2107,8 +2083,10 @@ struct ATHLTHProfileView: View {
                     HStack(spacing: 12) {
                         summaryCard(icon: "bookmark.fill", value: "12", title: "Saved Plans", tint: .green)
                         summaryCard(icon: "point.topleft.down.to.point.bottomright.curvepath", value: "\(session.savedRoutes.count)", title: "Saved Routes", tint: .blue)
-                        summaryCard(icon: "trophy.fill", value: "14", title: "Achievements", tint: .orange)
+                        summaryCard(icon: "trophy.fill", value: "\(trophyStore.unlockedCount)", title: "Trophies", tint: .orange)
                     }
+
+                    TrophyCabinetSection()
 
                     ATHLTHCard {
                         ATHLTHSectionHeader(title: "Share Your Plans")
