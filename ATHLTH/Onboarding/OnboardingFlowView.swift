@@ -74,7 +74,11 @@ struct OnboardingFlowView: View {
         .task {
             if session.signedIn, !session.onboardingCompleted {
                 if let bootstrap = try? await accountService.loadCurrentUser() {
-                    routeAuthenticatedUser(bootstrap)
+                    let restoredNameSeed = await accountService.currentUserNameSeed()
+                    routeAuthenticatedUser(
+                        bootstrap,
+                        usernameSeedFallback: restoredNameSeed
+                    )
                 } else if session.profile.username.isEmpty {
                     step = .username
                 } else {
@@ -1277,12 +1281,14 @@ struct OnboardingFlowView: View {
 
                 let appleGivenName = credential.fullName?.givenName?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
+                let storedAppleNameSeed = await accountService.currentUserNameSeed()
                 let appleEmailSeed = credential.email?
                     .split(separator: "@")
                     .first
                     .map(String.init)
                 let appleUsernameSeed =
                     (appleGivenName?.isEmpty == false ? appleGivenName : nil)
+                    ?? storedAppleNameSeed
                     ?? appleEmailSeed
 
                 routeAuthenticatedUser(
