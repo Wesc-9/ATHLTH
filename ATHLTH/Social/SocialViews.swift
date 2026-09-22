@@ -691,9 +691,38 @@ struct FriendProfileView: View {
                 .background(Color(.secondarySystemGroupedBackground), in: Capsule())
 
         case .incomingPending:
-            Button("View Request") {
+            if let request = social.incomingRequests.first(where: {
+                $0.profile.userID == userID
+            }) {
+                HStack(spacing: 8) {
+                    Button("Decline") {
+                        Task {
+                            await social.decline(request)
+                            await load(force: true)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+
+                    Button("Accept") {
+                        Task {
+                            await social.accept(request)
+                            await load(force: true)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .frame(maxWidth: .infinity)
+                }
+            } else {
+                Text("Friend request pending")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(
+                        Color(.secondarySystemGroupedBackground),
+                        in: Capsule()
+                    )
             }
-            .buttonStyle(.bordered)
 
         case .none:
             Button {
