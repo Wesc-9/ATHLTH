@@ -2097,6 +2097,8 @@ struct ATHLTHProfileView: View {
                         isLoading: performanceStatsLoading
                     )
 
+                    ProfileChallengesSection()
+
                     ATHLTHCard {
                         ATHLTHSectionHeader(title: "Share Your Plans")
                         HStack {
