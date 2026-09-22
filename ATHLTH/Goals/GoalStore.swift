@@ -66,6 +66,29 @@ final class GoalStore: ObservableObject {
         persist()
     }
 
+    func setLinkedPlan(
+        _ planID: UUID,
+        goalIDs: Set<UUID>
+    ) {
+        var changed = false
+
+        for index in goals.indices {
+            if goalIDs.contains(goals[index].id) {
+                if goals[index].linkedTrainingPlanID != planID {
+                    goals[index].linkedTrainingPlanID = planID
+                    changed = true
+                }
+            } else if goals[index].linkedTrainingPlanID == planID {
+                goals[index].linkedTrainingPlanID = nil
+                changed = true
+            }
+        }
+
+        if changed {
+            persist()
+        }
+    }
+
     func setPrimary(_ goalID: UUID) {
         guard goals.contains(where: { $0.id == goalID }) else { return }
 
