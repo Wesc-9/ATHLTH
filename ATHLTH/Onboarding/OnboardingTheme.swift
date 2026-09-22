@@ -1,9 +1,15 @@
 import SwiftUI
 
 enum OnboardingTheme {
-    static let green = Color(red: 0.43, green: 0.72, blue: 0.52)
+    static let accent = Color(red: 0.88, green: 0.66, blue: 0.43)
+    static let success = Color(red: 0.43, green: 0.72, blue: 0.52)
+
+    // Compatibility aliases for surfaces that have not yet moved to the
+    // semantic palette. Brand/selection UI should use accent; positive
+    // state feedback should use success.
+    static let green = success
     static let deepGreen = Color(red: 0.23, green: 0.50, blue: 0.34)
-    static let warmHighlight = Color(red: 0.88, green: 0.69, blue: 0.48)
+    static let warmHighlight = accent
 
     static let canvasTop = Color(red: 0.12, green: 0.105, blue: 0.095)
     static let canvasBottom = Color(red: 0.035, green: 0.035, blue: 0.035)
