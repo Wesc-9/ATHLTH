@@ -201,6 +201,77 @@ final class StrengthWorkoutStore: ObservableObject {
         return currentExerciseIndex + 1 < workout.exercises.count
     }
 
+    func startFreestyle(
+        watchSessionID: UUID?,
+        trackingMode: StrengthTrackingMode = .advanced,
+        captureDevice: WorkoutCaptureDevice = .iPhone
+    ) {
+        activeWorkout = StrengthWorkoutLog(
+            id: UUID(),
+            plannedSessionID: nil,
+            watchSessionID: watchSessionID,
+            captureDevice: captureDevice,
+            trackingMode: trackingMode,
+            title: "Freestyle Strength",
+            startedAt: Date(),
+            endedAt: nil,
+            exercises: [],
+            healthMetrics: LinkedHealthWorkoutMetrics(
+                healthKitWorkoutUUID: nil,
+                duration: nil,
+                activeCalories: nil,
+                averageHeartRate: nil,
+                maxHeartRate: nil
+            )
+        )
+
+        currentExerciseIndex = 0
+        currentSetIndex = 0
+        restEndsAt = nil
+    }
+
+    func appendExercise(
+        _ exercise: Exercise,
+        sets: Int = 3,
+        reps: Int? = 8,
+        targetWeightKilograms: Double? = nil,
+        restSeconds: Int? = 90
+    ) {
+        guard var workout = activeWorkout else { return }
+
+        let setCount = max(sets, 1)
+        let log = StrengthExerciseLog(
+            id: UUID(),
+            plannedExerciseID: nil,
+            exercise: exercise.snapshot,
+            sets: (1...setCount).map { number in
+                StrengthSetLog(
+                    id: UUID(),
+                    setNumber: number,
+                    plannedReps: reps,
+                    plannedWeightKilograms: targetWeightKilograms,
+                    completedReps: nil,
+                    completedWeightKilograms: nil,
+                    rpe: nil,
+                    completedAt: nil,
+                    restSeconds: restSeconds
+                )
+            },
+            completedAt: nil
+        )
+
+        let wasEmpty = workout.exercises.isEmpty
+        workout.exercises.append(log)
+        workout.trackingMode = .advanced
+        activeWorkout = workout
+
+        if wasEmpty {
+            currentExerciseIndex = 0
+            currentSetIndex = 0
+            restEndsAt = nil
+        }
+    }
+
     func start(
         session: PlannedSession,
         watchSessionID: UUID?,
