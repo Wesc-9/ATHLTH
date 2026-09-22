@@ -163,31 +163,8 @@ struct OnboardingFlowView: View {
 
                 Spacer()
 
-                Menu {
-                    ForEach(AppLanguage.allCases) { language in
-                        Button {
-                            settings.language = language
-                        } label: {
-                            HStack {
-                                Label(language.title, systemImage: language.systemImage)
-                                if settings.language == language {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "globe")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .overlay {
-                            Circle()
-                                .stroke(OnboardingTheme.border, lineWidth: 1)
-                        }
-                }
-                .accessibilityLabel("Language")
+                Color.clear
+                    .frame(width: 40, height: 40)
             }
 
             HStack(spacing: 6) {
