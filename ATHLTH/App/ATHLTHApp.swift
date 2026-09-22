@@ -98,6 +98,10 @@ struct AppRootView: View {
             )
             notifications.syncGoalEvents(from: goals.goals)
             challengeStore.refreshStatuses()
+            notifications.syncChallengeEvents(
+                from: challengeStore.challenges,
+                currentUserID: appSession.profile.userID
+            )
             await refreshTrophiesAndNotifications()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -116,6 +120,10 @@ struct AppRootView: View {
                 )
                 notifications.syncGoalEvents(from: goals.goals)
                 challengeStore.refreshStatuses()
+                notifications.syncChallengeEvents(
+                    from: challengeStore.challenges,
+                    currentUserID: appSession.profile.userID
+                )
                 await refreshTrophiesAndNotifications()
             }
         }
@@ -178,6 +186,16 @@ struct AppRootView: View {
                 workout,
                 userID: appSession.profile.userID,
                 displayName: appSession.profile.displayName
+            )
+
+            Task {
+                await refreshTrophiesAndNotifications()
+            }
+        }
+        .onChange(of: challengeStore.challenges) { _, updatedChallenges in
+            notifications.syncChallengeEvents(
+                from: updatedChallenges,
+                currentUserID: appSession.profile.userID
             )
 
             Task {
@@ -261,7 +279,9 @@ struct AppRootView: View {
         await trophies.refresh(
             health: health,
             strength: strengthWorkout,
-            goals: goals
+            goals: goals,
+            challenges: challengeStore,
+            currentUserID: appSession.profile.userID
         )
         notifications.syncTrophyEvents(from: trophies.unlocks)
     }
