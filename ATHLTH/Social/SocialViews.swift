@@ -942,11 +942,7 @@ struct SocialPrivacySettingsView: View {
                     Toggle("Training now", isOn: binding.shareTrainingPresence)
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
                     Toggle("Trophy Cabinet", isOn: binding.shareTrophyCabinet)
-                    Toggle("Goals", isOn: binding.shareGoals)
                     Toggle("Recent activity", isOn: binding.shareRecentActivity)
-                    Toggle("Running PRs", isOn: binding.shareRunningPRs)
-                    Toggle("Strength PRs", isOn: binding.shareStrengthPRs)
-                    Toggle("Workout totals", isOn: binding.shareWorkoutTotals)
                 }
 
                 Section("Challenges") {
