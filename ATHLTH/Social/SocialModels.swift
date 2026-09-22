@@ -287,6 +287,7 @@ struct SocialActivityRecord: Identifiable, Codable, Hashable {
     let subtitle: String?
     let metadata: [String: String]?
     let visibility: String
+    let eventKey: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -297,6 +298,7 @@ struct SocialActivityRecord: Identifiable, Codable, Hashable {
         case subtitle
         case metadata
         case visibility
+        case eventKey = "event_key"
         case createdAt = "created_at"
     }
 }
