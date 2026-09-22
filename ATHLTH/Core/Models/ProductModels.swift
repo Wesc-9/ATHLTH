@@ -362,6 +362,7 @@ struct TrainingPlan: Identifiable, Codable, Hashable {
     var spotifyAutoplayOnWorkoutStart: Bool = true
     var createdAt: Date
     var updatedAt: Date
+    var startDate: Date? = nil
 }
 
 struct RouteCoordinate: Codable, Hashable {
