@@ -203,6 +203,7 @@ struct GoalMilestone: Identifiable, Codable, Hashable {
     var title: String
     var targetDescription: String
     var automationRule: GoalAutomationRule?
+    var completesGoal: Bool
     var completedAt: Date?
     var completionMethod: GoalCompletionMethod?
     var manualOverride: GoalMilestoneManualOverride
@@ -215,6 +216,7 @@ struct GoalMilestone: Identifiable, Codable, Hashable {
         title: String,
         targetDescription: String,
         automationRule: GoalAutomationRule? = nil,
+        completesGoal: Bool = false,
         completedAt: Date? = nil,
         completionMethod: GoalCompletionMethod? = nil,
         manualOverride: GoalMilestoneManualOverride = .none,
@@ -226,6 +228,7 @@ struct GoalMilestone: Identifiable, Codable, Hashable {
         self.title = title
         self.targetDescription = targetDescription
         self.automationRule = automationRule
+        self.completesGoal = completesGoal
         self.completedAt = completedAt
         self.completionMethod = completionMethod
         self.manualOverride = manualOverride
