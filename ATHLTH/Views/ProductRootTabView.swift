@@ -2039,6 +2039,8 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var trophyStore: TrophyStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var challengeStore: ChallengeStore
 
     @State private var performanceStats: ProfilePerformanceStats?
     @State private var performanceStatsLoading = false
@@ -2079,9 +2081,24 @@ struct ATHLTHProfileView: View {
                     }
 
                     HStack {
-                        profileStat("\(session.profile.followersCount)", "Followers")
-                        profileStat("\(session.profile.followingCount)", "Following")
-                        profileStat("\(session.profile.workoutsCount)", "Workouts")
+                        NavigationLink {
+                            SocialHubView(initialTab: .friends)
+                        } label: {
+                            profileStat("\(social.friends.count)", "Friends")
+                        }
+                        .buttonStyle(.plain)
+
+                        profileStat(
+                            "\(performanceStats?.totalWorkoutCount ?? session.profile.workoutsCount)",
+                            "Workouts"
+                        )
+
+                        NavigationLink {
+                            ChallengeHubView()
+                        } label: {
+                            profileStat("\(challengeStore.challenges.count)", "Challenges")
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     HStack(spacing: 12) {
@@ -2089,6 +2106,8 @@ struct ATHLTHProfileView: View {
                         summaryCard(icon: "point.topleft.down.to.point.bottomright.curvepath", value: "\(session.savedRoutes.count)", title: "Saved Routes", tint: .blue)
                         summaryCard(icon: "trophy.fill", value: "\(trophyStore.unlockedCount)", title: "Trophies", tint: .orange)
                     }
+
+                    ProfileFriendsSection()
 
                     TrophyCabinetSection()
 
@@ -2121,36 +2140,6 @@ struct ATHLTHProfileView: View {
                         .padding(.top, 10)
                     }
 
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Recent Activities", actionTitle: "See All")
-                        HStack {
-                            recentActivity("Morning Run", icon: "figure.run", detail: "12.5 km")
-                            recentActivity("Upper Body", icon: "dumbbell.fill", detail: "6 exercises")
-                            recentActivity("Evening Walk", icon: "figure.walk", detail: "7.1 km")
-                        }
-                        .padding(.top, 10)
-                    }
-
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Friends", actionTitle: "Find Friends")
-                        HStack {
-                            ForEach(["Sara", "Erik", "Live", "Marcus"], id: \.self) { name in
-                                VStack(spacing: 7) {
-                                    Circle()
-                                        .fill(.blue.opacity(0.1))
-                                        .frame(width: 52, height: 52)
-                                        .overlay {
-                                            Image(systemName: "person.fill")
-                                                .foregroundStyle(.blue)
-                                        }
-                                    Text(name)
-                                        .font(.caption)
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
-                        }
-                        .padding(.top, 10)
-                    }
                 }
                 .padding()
                 .frame(maxWidth: 900)
@@ -2160,9 +2149,15 @@ struct ATHLTHProfileView: View {
             .navigationBarTitleDisplayMode(.inline)
             .refreshable {
                 await loadPerformanceStats(forceRefresh: true)
+                await social.refresh()
+                await social.syncOwnPerformance(performanceStats)
+                await social.syncOwnTrophies(trophyStore.showcaseTrophies)
             }
             .task {
                 await loadPerformanceStats()
+                await social.refresh()
+                await social.syncOwnPerformance(performanceStats)
+                await social.syncOwnTrophies(trophyStore.showcaseTrophies)
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
