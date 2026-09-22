@@ -757,39 +757,18 @@ private enum ProgressPeriod: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private struct ProgressBarPoint: Identifiable {
-    let id = UUID()
-    let label: String
-    let value: Double
-}
-
 struct ATHLTHProgressView: View {
+    @EnvironmentObject private var health: HealthKitManager
+
     @State private var period: ProgressPeriod = .week
+    @State private var progressSnapshot: HealthProgressSnapshot?
+    @State private var progressLoading = false
+    @State private var progressError: String?
 
     private let green = Color(red: 0.16, green: 0.72, blue: 0.38)
     private let blue = Color(red: 0.20, green: 0.56, blue: 0.96)
     private let purple = Color(red: 0.42, green: 0.36, blue: 0.95)
     private let canvas = Color(red: 0.965, green: 0.972, blue: 0.968)
-
-    private let workouts: [ProgressBarPoint] = [
-        .init(label: "M", value: 2),
-        .init(label: "T", value: 4),
-        .init(label: "W", value: 3),
-        .init(label: "T", value: 3),
-        .init(label: "F", value: 5),
-        .init(label: "S", value: 2),
-        .init(label: "S", value: 4)
-    ]
-
-    private let steps: [ProgressBarPoint] = [
-        .init(label: "M", value: 6200),
-        .init(label: "T", value: 8100),
-        .init(label: "W", value: 7600),
-        .init(label: "T", value: 11200),
-        .init(label: "F", value: 8400),
-        .init(label: "S", value: 10800),
-        .init(label: "S", value: 9700)
-    ]
 
     var body: some View {
         NavigationStack {
@@ -828,7 +807,13 @@ struct ATHLTHProgressView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(canvas.ignoresSafeArea())
+            .refreshable {
+                await loadProgressData()
+            }
             .toolbar(.hidden, for: .navigationBar)
+        }
+        .task(id: period) {
+            await loadProgressData()
         }
     }
 
@@ -954,12 +939,12 @@ struct ATHLTHProgressView: View {
     private var weeklyOverview: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(period == .week ? "Weekly Overview" : period.rawValue + " Overview")
+                Text(overviewTitle)
                     .font(.title3.weight(.bold))
 
                 Spacer()
 
-                Text("Mar 24 – Mar 30")
+                Text(periodDateLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -972,9 +957,10 @@ struct ATHLTHProgressView: View {
                 overviewMetric(
                     icon: "dumbbell.fill",
                     tint: green,
-                    value: "5",
+                    value: progressSnapshot.map { String($0.workoutCount) } ?? "—",
                     title: "Workouts",
-                    change: "25%"
+                    change: progressSnapshot?.workoutChangePercent,
+                    footer: comparisonLabel
                 )
 
                 overviewDivider
@@ -982,9 +968,10 @@ struct ATHLTHProgressView: View {
                 overviewMetric(
                     icon: "shoeprints.fill",
                     tint: blue,
-                    value: "8,432",
+                    value: formattedSteps(progressSnapshot?.averageDailySteps),
                     title: "Steps/Day",
-                    change: "12%"
+                    change: progressSnapshot?.stepsChangePercent,
+                    footer: comparisonLabel
                 )
 
                 overviewDivider
@@ -992,9 +979,10 @@ struct ATHLTHProgressView: View {
                 overviewMetric(
                     icon: "moon.fill",
                     tint: purple,
-                    value: "7h 24m",
+                    value: progressSnapshot?.averageSleepDuration.map { $0.shortDuration } ?? "—",
                     title: "Sleep/Day",
-                    change: "6%"
+                    change: progressSnapshot?.sleepChangePercent,
+                    footer: comparisonLabel
                 )
 
                 overviewDivider
@@ -1002,10 +990,21 @@ struct ATHLTHProgressView: View {
                 overviewMetric(
                     icon: "leaf.fill",
                     tint: green,
-                    value: "87",
+                    value: "Soon",
                     title: "Recovery",
-                    change: "14%"
+                    change: nil,
+                    footer: "ATHLTH score"
                 )
+            }
+
+            if progressLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+            } else if let progressError {
+                Label(progressError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
             }
         }
         .padding(18)
@@ -1017,47 +1016,46 @@ struct ATHLTHProgressView: View {
             compactHeader("Workouts Completed")
 
             HStack(alignment: .top, spacing: 10) {
-                Chart(workouts) { point in
-                    BarMark(
-                        x: .value("Day", point.label),
-                        y: .value("Workouts", point.value)
-                    )
-                    .foregroundStyle(green.gradient)
-                    .cornerRadius(4)
-                }
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: [0, 2, 4, 6]) {
-                        AxisGridLine().foregroundStyle(Color.black.opacity(0.045))
-                        AxisValueLabel().font(.system(size: 8))
+                if let snapshot = progressSnapshot, !snapshot.buckets.isEmpty {
+                    Chart(snapshot.buckets) { bucket in
+                        BarMark(
+                            x: .value("Period", bucketAxisLabel(bucket.startDate)),
+                            y: .value("Workouts", bucket.workoutCount)
+                        )
+                        .foregroundStyle(green.gradient)
+                        .cornerRadius(4)
                     }
-                }
-                .chartXAxis {
-                    AxisMarks {
-                        AxisValueLabel().font(.system(size: 8))
+                    .chartYAxis {
+                        AxisMarks(position: .leading) {
+                            AxisGridLine().foregroundStyle(Color.black.opacity(0.045))
+                            AxisValueLabel().font(.system(size: 8))
+                        }
                     }
+                    .chartXAxis {
+                        AxisMarks {
+                            AxisValueLabel().font(.system(size: 8))
+                        }
+                    }
+                    .frame(height: 120)
+                } else {
+                    chartPlaceholder(icon: "figure.run")
                 }
-                .frame(height: 120)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("5/7")
+                    Text(progressSnapshot.map { String($0.workoutCount) } ?? "—")
                         .font(.title2.weight(.bold))
-                    Text("this week")
+                    Text(periodSummaryLabel)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.up")
-                        Text("2")
-                    }
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(green)
-                    .padding(.top, 7)
+                    changeIndicator(progressSnapshot?.workoutChangePercent)
+                        .padding(.top, 7)
 
-                    Text("vs. last week")
+                    Text(comparisonLabel)
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                 }
-                .frame(width: 62, alignment: .leading)
+                .frame(width: 66, alignment: .leading)
             }
         }
         .padding(16)
@@ -1069,55 +1067,49 @@ struct ATHLTHProgressView: View {
             compactHeader("Daily Steps")
 
             HStack(alignment: .top, spacing: 10) {
-                Chart(steps) { point in
-                    BarMark(
-                        x: .value("Day", point.label),
-                        y: .value("Steps", point.value)
-                    )
-                    .foregroundStyle(blue.gradient)
-                    .cornerRadius(4)
-                }
-                .chartYScale(domain: 0...15000)
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: [0, 5000, 10000, 15000]) { value in
-                        AxisGridLine().foregroundStyle(Color.black.opacity(0.045))
-                        AxisValueLabel {
-                            if let amount = value.as(Int.self) {
-                                Text(amount == 0 ? "0" : "\(amount / 1000)K")
-                                    .font(.system(size: 8))
-                            }
+                if let snapshot = progressSnapshot, !snapshot.buckets.isEmpty {
+                    Chart(snapshot.buckets) { bucket in
+                        BarMark(
+                            x: .value("Period", bucketAxisLabel(bucket.startDate)),
+                            y: .value("Steps", bucket.averageDailySteps ?? 0)
+                        )
+                        .foregroundStyle(blue.gradient)
+                        .cornerRadius(4)
+                    }
+                    .chartYScale(domain: 0...stepsChartUpperBound)
+                    .chartYAxis {
+                        AxisMarks(position: .leading) {
+                            AxisGridLine().foregroundStyle(Color.black.opacity(0.045))
+                            AxisValueLabel().font(.system(size: 8))
                         }
                     }
-                }
-                .chartXAxis {
-                    AxisMarks {
-                        AxisValueLabel().font(.system(size: 8))
+                    .chartXAxis {
+                        AxisMarks {
+                            AxisValueLabel().font(.system(size: 8))
+                        }
                     }
+                    .frame(height: 120)
+                } else {
+                    chartPlaceholder(icon: "shoeprints.fill")
                 }
-                .frame(height: 120)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("8,432")
+                    Text(formattedSteps(progressSnapshot?.averageDailySteps))
                         .font(.title2.weight(.bold))
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.70)
                         .lineLimit(1)
                     Text("avg. steps")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.up")
-                        Text("12%")
-                    }
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(green)
-                    .padding(.top, 7)
+                    changeIndicator(progressSnapshot?.stepsChangePercent)
+                        .padding(.top, 7)
 
-                    Text("vs. last week")
+                    Text(comparisonLabel)
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                 }
-                .frame(width: 66, alignment: .leading)
+                .frame(width: 70, alignment: .leading)
             }
         }
         .padding(16)
@@ -1321,7 +1313,8 @@ struct ATHLTHProgressView: View {
         tint: Color,
         value: String,
         title: String,
-        change: String
+        change: Double?,
+        footer: String
     ) -> some View {
         VStack(spacing: 5) {
             Image(systemName: icon)
@@ -1338,18 +1331,216 @@ struct ATHLTHProgressView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-            HStack(spacing: 2) {
-                Image(systemName: "arrow.up")
-                Text(change)
+            if let change {
+                changeIndicator(change)
+            } else {
+                Text("—")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
             }
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(green)
 
-            Text("vs. last week")
+            Text(footer)
                 .font(.system(size: 8))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func changeIndicator(_ change: Double?) -> some View {
+        if let change {
+            HStack(spacing: 2) {
+                Image(systemName: change >= 0 ? "arrow.up" : "arrow.down")
+                Text("\(abs(change), specifier: "%.0f")%")
+            }
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(change >= 0 ? green : Color.orange)
+        } else {
+            Text("—")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func formattedSteps(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return Int(value.rounded()).formatted()
+    }
+
+    private var overviewTitle: String {
+        switch period {
+        case .week: return "Weekly Overview"
+        case .month: return "Monthly Overview"
+        case .threeMonths: return "3 Month Overview"
+        case .year: return "Year Overview"
+        }
+    }
+
+    private var comparisonLabel: String {
+        switch period {
+        case .week: return "vs. last week"
+        case .month: return "vs. last month"
+        case .threeMonths: return "vs. prior 3 mo."
+        case .year: return "vs. last year"
+        }
+    }
+
+    private var periodSummaryLabel: String {
+        switch period {
+        case .week: return "this week"
+        case .month: return "this month"
+        case .threeMonths: return "3 months"
+        case .year: return "this year"
+        }
+    }
+
+    private var periodDateLabel: String {
+        let range = progressRange
+        let start = range.start.formatted(.dateTime.month(.abbreviated).day())
+        let end = range.end.formatted(.dateTime.month(.abbreviated).day())
+        return "\(start) – \(end)"
+    }
+
+    private var stepsChartUpperBound: Double {
+        let maximum = progressSnapshot?.buckets
+            .compactMap(\.averageDailySteps)
+            .max() ?? 0
+        let rounded = ceil(maximum / 5_000) * 5_000
+        return max(10_000, rounded)
+    }
+
+    private func bucketAxisLabel(_ date: Date) -> String {
+        switch period {
+        case .week:
+            return date.formatted(.dateTime.weekday(.narrow))
+        case .month, .threeMonths:
+            return date.formatted(.dateTime.month(.abbreviated).day())
+        case .year:
+            return date.formatted(.dateTime.month(.abbreviated))
+        }
+    }
+
+    @ViewBuilder
+    private func chartPlaceholder(icon: String) -> some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Color.black.opacity(0.025))
+            .frame(height: 120)
+            .overlay {
+                Image(systemName: icon)
+                    .foregroundStyle(.secondary.opacity(0.5))
+            }
+    }
+
+    private var progressGrouping: HealthProgressGrouping {
+        switch period {
+        case .week:
+            return .day
+        case .month, .threeMonths:
+            return .week
+        case .year:
+            return .month
+        }
+    }
+
+    private var progressRange: (
+        start: Date,
+        end: Date,
+        previousStart: Date,
+        previousEnd: Date
+    ) {
+        let calendar = Calendar.current
+        let now = Date()
+
+        let start: Date
+        let previousStart: Date
+
+        switch period {
+        case .week:
+            start = calendar.dateInterval(of: .weekOfYear, for: now)?.start
+                ?? calendar.startOfDay(for: now)
+            previousStart = calendar.date(byAdding: .weekOfYear, value: -1, to: start)
+                ?? start.addingTimeInterval(-604_800)
+
+        case .month:
+            start = calendar.dateInterval(of: .month, for: now)?.start
+                ?? calendar.startOfDay(for: now)
+            previousStart = calendar.date(byAdding: .month, value: -1, to: start)
+                ?? start.addingTimeInterval(-2_592_000)
+
+        case .threeMonths:
+            let currentMonth = calendar.dateInterval(of: .month, for: now)?.start
+                ?? calendar.startOfDay(for: now)
+            start = calendar.date(byAdding: .month, value: -2, to: currentMonth)
+                ?? currentMonth
+            previousStart = calendar.date(byAdding: .month, value: -3, to: start)
+                ?? start.addingTimeInterval(-7_776_000)
+
+        case .year:
+            start = calendar.dateInterval(of: .year, for: now)?.start
+                ?? calendar.startOfDay(for: now)
+            previousStart = calendar.date(byAdding: .year, value: -1, to: start)
+                ?? start.addingTimeInterval(-31_536_000)
+        }
+
+        let elapsed = now.timeIntervalSince(start)
+        let previousBoundary: Date
+
+        switch period {
+        case .week:
+            previousBoundary = calendar.date(byAdding: .weekOfYear, value: 1, to: previousStart) ?? start
+        case .month:
+            previousBoundary = calendar.date(byAdding: .month, value: 1, to: previousStart) ?? start
+        case .threeMonths:
+            previousBoundary = calendar.date(byAdding: .month, value: 3, to: previousStart) ?? start
+        case .year:
+            previousBoundary = calendar.date(byAdding: .year, value: 1, to: previousStart) ?? start
+        }
+
+        let previousEnd = min(
+            previousStart.addingTimeInterval(elapsed),
+            previousBoundary
+        )
+
+        return (
+            start: start,
+            end: now,
+            previousStart: previousStart,
+            previousEnd: previousEnd
+        )
+    }
+
+    private func loadProgressData() async {
+        guard health.healthDataAvailable else {
+            progressSnapshot = nil
+            progressError = "Apple Health is unavailable on this device."
+            return
+        }
+
+        guard health.hasRequestedAuthorization else {
+            progressSnapshot = nil
+            progressError = "Connect Apple Health to show your progress."
+            return
+        }
+
+        progressLoading = true
+        progressError = nil
+        defer { progressLoading = false }
+
+        let range = progressRange
+
+        do {
+            progressSnapshot = try await health.progressSnapshot(
+                startDate: range.start,
+                endDate: range.end,
+                previousStartDate: range.previousStart,
+                previousEndDate: range.previousEnd,
+                grouping: progressGrouping
+            )
+        } catch {
+            progressSnapshot = nil
+            progressError = error.localizedDescription
+        }
     }
 
     private func recordRow(
