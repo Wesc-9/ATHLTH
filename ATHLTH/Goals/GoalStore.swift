@@ -121,6 +121,7 @@ final class GoalStore: ObservableObject {
             }
         }
 
+        normalizePrimaryGoal()
         persist()
     }
 
