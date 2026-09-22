@@ -1398,7 +1398,7 @@ struct ChallengeDetailView: View {
             }
 
             if let required = challenge.rules.fixedWeightKilograms {
-                ruleRow("Required weight", "\(required, specifier: "%.1f") kg")
+                ruleRow("Required weight", String(format: "%.1f kg", required))
             }
 
             ruleRow("Starts", challenge.rules.startsAt.formatted(date: .abbreviated, time: .shortened))
