@@ -60,6 +60,29 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     }
 }
 
+enum StrengthPersonalRecordKind: String, Codable, Hashable {
+    case heaviestSet
+    case estimatedOneRepMax
+    case workoutVolume
+
+    var systemImage: String {
+        switch self {
+        case .heaviestSet: return "dumbbell.fill"
+        case .estimatedOneRepMax: return "bolt.fill"
+        case .workoutVolume: return "sum"
+        }
+    }
+}
+
+struct StrengthPersonalRecord: Identifiable, Hashable {
+    let id: String
+    let kind: StrengthPersonalRecordKind
+    let title: String
+    let value: String
+    let date: Date
+    let score: Double
+}
+
 struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     let id: UUID
     var plannedSessionID: UUID?
