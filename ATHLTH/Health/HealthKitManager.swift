@@ -239,7 +239,15 @@ final class HealthKitManager: ObservableObject {
         defer { isRefreshing = false }
 
         do {
-            let fetched = try await fetchRecentWorkouts(limit: 30)
+            let end = Date()
+            let start = Calendar.current.date(byAdding: .month, value: -3, to: end)
+                ?? end.addingTimeInterval(-7_776_000)
+
+            let fetched = try await fetchWorkouts(
+                startDate: start,
+                endDate: end,
+                limit: 100
+            )
             workouts = fetched.map(WorkoutSummary.init)
             workoutObjects = Dictionary(uniqueKeysWithValues: fetched.map { ($0.uuid, $0) })
             sleep = try await fetchLatestSleep()
@@ -250,6 +258,38 @@ final class HealthKitManager: ObservableObject {
         } catch {
             authorizationError = error.localizedDescription
         }
+    }
+
+    func progressSnapshot(
+        startDate: Date,
+        endDate: Date,
+        previousStartDate: Date,
+        previousEndDate: Date,
+        grouping: HealthProgressGrouping
+    ) async throws -> HealthProgressSnapshot {
+        let current = try await progressMetrics(
+            startDate: startDate,
+            endDate: endDate,
+            grouping: grouping
+        )
+        let previous = try await progressMetrics(
+            startDate: previousStartDate,
+            endDate: previousEndDate,
+            grouping: grouping
+        )
+
+        return HealthProgressSnapshot(
+            startDate: startDate,
+            endDate: endDate,
+            workoutCount: current.workoutCount,
+            averageDailySteps: current.averageDailySteps,
+            averageSleepDuration: current.averageSleepDuration,
+            trainingDuration: current.trainingDuration,
+            buckets: current.buckets,
+            previousWorkoutCount: previous.workoutCount,
+            previousAverageDailySteps: previous.averageDailySteps,
+            previousAverageSleepDuration: previous.averageSleepDuration
+        )
     }
 
     func refreshPersonalDetails() async {
@@ -435,15 +475,24 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
-    private func fetchRecentWorkouts(limit: Int) async throws -> [HKWorkout] {
+    private func fetchWorkouts(
+        startDate: Date,
+        endDate: Date,
+        limit: Int = HKObjectQueryNoLimit
+    ) async throws -> [HKWorkout] {
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let predicate = HKQuery.predicateForSamples(
+            withStart: startDate,
+            end: endDate,
+            options: .strictStartDate
+        )
 
         return try await withCheckedThrowingContinuation {
             (continuation: CheckedContinuation<[HKWorkout], Error>) in
 
             let query = HKSampleQuery(
                 sampleType: HKObjectType.workoutType(),
-                predicate: nil,
+                predicate: predicate,
                 limit: limit,
                 sortDescriptors: [sort]
             ) { _, samples, error in
@@ -635,6 +684,226 @@ final class HealthKitManager: ObservableObject {
             oxygenSaturationPercent: try await oxygen?.0,
             respiratoryRate: try await respiratory?.0
         )
+    }
+
+    private struct ProgressMetrics {
+        let workoutCount: Int
+        let averageDailySteps: Double?
+        let averageSleepDuration: TimeInterval?
+        let trainingDuration: TimeInterval
+        let buckets: [HealthProgressBucket]
+    }
+
+    private func progressMetrics(
+        startDate: Date,
+        endDate: Date,
+        grouping: HealthProgressGrouping
+    ) async throws -> ProgressMetrics {
+        async let workoutsTask = fetchWorkouts(
+            startDate: startDate,
+            endDate: endDate
+        )
+        async let stepsTask = dailyCumulativeQuantities(
+            identifier: .stepCount,
+            unit: .count(),
+            startDate: startDate,
+            endDate: endDate
+        )
+        async let sleepTask = sleepDurationsByWakeDay(
+            startDate: startDate,
+            endDate: endDate
+        )
+
+        let workouts = try await workoutsTask
+        let stepsByDay = try await stepsTask
+        let sleepByDay = try await sleepTask
+
+        let totalTrainingDuration = workouts.reduce(0) { $0 + $1.duration }
+        let averageSteps = average(Array(stepsByDay.values))
+        let averageSleep = average(Array(sleepByDay.values))
+
+        return ProgressMetrics(
+            workoutCount: workouts.count,
+            averageDailySteps: averageSteps,
+            averageSleepDuration: averageSleep,
+            trainingDuration: totalTrainingDuration,
+            buckets: makeProgressBuckets(
+                startDate: startDate,
+                endDate: endDate,
+                grouping: grouping,
+                workouts: workouts,
+                stepsByDay: stepsByDay,
+                sleepByDay: sleepByDay
+            )
+        )
+    }
+
+    private func dailyCumulativeQuantities(
+        identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        startDate: Date,
+        endDate: Date
+    ) async throws -> [Date: Double] {
+        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+            return [:]
+        }
+
+        let calendar = Calendar.current
+        let anchor = calendar.startOfDay(for: startDate)
+        let predicate = HKQuery.predicateForSamples(
+            withStart: startDate,
+            end: endDate,
+            options: .strictStartDate
+        )
+
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<[Date: Double], Error>) in
+
+            let query = HKStatisticsCollectionQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: anchor,
+                intervalComponents: DateComponents(day: 1)
+            )
+
+            query.initialResultsHandler = { _, results, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let results else {
+                    continuation.resume(returning: [:])
+                    return
+                }
+
+                var values: [Date: Double] = [:]
+                results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
+                    guard let quantity = statistics.sumQuantity() else { return }
+                    let day = calendar.startOfDay(for: statistics.startDate)
+                    values[day] = quantity.doubleValue(for: unit)
+                }
+
+                continuation.resume(returning: values)
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    private func sleepDurationsByWakeDay(
+        startDate: Date,
+        endDate: Date
+    ) async throws -> [Date: TimeInterval] {
+        guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else {
+            return [:]
+        }
+
+        let calendar = Calendar.current
+        let queryStart = calendar.date(byAdding: .day, value: -1, to: startDate) ?? startDate
+        let predicate = HKQuery.predicateForSamples(
+            withStart: queryStart,
+            end: endDate,
+            options: []
+        )
+
+        let samples = try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<[HKCategorySample], Error>) in
+
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: (samples as? [HKCategorySample]) ?? [])
+                }
+            }
+
+            healthStore.execute(query)
+        }
+
+        var durations: [Date: TimeInterval] = [:]
+
+        for sample in samples {
+            guard sample.endDate >= startDate && sample.endDate <= endDate,
+                  let value = HKCategoryValueSleepAnalysis(rawValue: sample.value)
+            else {
+                continue
+            }
+
+            switch value {
+            case .asleepCore, .asleepDeep, .asleepREM, .asleepUnspecified:
+                let wakeDay = calendar.startOfDay(for: sample.endDate)
+                durations[wakeDay, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
+            default:
+                continue
+            }
+        }
+
+        return durations
+    }
+
+    private func makeProgressBuckets(
+        startDate: Date,
+        endDate: Date,
+        grouping: HealthProgressGrouping,
+        workouts: [HKWorkout],
+        stepsByDay: [Date: Double],
+        sleepByDay: [Date: TimeInterval]
+    ) -> [HealthProgressBucket] {
+        let calendar = Calendar.current
+        var buckets: [HealthProgressBucket] = []
+        var cursor = calendar.startOfDay(for: startDate)
+
+        while cursor < endDate {
+            let next: Date
+
+            switch grouping {
+            case .day:
+                next = calendar.date(byAdding: .day, value: 1, to: cursor) ?? endDate
+            case .week:
+                next = calendar.date(byAdding: .day, value: 7, to: cursor) ?? endDate
+            case .month:
+                next = calendar.date(byAdding: .month, value: 1, to: cursor) ?? endDate
+            }
+
+            let bucketEnd = min(next, endDate)
+            let bucketWorkouts = workouts.filter {
+                $0.startDate >= cursor && $0.startDate < bucketEnd
+            }
+
+            let stepValues = stepsByDay.compactMap { day, value in
+                day >= cursor && day < bucketEnd ? value : nil
+            }
+            let sleepValues = sleepByDay.compactMap { day, value in
+                day >= cursor && day < bucketEnd ? value : nil
+            }
+
+            buckets.append(
+                HealthProgressBucket(
+                    startDate: cursor,
+                    endDate: bucketEnd,
+                    workoutCount: bucketWorkouts.count,
+                    averageDailySteps: average(stepValues),
+                    averageSleepDuration: average(sleepValues),
+                    trainingDuration: bucketWorkouts.reduce(0) { $0 + $1.duration }
+                )
+            )
+
+            cursor = next
+        }
+
+        return buckets
+    }
+
+    private func average(_ values: [Double]) -> Double? {
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
     }
 
     private func summedQuantity(
