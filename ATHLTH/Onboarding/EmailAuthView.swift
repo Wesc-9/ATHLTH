@@ -77,7 +77,7 @@ struct EmailAuthView: View {
             VStack(spacing: 8) {
                 Image(systemName: "envelope.circle.fill")
                     .font(.system(size: 64))
-                    .foregroundStyle(OnboardingTheme.green)
+                    .foregroundStyle(OnboardingTheme.accent)
 
                 Text(mode == .signIn ? "Welcome back" : "Create your ATHLTH account")
                     .font(.largeTitle.weight(.bold))
@@ -223,7 +223,7 @@ struct EmailAuthView: View {
 
             Image(systemName: "envelope.badge.fill")
                 .font(.system(size: 70))
-                .foregroundStyle(OnboardingTheme.green)
+                .foregroundStyle(OnboardingTheme.accent)
 
             Text("Check your email")
                 .font(.largeTitle.weight(.bold))
@@ -239,7 +239,7 @@ struct EmailAuthView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Email verification required", systemImage: "checkmark.shield.fill")
                         .font(.headline)
-                        .foregroundStyle(OnboardingTheme.green)
+                        .foregroundStyle(OnboardingTheme.success)
 
                     Text("Your ATHLTH account has been created, but sign-in is not completed until the email address is verified.")
                         .font(.caption)
@@ -366,7 +366,7 @@ private struct PasswordResetRequestView: View {
                 if sent {
                     Section {
                         Label("Check your email", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(OnboardingTheme.green)
+                            .foregroundStyle(OnboardingTheme.success)
 
                         Text("If an ATHLTH account exists for this email address, a password-reset link has been sent. Open the link on this iPhone to return to ATHLTH and choose a new password.")
                             .font(.subheadline)
@@ -404,7 +404,7 @@ private struct PasswordResetRequestView: View {
             }
             .scrollContentBackground(.hidden)
             .background(OnboardingBackground().ignoresSafeArea())
-            .tint(OnboardingTheme.green)
+            .tint(OnboardingTheme.accent)
             .navigationTitle("Reset Password")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
