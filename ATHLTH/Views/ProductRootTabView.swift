@@ -208,6 +208,7 @@ struct ATHLTHHomeView: View {
 
 struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
@@ -444,16 +445,25 @@ struct ATHLTHTrainView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if session.canAccess(.routeChallenges) {
-                        if let challenge = session.challenges.first {
+                    if let challenge = challengeStore.visibleChallenges.first(where: {
+                        $0.status == .active || $0.status == .upcoming || $0.status == .invited
+                    }) {
+                        NavigationLink {
+                            ChallengeDetailView(challengeID: challenge.id)
+                        } label: {
                             Label(challenge.title, systemImage: "trophy.fill")
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(.green)
+                                .lineLimit(1)
                         }
                     } else {
-                        Label("ATHLTH+ challenges", systemImage: "lock.fill")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
+                        NavigationLink {
+                            ChallengeHubView()
+                        } label: {
+                            Label("Challenges", systemImage: "person.2.fill")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .padding(.top, 8)
@@ -2090,7 +2100,7 @@ struct ATHLTHProfileView: View {
                         .buttonStyle(.plain)
 
                         profileStat(
-                            "\(performanceStats?.totalWorkoutCount ?? session.profile.workoutsCount)",
+                            "\(performanceStats?.totalWorkoutCount ?? 0)",
                             "Workouts"
                         )
 
