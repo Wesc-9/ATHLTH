@@ -61,14 +61,12 @@ enum SubscriptionAccessSource: String, Codable, Hashable {
 enum ATHLTHFeature: Hashable, CaseIterable {
     case backgroundHealthSync
     case advancedTrainingPlans
-    case routeChallenges
     case advancedRecovery
 
     var requiresATHLTHPlus: Bool {
         switch self {
         case .backgroundHealthSync,
              .advancedTrainingPlans,
-             .routeChallenges,
              .advancedRecovery:
             return true
         }
@@ -237,9 +235,6 @@ struct UserProfile: Identifiable, Codable, Hashable {
     var bio: String
     var avatarURL: URL?
     var presence: TrainingPresence
-    var followersCount: Int
-    var followingCount: Int
-    var workoutsCount: Int
 }
 
 enum WorkoutKind: String, Codable, CaseIterable, Identifiable, Hashable {
@@ -388,36 +383,6 @@ struct TrainingRoute: Identifiable, Codable, Hashable {
     var createdAt: Date
 }
 
-enum ChallengeStatus: String, Codable, Hashable {
-    case upcoming
-    case active
-    case completed
-}
-
-struct RouteAttempt: Identifiable, Codable, Hashable {
-    let id: UUID
-    var userID: UUID
-    var routeID: UUID
-    var activityID: UUID?
-    var startedAt: Date
-    var duration: TimeInterval
-    var distanceKilometers: Double
-    var averagePaceSecondsPerKilometer: Double?
-}
-
-struct RouteChallenge: Identifiable, Codable, Hashable {
-    let id: UUID
-    var creatorID: UUID
-    var routeID: UUID
-    var title: String
-    var visibility: ProfileVisibility
-    var status: ChallengeStatus
-    var startsAt: Date?
-    var endsAt: Date?
-    var participantIDs: [UUID]
-    var attempts: [RouteAttempt]
-}
-
 struct ActivityRecord: Identifiable, Codable, Hashable {
     let id: UUID
     var userID: UUID
@@ -431,20 +396,6 @@ struct ActivityRecord: Identifiable, Codable, Hashable {
     var maxHeartRate: Double?
     var routeID: UUID?
     var visibility: ProfileVisibility
-}
-
-enum FriendshipStatus: String, Codable, Hashable {
-    case pending
-    case accepted
-    case blocked
-}
-
-struct Friendship: Identifiable, Codable, Hashable {
-    let id: UUID
-    var requesterID: UUID
-    var addresseeID: UUID
-    var status: FriendshipStatus
-    var createdAt: Date
 }
 
 struct ActivityComment: Identifiable, Codable, Hashable {
