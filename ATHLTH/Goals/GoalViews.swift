@@ -202,7 +202,6 @@ struct GoalDetailView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var session: AppSessionStore
 
     let goalID: UUID
 
@@ -658,6 +657,7 @@ struct GoalCreationView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var session: AppSessionStore
 
     @State private var step = 0
     @State private var category: GoalCategory = .endurance
