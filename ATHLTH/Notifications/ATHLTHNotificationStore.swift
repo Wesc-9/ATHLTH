@@ -150,8 +150,8 @@ final class ATHLTHNotificationStore: ObservableObject {
                         title: "New challenge result",
                         message: "\(attempt.participantName) posted \(attempt.detail) in \(challenge.title).",
                         createdAt: attempt.submittedAt,
-                        challengeID: challenge.id,
-                        workoutID: attempt.sourceWorkoutID
+                        workoutID: attempt.sourceWorkoutID,
+                        challengeID: challenge.id
                     )
                 )
             }
