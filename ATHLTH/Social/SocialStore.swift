@@ -43,7 +43,24 @@ final class SocialStore: ObservableObject {
     }
 
     var pendingRequestCount: Int {
-        incomingRequests.count
+        incomingRequests.count + workoutInvites.count
+    }
+
+    func acceptedTrainingPartnerNames(for workoutID: UUID) -> [String] {
+        guard let session = workoutSessions.first(where: {
+            $0.creatorID == currentUserID &&
+            $0.sourceWorkoutID == workoutID
+        }) else {
+            return []
+        }
+
+        return workoutParticipants
+            .filter {
+                $0.sessionID == session.id &&
+                $0.userID != currentUserID &&
+                $0.state == .accepted
+            }
+            .map(\.displayNameSnapshot)
     }
 
     func refresh(
