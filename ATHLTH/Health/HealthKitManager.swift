@@ -414,6 +414,221 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    func challengeRunningEvidence(
+        for result: WatchWorkoutResult,
+        rules: ATHLTHChallengeRules
+    ) async -> ChallengeRunningEvidence {
+        let elapsedDuration = max(
+            result.endedAt.timeIntervalSince(result.startedAt),
+            0
+        )
+        let movingDuration = max(result.duration, 0)
+        let selectedDuration = rules.timeBasis == .elapsed
+            ? elapsedDuration
+            : movingDuration
+
+        var route: [CLLocation] = []
+
+        if let workoutUUID = result.healthKitWorkoutUUID,
+           let workout = try? await workoutForChallenge(uuid: workoutUUID) {
+            route = (try? await fetchRoute(for: workout)) ?? []
+        }
+
+        let routeNeeded =
+            rules.gpsRequired ||
+            rules.route != nil ||
+            rules.scoring == .fastestDistance ||
+            rules.scoring == .farthestInTime
+
+        if routeNeeded && route.count < 2 {
+            if rules.scoring == .mostDistance && !rules.gpsRequired && rules.route == nil {
+                return ChallengeRunningEvidence(
+                    startedAt: result.startedAt,
+                    endedAt: result.endedAt,
+                    durationSeconds: selectedDuration,
+                    distanceMeters: result.distanceMeters,
+                    routeMatchPercent: nil,
+                    score: result.distanceMeters,
+                    detail: String(format: "%.2f km", result.distanceMeters / 1_000),
+                    isEligible: true,
+                    ineligibilityReason: nil
+                )
+            }
+
+            return ChallengeRunningEvidence(
+                startedAt: result.startedAt,
+                endedAt: result.endedAt,
+                durationSeconds: selectedDuration,
+                distanceMeters: result.distanceMeters,
+                routeMatchPercent: nil,
+                score: 0,
+                detail: String(format: "%.2f km", result.distanceMeters / 1_000),
+                isEligible: false,
+                ineligibilityReason: "No qualifying GPS route was available for this attempt."
+            )
+        }
+
+        var routeMatch: Double?
+
+        if let requiredRoute = rules.route {
+            routeMatch = routeMatchPercent(
+                actualLocations: route,
+                referenceCoordinates: requiredRoute.coordinates
+            )
+
+            let requiredMatch = rules.minimumRouteMatchPercent ?? 90
+
+            if (routeMatch ?? 0) < requiredMatch {
+                return ChallengeRunningEvidence(
+                    startedAt: result.startedAt,
+                    endedAt: result.endedAt,
+                    durationSeconds: selectedDuration,
+                    distanceMeters: result.distanceMeters,
+                    routeMatchPercent: routeMatch,
+                    score: 0,
+                    detail: String(
+                        format: "%.0f%% route match",
+                        routeMatch ?? 0
+                    ),
+                    isEligible: false,
+                    ineligibilityReason: String(
+                        format: "Route match %.0f%% · required %.0f%%.",
+                        routeMatch ?? 0,
+                        requiredMatch
+                    )
+                )
+            }
+        }
+
+        switch rules.scoring {
+        case .fastestDistance:
+            guard let target = rules.targetDistanceMeters, target > 0 else {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason: "This challenge has no valid target distance."
+                )
+            }
+
+            guard result.distanceMeters >= target else {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason: String(
+                        format: "%.2f km completed · %.2f km required.",
+                        result.distanceMeters / 1_000,
+                        target / 1_000
+                    )
+                )
+            }
+
+            guard let segmentDuration = fastestSegmentDuration(
+                in: route,
+                targetDistance: target
+            ) else {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason: "ATHLTH could not verify the target distance from the GPS track."
+                )
+            }
+
+            return ChallengeRunningEvidence(
+                startedAt: result.startedAt,
+                endedAt: result.endedAt,
+                durationSeconds: segmentDuration,
+                distanceMeters: target,
+                routeMatchPercent: routeMatch,
+                score: segmentDuration,
+                detail: "\(challengeClock(segmentDuration)) · \(String(format: "%.2f", target / 1_000)) km",
+                isEligible: true,
+                ineligibilityReason: nil
+            )
+
+        case .fastestRoute:
+            guard rules.route != nil else {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason: "A specific route is required for this challenge."
+                )
+            }
+
+            return ChallengeRunningEvidence(
+                startedAt: result.startedAt,
+                endedAt: result.endedAt,
+                durationSeconds: selectedDuration,
+                distanceMeters: result.distanceMeters,
+                routeMatchPercent: routeMatch,
+                score: selectedDuration,
+                detail: "\(challengeClock(selectedDuration)) · \(String(format: "%.0f%%", routeMatch ?? 0)) route match",
+                isEligible: true,
+                ineligibilityReason: nil
+            )
+
+        case .farthestInTime:
+            guard let targetDuration = rules.targetDurationSeconds,
+                  targetDuration > 0
+            else {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason: "This challenge has no valid time target."
+                )
+            }
+
+            guard let distance = maximumRouteDistance(
+                in: route,
+                within: targetDuration
+            ) else {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason: "ATHLTH could not verify distance inside the required time window."
+                )
+            }
+
+            return ChallengeRunningEvidence(
+                startedAt: result.startedAt,
+                endedAt: result.endedAt,
+                durationSeconds: targetDuration,
+                distanceMeters: distance,
+                routeMatchPercent: routeMatch,
+                score: distance,
+                detail: "\(String(format: "%.2f km", distance / 1_000)) in \(challengeClock(targetDuration))",
+                isEligible: true,
+                ineligibilityReason: nil
+            )
+
+        case .mostDistance:
+            return ChallengeRunningEvidence(
+                startedAt: result.startedAt,
+                endedAt: result.endedAt,
+                durationSeconds: selectedDuration,
+                distanceMeters: result.distanceMeters,
+                routeMatchPercent: routeMatch,
+                score: result.distanceMeters,
+                detail: String(format: "%.2f km", result.distanceMeters / 1_000),
+                isEligible: true,
+                ineligibilityReason: nil
+            )
+
+        case .heaviestWeight, .mostReps, .exerciseVolume, .workoutVolume:
+            return challengeEvidenceFailure(
+                result: result,
+                duration: selectedDuration,
+                routeMatch: routeMatch,
+                reason: "This is not a running scoring rule."
+            )
+        }
+    }
+
     func profilePerformanceStats(
         forceRefresh: Bool = false
     ) async throws -> ProfilePerformanceStats {
@@ -1710,6 +1925,164 @@ final class HealthKitManager: ObservableObject {
         }
 
         return bestDuration
+    }
+
+    private func workoutForChallenge(uuid: UUID) async throws -> HKWorkout? {
+        if let cached = workoutObjects[uuid] {
+            return cached
+        }
+
+        let predicate = HKQuery.predicateForObject(with: uuid)
+
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<HKWorkout?, Error>) in
+
+            let query = HKSampleQuery(
+                sampleType: HKObjectType.workoutType(),
+                predicate: predicate,
+                limit: 1,
+                sortDescriptors: nil
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                continuation.resume(returning: samples?.first as? HKWorkout)
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    private func challengeEvidenceFailure(
+        result: WatchWorkoutResult,
+        duration: TimeInterval,
+        routeMatch: Double?,
+        reason: String
+    ) -> ChallengeRunningEvidence {
+        ChallengeRunningEvidence(
+            startedAt: result.startedAt,
+            endedAt: result.endedAt,
+            durationSeconds: duration,
+            distanceMeters: result.distanceMeters,
+            routeMatchPercent: routeMatch,
+            score: 0,
+            detail: String(format: "%.2f km", result.distanceMeters / 1_000),
+            isEligible: false,
+            ineligibilityReason: reason
+        )
+    }
+
+    private func challengeClock(_ duration: TimeInterval) -> String {
+        let seconds = max(Int(duration.rounded()), 0)
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        let remainder = seconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainder)
+        }
+
+        return String(format: "%d:%02d", minutes, remainder)
+    }
+
+    private func routeMatchPercent(
+        actualLocations: [CLLocation],
+        referenceCoordinates: [RouteCoordinate]
+    ) -> Double {
+        guard actualLocations.count >= 2,
+              referenceCoordinates.count >= 2
+        else {
+            return 0
+        }
+
+        let actual = actualLocations
+            .filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 65 }
+
+        guard actual.count >= 2 else { return 0 }
+
+        let referenceLocations = referenceCoordinates.map {
+            CLLocation(
+                latitude: $0.latitude,
+                longitude: $0.longitude
+            )
+        }
+
+        let sampleStep = max(referenceLocations.count / 100, 1)
+        let samples = stride(
+            from: 0,
+            to: referenceLocations.count,
+            by: sampleStep
+        )
+        .map { referenceLocations[$0] }
+
+        guard !samples.isEmpty else { return 0 }
+
+        let tolerance = 80.0
+        let matched = samples.reduce(0) { count, reference in
+            let nearest = actual.lazy
+                .map { $0.distance(from: reference) }
+                .min() ?? .greatestFiniteMagnitude
+
+            return count + (nearest <= tolerance ? 1 : 0)
+        }
+
+        return Double(matched) / Double(samples.count) * 100
+    }
+
+    private func maximumRouteDistance(
+        in locations: [CLLocation],
+        within duration: TimeInterval
+    ) -> Double? {
+        let points = locations
+            .filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 65 }
+            .sorted { $0.timestamp < $1.timestamp }
+
+        guard points.count >= 2, duration > 0 else { return nil }
+
+        var cumulative = Array(repeating: 0.0, count: points.count)
+
+        for index in 1..<points.count {
+            let previous = points[index - 1]
+            let current = points[index]
+            let elapsed = current.timestamp.timeIntervalSince(previous.timestamp)
+
+            guard elapsed > 0 else {
+                cumulative[index] = cumulative[index - 1]
+                continue
+            }
+
+            let distance = current.distance(from: previous)
+            let speed = distance / elapsed
+            cumulative[index] = cumulative[index - 1] + (
+                distance >= 0 && speed <= 12.5 ? distance : 0
+            )
+        }
+
+        var best = 0.0
+        var endIndex = 1
+
+        for startIndex in 0..<(points.count - 1) {
+            if endIndex <= startIndex {
+                endIndex = startIndex + 1
+            }
+
+            let cutoff = points[startIndex].timestamp.addingTimeInterval(duration)
+
+            while endIndex + 1 < points.count &&
+                    points[endIndex + 1].timestamp <= cutoff {
+                endIndex += 1
+            }
+
+            guard endIndex > startIndex else { continue }
+            best = max(
+                best,
+                cumulative[endIndex] - cumulative[startIndex]
+            )
+        }
+
+        return best > 0 ? best : nil
     }
 
     private func fetchRoute(for workout: HKWorkout) async throws -> [CLLocation] {
