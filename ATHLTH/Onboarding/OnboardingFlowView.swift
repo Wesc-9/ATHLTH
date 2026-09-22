@@ -869,9 +869,9 @@ struct OnboardingFlowView: View {
                 .padding(.top, 18)
             }
 
-            if importedHealthDetails.hasAnyValue || watchConnection.isReady {
+            if healthReadyForSummary || watchConnection.isReady {
                 HStack(spacing: 10) {
-                    if importedHealthDetails.hasAnyValue {
+                    if healthReadyForSummary {
                         readyStatusChip(
                             title: "Apple Health",
                             icon: "heart.fill"
@@ -921,6 +921,15 @@ struct OnboardingFlowView: View {
             Spacer(minLength: 70)
         }
         .frame(maxWidth: .infinity, minHeight: 600)
+    }
+
+    private var healthReadyForSummary: Bool {
+        importedHealthDetails.hasAnyValue ||
+        !health.workouts.isEmpty ||
+        health.sleep.totalAsleep > 0 ||
+        health.heart.latestHeartRate != nil ||
+        health.heart.restingHeartRate != nil ||
+        health.heart.hrvMilliseconds != nil
     }
 
     private func readyStatusChip(
