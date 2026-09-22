@@ -1,4 +1,7 @@
+import AVKit
+import PhotosUI
 import SwiftUI
+import UIKit
 
 struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
@@ -305,6 +308,21 @@ struct ExerciseDetailView: View {
                     }
                 }
 
+                if let videoURL = entry.exercise.videoURL {
+                    detailCard("Video") {
+                        VideoPlayer(
+                            player: AVPlayer(url: videoURL)
+                        )
+                        .frame(height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                        Link(destination: videoURL) {
+                            Label("Open source video", systemImage: "arrow.up.right.square")
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
+                }
+
                 if !entry.tips.isEmpty {
                     detailCard("Tips") {
                         ForEach(entry.tips, id: \.self) { tip in
@@ -415,6 +433,9 @@ struct CustomExerciseEditorView: View {
     @State private var equipment = ""
     @State private var instructions = ""
     @State private var shareable = false
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedImageData: Data?
+    @State private var videoURLText = ""
 
     var body: some View {
         NavigationStack {
@@ -442,6 +463,44 @@ struct CustomExerciseEditorView: View {
                         axis: .vertical
                     )
                     .lineLimit(5...12)
+                }
+
+                Section("Media") {
+                    if let selectedImageData,
+                       let image = UIImage(data: selectedImageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 190)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                    }
+
+                    PhotosPicker(
+                        selection: $selectedPhoto,
+                        matching: .images
+                    ) {
+                        Label(
+                            selectedImageData == nil
+                                ? "Add Exercise Image"
+                                : "Change Exercise Image",
+                            systemImage: "photo.badge.plus"
+                        )
+                    }
+
+                    TextField(
+                        "Direct video URL (optional)",
+                        text: $videoURLText
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+
+                    Text(
+                        "Your image is stored locally in ATHLTH. A direct video URL can be attached to the exercise and shown on its detail page."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section("Sharing") {
@@ -475,7 +534,9 @@ struct CustomExerciseEditorView: View {
                             primaryMuscles: splitCSV(primaryMuscles),
                             secondaryMuscles: splitCSV(secondaryMuscles),
                             equipment: splitCSV(equipment),
-                            isVisibleOutsideOwnerLibrary: shareable
+                            isVisibleOutsideOwnerLibrary: shareable,
+                            imageData: selectedImageData,
+                            videoURL: cleanVideoURL
                         )
                         dismiss()
                     }
@@ -484,7 +545,25 @@ struct CustomExerciseEditorView: View {
                     )
                 }
             }
+            .onChange(of: selectedPhoto) { _, item in
+                guard let item else {
+                    selectedImageData = nil
+                    return
+                }
+
+                Task {
+                    selectedImageData = try? await item.loadTransferable(type: Data.self)
+                }
+            }
         }
+    }
+
+    private var cleanVideoURL: URL? {
+        let clean = videoURLText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !clean.isEmpty else { return nil }
+        return URL(string: clean)
     }
 
     private func splitCSV(_ value: String) -> [String] {
@@ -511,14 +590,21 @@ struct ExerciseArtwork: View {
     var body: some View {
         Group {
             if let url = entry.imageStartURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        fallback
+                if url.isFileURL,
+                   let image = UIImage(contentsOfFile: url.path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        default:
+                            fallback
+                        }
                     }
                 }
             } else {
