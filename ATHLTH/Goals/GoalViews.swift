@@ -201,11 +201,14 @@ struct GoalDetailView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var session: AppSessionStore
 
     let goalID: UUID
 
     @State private var showingDeleteConfirmation = false
     @State private var showingAddMilestone = false
+    @State private var showingEditGoal = false
 
     private var goal: ATHLTHGoal? {
         goalStore.goals.first { $0.id == goalID }
@@ -246,6 +249,10 @@ struct GoalDetailView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
+                            Button("Edit Goal", systemImage: "pencil") {
+                                showingEditGoal = true
+                            }
+
                             if !goal.isPrimary && goal.status != .completed {
                                 Button("Make Primary", systemImage: "star.fill") {
                                     goalStore.setPrimary(goal.id)
@@ -274,6 +281,9 @@ struct GoalDetailView: View {
                 }
                 .sheet(isPresented: $showingAddMilestone) {
                     AddManualMilestoneView(goalID: goal.id)
+                }
+                .sheet(isPresented: $showingEditGoal) {
+                    GoalEditView(goalID: goal.id)
                 }
                 .confirmationDialog(
                     "Delete this goal?",
@@ -361,6 +371,15 @@ struct GoalDetailView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+
+            if let latestEvidence = goal.milestones
+                .compactMap(\.lastEvidenceDescription)
+                .last {
+                Divider()
+                Label(latestEvidence, systemImage: "waveform.path.ecg")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding()
         .goalCard()
@@ -491,6 +510,18 @@ struct GoalDetailView: View {
                 Divider()
                 LabeledContent("Deadline") {
                     Text(deadline.formatted(date: .abbreviated, time: .omitted))
+                }
+                .font(.caption)
+            }
+
+            if let linkedPlanID = goal.linkedTrainingPlanID {
+                Divider()
+                LabeledContent("Training plan") {
+                    if session.activePlan?.id == linkedPlanID {
+                        Text(session.activePlan?.title ?? "Linked plan")
+                    } else {
+                        Text("Linked plan")
+                    }
                 }
                 .font(.caption)
             }
@@ -641,6 +672,7 @@ struct GoalCreationView: View {
     @State private var notes = ""
     @State private var privacy: GoalPrivacy = .privateOnly
     @State private var makePrimary = true
+    @State private var linkActivePlan = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
 
@@ -847,6 +879,17 @@ struct GoalCreationView: View {
             TextField("Notes (optional)", text: $notes, axis: .vertical)
                 .lineLimit(2...5)
                 .textFieldStyle(.roundedBorder)
+
+            if let activePlan = session.activePlan {
+                Toggle(isOn: $linkActivePlan) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Link training plan")
+                        Text(activePlan.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 
@@ -919,6 +962,12 @@ struct GoalCreationView: View {
                 ForEach(GoalPrivacy.allCases) { option in
                     Text(option.title).tag(option)
                 }
+            }
+
+            if linkActivePlan, let activePlan = session.activePlan {
+                Label("Linked to \(activePlan.title)", systemImage: "list.bullet.clipboard.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.green)
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -1066,7 +1115,8 @@ struct GoalCreationView: View {
             isPrimary: makePrimary,
             dataSource: source,
             target: target,
-            milestones: makeMilestones(createdAt: now)
+            milestones: makeMilestones(createdAt: now),
+            linkedTrainingPlanID: linkActivePlan ? session.activePlan?.id : nil
         )
 
         if let imageData,
@@ -1314,6 +1364,156 @@ struct GoalCreationView: View {
         }
         .padding()
         .goalCard()
+    }
+}
+
+struct GoalEditView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var session: AppSessionStore
+
+    let goalID: UUID
+
+    @State private var title = ""
+    @State private var hasDeadline = false
+    @State private var deadline = Date()
+    @State private var coverStyle: GoalCoverStyle = .forest
+    @State private var whyItMatters = ""
+    @State private var notes = ""
+    @State private var privacy: GoalPrivacy = .privateOnly
+    @State private var makePrimary = false
+    @State private var linkActivePlan = false
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var imageData: Data?
+    @State private var didLoad = false
+
+    private var goal: ATHLTHGoal? {
+        goalStore.goals.first { $0.id == goalID }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Goal") {
+                    TextField("Title", text: $title)
+
+                    Toggle("Deadline", isOn: $hasDeadline)
+                    if hasDeadline {
+                        DatePicker(
+                            "Target date",
+                            selection: $deadline,
+                            in: Calendar.current.startOfDay(for: Date())...,
+                            displayedComponents: .date
+                        )
+                    }
+
+                    Toggle("Primary Goal", isOn: $makePrimary)
+                }
+
+                Section("Identity") {
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        Label(
+                            imageData == nil ? "Choose or change photo" : "New photo selected",
+                            systemImage: "photo.on.rectangle.angled"
+                        )
+                    }
+
+                    Picker("Fallback cover", selection: $coverStyle) {
+                        ForEach(GoalCoverStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+
+                    TextField("Why this matters", text: $whyItMatters, axis: .vertical)
+                        .lineLimit(2...5)
+
+                    TextField("Notes", text: $notes, axis: .vertical)
+                        .lineLimit(2...5)
+                }
+
+                if let activePlan = session.activePlan {
+                    Section("Training plan") {
+                        Toggle(isOn: $linkActivePlan) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Link current plan")
+                                Text(activePlan.title)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                Section("Privacy") {
+                    Picker("Visibility", selection: $privacy) {
+                        ForEach(GoalPrivacy.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                }
+
+                Section {
+                    Text("Target rules and existing automatic milestones are kept unchanged when editing metadata. This prevents accidental changes to what counts as completion.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Edit Goal")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .task {
+                load()
+            }
+            .onChange(of: selectedPhoto) { _, item in
+                Task {
+                    imageData = try? await item?.loadTransferable(type: Data.self)
+                }
+            }
+        }
+    }
+
+    private func load() {
+        guard !didLoad, let goal else { return }
+        didLoad = true
+        title = goal.title
+        hasDeadline = goal.deadline != nil
+        deadline = goal.deadline ?? Date()
+        coverStyle = goal.coverStyle
+        whyItMatters = goal.whyItMatters ?? ""
+        notes = goal.notes ?? ""
+        privacy = goal.privacy
+        makePrimary = goal.isPrimary
+        linkActivePlan = goal.linkedTrainingPlanID != nil
+    }
+
+    private func save() {
+        guard var goal else { return }
+
+        goal.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        goal.deadline = hasDeadline ? deadline : nil
+        goal.coverStyle = coverStyle
+        goal.whyItMatters = whyItMatters.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        goal.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        goal.privacy = privacy
+        goal.isPrimary = makePrimary
+        goal.linkedTrainingPlanID = linkActivePlan ? session.activePlan?.id : nil
+
+        if let imageData,
+           let filename = try? goalStore.saveImageData(imageData, for: goal.id) {
+            goal.imageFilename = filename
+        }
+
+        goalStore.update(goal)
+        dismiss()
     }
 }
 
