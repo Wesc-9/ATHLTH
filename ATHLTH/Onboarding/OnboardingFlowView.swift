@@ -891,7 +891,7 @@ struct OnboardingFlowView: View {
 
             Text(title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(OnboardingTheme.primaryText)
 
             Image(systemName: "checkmark")
                 .font(.system(size: 9, weight: .bold))
@@ -1324,7 +1324,7 @@ private struct WatchInstallHelpView: View {
 
                     Text("Install ATHLTH on Apple Watch")
                         .font(.title2.weight(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(OnboardingTheme.primaryText)
 
                     Text("ATHLTH includes a companion Watch app. Install it from the Watch app on this iPhone.")
                         .font(.subheadline)
@@ -1352,7 +1352,7 @@ private struct WatchInstallHelpView: View {
                 }
                 .padding(18)
                 .background(
-                    Color.white.opacity(0.07),
+                    OnboardingTheme.card,
                     in: RoundedRectangle(cornerRadius: 22, style: .continuous)
                 )
                 .overlay {
@@ -1387,7 +1387,7 @@ private struct WatchInstallHelpView: View {
             .navigationTitle("Apple Watch")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
     }
 
     private func watchInstallStep(
@@ -1405,7 +1405,7 @@ private struct WatchInstallHelpView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(OnboardingTheme.primaryText)
 
                 Text(detail)
                     .font(.caption)
