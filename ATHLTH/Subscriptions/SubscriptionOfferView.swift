@@ -15,9 +15,8 @@ struct SubscriptionOfferView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 22) {
+                VStack(spacing: 18) {
                     hero
-                    benefits
 
                     if subscriptionStore.isLoading {
                         ProgressView("Loading plans…")
@@ -30,6 +29,7 @@ struct SubscriptionOfferView: View {
                     } else {
                         plans
                         purchaseButton
+                        continueTrialButton
                     }
 
                     if let errorMessage = subscriptionStore.errorMessage {
@@ -39,7 +39,8 @@ struct SubscriptionOfferView: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    trialEscape
+                    benefits
+                    trialDisclosure
                     purchaseUtilities
                     legalLinks
                 }
@@ -108,11 +109,11 @@ struct SubscriptionOfferView: View {
                         .stroke(OnboardingTheme.accent.opacity(0.24), lineWidth: 1)
                 }
 
-            Text("Unlock ATHLTH+")
-                .font(.system(size: 34, weight: .bold))
+            Text("ATHLTH+")
+                .font(.system(size: 36, weight: .bold))
                 .multilineTextAlignment(.center)
 
-            Text("Choose Monthly or Yearly for the full ATHLTH experience.")
+            Text("Train deeper. Recover smarter. See more.")
                 .font(.subheadline)
                 .foregroundStyle(OnboardingTheme.mutedText)
                 .multilineTextAlignment(.center)
@@ -133,13 +134,26 @@ struct SubscriptionOfferView: View {
     }
 
     private var benefits: some View {
-        OnboardingCard {
-            VStack(alignment: .leading, spacing: 15) {
-                benefit("Automatic Health background sync", icon: "heart.fill")
-                benefit("Advanced training and planning tools", icon: "calendar.badge.clock")
-                benefit("Full Apple Watch integration", icon: "applewatch")
-                benefit("Expanded progress and recovery features", icon: "chart.line.uptrend.xyaxis")
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Included with ATHLTH+")
+                .font(.caption.weight(.bold))
+                .tracking(1.2)
+                .foregroundStyle(OnboardingTheme.accent)
+
+            VStack(spacing: 10) {
+                benefit("Background Health sync", icon: "heart.fill")
+                benefit("Advanced plans & progression", icon: "calendar.badge.clock")
+                benefit("Apple Watch workout integration", icon: "applewatch")
             }
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.055),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(OnboardingTheme.border, lineWidth: 1)
         }
     }
 
@@ -213,22 +227,30 @@ struct SubscriptionOfferView: View {
         )
     }
 
-    private var trialEscape: some View {
-        VStack(spacing: 7) {
+    private var continueTrialButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Text("Continue with free trial")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+        }
+        .buttonStyle(.bordered)
+        .tint(OnboardingTheme.mutedText)
+    }
+
+    private var trialDisclosure: some View {
+        VStack(spacing: 5) {
             if session.subscriptionAccess.trialIsActive {
                 if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
-                    Text("Not ready to subscribe? Close this screen and keep ATHLTH+ free through \(trialEndsAt.formatted(date: .abbreviated, time: .omitted)).")
-                        .font(.caption)
-                        .foregroundStyle(OnboardingTheme.mutedText)
-                        .multilineTextAlignment(.center)
-                } else {
-                    Text("Not ready to subscribe? Close this screen and continue your 7-day ATHLTH+ trial.")
-                        .font(.caption)
+                    Text("Your ATHLTH+ trial stays active through \(trialEndsAt.formatted(date: .abbreviated, time: .omitted)).")
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(OnboardingTheme.mutedText)
                         .multilineTextAlignment(.center)
                 }
 
-                Text("No subscription starts automatically. Purchasing a plan now starts the App Store subscription now.")
+                Text("No subscription starts automatically. If you subscribe now, the App Store subscription starts now.")
                     .font(.caption2)
                     .foregroundStyle(OnboardingTheme.faintText)
                     .multilineTextAlignment(.center)
@@ -342,10 +364,18 @@ struct SubscriptionOfferView: View {
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.white)
 
-                    if yearly, let saving = yearlySavingsPercent {
-                        Text("Save about \(saving)% compared with Monthly")
-                            .font(.caption)
-                            .foregroundStyle(OnboardingTheme.accent)
+                    if yearly {
+                        if let equivalent = yearlyMonthlyEquivalent(for: product) {
+                            Text("≈ \(equivalent) / month")
+                                .font(.caption)
+                                .foregroundStyle(OnboardingTheme.mutedText)
+                        }
+
+                        if let saving = yearlySavingsPercent {
+                            Text("Save about \(saving)% compared with Monthly")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(OnboardingTheme.accent)
+                        }
                     } else if product.id == SubscriptionStore.monthlyProductID {
                         Text("Flexible monthly billing")
                             .font(.caption)
@@ -394,6 +424,14 @@ struct SubscriptionOfferView: View {
 
             Spacer(minLength: 0)
         }
+    }
+
+    private func yearlyMonthlyEquivalent(for product: Product) -> String? {
+        guard product.id == SubscriptionStore.yearlyProductID else {
+            return nil
+        }
+
+        return (product.price / Decimal(12)).formatted(product.priceFormatStyle)
     }
 
     private var yearlySavingsPercent: Int? {
