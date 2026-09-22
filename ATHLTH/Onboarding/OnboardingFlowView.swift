@@ -208,67 +208,63 @@ struct OnboardingFlowView: View {
     }
 
     private var accountStep: some View {
-        GeometryReader { proxy in
-            ZStack {
-                OnboardingHeroPhoto()
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height
+        ZStack {
+            OnboardingHeroPhoto()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scaleEffect(1.025)
+                .offset(y: 8)
+                .clipped()
+                .ignoresSafeArea()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.44),
+                    Color.black.opacity(0.10),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: UnitPoint(x: 0.5, y: 0.38)
+            )
+            .ignoresSafeArea()
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.06),
+                    Color.black.opacity(0.76)
+                ],
+                startPoint: UnitPoint(x: 0.5, y: 0.50),
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                accountBrand
+                    .padding(.top, 18)
+
+                Spacer(minLength: 170)
+
+                accountSignInPanel
+
+                if let authenticationError {
+                    Label(
+                        authenticationError,
+                        systemImage: "exclamationmark.circle.fill"
                     )
-                    .clipped()
-                    .ignoresSafeArea()
-
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.42),
-                        Color.black.opacity(0.10),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: UnitPoint(x: 0.5, y: 0.38)
-                )
-                .ignoresSafeArea()
-
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        Color.black.opacity(0.08),
-                        Color.black.opacity(0.72)
-                    ],
-                    startPoint: UnitPoint(x: 0.5, y: 0.52),
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    accountBrand
-                        .padding(.top, 26)
-
-                    Spacer(minLength: 220)
-
-                    accountSignInPanel
-
-                    if let authenticationError {
-                        Label(
-                            authenticationError,
-                            systemImage: "exclamationmark.circle.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 6)
-                        .padding(.top, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    accountLegal
-                        .padding(.top, 18)
-                        .padding(.bottom, max(10, proxy.safeAreaInsets.bottom + 6))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 6)
+                    .padding(.top, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, max(8, proxy.safeAreaInsets.top))
+
+                accountLegal
+                    .padding(.top, 18)
+                    .padding(.bottom, 12)
             }
+            .padding(.horizontal, 24)
         }
-        .ignoresSafeArea(edges: .top)
+        .background(Color.black.ignoresSafeArea())
     }
 
     private var accountBrand: some View {
@@ -299,7 +295,7 @@ struct OnboardingFlowView: View {
     }
 
     private var accountSignInPanel: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 13) {
             SignInWithAppleButton(.continue) { request in
                 authenticationError = nil
                 accountService.prepareAppleSignIn(request)
@@ -310,6 +306,11 @@ struct OnboardingFlowView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 58)
             .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.24), radius: 12, x: 0, y: 7)
             .disabled(appleSignInInProgress)
 
             Button {
@@ -323,28 +324,67 @@ struct OnboardingFlowView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.white)
             .background(
-                Color.white.opacity(0.10),
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.13),
+                        Color.white.opacity(0.065)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
                 in: Capsule()
             )
             .overlay {
                 Capsule()
-                    .stroke(Color.white.opacity(0.82), lineWidth: 1.25)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.62),
+                                OnboardingTheme.accent.opacity(0.28),
+                                Color.white.opacity(0.22)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.1
+                    )
             }
         }
-        .padding(16)
-        .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: 30, style: .continuous)
-        )
-        .background(
-            Color.white.opacity(0.20),
-            in: RoundedRectangle(cornerRadius: 30, style: .continuous)
-        )
+        .padding(15)
+        .background {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.10),
+                                    OnboardingTheme.accent.opacity(0.045),
+                                    Color.black.opacity(0.16)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .stroke(Color.white.opacity(0.42), lineWidth: 1)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.46),
+                            OnboardingTheme.accent.opacity(0.18),
+                            Color.white.opacity(0.16)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         }
-        .shadow(color: .black.opacity(0.28), radius: 24, x: 0, y: 14)
+        .shadow(color: .black.opacity(0.30), radius: 28, x: 0, y: 16)
     }
 
     private var accountLegal: some View {
