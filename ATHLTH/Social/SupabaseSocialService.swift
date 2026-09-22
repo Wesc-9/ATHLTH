@@ -2,7 +2,7 @@ import Foundation
 import Supabase
 
 final class SupabaseSocialService {
-    private let client: SupabaseClient
+    let client: SupabaseClient
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
