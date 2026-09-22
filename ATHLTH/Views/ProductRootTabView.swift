@@ -2038,6 +2038,10 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var trophyStore: TrophyStore
+    @EnvironmentObject private var health: HealthKitManager
+
+    @State private var performanceStats: ProfilePerformanceStats?
+    @State private var performanceStatsLoading = false
 
     var body: some View {
         NavigationStack {
@@ -2087,6 +2091,11 @@ struct ATHLTHProfileView: View {
                     }
 
                     TrophyCabinetSection()
+
+                    ProfilePerformanceSection(
+                        stats: performanceStats,
+                        isLoading: performanceStatsLoading
+                    )
 
                     ATHLTHCard {
                         ATHLTHSectionHeader(title: "Share Your Plans")
@@ -2147,6 +2156,12 @@ struct ATHLTHProfileView: View {
             }
             .navigationTitle("ATHLTH")
             .navigationBarTitleDisplayMode(.inline)
+            .refreshable {
+                await loadPerformanceStats(forceRefresh: true)
+            }
+            .task {
+                await loadPerformanceStats()
+            }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
@@ -2190,6 +2205,21 @@ struct ATHLTHProfileView: View {
                 }
             }
         }
+    }
+
+    @MainActor
+    private func loadPerformanceStats(forceRefresh: Bool = false) async {
+        guard health.hasRequestedAuthorization else {
+            performanceStats = nil
+            return
+        }
+
+        performanceStatsLoading = true
+        defer { performanceStatsLoading = false }
+
+        performanceStats = try? await health.profilePerformanceStats(
+            forceRefresh: forceRefresh
+        )
     }
 
     @ViewBuilder
