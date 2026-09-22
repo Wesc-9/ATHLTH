@@ -110,6 +110,60 @@ enum AchievementGoal: String, CaseIterable, Identifiable, Codable, Hashable {
     }
 }
 
+enum GoalFocusArea: String, CaseIterable, Identifiable, Hashable {
+    case strengthBody
+    case performance
+    case healthMovement
+    case recovery
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .strengthBody: return "Strength & Body"
+        case .performance: return "Performance"
+        case .healthMovement: return "Health & Movement"
+        case .recovery: return "Recovery"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .strengthBody: return "Strength, muscle & body goals"
+        case .performance: return "Fitness, running & events"
+        case .healthMovement: return "Daily movement & mobility"
+        case .recovery: return "Sleep, readiness & recovery"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .strengthBody: return "dumbbell.fill"
+        case .performance: return "bolt.fill"
+        case .healthMovement: return "figure.walk"
+        case .recovery: return "moon.stars.fill"
+        }
+    }
+
+    var goals: [AchievementGoal] {
+        switch self {
+        case .strengthBody:
+            return [.loseWeight, .buildMuscle, .getStronger]
+        case .performance:
+            return [.improveEndurance, .runBetter, .event]
+        case .healthMovement:
+            return [.moveMore, .mobility, .maintainHealth]
+        case .recovery:
+            return [.recoverySleep]
+        }
+    }
+
+    func contains(_ goal: AchievementGoal?) -> Bool {
+        guard let goal else { return false }
+        return goals.contains(goal)
+    }
+}
+
 enum ATHLTHInterest: String, CaseIterable, Identifiable, Codable, Hashable {
     case strength
     case running
