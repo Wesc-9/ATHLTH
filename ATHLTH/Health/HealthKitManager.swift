@@ -282,13 +282,17 @@ final class HealthKitManager: ObservableObject {
             startDate: startDate,
             endDate: endDate,
             workoutCount: current.workoutCount,
+            totalSteps: current.totalSteps,
             averageDailySteps: current.averageDailySteps,
             averageSleepDuration: current.averageSleepDuration,
             trainingDuration: current.trainingDuration,
+            activeWorkoutDays: current.activeWorkoutDays,
             buckets: current.buckets,
             previousWorkoutCount: previous.workoutCount,
+            previousTotalSteps: previous.totalSteps,
             previousAverageDailySteps: previous.averageDailySteps,
-            previousAverageSleepDuration: previous.averageSleepDuration
+            previousAverageSleepDuration: previous.averageSleepDuration,
+            previousTrainingDuration: previous.trainingDuration
         )
     }
 
@@ -688,9 +692,11 @@ final class HealthKitManager: ObservableObject {
 
     private struct ProgressMetrics {
         let workoutCount: Int
+        let totalSteps: Double?
         let averageDailySteps: Double?
         let averageSleepDuration: TimeInterval?
         let trainingDuration: TimeInterval
+        let activeWorkoutDays: [Date]
         let buckets: [HealthProgressBucket]
     }
 
@@ -718,15 +724,23 @@ final class HealthKitManager: ObservableObject {
         let stepsByDay = try await stepsTask
         let sleepByDay = try await sleepTask
 
+        let calendar = Calendar.current
         let totalTrainingDuration = workouts.reduce(0) { $0 + $1.duration }
+        let totalSteps = stepsByDay.isEmpty ? nil : stepsByDay.values.reduce(0, +)
         let averageSteps = average(Array(stepsByDay.values))
         let averageSleep = average(Array(sleepByDay.values))
+        let activeWorkoutDays = Array(
+            Set(workouts.map { calendar.startOfDay(for: $0.startDate) })
+        )
+        .sorted()
 
         return ProgressMetrics(
             workoutCount: workouts.count,
+            totalSteps: totalSteps,
             averageDailySteps: averageSteps,
             averageSleepDuration: averageSleep,
             trainingDuration: totalTrainingDuration,
+            activeWorkoutDays: activeWorkoutDays,
             buckets: makeProgressBuckets(
                 startDate: startDate,
                 endDate: endDate,
