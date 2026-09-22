@@ -263,13 +263,30 @@ final class SupabaseSocialService {
     }
 
     func loadFriendProfile(_ userID: UUID) async throws -> SocialFriendProfile {
-        let card: SocialProfileCard = try await client
+        let rawCard: SocialProfileCard = try await client
             .from("social_profile_cards")
             .select()
             .eq("user_id", value: userID)
             .single()
             .execute()
             .value
+
+        let detailRows: [SocialProfileDetailRecord] = try await client
+            .from("social_profile_details")
+            .select()
+            .eq("user_id", value: userID)
+            .execute()
+            .value
+
+        let card = SocialProfileCard(
+            userID: rawCard.userID,
+            username: rawCard.username,
+            displayName: rawCard.displayName,
+            bio: detailRows.first?.bio,
+            avatarURL: rawCard.avatarURL,
+            createdAt: rawCard.createdAt,
+            updatedAt: rawCard.updatedAt
+        )
 
         let presenceRows: [SocialPresenceRecord] = try await client
             .from("social_presence")
