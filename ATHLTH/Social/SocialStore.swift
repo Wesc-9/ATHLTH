@@ -569,7 +569,11 @@ final class SocialStore: ObservableObject {
                     createdAt: event.createdAt,
                     challengeID: event.entityType == "challenge"
                         ? event.entityID
-                        : nil
+                        : nil,
+                    backendEventID: event.id,
+                    socialEventKind: event.kind,
+                    socialEntityType: event.entityType,
+                    socialEntityID: event.entityID
                 ),
                 deliverSystemAlert: event.createdAt >= activationDate
             )
