@@ -317,6 +317,40 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
+        let fiveKCandidates = workouts.filter {
+            guard $0.workoutActivityType == .running,
+                  let distance = $0.totalDistance?.doubleValue(for: .meter())
+            else {
+                return false
+            }
+
+            return distance >= 5_000
+        }
+
+        var fastestFiveK: (duration: TimeInterval, date: Date)?
+
+        for workout in fiveKCandidates {
+            guard let route = try? await fetchRoute(for: workout),
+                  let duration = fastestFiveKilometerDuration(in: route)
+            else {
+                continue
+            }
+
+            if fastestFiveK == nil || duration < fastestFiveK!.duration {
+                fastestFiveK = (duration, workout.startDate)
+            }
+        }
+
+        if let fastestFiveK {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .fastest5K,
+                    value: fastestFiveK.duration,
+                    date: fastestFiveK.date
+                )
+            )
+        }
+
         if let workout = workouts
             .filter({ $0.workoutActivityType == .cycling && $0.totalDistance != nil })
             .max(by: {
@@ -1185,6 +1219,95 @@ final class HealthKitManager: ObservableObject {
             values.reduce(0, +) / Double(values.count),
             values.max()
         )
+    }
+
+    private func fastestFiveKilometerDuration(
+        in locations: [CLLocation]
+    ) -> TimeInterval? {
+        let targetDistance = 5_000.0
+
+        let points = locations
+            .filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 65 }
+            .sorted { $0.timestamp < $1.timestamp }
+
+        guard points.count >= 2 else { return nil }
+
+        var cumulativeDistance = Array(repeating: 0.0, count: points.count)
+
+        for index in 1..<points.count {
+            let previous = points[index - 1]
+            let current = points[index]
+            let elapsed = current.timestamp.timeIntervalSince(previous.timestamp)
+
+            guard elapsed > 0 else {
+                cumulativeDistance[index] = cumulativeDistance[index - 1]
+                continue
+            }
+
+            let distance = current.distance(from: previous)
+            let speed = distance / elapsed
+
+            // Reject implausible running GPS jumps while preserving legitimate sparse samples.
+            let acceptedDistance = distance >= 0 && speed <= 12.5 ? distance : 0
+            cumulativeDistance[index] = cumulativeDistance[index - 1] + acceptedDistance
+        }
+
+        guard cumulativeDistance.last ?? 0 >= targetDistance else {
+            return nil
+        }
+
+        var bestDuration: TimeInterval?
+        var endIndex = 1
+
+        for startIndex in 0..<(points.count - 1) {
+            if endIndex <= startIndex {
+                endIndex = startIndex + 1
+            }
+
+            while endIndex < points.count &&
+                    cumulativeDistance[endIndex] - cumulativeDistance[startIndex] < targetDistance {
+                endIndex += 1
+            }
+
+            guard endIndex < points.count else { break }
+
+            let previousEndIndex = max(endIndex - 1, startIndex)
+            let distanceBeforeEnd =
+                cumulativeDistance[previousEndIndex] - cumulativeDistance[startIndex]
+            let distanceAtEnd =
+                cumulativeDistance[endIndex] - cumulativeDistance[startIndex]
+            let segmentDistance = distanceAtEnd - distanceBeforeEnd
+
+            let fraction: Double
+            if segmentDistance > 0 {
+                fraction = min(
+                    max(
+                        (targetDistance - distanceBeforeEnd) / segmentDistance,
+                        0
+                    ),
+                    1
+                )
+            } else {
+                fraction = 1
+            }
+
+            let segmentTime = points[endIndex].timestamp.timeIntervalSince(
+                points[previousEndIndex].timestamp
+            )
+            let interpolatedEnd = points[previousEndIndex].timestamp.addingTimeInterval(
+                segmentTime * fraction
+            )
+            let duration = interpolatedEnd.timeIntervalSince(points[startIndex].timestamp)
+
+            // Ignore corrupt or physically implausible records.
+            guard duration >= 600, duration <= 18_000 else { continue }
+
+            if bestDuration == nil || duration < bestDuration! {
+                bestDuration = duration
+            }
+        }
+
+        return bestDuration
     }
 
     private func fetchRoute(for workout: HKWorkout) async throws -> [CLLocation] {
