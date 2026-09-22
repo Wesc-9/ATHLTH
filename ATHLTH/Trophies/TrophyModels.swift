@@ -7,6 +7,7 @@ enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
     case consistency
     case goals
     case recovery
+    case challenges
 
     var id: String { rawValue }
 
@@ -18,6 +19,7 @@ enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
         case .consistency: return "Consistency"
         case .goals: return "Goals"
         case .recovery: return "Recovery"
+        case .challenges: return "Challenges"
         }
     }
 
@@ -29,6 +31,7 @@ enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
         case .consistency: return "flame.fill"
         case .goals: return "target"
         case .recovery: return "moon.stars.fill"
+        case .challenges: return "person.2.fill"
         }
     }
 }
@@ -57,6 +60,7 @@ enum TrophyVerificationSource: String, Codable, Hashable {
     case appleHealth
     case athlth
     case goal
+    case challenge
     case mixed
 
     var title: String {
@@ -64,6 +68,7 @@ enum TrophyVerificationSource: String, Codable, Hashable {
         case .appleHealth: return "Apple Health"
         case .athlth: return "ATHLTH"
         case .goal: return "ATHLTH Goal"
+        case .challenge: return "ATHLTH Challenge"
         case .mixed: return "Verified"
         }
     }
@@ -73,6 +78,7 @@ enum TrophyVerificationSource: String, Codable, Hashable {
         case .appleHealth: return "heart.fill"
         case .athlth: return "a.circle.fill"
         case .goal: return "target"
+        case .challenge: return "person.2.fill"
         case .mixed: return "checkmark.seal.fill"
         }
     }
@@ -274,12 +280,58 @@ enum TrophyCatalog {
         ]
     )
 
+    static let challengeParticipation = TrophySeriesDefinition(
+        id: "challenges.participation",
+        title: "Head to Head",
+        subtitle: "Take part in ATHLTH Challenges with friends.",
+        category: .challenges,
+        verificationSource: .challenge,
+        systemImage: "person.2.fill",
+        stages: [
+            .init(id: "1", title: "First Challenge", threshold: 1, displayTarget: "1 challenge", rarity: .core),
+            .init(id: "5", title: "Rival", threshold: 5, displayTarget: "5 challenges", rarity: .rare),
+            .init(id: "20", title: "Competitor", threshold: 20, displayTarget: "20 challenges", rarity: .epic),
+            .init(id: "50", title: "Head to Head", threshold: 50, displayTarget: "50 challenges", rarity: .signature)
+        ]
+    )
+
+    static let challengeWins = TrophySeriesDefinition(
+        id: "challenges.wins",
+        title: "On Top",
+        subtitle: "Finish ATHLTH Challenges at the top of the leaderboard.",
+        category: .challenges,
+        verificationSource: .challenge,
+        systemImage: "crown.fill",
+        stages: [
+            .init(id: "1", title: "First Win", threshold: 1, displayTarget: "1 win", rarity: .rare),
+            .init(id: "5", title: "Winner", threshold: 5, displayTarget: "5 wins", rarity: .epic),
+            .init(id: "10", title: "On Top", threshold: 10, displayTarget: "10 wins", rarity: .signature)
+        ]
+    )
+
+    static let friendsChallenged = TrophySeriesDefinition(
+        id: "challenges.friends-invited",
+        title: "Call Them Out",
+        subtitle: "Invite different friends into your ATHLTH Challenges.",
+        category: .challenges,
+        verificationSource: .challenge,
+        systemImage: "person.badge.plus",
+        stages: [
+            .init(id: "1", title: "Call Out", threshold: 1, displayTarget: "1 friend", rarity: .core),
+            .init(id: "5", title: "Crew", threshold: 5, displayTarget: "5 friends", rarity: .rare),
+            .init(id: "10", title: "Call Them Out", threshold: 10, displayTarget: "10 friends", rarity: .epic)
+        ]
+    )
+
     static let allSeries: [TrophySeriesDefinition] = [
         workoutMomentum,
         runningDistance,
         streak,
         strengthSessions,
         recoveryNights,
-        completedGoals
+        completedGoals,
+        challengeParticipation,
+        challengeWins,
+        friendsChallenged
     ]
 }
