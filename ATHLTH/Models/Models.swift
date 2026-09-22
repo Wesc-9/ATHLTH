@@ -94,6 +94,58 @@ struct HealthProgressSnapshot: Equatable {
     }
 }
 
+enum HealthPersonalRecordKind: String, Hashable {
+    case longestRun
+    case longestRide
+    case longestWalkOrHike
+    case longestWorkout
+    case mostActiveCalories
+
+    var title: String {
+        switch self {
+        case .longestRun: return "Longest Run"
+        case .longestRide: return "Longest Ride"
+        case .longestWalkOrHike: return "Longest Walk / Hike"
+        case .longestWorkout: return "Longest Workout"
+        case .mostActiveCalories: return "Most Active Calories"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .longestRun: return "figure.run"
+        case .longestRide: return "figure.outdoor.cycle"
+        case .longestWalkOrHike: return "figure.hiking"
+        case .longestWorkout: return "clock.fill"
+        case .mostActiveCalories: return "flame.fill"
+        }
+    }
+}
+
+struct HealthPersonalRecord: Identifiable, Equatable {
+    var id: String { kind.rawValue }
+
+    let kind: HealthPersonalRecordKind
+    let value: Double
+    let date: Date
+
+    var formattedValue: String {
+        switch kind {
+        case .longestRun, .longestRide, .longestWalkOrHike:
+            return String(format: "%.1f km", value / 1_000)
+
+        case .longestWorkout:
+            let totalMinutes = Int((value / 60).rounded())
+            let hours = totalMinutes / 60
+            let minutes = totalMinutes % 60
+            return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes) min"
+
+        case .mostActiveCalories:
+            return "\(Int(value.rounded())) kcal"
+        }
+    }
+}
+
 struct WorkoutSummary: Identifiable, Hashable {
     let id: UUID
     let activity: WorkoutActivity
