@@ -420,6 +420,140 @@ final class SocialStore: ObservableObject {
         await resolveWorkoutInvite(invite, state: .declined)
     }
 
+    func workoutActivity(for workoutID: UUID) async -> SocialActivityRecord? {
+        try? await service.workoutActivity(for: workoutID)
+    }
+
+    func workoutAssociatedFriendIDs(for workoutID: UUID) -> Set<UUID> {
+        guard let currentUserID,
+              let session = workoutSessions.first(where: {
+                  $0.creatorID == currentUserID &&
+                  $0.sourceWorkoutID == workoutID
+              })
+        else {
+            return []
+        }
+
+        return Set(
+            workoutParticipants
+                .filter {
+                    $0.sessionID == session.id &&
+                    $0.userID != currentUserID &&
+                    ($0.state == .accepted || $0.state == .invited)
+                }
+                .map(\.userID)
+        )
+    }
+
+    func saveWorkoutReview(
+        _ workout: SocialPublishableWorkout,
+        visibility: ProfileVisibility,
+        description: String,
+        effort: Int,
+        friendIDs: Set<UUID>,
+        creatorName: String,
+        creatorUsername: String?
+    ) async -> Bool {
+        guard let currentUserID else { return false }
+
+        errorMessage = nil
+
+        do {
+            var linkedSession = workoutSessions.first {
+                $0.creatorID == currentUserID &&
+                $0.sourceWorkoutID == workout.id
+            }
+
+            let selectedFriends = friends.filter {
+                friendIDs.contains($0.userID)
+            }
+
+            if linkedSession == nil && !selectedFriends.isEmpty {
+                linkedSession = try await service.createCompletedWorkoutSession(
+                    workout: workout,
+                    creatorName: creatorName,
+                    creatorUsername: creatorUsername,
+                    friends: selectedFriends
+                )
+                await refresh()
+            } else if let linkedSession {
+                let existingIDs = Set(
+                    workoutParticipants
+                        .filter { $0.sessionID == linkedSession.id }
+                        .map(\.userID)
+                )
+                let newFriends = selectedFriends.filter {
+                    !existingIDs.contains($0.userID)
+                }
+
+                if !newFriends.isEmpty {
+                    try await service.addWorkoutParticipants(
+                        sessionID: linkedSession.id,
+                        friends: newFriends,
+                        creatorID: currentUserID
+                    )
+                    await refresh()
+                }
+            }
+
+            let resolvedSession = workoutSessions.first {
+                $0.creatorID == currentUserID &&
+                $0.sourceWorkoutID == workout.id
+            } ?? linkedSession
+
+            let acceptedPartners: [SocialWorkoutParticipantRecord]
+            if let resolvedSession {
+                acceptedPartners = workoutParticipants.filter {
+                    $0.sessionID == resolvedSession.id &&
+                    $0.userID != currentUserID &&
+                    $0.state == .accepted
+                }
+            } else {
+                acceptedPartners = []
+            }
+
+            var metadata: [String: String] = [
+                "workout_id": workout.id.uuidString,
+                "kind": workout.activity.rawValue,
+                "source": workout.source,
+                "effort": "\(max(1, min(effort, 10)))"
+            ]
+
+            let cleanDescription = description
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if !cleanDescription.isEmpty {
+                metadata["caption"] = cleanDescription
+            }
+
+            if !acceptedPartners.isEmpty {
+                metadata["with_names"] = acceptedPartners
+                    .map(\.displayNameSnapshot)
+                    .joined(separator: ", ")
+                metadata["with_count"] = "\(acceptedPartners.count)"
+            }
+
+            if !selectedFriends.isEmpty {
+                metadata["partner_count_selected"] = "\(selectedFriends.count)"
+            }
+
+            try await service.publishWorkoutActivity(
+                eventKey: "workout-\(workout.id.uuidString)",
+                title: workout.title,
+                subtitle: workout.summaryText,
+                metadata: metadata,
+                visibility: visibility,
+                workoutSessionID: resolvedSession?.id
+            )
+
+            feed = try await service.loadFeed()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func publishWorkout(
         _ workout: SocialPublishableWorkout,
         visibility: ProfileVisibility,
