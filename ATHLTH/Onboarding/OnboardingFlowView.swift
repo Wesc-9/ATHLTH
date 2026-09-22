@@ -1258,7 +1258,10 @@ struct OnboardingFlowView: View {
         .frame(minHeight: 76)
     }
 
-    private func routeAuthenticatedUser(_ bootstrap: BackendUserBootstrap) {
+    private func routeAuthenticatedUser(
+        _ bootstrap: BackendUserBootstrap,
+        usernameSeedFallback: String? = nil
+    ) {
         if bootstrap.profile.onboardingCompleted {
             return
         }
@@ -1268,7 +1271,9 @@ struct OnboardingFlowView: View {
             username = existingUsername
             step = .goals
         } else {
-            let seed = bootstrap.profile.displayName ?? "athlete"
+            let seed = bootstrap.profile.displayName
+                ?? usernameSeedFallback
+                ?? "athlete"
             session.setUsernameSeed(seed)
             step = .username
         }
@@ -1294,16 +1299,20 @@ struct OnboardingFlowView: View {
                 )
                 session.applyBackendBootstrap(bootstrap, method: .apple)
 
-                if bootstrap.profile.username == nil,
-                   bootstrap.profile.displayName == nil,
-                   let emailSeed = credential.email?
+                let appleGivenName = credential.fullName?.givenName?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let appleEmailSeed = credential.email?
                     .split(separator: "@")
                     .first
-                    .map(String.init) {
-                    session.setUsernameSeed(emailSeed)
-                }
+                    .map(String.init)
+                let appleUsernameSeed =
+                    (appleGivenName?.isEmpty == false ? appleGivenName : nil)
+                    ?? appleEmailSeed
 
-                routeAuthenticatedUser(bootstrap)
+                routeAuthenticatedUser(
+                    bootstrap,
+                    usernameSeedFallback: appleUsernameSeed
+                )
             } catch {
                 authenticationError = error.localizedDescription
             }
