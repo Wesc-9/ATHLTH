@@ -8,6 +8,7 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var workouts: [WorkoutSummary] = []
     @Published private(set) var sleep: SleepSummary = .empty
     @Published private(set) var heart: HeartSummary = .empty
+    @Published private(set) var training: TrainingHealthSummary = .empty
     @Published private(set) var personalDetails: HealthProfileBasics = .empty
     @Published private(set) var isRefreshing = false
     @Published var authorizationError: String?
@@ -19,42 +20,71 @@ final class HealthKitManager: ObservableObject {
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
-    private let authorizationFlagKey = "athlth.healthAuthorizationRequested"
+    private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
+    private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
+    private let currentAuthorizationVersion = 2
 
     init() {
         // Apple recommends installing observer queries as early as possible
         // so HealthKit can deliver background updates immediately after launch.
-        if UserDefaults.standard.bool(forKey: authorizationFlagKey),
+        if (
+            UserDefaults.standard.integer(forKey: authorizationVersionKey) >= currentAuthorizationVersion ||
+            UserDefaults.standard.bool(forKey: legacyAuthorizationFlagKey)
+        ),
            HKHealthStore.isHealthDataAvailable() {
             startBackgroundObservers()
         }
     }
 
     var hasRequestedAuthorization: Bool {
-        UserDefaults.standard.bool(forKey: authorizationFlagKey)
+        UserDefaults.standard.integer(forKey: authorizationVersionKey) >= currentAuthorizationVersion
     }
 
     var healthDataAvailable: Bool {
         HKHealthStore.isHealthDataAvailable()
     }
 
-    private var readTypes: Set<HKObjectType> {
-        var types: Set<HKObjectType> = [
-            HKObjectType.workoutType(),
-            HKSeriesType.workoutRoute()
-        ]
-
-        let quantityIdentifiers: [HKQuantityTypeIdentifier] = [
+    private var trainingQuantityIdentifiers: [HKQuantityTypeIdentifier] {
+        [
             .heartRate,
             .restingHeartRate,
+            .walkingHeartRateAverage,
             .heartRateVariabilitySDNN,
             .activeEnergyBurned,
+            .basalEnergyBurned,
             .distanceWalkingRunning,
+            .distanceCycling,
+            .distanceSwimming,
+            .stepCount,
+            .flightsClimbed,
+            .appleExerciseTime,
+            .appleStandTime,
+            .vo2Max,
+            .oxygenSaturation,
+            .respiratoryRate,
+            .walkingSpeed,
+            .walkingStepLength,
+            .runningSpeed,
+            .runningPower,
+            .runningStrideLength,
+            .runningVerticalOscillation,
+            .runningGroundContactTime,
+            .cyclingSpeed,
+            .cyclingPower,
+            .swimmingStrokeCount,
             .height,
             .bodyMass
         ]
+    }
 
-        for identifier in quantityIdentifiers {
+    private var readTypes: Set<HKObjectType> {
+        var types: Set<HKObjectType> = [
+            HKObjectType.workoutType(),
+            HKSeriesType.workoutRoute(),
+            HKObjectType.activitySummaryType()
+        ]
+
+        for identifier in trainingQuantityIdentifiers {
             if let type = HKObjectType.quantityType(forIdentifier: identifier) {
                 types.insert(type)
             }
@@ -88,7 +118,8 @@ final class HealthKitManager: ObservableObject {
 
         do {
             try await healthStore.requestAuthorization(toShare: [], read: readTypes)
-            UserDefaults.standard.set(true, forKey: authorizationFlagKey)
+            UserDefaults.standard.set(true, forKey: legacyAuthorizationFlagKey)
+            UserDefaults.standard.set(currentAuthorizationVersion, forKey: authorizationVersionKey)
             objectWillChange.send()
             await refreshPersonalDetails()
             await refreshAll()
@@ -120,9 +151,22 @@ final class HealthKitManager: ObservableObject {
         let quantityTypes: [(HKQuantityTypeIdentifier, HKUpdateFrequency)] = [
             (.heartRate, .immediate),
             (.restingHeartRate, .hourly),
+            (.walkingHeartRateAverage, .hourly),
             (.heartRateVariabilitySDNN, .hourly),
             (.activeEnergyBurned, .hourly),
-            (.distanceWalkingRunning, .hourly)
+            (.basalEnergyBurned, .hourly),
+            (.distanceWalkingRunning, .hourly),
+            (.distanceCycling, .hourly),
+            (.distanceSwimming, .hourly),
+            (.stepCount, .hourly),
+            (.flightsClimbed, .hourly),
+            (.appleExerciseTime, .hourly),
+            (.vo2Max, .daily),
+            (.runningSpeed, .immediate),
+            (.runningPower, .immediate),
+            (.cyclingSpeed, .immediate),
+            (.cyclingPower, .immediate),
+            (.swimmingStrokeCount, .immediate)
         ]
 
         for (identifier, frequency) in quantityTypes {
@@ -200,6 +244,7 @@ final class HealthKitManager: ObservableObject {
             workoutObjects = Dictionary(uniqueKeysWithValues: fetched.map { ($0.uuid, $0) })
             sleep = try await fetchLatestSleep()
             heart = try await fetchHeartSummary()
+            training = try await fetchTrainingSummary()
             await refreshPersonalDetails()
             lastSuccessfulRefreshAt = Date()
         } catch {
@@ -316,6 +361,60 @@ final class HealthKitManager: ObservableObject {
 
         async let routeTask = fetchRoute(for: workout)
         async let heartTask = fetchHeartRateStats(for: workout)
+        async let stepsTask = workoutQuantity(
+            identifier: .stepCount,
+            unit: .count(),
+            option: .cumulativeSum,
+            workout: workout
+        )
+        async let runningSpeedTask = workoutQuantity(
+            identifier: .runningSpeed,
+            unit: .meter().unitDivided(by: .second()),
+            option: .discreteAverage,
+            workout: workout
+        )
+        async let runningPowerTask = workoutQuantity(
+            identifier: .runningPower,
+            unit: .watt(),
+            option: .discreteAverage,
+            workout: workout
+        )
+        async let strideTask = workoutQuantity(
+            identifier: .runningStrideLength,
+            unit: .meter(),
+            option: .discreteAverage,
+            workout: workout
+        )
+        async let verticalOscillationTask = workoutQuantity(
+            identifier: .runningVerticalOscillation,
+            unit: .meterUnit(with: .centi),
+            option: .discreteAverage,
+            workout: workout
+        )
+        async let groundContactTask = workoutQuantity(
+            identifier: .runningGroundContactTime,
+            unit: .secondUnit(with: .milli),
+            option: .discreteAverage,
+            workout: workout
+        )
+        async let cyclingSpeedTask = workoutQuantity(
+            identifier: .cyclingSpeed,
+            unit: .meter().unitDivided(by: .second()),
+            option: .discreteAverage,
+            workout: workout
+        )
+        async let cyclingPowerTask = workoutQuantity(
+            identifier: .cyclingPower,
+            unit: .watt(),
+            option: .discreteAverage,
+            workout: workout
+        )
+        async let swimmingStrokeTask = workoutQuantity(
+            identifier: .swimmingStrokeCount,
+            unit: .count(),
+            option: .cumulativeSum,
+            workout: workout
+        )
 
         let route = (try? await routeTask) ?? []
         let heartStats = (try? await heartTask) ?? (nil, nil)
@@ -323,7 +422,16 @@ final class HealthKitManager: ObservableObject {
         return WorkoutDetail(
             route: route,
             averageHeartRate: heartStats.0,
-            maxHeartRate: heartStats.1
+            maxHeartRate: heartStats.1,
+            stepCount: (try? await stepsTask) ?? nil,
+            averageRunningSpeedMetersPerSecond: (try? await runningSpeedTask) ?? nil,
+            averageRunningPowerWatts: (try? await runningPowerTask) ?? nil,
+            averageRunningStrideLengthMeters: (try? await strideTask) ?? nil,
+            averageRunningVerticalOscillationCentimeters: (try? await verticalOscillationTask) ?? nil,
+            averageRunningGroundContactTimeMilliseconds: (try? await groundContactTask) ?? nil,
+            averageCyclingSpeedMetersPerSecond: (try? await cyclingSpeedTask) ?? nil,
+            averageCyclingPowerWatts: (try? await cyclingPowerTask) ?? nil,
+            swimmingStrokeCount: (try? await swimmingStrokeTask) ?? nil
         )
     }
 
@@ -441,6 +549,173 @@ final class HealthKitManager: ObservableObject {
             hrvMilliseconds: hrvValue?.0,
             hrvDate: hrvValue?.1
         )
+    }
+
+    private func fetchTrainingSummary() async throws -> TrainingHealthSummary {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        let end = Date()
+
+        async let steps = summedQuantity(
+            identifier: .stepCount,
+            unit: .count(),
+            start: start,
+            end: end
+        )
+        async let activeEnergy = summedQuantity(
+            identifier: .activeEnergyBurned,
+            unit: .kilocalorie(),
+            start: start,
+            end: end
+        )
+        async let basalEnergy = summedQuantity(
+            identifier: .basalEnergyBurned,
+            unit: .kilocalorie(),
+            start: start,
+            end: end
+        )
+        async let exerciseMinutes = summedQuantity(
+            identifier: .appleExerciseTime,
+            unit: .minute(),
+            start: start,
+            end: end
+        )
+        async let walkingRunningDistance = summedQuantity(
+            identifier: .distanceWalkingRunning,
+            unit: .meter(),
+            start: start,
+            end: end
+        )
+        async let cyclingDistance = summedQuantity(
+            identifier: .distanceCycling,
+            unit: .meter(),
+            start: start,
+            end: end
+        )
+        async let swimmingDistance = summedQuantity(
+            identifier: .distanceSwimming,
+            unit: .meter(),
+            start: start,
+            end: end
+        )
+        async let flights = summedQuantity(
+            identifier: .flightsClimbed,
+            unit: .count(),
+            start: start,
+            end: end
+        )
+        async let vo2 = latestQuantity(
+            identifier: .vo2Max,
+            unit: HKUnit(from: "ml/kg*min")
+        )
+        async let walkingHeartRate = latestQuantity(
+            identifier: .walkingHeartRateAverage,
+            unit: HKUnit.count().unitDivided(by: .minute())
+        )
+        async let oxygen = latestQuantity(
+            identifier: .oxygenSaturation,
+            unit: .percent()
+        )
+        async let respiratory = latestQuantity(
+            identifier: .respiratoryRate,
+            unit: HKUnit.count().unitDivided(by: .minute())
+        )
+
+        return TrainingHealthSummary(
+            stepsToday: try await steps,
+            activeEnergyKilocaloriesToday: try await activeEnergy,
+            basalEnergyKilocaloriesToday: try await basalEnergy,
+            exerciseMinutesToday: try await exerciseMinutes,
+            distanceWalkingRunningMetersToday: try await walkingRunningDistance,
+            distanceCyclingMetersToday: try await cyclingDistance,
+            distanceSwimmingMetersToday: try await swimmingDistance,
+            flightsClimbedToday: try await flights,
+            vo2Max: try await vo2?.0,
+            walkingHeartRateAverage: try await walkingHeartRate?.0,
+            oxygenSaturationPercent: try await oxygen?.0,
+            respiratoryRate: try await respiratory?.0
+        )
+    }
+
+    private func summedQuantity(
+        identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        start: Date,
+        end: Date
+    ) async throws -> Double? {
+        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+            return nil
+        }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: start,
+            end: end,
+            options: .strictStartDate
+        )
+
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<Double?, Error>) in
+
+            let query = HKStatisticsQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum
+            ) { _, result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                continuation.resume(
+                    returning: result?.sumQuantity()?.doubleValue(for: unit)
+                )
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    private func workoutQuantity(
+        identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        option: HKStatisticsOptions,
+        workout: HKWorkout
+    ) async throws -> Double? {
+        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+            return nil
+        }
+
+        let predicate = HKQuery.predicateForObjects(from: workout)
+
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<Double?, Error>) in
+
+            let query = HKStatisticsQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: option
+            ) { _, result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                let quantity: HKQuantity?
+                if option.contains(.cumulativeSum) {
+                    quantity = result?.sumQuantity()
+                } else if option.contains(.discreteAverage) {
+                    quantity = result?.averageQuantity()
+                } else {
+                    quantity = nil
+                }
+
+                continuation.resume(
+                    returning: quantity?.doubleValue(for: unit)
+                )
+            }
+
+            healthStore.execute(query)
+        }
     }
 
     private func latestQuantity(
