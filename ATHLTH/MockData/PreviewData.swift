@@ -15,10 +15,7 @@ enum PreviewData {
             workoutTitle: nil,
             startedAt: nil,
             visibility: .friends
-        ),
-        followersCount: 248,
-        followingCount: 182,
-        workoutsCount: 37
+        )
     )
 
     static let benchPress = Exercise(
@@ -160,36 +157,6 @@ enum PreviewData {
         spotifyAutoplayOnWorkoutStart: true,
         createdAt: Date(),
         updatedAt: Date()
-    )
-
-    static let route = TrainingRoute(
-        id: UUID(uuidString: "77777777-7777-7777-7777-777777777777")!,
-        ownerID: userID,
-        title: "Lakeside Loop",
-        visibility: .friends,
-        coordinates: [
-            RouteCoordinate(latitude: 66.3126, longitude: 14.1428, altitude: nil, sequence: 0),
-            RouteCoordinate(latitude: 66.3141, longitude: 14.1491, altitude: nil, sequence: 1),
-            RouteCoordinate(latitude: 66.3160, longitude: 14.1532, altitude: nil, sequence: 2),
-            RouteCoordinate(latitude: 66.3137, longitude: 14.1580, altitude: nil, sequence: 3)
-        ],
-        distanceKilometers: 5.2,
-        elevationGainMeters: 124,
-        importedFilename: "lakeside-loop.gpx",
-        createdAt: Date()
-    )
-
-    static let challenge = RouteChallenge(
-        id: UUID(uuidString: "88888888-8888-8888-8888-888888888888")!,
-        creatorID: userID,
-        routeID: route.id,
-        title: "Weekend Route Challenge",
-        visibility: .friends,
-        status: .active,
-        startsAt: Date(),
-        endsAt: Calendar.current.date(byAdding: .day, value: 7, to: Date()),
-        participantIDs: [userID],
-        attempts: []
     )
 
     static let healthSnapshot = HealthSnapshot(
