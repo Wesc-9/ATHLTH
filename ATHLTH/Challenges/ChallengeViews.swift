@@ -309,9 +309,15 @@ struct ChallengeCreationView: View {
     @EnvironmentObject private var social: SocialStore
 
     let preselectedFriends: [SocialProfileCard]
+    let preselectedRouteID: UUID?
 
-    init(preselectedFriends: [SocialProfileCard] = []) {
+    init(
+        preselectedFriends: [SocialProfileCard] = [],
+        preselectedRouteID: UUID? = nil
+    ) {
         self.preselectedFriends = preselectedFriends
+        self.preselectedRouteID = preselectedRouteID
+        _selectedRouteID = State(initialValue: preselectedRouteID)
     }
 
     @State private var step = 0
