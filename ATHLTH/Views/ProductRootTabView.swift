@@ -2061,6 +2061,7 @@ private extension View {
 
 struct ATHLTHProfileView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
     var body: some View {
         NavigationStack {
@@ -2179,6 +2180,29 @@ struct ATHLTHProfileView: View {
                     } label: {
                         Image(systemName: "pencil")
                     }
+
+                    NavigationLink {
+                        ATHLTHNotificationCenterView()
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: notifications.unreadCount > 0 ? "bell.fill" : "bell")
+
+                            if notifications.unreadCount > 0 {
+                                Circle()
+                                    .fill(.red)
+                                    .frame(width: 8, height: 8)
+                                    .overlay {
+                                        Circle().stroke(.white, lineWidth: 1.5)
+                                    }
+                                    .offset(x: 4, y: -3)
+                            }
+                        }
+                    }
+                    .accessibilityLabel(
+                        notifications.unreadCount > 0
+                            ? "Notifications, \(notifications.unreadCount) unread"
+                            : "Notifications"
+                    )
 
                     NavigationLink {
                         ATHLTHSettingsView()
