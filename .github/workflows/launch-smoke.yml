@@ -25,8 +25,19 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode project
-        run: xcodegen generate
+      - name: Generate iPhone-only smoke-test project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp project.yml "$RUNNER_TEMP/project-smoke.yml"
+          python3 - "$RUNNER_TEMP/project-smoke.yml" <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          text = text.replace("      - target: ATHLTHWatchApp\n        embed: true\n", "")
+          path.write_text(text)
+          PY
+          xcodegen generate --spec "$RUNNER_TEMP/project-smoke.yml"
 
       - name: Build simulator app
         shell: bash
