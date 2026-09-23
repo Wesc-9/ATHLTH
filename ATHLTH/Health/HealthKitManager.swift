@@ -27,20 +27,8 @@ final class HealthKitManager: ObservableObject {
     private let currentAuthorizationVersion = 2
 
     init() {
-        // Install observer queries early only when the user has left
-        // Background Health sync enabled. Subscription access is checked
-        // again by AppRootView before HealthKit background delivery is enabled.
-        let backgroundSyncEnabled =
-            UserDefaults.standard.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
-
-        if (
-            UserDefaults.standard.integer(forKey: authorizationVersionKey) >= currentAuthorizationVersion ||
-            UserDefaults.standard.bool(forKey: legacyAuthorizationFlagKey)
-        ),
-           backgroundSyncEnabled,
-           HKHealthStore.isHealthDataAvailable() {
-            startBackgroundObservers()
-        }
+        // Keep launch lightweight. Observer queries are installed from
+        // AppRootView after the UI has entered its lifecycle task.
     }
 
     var hasRequestedAuthorization: Bool {
@@ -239,7 +227,7 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshAll() async {
-        guard healthDataAvailable else { return }
+        guard healthDataAvailable, !isRefreshing else { return }
 
         isRefreshing = true
         authorizationError = nil
@@ -256,7 +244,9 @@ final class HealthKitManager: ObservableObject {
                 limit: 100
             )
             workouts = fetched.map(WorkoutSummary.init)
-            workoutObjects = Dictionary(uniqueKeysWithValues: fetched.map { ($0.uuid, $0) })
+            workoutObjects = fetched.reduce(into: [:]) { result, workout in
+                result[workout.uuid] = workout
+            }
             sleep = try await fetchLatestSleep()
             heart = try await fetchHeartSummary()
             training = try await fetchTrainingSummary()
