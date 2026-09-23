@@ -91,7 +91,7 @@ targets:
         WKRunsIndependentlyOfCompanionApp: false
         NSHealthShareUsageDescription: "ATHLTH reads live heart rate, energy, distance and workout data to show your training metrics on Apple Watch."
         NSHealthUpdateUsageDescription: "ATHLTH saves workouts and workout routes from Apple Watch to Apple Health so your training history stays complete."
-        NSLocationWhenInUseUsageDescription: "ATHLTH uses your location during outdoor workouts to record distance and your workout route."
+        NSLocationWhenInUseUsageDescription: "ATHLTH uses your location during outdoor workouts to record your route and, when available, to save the place where an indoor workout such as strength was performed."
         WKBackgroundModes:
           - workout-processing
     settings:
