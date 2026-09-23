@@ -717,7 +717,7 @@ private struct CommunityQuickLink<Destination: View>: View {
     let title: String
     let detail: String
     let icon: String
-    @ViewBuilder let destination: Destination
+    let destination: Destination
 
     init(
         title: String,
