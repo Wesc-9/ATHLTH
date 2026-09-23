@@ -1,112 +1,923 @@
 import SwiftUI
+import UIKit
 
 struct ATHLTHSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
+    @State private var showingMembership = false
+    @State private var healthRequestInProgress = false
+
     var body: some View {
-        List {
-            Section("App") {
-                Picker("Measurements", selection: $settings.measurementPreference) {
-                    ForEach(MeasurementPreference.allCases) { preference in
+        ZStack {
+            settingsBackground
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    header
+                        .padding(.bottom, 24)
+
+                    settingsSection("App") {
+                        Menu {
+                            ForEach(MeasurementPreference.allCases) { preference in
+                                Button {
+                                    settings.measurementPreference = preference
+                                } label: {
+                                    if settings.measurementPreference == preference {
+                                        Label(preference.title, systemImage: "checkmark")
+                                    } else {
+                                        Text(preference.title)
+                                    }
+                                }
+                            }
+                        } label: {
+                            PremiumSettingsRow(
+                                icon: "ruler",
+                                title: "Measurements",
+                                subtitle: "Units for distance, weight and temperature"
+                            ) {
+                                HStack(spacing: 8) {
+                                    Text(settings.measurementPreference.title)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    settingsSection("Membership") {
+                        PremiumSettingsCard {
+                            Button {
+                                showingMembership = true
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "crown.fill",
+                                    iconTint: ATHLTHTheme.premiumGold,
+                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                    title: "Plan",
+                                    subtitle: "Your current plan"
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text(session.subscriptionAccess.displayTitle)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                            .lineLimit(1)
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            if let billingPeriod = session.subscriptionAccess.billingPeriodTitle {
+                                SettingsDivider()
+                                PremiumSettingsRow(
+                                    icon: "creditcard",
+                                    title: "Billing",
+                                    subtitle: "Your billing cycle"
+                                ) {
+                                    Text(billingPeriod)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            }
+
+                            if session.subscriptionAccess.trialIsActive,
+                               let trialEndsAt = session.subscriptionAccess.trialEndsAt {
+                                SettingsDivider()
+                                PremiumSettingsRow(
+                                    icon: "calendar",
+                                    title: "7-day trial ends",
+                                    subtitle: "Keep going. You’re almost there."
+                                ) {
+                                    Text(trialEndsAt.formatted(date: .abbreviated, time: .omitted))
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                            }
+
+                            if let periodEndsAt = session.subscriptionAccess.currentPeriodEndsAt {
+                                switch session.subscriptionAccess.lifecycleState {
+                                case .active:
+                                    SettingsDivider()
+                                    PremiumSettingsRow(
+                                        icon: "calendar.badge.clock",
+                                        title: "Current period",
+                                        subtitle: "Your current ATHLTH+ access"
+                                    ) {
+                                        Text(periodEndsAt.formatted(date: .abbreviated, time: .omitted))
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                case .expired:
+                                    SettingsDivider()
+                                    PremiumSettingsRow(
+                                        icon: "calendar.badge.exclamationmark",
+                                        title: "Access ended",
+                                        subtitle: "Your ATHLTH+ access has ended"
+                                    ) {
+                                        Text(periodEndsAt.formatted(date: .abbreviated, time: .omitted))
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                default:
+                                    EmptyView()
+                                }
+                            }
+
+                            SettingsDivider()
+
+                            Button {
+                                Task {
+                                    _ = await subscriptionStore.restorePurchases()
+                                }
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "arrow.counterclockwise",
+                                    title: "Restore Purchases",
+                                    subtitle: "Restore your ATHLTH+ purchase"
+                                ) {
+                                    if subscriptionStore.restoreInProgress {
+                                        ProgressView()
+                                            .tint(ATHLTHTheme.accent)
+                                    } else {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(subscriptionStore.restoreInProgress)
+
+                            if let errorMessage = subscriptionStore.errorMessage {
+                                SettingsDivider()
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                            }
+                        }
+                    }
+
+                    settingsSection("Profile") {
+                        NavigationLink {
+                            PersonalHealthProfileView()
+                        } label: {
+                            PremiumSettingsRow(
+                                icon: "person",
+                                title: "Personal & health details",
+                                subtitle: "Your profile, stats and health information"
+                            ) {
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    settingsSection("Privacy") {
+                        PremiumSettingsCard {
+                            Menu {
+                                ForEach(ProfileVisibility.allCases) { visibility in
+                                    Button {
+                                        settings.profileVisibility = visibility
+                                    } label: {
+                                        if settings.profileVisibility == visibility {
+                                            Label(visibility.title, systemImage: "checkmark")
+                                        } else {
+                                            Text(visibility.title)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "person.2",
+                                    title: "Profile visibility",
+                                    subtitle: "Control who can see your profile"
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text(settings.profileVisibility.title)
+                                            .font(.subheadline)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            Menu {
+                                ForEach(ProfileVisibility.allCases) { visibility in
+                                    Button {
+                                        settings.defaultActivityVisibility = visibility
+                                    } label: {
+                                        if settings.defaultActivityVisibility == visibility {
+                                            Label(visibility.title, systemImage: "checkmark")
+                                        } else {
+                                            Text(visibility.title)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "eye",
+                                    title: "Default activity visibility",
+                                    subtitle: "Choose who can see your activities"
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text(settings.defaultActivityVisibility.title)
+                                            .font(.subheadline)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                ATHLTHPrivacyPreferencesView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "hand.raised",
+                                    title: "Privacy & sharing",
+                                    subtitle: "Training status, routes, heart rate and offers"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    settingsSection("Health & Sync") {
+                        PremiumSettingsCard {
+                            PremiumSettingsRow(
+                                icon: "heart",
+                                title: "Background Health Sync",
+                                subtitle: backgroundHealthSubtitle
+                            ) {
+                                Toggle("", isOn: backgroundHealthSyncBinding)
+                                    .labelsHidden()
+                                    .tint(ATHLTHTheme.accent)
+                                    .disabled(!session.canAccess(.backgroundHealthSync))
+                            }
+                            .opacity(session.canAccess(.backgroundHealthSync) ? 1 : 0.64)
+                        }
+                    }
+
+                    settingsSection("Connections") {
+                        PremiumSettingsCard {
+                            Button {
+                                handleAppleHealthTap()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "heart.fill",
+                                    iconTint: .pink,
+                                    iconBackground: Color.pink.opacity(0.10),
+                                    title: "Apple Health",
+                                    subtitle: health.hasRequestedAuthorization
+                                        ? "Health access has been configured"
+                                        : "Connect your Apple Health data"
+                                ) {
+                                    connectionTrailing(
+                                        health.hasRequestedAuthorization ? "Configured" : "Connect",
+                                        showChevron: true,
+                                        loading: healthRequestInProgress
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(healthRequestInProgress)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                AppleWatchConnectionView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "applewatch",
+                                    iconTint: ATHLTHTheme.primaryText,
+                                    title: "Apple Watch",
+                                    subtitle: watchConnection.statusText
+                                ) {
+                                    connectionTrailing(
+                                        watchConnection.isReady ? "Connected" : "Open",
+                                        showChevron: true
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                SpotifySettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "music.note",
+                                    iconTint: spotifyGreen,
+                                    iconBackground: spotifyGreen.opacity(0.12),
+                                    title: "Spotify",
+                                    subtitle: settings.spotifyConnected
+                                        ? "Connected · training plans only"
+                                        : "Not connected"
+                                ) {
+                                    connectionTrailing(
+                                        settings.spotifyConnected ? "Connected" : "Connect",
+                                        showChevron: true
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            PremiumSettingsRow(
+                                icon: "house",
+                                iconTint: Color(red: 0.12, green: 0.58, blue: 0.86),
+                                iconBackground: Color(red: 0.12, green: 0.58, blue: 0.86).opacity(0.11),
+                                title: "Home Assistant",
+                                subtitle: settings.homeAssistantConnected
+                                    ? "Connected"
+                                    : "Integration is not configured yet"
+                            ) {
+                                Text(settings.homeAssistantConnected ? "Connected" : "Planned")
+                                    .font(.subheadline)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                    }
+
+                    settingsSection("Preferences") {
+                        PremiumSettingsCard {
+                            NavigationLink {
+                                ATHLTHTrainingSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "figure.strengthtraining.traditional",
+                                    title: "Training",
+                                    subtitle: "Workout capture, cues and automatic publishing"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                ATHLTHNotificationSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "bell",
+                                    title: "Notifications",
+                                    subtitle: "Workouts, friends, challenges and messages"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    settingsSection("Language") {
+                        PremiumSettingsRow(
+                            icon: "globe",
+                            title: "Language",
+                            subtitle: "More languages are planned"
+                        ) {
+                            Text("English")
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+
+                    settingsSection("About & Account") {
+                        PremiumSettingsCard {
+                            Link(destination: URL(string: "https://repdb.co")!) {
+                                PremiumSettingsRow(
+                                    icon: "figure.strengthtraining.traditional",
+                                    title: "Exercise data",
+                                    subtitle: "Exercise catalog powered by RepDB"
+                                ) {
+                                    Image(systemName: "arrow.up.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                LegalDocumentView(kind: .terms)
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "doc.text",
+                                    title: "Terms of Service",
+                                    subtitle: "Read the ATHLTH terms"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                LegalDocumentView(kind: .privacy)
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "lock.shield",
+                                    title: "Privacy Policy",
+                                    subtitle: "How ATHLTH handles your data"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                Text("Export will package ATHLTH-owned data such as plans, routes and activities. HealthKit export stays under Apple Health controls.")
+                                    .padding()
+                                    .navigationTitle("Export Data")
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "square.and.arrow.up",
+                                    title: "Export ATHLTH data",
+                                    subtitle: "Export data owned by ATHLTH"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                BlockedUsersView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "person.crop.circle.badge.xmark",
+                                    title: "Blocked users",
+                                    subtitle: "Review people you have blocked"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                DeleteAccountView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "trash",
+                                    iconTint: .red,
+                                    iconBackground: Color.red.opacity(0.08),
+                                    title: "Delete account",
+                                    subtitle: "Permanently delete your ATHLTH account",
+                                    titleColor: .red
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(Color.red.opacity(0.65))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if session.currentRole.canAccessControlCenter {
+                        settingsSection("Admin") {
+                            NavigationLink {
+                                AdminCenterView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "lock.rectangle.stack",
+                                    title: "Control Center",
+                                    subtitle: "ATHLTH administration"
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text(session.currentRole.title)
+                                            .font(.subheadline)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    settingsSection("Developer") {
+                        PremiumSettingsCard {
+                            NavigationLink {
+                                CapabilityLabView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "testtube.2",
+                                    title: "Capability Lab",
+                                    subtitle: "Developer diagnostics and capability tests"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            PremiumSettingsRow(
+                                icon: "hammer",
+                                title: "App version",
+                                subtitle: session.previewModeEnabled ? "Preview mode enabled" : "Production mode"
+                            ) {
+                                Text(appVersion)
+                                    .font(.subheadline)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                    }
+
+                    Text("ATHLTH · Progress lives here.")
+                        .font(.caption2.weight(.medium))
+                        .tracking(1.2)
+                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                        .padding(.top, 6)
+                        .padding(.bottom, 34)
+                }
+                .padding(.horizontal, 18)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showingMembership) {
+            SubscriptionOfferView {
+                showingMembership = false
+            }
+        }
+    }
+
+    private var settingsBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.canvasTop,
+                    Color.white,
+                    ATHLTHTheme.canvasBottom
+                ],
+                startPoint: .top,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    ATHLTHTheme.premiumGold.opacity(0.055),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 420
+            )
+        }
+        .ignoresSafeArea()
+    }
+
+    private var header: some View {
+        ZStack(alignment: .top) {
+            VStack(spacing: 7) {
+                ATHLTHBrandMark(size: .compact)
+                    .scaleEffect(0.78)
+
+                Text("Settings")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+            }
+            .padding(.top, 8)
+
+            HStack(alignment: .top) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(width: 48, height: 48)
+                        .background(Color.white.opacity(0.86), in: Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(ATHLTHTheme.border, lineWidth: 1)
+                        }
+                        .shadow(color: Color.black.opacity(0.035), radius: 14, x: 0, y: 8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer()
+
+                Text("A healthier\nyou, further")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.70))
+                    .multilineTextAlignment(.trailing)
+                    .padding(.top, 10)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private func settingsSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title.uppercased())
+                .font(.caption.weight(.semibold))
+                .tracking(2.8)
+                .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+                .padding(.leading, 16)
+
+            content()
+        }
+        .padding(.bottom, 24)
+    }
+
+    private var backgroundHealthSyncBinding: Binding<Bool> {
+        Binding(
+            get: {
+                session.canAccess(.backgroundHealthSync) &&
+                settings.backgroundHealthSyncEnabled
+            },
+            set: { enabled in
+                guard session.canAccess(.backgroundHealthSync) else {
+                    showingMembership = true
+                    return
+                }
+                settings.backgroundHealthSyncEnabled = enabled
+            }
+        )
+    }
+
+    private var backgroundHealthSubtitle: String {
+        if session.canAccess(.backgroundHealthSync) {
+            return "Sync with Apple Health in the background. ATHLTH+ feature."
+        }
+        return "Available with ATHLTH+. Apple Health still works on Free."
+    }
+
+    private var spotifyGreen: Color {
+        Color(red: 0.12, green: 0.72, blue: 0.35)
+    }
+
+    @ViewBuilder
+    private func connectionTrailing(
+        _ text: String,
+        showChevron: Bool,
+        loading: Bool = false
+    ) -> some View {
+        HStack(spacing: 8) {
+            if loading {
+                ProgressView()
+                    .tint(ATHLTHTheme.accent)
+            } else {
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            if showChevron {
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+            }
+        }
+    }
+
+    private func handleAppleHealthTap() {
+        if health.hasRequestedAuthorization {
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                openURL(settingsURL)
+            }
+            return
+        }
+
+        Task {
+            healthRequestInProgress = true
+            await health.requestAuthorization()
+            await health.configureBackgroundSync(
+                allowed:
+                    session.canAccess(.backgroundHealthSync) &&
+                    settings.backgroundHealthSyncEnabled
+            )
+            healthRequestInProgress = false
+        }
+    }
+
+    private var appVersion: String {
+        let version = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "—"
+        let build = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleVersion"
+        ) as? String ?? "—"
+        return "\(version) (\(build))"
+    }
+}
+
+private struct PremiumSettingsCard<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            content
+        }
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(ATHLTHTheme.border, lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.035), radius: 20, x: 0, y: 10)
+    }
+}
+
+private struct PremiumSettingsRow<Trailing: View>: View {
+    let icon: String
+    var iconTint: Color = ATHLTHTheme.primaryText
+    var iconBackground: Color = ATHLTHTheme.accentSoft
+    let title: String
+    let subtitle: String?
+    var titleColor: Color = ATHLTHTheme.primaryText
+    @ViewBuilder let trailing: Trailing
+
+    init(
+        icon: String,
+        iconTint: Color = ATHLTHTheme.primaryText,
+        iconBackground: Color = ATHLTHTheme.accentSoft,
+        title: String,
+        subtitle: String? = nil,
+        titleColor: Color = ATHLTHTheme.primaryText,
+        @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.icon = icon
+        self.iconTint = iconTint
+        self.iconBackground = iconBackground
+        self.title = title
+        self.subtitle = subtitle
+        self.titleColor = titleColor
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(iconTint)
+                .frame(width: 44, height: 44)
+                .background(
+                    iconBackground,
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 16.5, weight: .medium))
+                    .foregroundStyle(titleColor)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            trailing
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(ATHLTHTheme.divider)
+            .frame(height: 0.5)
+            .padding(.leading, 74)
+            .padding(.trailing, 16)
+    }
+}
+
+private struct ATHLTHTrainingSettingsView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+
+    var body: some View {
+        Form {
+            Section("Workout") {
+                Picker("Preferred workout device", selection: $settings.preferredWorkoutCapture) {
+                    ForEach(WorkoutCapturePreference.allCases) { preference in
                         Text(preference.title).tag(preference)
                     }
                 }
-            }
 
-            Section("Subscription") {
-                LabeledContent("Plan", value: session.subscriptionAccess.displayTitle)
-
-                if let billingPeriod = session.subscriptionAccess.billingPeriodTitle {
-                    LabeledContent("Billing", value: billingPeriod)
+                Picker("Strength tracking", selection: $settings.defaultStrengthTracking) {
+                    ForEach(StrengthTrackingPreference.allCases) { preference in
+                        Text(preference.title).tag(preference)
+                    }
                 }
 
-                if session.subscriptionAccess.trialIsActive,
-                   let trialEndsAt = session.subscriptionAccess.trialEndsAt {
+                Toggle("Auto-pause outdoor workouts", isOn: $settings.autoPauseOutdoorWorkouts)
+                Toggle("Audio cues", isOn: $settings.audioCuesEnabled)
+                Toggle("Haptic cues on Apple Watch", isOn: $settings.hapticCuesEnabled)
+            }
+
+            Section("Social") {
+                Toggle(
+                    "Publish completed workouts automatically",
+                    isOn: $settings.autoPublishCompletedWorkouts
+                )
+
+                if settings.autoPublishCompletedWorkouts {
                     LabeledContent(
-                        "7-day trial ends",
-                        value: trialEndsAt.formatted(date: .abbreviated, time: .omitted)
+                        "Automatic visibility",
+                        value: settings.defaultActivityVisibility.title
                     )
-                }
 
-                if let periodEndsAt = session.subscriptionAccess.currentPeriodEndsAt {
-                    switch session.subscriptionAccess.lifecycleState {
-                    case .active:
-                        LabeledContent(
-                            "Current period",
-                            value: periodEndsAt.formatted(date: .abbreviated, time: .omitted)
-                        )
-                    case .expired:
-                        LabeledContent(
-                            "Access ended",
-                            value: periodEndsAt.formatted(date: .abbreviated, time: .omitted)
-                        )
-                    default:
-                        EmptyView()
-                    }
-                }
-
-                Button {
-                    Task {
-                        _ = await subscriptionStore.restorePurchases()
-                    }
-                } label: {
-                    HStack {
-                        Text("Restore Purchases")
-                        Spacer()
-                        if subscriptionStore.restoreInProgress {
-                            ProgressView()
-                        }
-                    }
-                }
-                .disabled(subscriptionStore.restoreInProgress)
-
-                if let errorMessage = subscriptionStore.errorMessage {
-                    Text(errorMessage)
+                    Text("The workout is saved first. Post-workout review still opens so you can add context or change visibility.")
                         .font(.caption)
-                        .foregroundStyle(.red)
-                }
-
-                Text("Manage your ATHLTH+ access and purchases here.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Profile") {
-                NavigationLink {
-                    PersonalHealthProfileView()
-                } label: {
-                    Label("Personal & health details", systemImage: "person.text.rectangle")
+                        .foregroundStyle(.secondary)
                 }
             }
+        }
+        .navigationTitle("Training")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
 
-            Section("Privacy") {
-                Picker("Profile visibility", selection: $settings.profileVisibility) {
-                    ForEach(ProfileVisibility.allCases) { visibility in
-                        Text(visibility.title).tag(visibility)
-                    }
-                }
+private struct ATHLTHNotificationSettingsView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
 
-                Picker("Default activity visibility", selection: $settings.defaultActivityVisibility) {
-                    ForEach(ProfileVisibility.allCases) { visibility in
-                        Text(visibility.title).tag(visibility)
-                    }
-                }
+    var body: some View {
+        Form {
+            Section("Notifications") {
+                Toggle("Workout reminders", isOn: $settings.workoutRemindersEnabled)
+                Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
+                Toggle("Challenges", isOn: $settings.challengeNotificationsEnabled)
+                Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
+            }
+        }
+        .navigationTitle("Notifications")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
 
+private struct ATHLTHPrivacyPreferencesView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var session: AppSessionStore
+
+    var body: some View {
+        Form {
+            Section("Sharing defaults") {
                 Toggle("Show “Training now” status", isOn: $settings.shareTrainingPresence)
                 Toggle("Share routes by default", isOn: $settings.shareRoutesByDefault)
                 Toggle("Hide route start/end when sharing", isOn: $settings.hideRouteStartAndEnd)
                 Toggle("Share heart rate by default", isOn: $settings.shareHeartRateByDefault)
+            }
 
+            Section("Social") {
                 NavigationLink {
                     SocialPrivacySettingsView()
                 } label: {
                     Label("Social privacy controls", systemImage: "person.2.badge.gearshape")
                 }
+            }
 
+            Section("Personalization") {
                 Toggle(
                     "Personalized ATHLTH offers",
                     isOn: Binding(
@@ -124,254 +935,15 @@ struct ATHLTHSettingsView: View {
                 Text("Uses only goals and interests you choose in ATHLTH. Apple Health / HealthKit data is excluded from offer targeting.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
 
+            Section {
                 Text("Health data is private by default. Social sharing should always be explicit.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-
-            Section("Connections") {
-                integrationRow(
-                    .appleHealth,
-                    subtitle: health.hasRequestedAuthorization ? "Connected / authorization requested" : "Not configured",
-                    connected: health.hasRequestedAuthorization
-                )
-
-                NavigationLink {
-                    AppleWatchConnectionView()
-                } label: {
-                    integrationRow(
-                        .appleWatch,
-                        subtitle: watchConnection.statusText,
-                        connected: watchConnection.isReady
-                    )
-                }
-
-                NavigationLink {
-                    SpotifySettingsView()
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: IntegrationKind.spotify.systemImage)
-                            .frame(width: 30)
-                            .foregroundStyle(settings.spotifyConnected ? Color.green : Color.secondary)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Spotify")
-                            Text(settings.spotifyConnected ? "Connected · training plans only" : "Connect training-plan playlists")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        if settings.spotifyConnected {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                    }
-                }
-
-                integrationRow(
-                    .homeAssistant,
-                    subtitle: settings.homeAssistantConnected ? "Connected" : "Optional integration",
-                    connected: settings.homeAssistantConnected
-                )
-            }
-
-            Section("Training") {
-                Picker("Preferred workout device", selection: $settings.preferredWorkoutCapture) {
-                    ForEach(WorkoutCapturePreference.allCases) { preference in
-                        Text(preference.title).tag(preference)
-                    }
-                }
-
-                Picker("Strength tracking", selection: $settings.defaultStrengthTracking) {
-                    ForEach(StrengthTrackingPreference.allCases) { preference in
-                        Text(preference.title).tag(preference)
-                    }
-                }
-
-                Text("Apple Watch and detailed set tracking are optional. Every workout can be started and completed from iPhone.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Toggle("Auto-pause outdoor workouts", isOn: $settings.autoPauseOutdoorWorkouts)
-
-                Toggle(
-                    "Publish completed workouts automatically",
-                    isOn: $settings.autoPublishCompletedWorkouts
-                )
-
-                if settings.autoPublishCompletedWorkouts {
-                    LabeledContent(
-                        "Automatic visibility",
-                        value: settings.defaultActivityVisibility.title
-                    )
-
-                    Text("The workout is still saved first and the post-workout review opens so you can add a description, effort and training partners or change visibility.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Toggle("Audio cues", isOn: $settings.audioCuesEnabled)
-                Toggle("Haptic cues on Apple Watch", isOn: $settings.hapticCuesEnabled)
-            }
-
-            Section("Notifications") {
-                Toggle("Workout reminders", isOn: $settings.workoutRemindersEnabled)
-                Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
-                Toggle("Challenges", isOn: $settings.challengeNotificationsEnabled)
-                Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
-            }
-
-            Section("Health & sync") {
-                Toggle(
-                    "Background Health sync",
-                    isOn: backgroundHealthSyncBinding
-                )
-                .disabled(!session.canAccess(.backgroundHealthSync))
-
-                if session.canAccess(.backgroundHealthSync) {
-                    Text("Keeps Apple Health data updated automatically in the background. You can turn this off at any time.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Background Health sync requires ATHLTH+. Apple Health and Apple Watch can still be connected on Free.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Section("Exercise data") {
-                Link(destination: URL(string: "https://repdb.co")!) {
-                    Label(
-                        "Exercise data by RepDB (repdb.co)",
-                        systemImage: "arrow.up.right.square"
-                    )
-                }
-
-                Text(
-                    "ATHLTH uses the RepDB Free exercise catalog inside the app. RepDB content is attributed under the RepDB Free Tier License."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Section("Language") {
-                LabeledContent("Language", value: "English")
-            }
-
-            Section("Legal") {
-                NavigationLink {
-                    LegalDocumentView(kind: .terms)
-                } label: {
-                    Label("Terms of Service", systemImage: "doc.text")
-                }
-
-                NavigationLink {
-                    LegalDocumentView(kind: .privacy)
-                } label: {
-                    Label("Privacy Policy", systemImage: "hand.raised.fill")
-                }
-            }
-
-            Section("Data & account") {
-                NavigationLink {
-                    Text("Export will package ATHLTH-owned data such as plans, routes and activities. HealthKit export stays under Apple Health controls.")
-                        .padding()
-                        .navigationTitle("Export Data")
-                } label: {
-                    Label("Export ATHLTH data", systemImage: "square.and.arrow.up")
-                }
-
-                NavigationLink {
-                    BlockedUsersView()
-                } label: {
-                    Label("Blocked users", systemImage: "person.crop.circle.badge.xmark")
-                }
-
-                NavigationLink {
-                    DeleteAccountView()
-                } label: {
-                    Label("Delete account", systemImage: "trash")
-                        .foregroundStyle(.red)
-                }
-            }
-
-            if session.currentRole.canAccessControlCenter {
-                Section("Admin") {
-                    NavigationLink {
-                        AdminCenterView()
-                    } label: {
-                        Label("Control Center", systemImage: "lock.rectangle.stack.fill")
-                    }
-
-                    LabeledContent("Account role", value: session.currentRole.title)
-                }
-            }
-
-            Section("Diagnostics") {
-                NavigationLink {
-                    CapabilityLabView()
-                } label: {
-                    Label("Capability Lab", systemImage: "testtube.2")
-                }
-
-                LabeledContent("Preview mode", value: session.previewModeEnabled ? "Enabled" : "Disabled")
-                LabeledContent("App version", value: appVersion)
-            }
         }
-        .navigationTitle("Settings")
+        .navigationTitle("Privacy & Sharing")
         .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var backgroundHealthSyncBinding: Binding<Bool> {
-        Binding(
-            get: {
-                session.canAccess(.backgroundHealthSync) &&
-                settings.backgroundHealthSyncEnabled
-            },
-            set: { enabled in
-                guard session.canAccess(.backgroundHealthSync) else {
-                    return
-                }
-                settings.backgroundHealthSyncEnabled = enabled
-            }
-        )
-    }
-
-    private var appVersion: String {
-        let version = Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "—"
-        let build = Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleVersion"
-        ) as? String ?? "—"
-        return "\(version) (\(build))"
-    }
-
-    @ViewBuilder
-    private func integrationRow(
-        _ integration: IntegrationKind,
-        subtitle: String,
-        connected: Bool
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: integration.systemImage)
-                .frame(width: 30)
-                .foregroundStyle(connected ? .green : .secondary)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(integration.title)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Image(systemName: connected ? "checkmark.circle.fill" : "chevron.right")
-                .foregroundStyle(connected ? Color.green : Color.secondary)
-        }
     }
 }
