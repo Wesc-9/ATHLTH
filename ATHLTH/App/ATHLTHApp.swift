@@ -427,10 +427,17 @@ struct AppRootView: View {
             challengeStore: challengeStore,
             notificationStore: notifications
         )
-        await social.updateCorePrivacy(
-            profileVisibility: settings.profileVisibility,
-            shareTrainingPresence: settings.shareTrainingPresence
-        )
+
+        // Supabase social privacy is authoritative once the account is loaded.
+        // Mirror the backend values into local settings instead of overwriting
+        // server privacy from stale device defaults on every refresh.
+        if let privacy = social.privacy {
+            if let visibility = ProfileVisibility(rawValue: privacy.profileVisibility) {
+                settings.profileVisibility = visibility
+            }
+            settings.shareTrainingPresence = privacy.shareTrainingPresence
+        }
+
         await social.syncPresence(appSession.profile.presence)
     }
 
