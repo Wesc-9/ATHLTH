@@ -89,11 +89,11 @@ struct AppRootView: View {
                 if let bootstrap = try await accountService.restoreCurrentUser() {
                     appSession.applyBackendBootstrap(bootstrap)
                 } else if appSession.signedIn && !accountService.hasPersistedSession {
-                    appSession.resetOnboardingForPreview()
+                    appSession.resetAuthenticationState()
                 }
             } catch {
                 if !accountService.hasPersistedSession {
-                    appSession.resetOnboardingForPreview()
+                    appSession.resetAuthenticationState()
                 }
             }
 
