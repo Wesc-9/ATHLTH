@@ -7,25 +7,39 @@ struct MessageInboxView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 20) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Messages")
                             .font(.title2.bold())
-                        Text("Chat and share training with your friends.")
+                        Text("Chat, share training and review message requests.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
                     Spacer()
 
-                    if messaging.unreadCount > 0 {
-                        Text("\(messaging.unreadCount)")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(ATHLTHTheme.accent, in: Capsule())
+                    if messaging.unreadCount > 0 || messaging.messageRequestCount > 0 {
+                        HStack(spacing: 6) {
+                            if messaging.messageRequestCount > 0 {
+                                Label(
+                                    "\(messaging.messageRequestCount)",
+                                    systemImage: "person.crop.circle.badge.questionmark"
+                                )
+                            }
+
+                            if messaging.unreadCount > 0 {
+                                Label(
+                                    "\(messaging.unreadCount)",
+                                    systemImage: "message.fill"
+                                )
+                            }
+                        }
+                        .font(.caption.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(ATHLTHTheme.accent, in: Capsule())
                     }
                 }
 
@@ -35,106 +49,188 @@ struct MessageInboxView: View {
                         .foregroundStyle(.red)
                 }
 
-                if social.friends.isEmpty {
+                if !incomingRequestItems.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionLabel("MESSAGE REQUESTS")
+
+                        ForEach(incomingRequestItems) { item in
+                            MessageRequestRow(
+                                friend: item.friend,
+                                message: item.lastMessage,
+                                direction: .incoming,
+                                onAccept: {
+                                    Task {
+                                        _ = await messaging.respondToMessageRequest(
+                                            item.conversation.id,
+                                            accept: true
+                                        )
+                                    }
+                                },
+                                onDecline: {
+                                    Task {
+                                        _ = await messaging.respondToMessageRequest(
+                                            item.conversation.id,
+                                            accept: false
+                                        )
+                                    }
+                                },
+                                onBlock: {
+                                    Task {
+                                        _ = await messaging.respondToMessageRequest(
+                                            item.conversation.id,
+                                            accept: false
+                                        )
+                                        await social.block(item.friend.userID)
+                                        await messaging.refresh()
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if !outgoingRequestItems.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionLabel("REQUESTS SENT")
+
+                        ForEach(outgoingRequestItems) { item in
+                            NavigationLink {
+                                DirectMessageThreadView(friend: item.friend)
+                            } label: {
+                                MessageRequestRow(
+                                    friend: item.friend,
+                                    message: item.lastMessage,
+                                    direction: .outgoing,
+                                    onAccept: {},
+                                    onDecline: {},
+                                    onBlock: {}
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if !activeConversations.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionLabel("CONVERSATIONS")
+
+                        ForEach(activeConversations) { item in
+                            NavigationLink {
+                                DirectMessageThreadView(friend: item.friend)
+                            } label: {
+                                MessageConversationRow(
+                                    friend: item.friend,
+                                    lastMessage: item.lastMessage,
+                                    unreadCount: messaging.unreadCount(for: item.conversation.id)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if !friendsWithoutConversation.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionLabel("START A CONVERSATION")
+
+                        ForEach(friendsWithoutConversation) { friend in
+                            NavigationLink {
+                                DirectMessageThreadView(friend: friend)
+                            } label: {
+                                HStack(spacing: 13) {
+                                    SocialAvatar(profile: friend, size: 48)
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(friend.resolvedName)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                        Text(friend.usernameLabel)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: "message.fill")
+                                        .foregroundStyle(ATHLTHTheme.accent)
+                                }
+                                .padding(14)
+                                .background(
+                                    Color.white.opacity(0.96),
+                                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .stroke(ATHLTHTheme.border, lineWidth: 1)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if activeConversations.isEmpty &&
+                    incomingRequestItems.isEmpty &&
+                    outgoingRequestItems.isEmpty &&
+                    friendsWithoutConversation.isEmpty {
                     ContentUnavailableView(
-                        "No friends to message",
+                        "No messages yet",
                         systemImage: "message",
-                        description: Text("Add a friend first, then you can chat and share workouts, plans, routes and challenges.")
+                        description: Text(
+                            social.friends.isEmpty
+                                ? "Find people in Social. If they allow message requests, you can send one request before becoming friends."
+                                : "Start a conversation with one of your friends."
+                        )
                     )
                     .padding(.vertical, 50)
-                } else {
-                    let activeConversations = conversationFriends
-
-                    if !activeConversations.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("CONVERSATIONS")
-                                .font(.caption.weight(.semibold))
-                                .tracking(2)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-
-                            ForEach(activeConversations) { item in
-                                NavigationLink {
-                                    DirectMessageThreadView(friend: item.friend)
-                                } label: {
-                                    MessageConversationRow(
-                                        friend: item.friend,
-                                        lastMessage: item.lastMessage,
-                                        unreadCount: messaging.unreadCount(for: item.conversation.id)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    let availableFriends = friendsWithoutConversation
-                    if !availableFriends.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("START A CONVERSATION")
-                                .font(.caption.weight(.semibold))
-                                .tracking(2)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-
-                            ForEach(availableFriends) { friend in
-                                NavigationLink {
-                                    DirectMessageThreadView(friend: friend)
-                                } label: {
-                                    HStack(spacing: 13) {
-                                        SocialAvatar(profile: friend, size: 48)
-
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(friend.resolvedName)
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(.primary)
-                                            Text(friend.usernameLabel)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-
-                                        Spacer()
-
-                                        Image(systemName: "message.fill")
-                                            .foregroundStyle(ATHLTHTheme.accent)
-                                    }
-                                    .padding(14)
-                                    .background(
-                                        Color.white.opacity(0.96),
-                                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    )
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                            .stroke(ATHLTHTheme.border, lineWidth: 1)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
                 }
             }
             .padding()
         }
         .refreshable {
+            await social.refresh()
             await messaging.refresh()
         }
         .task {
+            await social.refresh()
             await messaging.refresh()
         }
     }
 
-    private var conversationFriends: [MessageConversationItem] {
+    private var activeConversations: [MessageConversationItem] {
+        items(
+            from: messaging.conversations.filter {
+                $0.requestStatus == .accepted
+            }
+        )
+    }
+
+    private var incomingRequestItems: [MessageConversationItem] {
+        items(from: messaging.incomingMessageRequests)
+            .filter { $0.lastMessage != nil }
+    }
+
+    private var outgoingRequestItems: [MessageConversationItem] {
+        items(from: messaging.outgoingMessageRequests)
+            .filter { $0.lastMessage != nil }
+    }
+
+    private func items(
+        from conversations: [DirectConversationRecord]
+    ) -> [MessageConversationItem] {
         guard let currentUserID = messaging.currentUserID else { return [] }
 
-        return messaging.conversations.compactMap { conversation in
-            guard let friendID = conversation.otherUserID(for: currentUserID),
-                  let friend = social.friends.first(where: { $0.userID == friendID })
+        return conversations.compactMap { conversation in
+            guard let otherID = conversation.otherUserID(for: currentUserID),
+                  let profile = profile(for: otherID)
             else {
                 return nil
             }
 
             return MessageConversationItem(
                 conversation: conversation,
-                friend: friend,
+                friend: profile,
                 lastMessage: messaging.lastMessage(for: conversation.id)
             )
         }
@@ -144,9 +240,121 @@ struct MessageInboxView: View {
         }
     }
 
+    private func profile(for userID: UUID) -> SocialProfileCard? {
+        social.friends.first { $0.userID == userID }
+            ?? social.visibleProfiles.first { $0.userID == userID }
+            ?? social.discoverResults.first { $0.userID == userID }
+    }
+
     private var friendsWithoutConversation: [SocialProfileCard] {
-        let conversationIDs = Set(conversationFriends.map { $0.friend.userID })
-        return social.friends.filter { !conversationIDs.contains($0.userID) }
+        guard let currentUserID = messaging.currentUserID else {
+            return social.friends
+        }
+
+        let conversationUserIDs = Set(
+            messaging.conversations.compactMap {
+                $0.otherUserID(for: currentUserID)
+            }
+        )
+
+        return social.friends.filter {
+            !conversationUserIDs.contains($0.userID)
+        }
+    }
+
+    @ViewBuilder
+    private func sectionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .tracking(2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+    }
+}
+
+private enum MessageRequestDirection {
+    case incoming
+    case outgoing
+}
+
+private struct MessageRequestRow: View {
+    let friend: SocialProfileCard
+    let message: DirectMessageRecord?
+    let direction: MessageRequestDirection
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+    let onBlock: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 13) {
+                SocialAvatar(profile: friend, size: 50)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(friend.resolvedName)
+                        .font(.subheadline.weight(.semibold))
+                    Text(friend.usernameLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(direction == .incoming ? "Request" : "Pending")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accent)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(ATHLTHTheme.accentSoft, in: Capsule())
+            }
+
+            if let body = message?.body, !body.isEmpty {
+                Text(body)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(4)
+            }
+
+            if direction == .incoming {
+                HStack(spacing: 8) {
+                    Button("Accept", action: onAccept)
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accent)
+
+                    Button("Decline", action: onDecline)
+                        .buttonStyle(.bordered)
+
+                    Spacer()
+
+                    Menu {
+                        Button("Block", role: .destructive, action: onBlock)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 32, height: 32)
+                    }
+                }
+            } else {
+                Label(
+                    "Waiting for acceptance",
+                    systemImage: "clock"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .background(
+            Color.white.opacity(0.96),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(
+                    direction == .incoming
+                        ? ATHLTHTheme.accent.opacity(0.26)
+                        : ATHLTHTheme.border,
+                    lineWidth: 1
+                )
+        }
     }
 }
 
