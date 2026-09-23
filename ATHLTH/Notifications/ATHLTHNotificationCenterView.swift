@@ -23,7 +23,7 @@ struct ATHLTHNotificationCenterView: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.green)
+                        .tint(ATHLTHTheme.accent)
                     }
                     .padding(.vertical, 6)
                 }
@@ -191,9 +191,9 @@ struct ATHLTHNotificationCenterView: View {
 
     private func iconTint(_ kind: ATHLTHNotificationKind) -> Color {
         switch kind {
-        case .workoutCompleted: return .green
+        case .workoutCompleted: return ATHLTHTheme.accent
         case .milestoneReached: return .blue
-        case .goalCompleted: return .green
+        case .goalCompleted: return ATHLTHTheme.accent
         case .personalRecord: return .orange
         case .achievement: return .purple
         case .social: return .blue
