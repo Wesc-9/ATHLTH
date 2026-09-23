@@ -7,6 +7,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var incomingRequests: [SocialFriendRequestDisplay] = []
     @Published private(set) var outgoingRequests: [SocialFriendRequestDisplay] = []
     @Published private(set) var discoverResults: [SocialProfileCard] = []
+    @Published private(set) var visibleProfiles: [SocialProfileCard] = []
     @Published private(set) var feed: [SocialFeedItem] = []
     @Published private(set) var blockedUsers: [SocialBlockedUser] = []
     @Published private(set) var inboxEvents: [SocialInboxEvent] = []
@@ -100,6 +101,8 @@ final class SocialStore: ObservableObject {
             let remoteChallenges = try await remoteChallengesTask
             let workoutSessions = try await workoutSessionsTask
             let workoutParticipants = try await workoutParticipantsTask
+
+            visibleProfiles = cards
 
             applyRelationships(
                 cards: cards,
@@ -966,6 +969,7 @@ final class SocialStore: ObservableObject {
         incomingRequests = []
         outgoingRequests = []
         discoverResults = []
+        visibleProfiles = []
         feed = []
         blockedUsers = []
         inboxEvents = []
