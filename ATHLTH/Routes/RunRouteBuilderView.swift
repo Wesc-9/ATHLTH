@@ -4,6 +4,7 @@ import SwiftUI
 struct RunRouteBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     @StateObject private var startSearch = RunRouteLocationSearchModel()
@@ -100,7 +101,7 @@ struct RunRouteBuilderView: View {
                     .font(.system(size: 31, weight: .bold))
                     .foregroundStyle(.white)
 
-                Text("Search two places, choose a route, save it and send it to Apple Watch.")
+                Text(routeBuilderSubtitle)
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.76))
             }
@@ -303,9 +304,9 @@ struct RunRouteBuilderView: View {
                 )
 
                 routeDetailRow(
-                    icon: "applewatch",
-                    title: "Apple Watch",
-                    value: "Route-ready"
+                    icon: settings.trainingDeviceProvider.systemImage,
+                    title: settings.trainingDeviceProvider.title,
+                    value: routeDeviceStatus
                 )
 
                 routeDetailRow(
@@ -342,16 +343,32 @@ struct RunRouteBuilderView: View {
                 .foregroundStyle(ATHLTHTheme.accent)
             }
 
-            Toggle(
-                "Send to Apple Watch after saving",
-                isOn: $sendToWatchAfterSaving
-            )
-            .disabled(!watchConnection.isReady)
+            if settings.trainingDeviceProvider == .appleWatch {
+                Toggle(
+                    "Send to Apple Watch after saving",
+                    isOn: $sendToWatchAfterSaving
+                )
+                .disabled(!watchConnection.isReady)
 
-            if sendToWatchAfterSaving && !watchConnection.isReady {
-                Text(watchConnection.state.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !watchConnection.isReady {
+                    Text(watchConnection.state.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if settings.trainingDeviceProvider == .garmin {
+                Label(
+                    "Garmin route sync is prepared and will unlock after authorization approval.",
+                    systemImage: "watch.analog"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                Label(
+                    "The route will stay available on this iPhone.",
+                    systemImage: "iphone"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Button {
@@ -508,7 +525,9 @@ struct RunRouteBuilderView: View {
 
         session.addImportedRoute(route)
 
-        if sendToWatchAfterSaving {
+        if sendToWatchAfterSaving &&
+            settings.trainingDeviceProvider == .appleWatch &&
+            watchConnection.isReady {
             do {
                 try watchConnection.sendRoute(route)
                 savedMessage = "Route saved and sent to Apple Watch."
@@ -520,6 +539,28 @@ struct RunRouteBuilderView: View {
         }
 
         dismiss()
+    }
+
+    private var routeBuilderSubtitle: String {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            return "Search two places, choose a route, save it and optionally send it to Apple Watch."
+        case .garmin:
+            return "Search two places, choose a route and save it. Garmin route sync is prepared for later authorization."
+        case .none:
+            return "Search two places, choose a route and keep it available in ATHLTH on iPhone."
+        }
+    }
+
+    private var routeDeviceStatus: String {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            return watchConnection.isReady ? "Route-ready" : "Setup required"
+        case .garmin:
+            return "Sync planned"
+        case .none:
+            return "iPhone route"
+        }
     }
 
     private func routeDetailRow(
