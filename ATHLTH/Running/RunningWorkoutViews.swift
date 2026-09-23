@@ -1,5 +1,19 @@
 import SwiftUI
 
+private enum RunningWorkoutLibrarySection: String, CaseIterable, Identifiable {
+    case library
+    case mine
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .library: return "Library"
+        case .mine: return "My Workouts"
+        }
+    }
+}
+
 struct RunningWorkoutLibraryView: View {
     @EnvironmentObject private var library: RunningWorkoutLibraryStore
 
@@ -8,6 +22,7 @@ struct RunningWorkoutLibraryView: View {
 
     @State private var selectedType: RunningWorkoutType?
     @State private var showingBuilder = false
+    @State private var selectedSection: RunningWorkoutLibrarySection = .library
 
     init(
         selectionTitle: String? = nil,
@@ -18,15 +33,34 @@ struct RunningWorkoutLibraryView: View {
     }
 
     private var templates: [RunningWorkoutTemplate] {
-        guard let selectedType else {
-            return library.allTemplates
+        let sourceTemplates = library.allTemplates.filter { workout in
+            switch selectedSection {
+            case .library:
+                return workout.isBuiltIn
+            case .mine:
+                return !workout.isBuiltIn
+            }
         }
 
-        return library.allTemplates.filter { $0.type == selectedType }
+        guard let selectedType else {
+            return sourceTemplates
+        }
+
+        return sourceTemplates.filter { $0.type == selectedType }
     }
 
     var body: some View {
         VStack(spacing: 0) {
+            Picker("Workout source", selection: $selectedSection) {
+                ForEach(RunningWorkoutLibrarySection.allCases) { section in
+                    Text(section.title).tag(section)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     Button {
@@ -52,33 +86,58 @@ struct RunningWorkoutLibraryView: View {
                 .padding(.vertical, 10)
             }
 
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(templates) { workout in
-                        NavigationLink {
-                            RunningWorkoutDetailView(
-                                workout: workout,
-                                selectionTitle: selectionTitle,
-                                onSelect: onSelect
-                            )
-                        } label: {
-                            workoutCard(workout)
-                        }
-                        .buttonStyle(.plain)
+            if templates.isEmpty && selectedSection == .mine && selectedType == nil {
+                ContentUnavailableView {
+                    Label("No custom workouts yet", systemImage: "figure.run")
+                } description: {
+                    Text("Build your own running workout and it will appear here.")
+                } actions: {
+                    Button("Build Workout") {
+                        showingBuilder = true
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
                 }
-                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if templates.isEmpty {
+                ContentUnavailableView(
+                    "No workouts",
+                    systemImage: "figure.run",
+                    description: Text("Try another workout type.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(templates) { workout in
+                            NavigationLink {
+                                RunningWorkoutDetailView(
+                                    workout: workout,
+                                    selectionTitle: selectionTitle,
+                                    onSelect: onSelect
+                                )
+                            } label: {
+                                workoutCard(workout)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding()
+                }
             }
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(selectionTitle ?? "Running Workouts")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingBuilder = true
-                } label: {
-                    Image(systemName: "plus")
+            if selectedSection == .mine {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingBuilder = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Build running workout")
                 }
             }
         }
