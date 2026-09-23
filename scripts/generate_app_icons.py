@@ -9,9 +9,9 @@ import zlib
 from pathlib import Path
 
 SIZE = 1024
-SOURCE_SIZE = 256
+SOURCE_SIZE = 128
 SOURCE_PATH = Path("ATHLTH/Brand/AppIconSource/raw256.b64")
-EXPECTED_SOURCE_SHA256 = "b222baec51043a69dd9788533d994dc8c612a649aa85550dbe5105640f2e9190"
+EXPECTED_SOURCE_SHA256 = "cfc79c5e46ad1ce8238151e75ff5e2e0615b4022bb7e5a35843428eee3ebdb05"
 
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
