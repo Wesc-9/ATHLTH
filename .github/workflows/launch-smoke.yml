@@ -29,15 +29,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp project.yml "$RUNNER_TEMP/project-smoke.yml"
-          python3 - "$RUNNER_TEMP/project-smoke.yml" <<'PY'
+          cp project.yml project-smoke.yml
+          python3 - project-smoke.yml <<'PY'
           import pathlib, sys
           path = pathlib.Path(sys.argv[1])
           text = path.read_text()
           text = text.replace("      - target: ATHLTHWatchApp\n        embed: true\n", "")
           path.write_text(text)
           PY
-          xcodegen generate --spec "$RUNNER_TEMP/project-smoke.yml"
+          xcodegen generate --spec project-smoke.yml
 
       - name: Build simulator app
         shell: bash
