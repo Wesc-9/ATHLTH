@@ -1113,6 +1113,17 @@ struct SocialPrivacySettingsView: View {
                     Toggle("Allow friend requests", isOn: binding.allowFriendRequests)
                 }
 
+                Section("Messages") {
+                    Picker("Who can message me", selection: binding.allowDirectMessages) {
+                        Text("Friends").tag("friends")
+                        Text("Nobody").tag("nobody")
+                    }
+
+                    Text("ATHLTH currently allows direct messages only between accepted friends. Blocking a user also blocks messaging.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Shared with allowed viewers") {
                     Toggle("Training now", isOn: binding.shareTrainingPresence)
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
