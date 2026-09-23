@@ -456,11 +456,19 @@ struct WorkoutHistoryDetailView: View {
     }
 
     private var sourceIcon: String {
-        workout.source.contains("Watch")
-            ? "applewatch"
-            : workout.source.contains("Health")
-                ? "heart.fill"
-                : "figure.strengthtraining.traditional"
+        if workout.source.contains("Garmin") {
+            return "watch.analog"
+        }
+
+        if workout.source.contains("Watch") {
+            return "applewatch"
+        }
+
+        if workout.source.contains("Health") {
+            return "heart.fill"
+        }
+
+        return "figure.strengthtraining.traditional"
     }
 
     private func durationText(_ seconds: TimeInterval) -> String {
