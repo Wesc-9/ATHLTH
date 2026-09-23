@@ -195,6 +195,7 @@ struct TrainingPlanManagerView: View {
     @State private var showingPlanEditor = false
     @State private var showingProgramCreation = false
     @State private var programToStart: TrainingPlan?
+    @State private var aiMode: AIProgramGenerationMode?
 
     init(onOpenCalendar: @escaping () -> Void = {}) {
         self.onOpenCalendar = onOpenCalendar
@@ -233,6 +234,65 @@ struct TrainingPlanManagerView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .tint(ATHLTHTheme.accent)
+                }
+            }
+
+            ATHLTHCard {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("ATHLTH AI")
+                            .font(.title3.weight(.bold))
+                        Text(
+                            "Generate a program from your goals, dates and available training days — or let AI fill only the gaps in the program you already started."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        HStack(spacing: 8) {
+                            Button {
+                                aiMode = .generate
+                            } label: {
+                                Label(
+                                    "Generate",
+                                    systemImage: "sparkles"
+                                )
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .tint(ATHLTHTheme.accent)
+
+                            if session.activePlan != nil {
+                                Button {
+                                    aiMode = .complete
+                                } label: {
+                                    Label(
+                                        "Complete",
+                                        systemImage: "wand.and.stars"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                        }
+                        .padding(.top, 4)
+
+                        if goalStore.activeGoals.isEmpty {
+                            Text("Create a goal in Progress first to use goal-based generation.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
                 }
             }
 
@@ -518,6 +578,9 @@ struct TrainingPlanManagerView: View {
                 program: program,
                 onStarted: onOpenCalendar
             )
+        }
+        .sheet(item: $aiMode) { mode in
+            AIProgramBuilderView(mode: mode)
         }
     }
 }
