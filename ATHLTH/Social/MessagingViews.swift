@@ -805,14 +805,14 @@ struct MessageSharePicker: View {
             }
 
         case .challenge:
-            if challengeStore.visibleChallenges.isEmpty {
+            if shareableChallenges.isEmpty {
                 ContentUnavailableView(
                     "No challenges",
                     systemImage: "bolt",
                     description: Text("Create or join a challenge first.")
                 )
             } else {
-                ForEach(challengeStore.visibleChallenges) { challenge in
+                ForEach(shareableChallenges) { challenge in
                     shareRow(
                         icon: challenge.sport.systemImage,
                         title: challenge.title,
@@ -828,6 +828,16 @@ struct MessageSharePicker: View {
                         )
                     }
                 }
+            }
+        }
+    }
+
+    private var shareableChallenges: [ATHLTHChallenge] {
+        challengeStore.visibleChallenges.filter { challenge in
+            challenge.creatorID == session.profile.userID ||
+            challenge.participants.contains {
+                $0.userID == session.profile.userID &&
+                ($0.state == .creator || $0.state == .accepted)
             }
         }
     }
