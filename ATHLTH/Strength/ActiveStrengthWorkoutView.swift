@@ -126,7 +126,7 @@ struct ActiveStrengthWorkoutView: View {
         case .appleWatch:
             return "This finishes the ATHLTH log and ends the linked HealthKit workout on Apple Watch."
         case .iPhone:
-            return "This finishes the ATHLTH workout on iPhone. Apple Watch is not required."
+            return "This finishes the ATHLTH workout on iPhone. A wearable is not required."
         }
     }
 
@@ -300,7 +300,7 @@ struct ActiveStrengthWorkoutView: View {
             Text(
                 workout.captureDevice == .appleWatch
                     ? "Logging sets or resting in ATHLTH does not pause the Apple Watch workout. It runs continuously from Start until Finish."
-                    : "Apple Watch is optional. The ATHLTH workout runs continuously on iPhone from Start until Finish."
+                    : "A wearable is optional. The ATHLTH workout runs continuously on iPhone from Start until Finish."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
