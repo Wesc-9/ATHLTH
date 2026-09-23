@@ -210,6 +210,15 @@ final class AppSettingsStore: ObservableObject {
     @Published var shareTrainingPresence: Bool { didSet { persist() } }
     @Published var hideRouteStartAndEnd: Bool { didSet { persist() } }
 
+    @Published var profileSetupPromptDismissed: Bool { didSet { persist() } }
+    @Published var profileSetupCompleted: Bool { didSet { persist() } }
+    @Published var showTrainingFocusOnProfile: Bool { didSet { persist() } }
+    @Published var showTrainingStatusOnProfile: Bool { didSet { persist() } }
+    @Published var showCurrentGoalOnProfile: Bool { didSet { persist() } }
+    @Published var showProfileStatsOnProfile: Bool { didSet { persist() } }
+    @Published var showPerformanceStatsOnProfile: Bool { didSet { persist() } }
+    @Published var showWorkoutHistoryOnProfile: Bool { didSet { persist() } }
+
     @Published var trainingDeviceProvider: TrainingDeviceProvider { didSet { persist() } }
     @Published var preferredWorkoutCapture: WorkoutCapturePreference { didSet { persist() } }
     @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
@@ -247,6 +256,15 @@ final class AppSettingsStore: ObservableObject {
         defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .friends
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? false
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
+
+        profileSetupPromptDismissed = defaults.object(forKey: "settings.profileSetupPromptDismissed") as? Bool ?? false
+        profileSetupCompleted = defaults.object(forKey: "settings.profileSetupCompleted") as? Bool ?? false
+        showTrainingFocusOnProfile = defaults.object(forKey: "settings.showTrainingFocusOnProfile") as? Bool ?? false
+        showTrainingStatusOnProfile = defaults.object(forKey: "settings.showTrainingStatusOnProfile") as? Bool ?? false
+        showCurrentGoalOnProfile = defaults.object(forKey: "settings.showCurrentGoalOnProfile") as? Bool ?? false
+        showProfileStatsOnProfile = defaults.object(forKey: "settings.showProfileStatsOnProfile") as? Bool ?? false
+        showPerformanceStatsOnProfile = defaults.object(forKey: "settings.showPerformanceStatsOnProfile") as? Bool ?? false
+        showWorkoutHistoryOnProfile = defaults.object(forKey: "settings.showWorkoutHistoryOnProfile") as? Bool ?? false
 
         let resolvedProvider: TrainingDeviceProvider
         if let storedProvider = defaults.string(
@@ -314,6 +332,15 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(shareTrainingPresence, forKey: "settings.shareTrainingPresence")
         defaults.set(hideRouteStartAndEnd, forKey: "settings.hideRouteStartAndEnd")
 
+        defaults.set(profileSetupPromptDismissed, forKey: "settings.profileSetupPromptDismissed")
+        defaults.set(profileSetupCompleted, forKey: "settings.profileSetupCompleted")
+        defaults.set(showTrainingFocusOnProfile, forKey: "settings.showTrainingFocusOnProfile")
+        defaults.set(showTrainingStatusOnProfile, forKey: "settings.showTrainingStatusOnProfile")
+        defaults.set(showCurrentGoalOnProfile, forKey: "settings.showCurrentGoalOnProfile")
+        defaults.set(showProfileStatsOnProfile, forKey: "settings.showProfileStatsOnProfile")
+        defaults.set(showPerformanceStatsOnProfile, forKey: "settings.showPerformanceStatsOnProfile")
+        defaults.set(showWorkoutHistoryOnProfile, forKey: "settings.showWorkoutHistoryOnProfile")
+
         defaults.set(trainingDeviceProvider.rawValue, forKey: "settings.trainingDeviceProvider")
         defaults.set(preferredWorkoutCapture.rawValue, forKey: "settings.preferredWorkoutCapture")
         defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
@@ -332,6 +359,19 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(watchConnected, forKey: "settings.watchConnected")
         defaults.set(spotifyConnected, forKey: "settings.spotifyConnected")
         defaults.set(homeAssistantConnected, forKey: "settings.homeAssistantConnected")
+    }
+
+    var shouldShowProfileSetupPrompt: Bool {
+        !profileSetupPromptDismissed && !profileSetupCompleted
+    }
+
+    func dismissProfileSetupPrompt() {
+        profileSetupPromptDismissed = true
+    }
+
+    func markProfileSetupCompleted() {
+        profileSetupCompleted = true
+        profileSetupPromptDismissed = true
     }
 
     func connectionState(for integration: IntegrationKind) -> Bool {
