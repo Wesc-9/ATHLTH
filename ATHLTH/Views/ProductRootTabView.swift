@@ -42,29 +42,15 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
 
-    private var snapshot: HealthSnapshot {
-        HealthSnapshot(
-            activeCalories: PreviewData.healthSnapshot.activeCalories,
-            activeCaloriesGoal: PreviewData.healthSnapshot.activeCaloriesGoal,
-            steps: PreviewData.healthSnapshot.steps,
-            sleepDuration: health.sleep.totalAsleep > 0
-                ? health.sleep.totalAsleep
-                : PreviewData.healthSnapshot.sleepDuration,
-            restingHeartRate: health.heart.restingHeartRate ?? PreviewData.healthSnapshot.restingHeartRate,
-            hrvMilliseconds: health.heart.hrvMilliseconds ?? PreviewData.healthSnapshot.hrvMilliseconds,
-            recoveryScore: PreviewData.healthSnapshot.recoveryScore
-        )
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
                     ATHLTHPageHeader(
-                        title: "Good morning, \(session.profile.displayName)",
+                        title: greetingTitle,
                         subtitle: session.profile.presence.state == .training
                             ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
-                            : "Ready to train"
+                            : "Your health and training at a glance."
                     )
 
                     ATHLTHTabHero(
@@ -73,28 +59,54 @@ struct ATHLTHHomeView: View {
                     )
 
                     ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Today's Activity", actionTitle: "Apple Health")
-                        HStack(spacing: 8) {
-                            ATHLTHProgressRing(
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Your Day")
+                                    .font(.title3.weight(.bold))
+                                Text("Live from Apple Health")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            if health.isRefreshing {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else if let refreshed = health.lastSuccessfulRefreshAt {
+                                Text(refreshed, style: .relative)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+
+                        HStack(alignment: .top, spacing: 10) {
+                            HomeDayStatus(
                                 title: "Move",
-                                value: "\(Int(snapshot.activeCalories))",
-                                progress: snapshot.activeCalories / max(snapshot.activeCaloriesGoal, 1),
-                                icon: "figure.run",
-                                tint: ATHLTHTheme.accent
+                                value: moveValue,
+                                subtitle: moveSubtitle,
+                                icon: "flame.fill",
+                                progress: moveProgress
                             )
-                            ATHLTHProgressRing(
+
+                            HomeDayStatus(
                                 title: "Recovery",
-                                value: "\(snapshot.recoveryScore ?? 0)%",
-                                progress: Double(snapshot.recoveryScore ?? 0) / 100,
-                                icon: "heart.fill",
-                                tint: .blue
+                                value: recoveryValue,
+                                subtitle: health.recovery.state.title,
+                                icon: health.recovery.state.systemImage,
+                                progress: health.recovery.score.map {
+                                    Double($0) / 100
+                                }
                             )
-                            ATHLTHProgressRing(
+
+                            HomeDayStatus(
                                 title: "Sleep",
-                                value: snapshot.sleepDuration.shortDuration,
-                                progress: snapshot.sleepDuration / (8 * 3600),
+                                value: sleepValue,
+                                subtitle: sleepSubtitle,
                                 icon: "moon.fill",
-                                tint: .purple
+                                progress: health.sleep.totalAsleep > 0
+                                    ? min(health.sleep.totalAsleep / (8 * 3_600), 1)
+                                    : nil
                             )
                         }
                         .padding(.top, 14)
@@ -102,98 +114,41 @@ struct ATHLTHHomeView: View {
 
                     HomeActivitySection()
 
-                    HStack(alignment: .top, spacing: 12) {
+                    if let insight = homeInsight {
                         ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Train Today")
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                                ForEach([WorkoutKind.running, .walking, .strength, .custom]) { kind in
-                                    VStack(spacing: 7) {
-                                        Image(systemName: kind.systemImage)
-                                            .font(.title2)
-                                            .foregroundStyle(ATHLTHTheme.accent)
-                                        Text(kind.title)
-                                            .font(.caption.weight(.semibold))
-                                    }
-                                    .frame(maxWidth: .infinity, minHeight: 70)
-                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                            HStack(alignment: .top, spacing: 14) {
+                                Image(systemName: insight.icon)
+                                    .font(.title2)
+                                    .foregroundStyle(ATHLTHTheme.accent)
+                                    .frame(width: 46, height: 46)
+                                    .background(
+                                        ATHLTHTheme.accentSoft,
+                                        in: RoundedRectangle(
+                                            cornerRadius: 14,
+                                            style: .continuous
+                                        )
+                                    )
+
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("For You")
+                                        .font(.caption.weight(.semibold))
+                                        .tracking(1.4)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                                    Text(insight.title)
+                                        .font(.headline)
+
+                                    Text(insight.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(
+                                            horizontal: false,
+                                            vertical: true
+                                        )
                                 }
+
+                                Spacer()
                             }
-                            .padding(.top, 10)
-                        }
-
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Next Workout")
-                            if let workout = session.activePlan?.weeks.first?.days.first?.sessions.first {
-                                Text(workout.title)
-                                    .font(.headline)
-                                    .padding(.top, 8)
-                                Text("\(workout.durationMinutes ?? 0) min")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-
-                                Button {
-                                    session.beginTrainingStatus(for: workout)
-                                } label: {
-                                    Label("Start", systemImage: "play.fill")
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(ATHLTHTheme.accent)
-                                .padding(.top, 8)
-                            }
-                        }
-                    }
-
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Health Metrics")
-                        HStack {
-                            ATHLTHMetric(
-                                title: "Heart Rate",
-                                value: snapshot.restingHeartRate.map { "\(Int($0)) bpm" } ?? "—",
-                                icon: "heart.fill",
-                                tint: .red
-                            )
-                            ATHLTHMetric(
-                                title: "Sleep",
-                                value: snapshot.sleepDuration.shortDuration,
-                                icon: "moon.fill",
-                                tint: .purple
-                            )
-                            ATHLTHMetric(
-                                title: "Steps",
-                                value: snapshot.steps.formatted(),
-                                icon: "shoeprints.fill",
-                                tint: .blue
-                            )
-                            ATHLTHMetric(
-                                title: "Recovery",
-                                value: "\(snapshot.recoveryScore ?? 0)",
-                                icon: "leaf.fill",
-                                tint: ATHLTHTheme.accent
-                            )
-                        }
-                        .padding(.top, 10)
-                    }
-
-                    HStack(spacing: 12) {
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Consistency")
-                            Text("5/7")
-                                .font(.largeTitle.weight(.bold))
-                                .padding(.top, 6)
-                            Text("sessions this week")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Insights")
-                            Text("Sleep is trending up.")
-                                .font(.headline)
-                                .padding(.top, 6)
-                            Text("Keep the routine consistent and use recovery to guide intensity.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -203,12 +158,250 @@ struct ATHLTHHomeView: View {
             }
             .background(
                 LinearGradient(
-                    colors: [.blue.opacity(0.08), ATHLTHTheme.accent.opacity(0.05), .clear],
+                    colors: [
+                        .blue.opacity(0.055),
+                        ATHLTHTheme.accent.opacity(0.035),
+                        .clear
+                    ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
-            .refreshable { await health.refreshAll() }
+            .refreshable {
+                await health.refreshAll()
+            }
+            .task {
+                if health.lastSuccessfulRefreshAt == nil {
+                    await health.refreshAll()
+                }
+            }
+        }
+    }
+
+    private var greetingTitle: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let greeting: String
+
+        switch hour {
+        case 5..<12:
+            greeting = "Good morning"
+        case 12..<18:
+            greeting = "Good afternoon"
+        default:
+            greeting = "Good evening"
+        }
+
+        return "\(greeting), \(session.profile.displayName)"
+    }
+
+    private var moveValue: String {
+        guard let calories = health.training.activeEnergyKilocaloriesToday,
+              calories > 0
+        else {
+            return "—"
+        }
+
+        return "\(Int(calories.rounded())) kcal"
+    }
+
+    private var moveProgress: Double? {
+        guard let calories = health.training.activeEnergyKilocaloriesToday,
+              let goal = health.training.moveGoalKilocaloriesToday,
+              goal > 0
+        else {
+            return nil
+        }
+
+        return min(max(calories / goal, 0), 1)
+    }
+
+    private var moveSubtitle: String {
+        guard let calories = health.training.activeEnergyKilocaloriesToday
+        else {
+            return "No data yet"
+        }
+
+        if let goal = health.training.moveGoalKilocaloriesToday,
+           goal > 0 {
+            let percent = Int(
+                ((calories / goal) * 100).rounded()
+            )
+            return "\(percent)% of goal"
+        }
+
+        if let minutes = health.training.exerciseMinutesToday,
+           minutes > 0 {
+            return "\(Int(minutes.rounded())) exercise min"
+        }
+
+        return "Today"
+    }
+
+    private var recoveryValue: String {
+        guard let score = health.recovery.score else {
+            return "—"
+        }
+
+        return "\(score)"
+    }
+
+    private var sleepValue: String {
+        guard health.sleep.totalAsleep > 0 else {
+            return "—"
+        }
+
+        return health.sleep.totalAsleep.shortDuration
+    }
+
+    private var sleepSubtitle: String {
+        guard health.sleep.totalAsleep > 0 else {
+            return "No sleep data"
+        }
+
+        if let baseline = health.recovery.averageSleepDuration,
+           baseline > 0 {
+            let difference = health.sleep.totalAsleep - baseline
+            let minutes = Int(abs(difference / 60).rounded())
+
+            if minutes < 10 {
+                return "Near your baseline"
+            }
+
+            return difference >= 0
+                ? "+\(minutes)m vs baseline"
+                : "−\(minutes)m vs baseline"
+        }
+
+        switch health.sleep.totalAsleep {
+        case 7.5 * 3_600...:
+            return "Good duration"
+        case 6.5 * 3_600..<7.5 * 3_600:
+            return "A little short"
+        default:
+            return "Short night"
+        }
+    }
+
+    private var homeInsight: (
+        title: String,
+        detail: String,
+        icon: String
+    )? {
+        if let score = health.recovery.score {
+            switch health.recovery.state {
+            case .ready:
+                return (
+                    "You look ready for a normal training load.",
+                    health.recovery.detail,
+                    "bolt.heart.fill"
+                )
+            case .balanced:
+                return (
+                    "Recovery looks balanced today.",
+                    health.recovery.detail,
+                    "heart.fill"
+                )
+            case .takeItEasy:
+                return (
+                    "A lighter session may fit better today.",
+                    health.recovery.detail,
+                    "gauge.with.dots.needle.33percent"
+                )
+            case .recover:
+                return (
+                    "Recovery signals are below your baseline.",
+                    "Consider reducing intensity and prioritizing sleep and recovery today.",
+                    "bed.double.fill"
+                )
+            case .buildingBaseline:
+                break
+            }
+
+            if score >= 0 {
+                return nil
+            }
+        }
+
+        if health.recovery.state == .buildingBaseline {
+            return (
+                "ATHLTH is building your recovery baseline.",
+                health.recovery.detail,
+                "waveform.path.ecg"
+            )
+        }
+
+        return nil
+    }
+}
+
+private struct HomeDayStatus: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    let icon: String
+    let progress: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+                .frame(width: 30, height: 30)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(.primary)
+                .minimumScaleFactor(0.72)
+                .lineLimit(1)
+
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+
+            if let progress {
+                ProgressView(value: progress)
+                    .tint(ATHLTHTheme.accent)
+            } else {
+                Capsule()
+                    .fill(ATHLTHTheme.border)
+                    .frame(height: 4)
+            }
+        }
+        .padding(12)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 150,
+            alignment: .topLeading
+        )
+        .background(
+            Color.white.opacity(0.72),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(ATHLTHTheme.border, lineWidth: 1)
         }
     }
 }
