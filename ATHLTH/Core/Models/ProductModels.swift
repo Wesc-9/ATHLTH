@@ -65,13 +65,10 @@ enum ATHLTHFeature: Hashable, CaseIterable {
     case aiTrainingPrograms
 
     var requiresATHLTHPlus: Bool {
-        switch self {
-        case .backgroundHealthSync,
-             .advancedTrainingPlans,
-             .advancedRecovery,
-             .aiTrainingPrograms:
-            return true
-        }
+        // All ATHLTH features are temporarily available to everyone.
+        // Keep the feature model in place so Free/ATHLTH+ can be
+        // redefined later without rebuilding each feature flow.
+        false
     }
 }
 
