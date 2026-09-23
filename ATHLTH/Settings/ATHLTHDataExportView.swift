@@ -95,7 +95,7 @@ struct ATHLTHDataExportView: View {
         defer { isPreparing = false }
 
         let payload = ATHLTHDataExportEnvelope(
-            schemaVersion: 2,
+            schemaVersion: 3,
             exportedAt: Date(),
             profile: session.profile,
             activePlan: session.activePlan,
