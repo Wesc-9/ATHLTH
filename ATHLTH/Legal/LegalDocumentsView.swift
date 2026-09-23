@@ -79,7 +79,7 @@ struct LegalDocumentView: View {
         [
             LegalSectionData(
                 title: "1. About ATHLTH",
-                body: "ATHLTH is a fitness and wellness service for planning workouts, recording training, reviewing health and activity information, managing routes, and optionally interacting with other users. Features may include Apple Health, Apple Watch, Spotify, Home Assistant, routes, challenges, training plans and social functionality."
+                body: "ATHLTH is a fitness and wellness service for planning workouts, recording training, reviewing health and activity information, managing routes, and optionally interacting with other users. Features may include Apple Health, supported wearable integrations such as Apple Watch, future Garmin Connect support, Spotify, Home Assistant, routes, challenges, training plans and social functionality."
             ),
             LegalSectionData(
                 title: "2. Your account",
@@ -90,8 +90,8 @@ struct LegalDocumentView: View {
                 body: "ATHLTH provides fitness, training and wellness information. It is not a medical service, medical device, emergency service or substitute for professional medical advice, diagnosis or treatment. Training recommendations, recovery indicators and similar features are informational and may be incomplete or inaccurate. Stop exercising and seek appropriate professional help if you have health concerns or symptoms."
             ),
             LegalSectionData(
-                title: "4. Apple Health and Apple Watch",
-                body: "Apple Health and Apple Watch are optional. If you connect Apple Health, you choose which data categories ATHLTH may access. You can change those permissions through Apple at any time. ATHLTH is designed to keep HealthKit-derived data private unless you explicitly choose an allowed sharing action. HealthKit data is not used for advertising and is not sold to advertising platforms, data brokers or information resellers."
+                title: "4. Health and wearable integrations",
+                body: "Apple Health and wearable integrations are optional. ATHLTH can be used without a watch. If you connect Apple Health, Apple Watch or another supported wearable provider, you choose which available data sources and permissions to use. Availability depends on the provider. ATHLTH is designed to keep health-derived data private unless you explicitly choose an allowed sharing action. HealthKit data is not used for advertising and is not sold to advertising platforms, data brokers or information resellers."
             ),
             LegalSectionData(
                 title: "5. Workouts and training plans",
@@ -111,7 +111,7 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "9. Availability and changes",
-                body: "ATHLTH may change, add, remove or discontinue features as the product develops. Health, watch, location, Spotify and third-party functionality may depend on hardware, operating-system permissions, network access or third-party services outside ATHLTH's control."
+                body: "ATHLTH may change, add, remove or discontinue features as the product develops. Health, wearable, location, Spotify and third-party functionality may depend on hardware, operating-system permissions, network access, provider approval or third-party services outside ATHLTH's control. A provider shown as planned is not connected until authorization support is enabled."
             ),
             LegalSectionData(
                 title: "10. Intellectual property",
@@ -140,7 +140,7 @@ struct LegalDocumentView: View {
         [
             LegalSectionData(
                 title: "1. What this policy covers",
-                body: "This Privacy Policy explains how ATHLTH handles information when you use the app, including account information, training data, optional Apple Health data, routes, social features and optional integrations."
+                body: "This Privacy Policy explains how ATHLTH handles information when you use the app, including account information, training data, optional Apple Health or supported wearable data, routes, social features and optional integrations."
             ),
             LegalSectionData(
                 title: "2. Account and profile information",
@@ -156,7 +156,7 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "5. Workout, plan and exercise data",
-                body: "ATHLTH may store workouts, planned sessions, exercises, sets, repetitions, weights, RPE, rest periods, training notes, progress records, achievements and related training data that you create in the app. Some of this data may be linked to a HealthKit workout when you choose to use Apple Health or Apple Watch."
+                body: "ATHLTH may store workouts, planned sessions, exercises, sets, repetitions, weights, RPE, rest periods, training notes, progress records, achievements and related training data that you create in the app. Some of this data may be linked to a workout from Apple Health, Apple Watch or another wearable provider that you explicitly connect."
             ),
             LegalSectionData(
                 title: "6. Routes and location information",
@@ -167,8 +167,8 @@ struct LegalDocumentView: View {
                 body: "If social features are used, ATHLTH may process friendship relationships, followers/following, public or friends-only profiles, shared plans, shared routes, challenges, comments, messages and activity visibility. Content you choose to make public can be visible to other users."
             ),
             LegalSectionData(
-                title: "8. Spotify, Apple Watch and Home Assistant",
-                body: "Optional integrations may require identifiers, authorization tokens or connection state needed to provide the integration. Spotify is intended only to link playlists to training plans and optionally start the linked playlist with a workout. Home Assistant is optional and configured through Settings. Third-party services process data under their own privacy policies."
+                title: "8. Wearables and other integrations",
+                body: "Optional integrations may require identifiers, authorization tokens or connection state needed to provide the integration. Apple Watch can provide supported workout functionality. Garmin Connect support is prepared but remains inactive until ATHLTH has the required provider authorization. Spotify and Home Assistant are optional. Third-party services process data under their own privacy policies."
             ),
             LegalSectionData(
                 title: "9. Why information is processed",
