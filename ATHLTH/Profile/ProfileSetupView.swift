@@ -333,4 +333,3 @@ struct ATHLTHProfileSetupView: View {
         dismiss()
     }
 }
-}
