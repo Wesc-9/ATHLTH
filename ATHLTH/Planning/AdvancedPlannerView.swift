@@ -850,6 +850,7 @@ struct PlanMetadataEditorView: View {
     @State private var tags: String
     @State private var startDateEnabled: Bool
     @State private var startDate: Date
+    @State private var weekCount: Int
     @State private var selectedGoalIDs: Set<UUID> = []
 
     init(plan: TrainingPlan) {
@@ -860,6 +861,7 @@ struct PlanMetadataEditorView: View {
         _tags = State(initialValue: plan.tags.joined(separator: ", "))
         _startDateEnabled = State(initialValue: plan.startDate != nil)
         _startDate = State(initialValue: plan.startDate ?? Date())
+        _weekCount = State(initialValue: max(plan.weeks.count, 1))
     }
 
     var body: some View {
@@ -880,6 +882,20 @@ struct PlanMetadataEditorView: View {
                         }
                     }
 
+                    TextField(
+                        "Tags, comma separated",
+                        text: $tags
+                    )
+                    .textInputAutocapitalization(.never)
+                }
+
+                Section("Timeline") {
+                    Stepper(
+                        "\(weekCount) \(weekCount == 1 ? "week" : "weeks")",
+                        value: $weekCount,
+                        in: 1...52
+                    )
+
                     Toggle("Use calendar start date", isOn: $startDateEnabled)
 
                     if startDateEnabled {
@@ -888,13 +904,21 @@ struct PlanMetadataEditorView: View {
                             selection: $startDate,
                             displayedComponents: .date
                         )
-                    }
 
-                    TextField(
-                        "Tags, comma separated",
-                        text: $tags
-                    )
-                    .textInputAutocapitalization(.never)
+                        if let endDate = Calendar.current.date(
+                            byAdding: .day,
+                            value: max(weekCount * 7 - 1, 0),
+                            to: Calendar.current.startOfDay(for: startDate)
+                        ) {
+                            LabeledContent(
+                                "Program ends",
+                                value: endDate.formatted(
+                                    date: .abbreviated,
+                                    time: .omitted
+                                )
+                            )
+                        }
+                    }
                 }
 
                 Section("Goals") {
@@ -953,6 +977,7 @@ struct PlanMetadataEditorView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        session.setActivePlanWeekCount(weekCount)
                         session.updateActivePlanMetadata(
                             title: title,
                             summary: summary,
