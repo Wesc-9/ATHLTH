@@ -248,26 +248,39 @@ final class AppSettingsStore: ObservableObject {
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? true
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
 
-        if let storedProvider = defaults.string(forKey: "settings.trainingDeviceProvider"),
+        let resolvedProvider: TrainingDeviceProvider
+        if let storedProvider = defaults.string(
+            forKey: "settings.trainingDeviceProvider"
+        ),
            let provider = TrainingDeviceProvider(rawValue: storedProvider) {
-            trainingDeviceProvider = provider
+            resolvedProvider = provider
         } else if defaults.object(forKey: "settings.watchConnected") as? Bool == true ||
                     defaults.string(forKey: "settings.preferredWorkoutCapture") ==
                         WorkoutCapturePreference.appleWatch.rawValue {
-            trainingDeviceProvider = .appleWatch
+            resolvedProvider = .appleWatch
         } else {
-            trainingDeviceProvider = .none
+            resolvedProvider = .none
         }
 
-        preferredWorkoutCapture = WorkoutCapturePreference(rawValue: defaults.string(forKey: "settings.preferredWorkoutCapture") ?? "") ?? .automatic
-        if trainingDeviceProvider != .appleWatch &&
-            preferredWorkoutCapture == .appleWatch {
-            preferredWorkoutCapture = .iPhone
+        let storedCapture = WorkoutCapturePreference(
+            rawValue: defaults.string(
+                forKey: "settings.preferredWorkoutCapture"
+            ) ?? ""
+        ) ?? .automatic
+        let resolvedCapture: WorkoutCapturePreference
+        if resolvedProvider != .appleWatch &&
+            storedCapture == .appleWatch {
+            resolvedCapture = .iPhone
             defaults.set(
                 WorkoutCapturePreference.iPhone.rawValue,
                 forKey: "settings.preferredWorkoutCapture"
             )
+        } else {
+            resolvedCapture = storedCapture
         }
+
+        trainingDeviceProvider = resolvedProvider
+        preferredWorkoutCapture = resolvedCapture
 
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
