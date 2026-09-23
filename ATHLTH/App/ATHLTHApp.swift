@@ -3,6 +3,8 @@ import SwiftUI
 
 @main
 struct ATHLTHApp: App {
+    @UIApplicationDelegateAdaptor(ATHLTHAppDelegate.self)
+    private var appDelegate
     @StateObject private var health = HealthKitManager()
     @StateObject private var trainingPlan = TrainingPlanStore()
     @StateObject private var exerciseLibrary = ExerciseLibraryStore()
@@ -124,6 +126,7 @@ struct AppRootView: View {
             await submitLatestStoreProofIfPossible()
 
             if appSession.signedIn {
+                await APNsPushManager.shared.syncCurrentToken()
                 await refreshSocialCore()
                 await messaging.refresh()
             }
@@ -369,6 +372,7 @@ struct AppRootView: View {
 
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
             Task {
+                await APNsPushManager.shared.syncCurrentToken()
                 await submitLatestStoreProofIfPossible()
                 await refreshSocialCore()
                 if health.hasRequestedAuthorization {
