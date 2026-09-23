@@ -55,11 +55,13 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var messaging: MessagingStore
 
     @State private var homeStreakSnapshot: HealthProgressSnapshot?
 
     var body: some View {
-        ScrollView {
+        NavigationStack {
+            ScrollView {
                 VStack(spacing: 18) {
                     ZStack(alignment: .topTrailing) {
                         ATHLTHTabHero(
@@ -2895,7 +2897,6 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var trophyStore: TrophyStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var social: SocialStore
-    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var goalStore: GoalStore
 
