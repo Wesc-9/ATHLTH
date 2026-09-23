@@ -435,11 +435,13 @@ private struct MessageConversationRow: View {
 }
 
 struct DirectMessageThreadView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var social: SocialStore
 
     let friend: SocialProfileCard
 
@@ -470,7 +472,7 @@ struct DirectMessageThreadView: View {
         .navigationTitle(friend.resolvedName)
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
-            composer
+            bottomBar
         }
         .sheet(isPresented: $showingSharePicker) {
             MessageSharePicker { draft in
@@ -541,6 +543,129 @@ struct DirectMessageThreadView: View {
         }
     }
 
+    private var currentConversation: DirectConversationRecord? {
+        guard let conversationID else { return nil }
+        return messaging.conversations.first { $0.id == conversationID }
+    }
+
+    private var isIncomingRequest: Bool {
+        guard let currentConversation,
+              let currentUserID = messaging.currentUserID
+        else {
+            return false
+        }
+
+        return currentConversation.requestStatus == .pending &&
+            currentConversation.requestedBy != nil &&
+            currentConversation.requestedBy != currentUserID
+    }
+
+    private var isOutgoingRequest: Bool {
+        guard let currentConversation,
+              let currentUserID = messaging.currentUserID
+        else {
+            return false
+        }
+
+        return currentConversation.requestStatus == .pending &&
+            currentConversation.requestedBy == currentUserID
+    }
+
+    private var hasSentRequestMessage: Bool {
+        guard let conversationID else { return false }
+        return !messaging.messages(in: conversationID).isEmpty
+    }
+
+    @ViewBuilder
+    private var bottomBar: some View {
+        if isIncomingRequest {
+            incomingRequestBar
+        } else if isOutgoingRequest && hasSentRequestMessage {
+            outgoingRequestBar
+        } else {
+            composer
+        }
+    }
+
+    private var incomingRequestBar: some View {
+        VStack(spacing: 10) {
+            Text("Accept this request before replying or sharing training.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 10) {
+                Button("Decline") {
+                    Task {
+                        guard let conversationID else { return }
+                        if await messaging.respondToMessageRequest(
+                            conversationID,
+                            accept: false
+                        ) {
+                            dismiss()
+                        }
+                    }
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+
+                Button("Accept") {
+                    Task {
+                        guard let conversationID else { return }
+                        _ = await messaging.respondToMessageRequest(
+                            conversationID,
+                            accept: true
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accent)
+                .frame(maxWidth: .infinity)
+
+                Menu {
+                    Button("Block", role: .destructive) {
+                        Task {
+                            guard let conversationID else { return }
+                            _ = await messaging.respondToMessageRequest(
+                                conversationID,
+                                accept: false
+                            )
+                            await social.block(friend.userID)
+                            await messaging.refresh()
+                            dismiss()
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 38, height: 38)
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+    }
+
+    private var outgoingRequestBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "clock.fill")
+                .foregroundStyle(ATHLTHTheme.accent)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Message request sent")
+                    .font(.subheadline.weight(.semibold))
+                Text("You can send more messages and training items after it is accepted.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+    }
+
     private var composer: some View {
         VStack(spacing: 8) {
             if let selectedShare {
@@ -572,18 +697,24 @@ struct DirectMessageThreadView: View {
             }
 
             HStack(alignment: .bottom, spacing: 10) {
-                Button {
-                    showingSharePicker = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 38, height: 38)
-                        .background(ATHLTHTheme.accentSoft, in: Circle())
+                if currentConversation?.requestStatus == .accepted {
+                    Button {
+                        showingSharePicker = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(width: 38, height: 38)
+                            .background(ATHLTHTheme.accentSoft, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(conversationID == nil)
                 }
-                .buttonStyle(.plain)
-                .disabled(conversationID == nil)
 
-                TextField("Message", text: $text, axis: .vertical)
+                TextField(
+                    isOutgoingRequest ? "Write one message request" : "Message",
+                    text: $text,
+                    axis: .vertical
+                )
                     .lineLimit(1...5)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
@@ -616,8 +747,20 @@ struct DirectMessageThreadView: View {
     }
 
     private var canSend: Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        selectedShare != nil
+        let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        guard let currentConversation else {
+            return false
+        }
+
+        switch currentConversation.requestStatus {
+        case .accepted:
+            return hasText || selectedShare != nil
+        case .pending:
+            return isOutgoingRequest && !hasSentRequestMessage && hasText
+        case .declined:
+            return false
+        }
     }
 
     private func openAndPoll() async {
@@ -639,7 +782,9 @@ struct DirectMessageThreadView: View {
 
     private func markLocalMessageNotificationsRead(conversationID: UUID) {
         for item in notifications.items
-        where item.socialEventKind == "message" &&
+        where (item.socialEventKind == "message" ||
+               item.socialEventKind == "message_request" ||
+               item.socialEventKind == "message_request_accepted") &&
               item.socialEntityID == conversationID &&
               item.isUnread {
             notifications.markRead(item.id)
@@ -651,7 +796,9 @@ struct DirectMessageThreadView: View {
 
         isSending = true
         let body = text
-        let attachment = selectedShare
+        let attachment = currentConversation?.requestStatus == .accepted
+            ? selectedShare
+            : nil
 
         if await messaging.send(
             to: friend.userID,
