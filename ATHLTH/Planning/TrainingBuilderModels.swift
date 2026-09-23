@@ -237,6 +237,8 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     var isBuiltIn: Bool
     var createdAt: Date
     var updatedAt: Date
+    var sharedSourceOwnerID: UUID? = nil
+    var sharedSourceWorkoutID: UUID? = nil
 
     var estimatedDistanceMeters: Double? {
         let values = blocks.compactMap { block -> Double? in
