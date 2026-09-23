@@ -3,12 +3,51 @@ import SwiftUI
 struct AdvancedPlannerView: View {
     @EnvironmentObject private var session: AppSessionStore
 
+    let onOpenPrograms: () -> Void
+
     @State private var showingSessionEditor = false
-    @State private var showingPlanCreation = false
     @State private var selectedDayID: UUID?
+
+    init(onOpenPrograms: @escaping () -> Void = {}) {
+        self.onOpenPrograms = onOpenPrograms
+    }
 
     var body: some View {
         VStack(spacing: 16) {
+            ATHLTHCard {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Programs")
+                            .font(.title3.weight(.bold))
+                        Text(
+                            "Build or save complete training programs here. Start one when you're ready, then use Calendar to schedule and adjust the sessions."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showingProgramCreation = true
+                    } label: {
+                        Label("Create", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(ATHLTHTheme.accent)
+                }
+            }
+
             if let plan = session.activePlan {
                 ATHLTHCard {
                     HStack {
@@ -97,15 +136,17 @@ struct AdvancedPlannerView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "No active plan",
+                    "No active program",
                     systemImage: "calendar.badge.plus",
                     description: Text(
-                        "Create a real training plan, then add strength, running, walking or recovery sessions."
+                        "Choose or create a program first. Calendar is where its sessions are scheduled and adjusted."
                     )
                 )
 
-                Button("Create Training Plan") {
-                    showingPlanCreation = true
+                Button {
+                    onOpenPrograms()
+                } label: {
+                    Label("Open Programs", systemImage: "square.stack.3d.up.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHTheme.accent)
@@ -115,9 +156,6 @@ struct AdvancedPlannerView: View {
             if let selectedDayID {
                 SessionEditorView(dayID: selectedDayID)
             }
-        }
-        .sheet(isPresented: $showingPlanCreation) {
-            TrainingPlanCreationView()
         }
     }
 
@@ -186,16 +224,29 @@ struct TrainingPlanManagerView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var goalStore: GoalStore
 
+    let onOpenCalendar: () -> Void
+
     @State private var showingPlanEditor = false
+    @State private var showingProgramCreation = false
+    @State private var programToStart: TrainingPlan?
+
+    init(onOpenCalendar: @escaping () -> Void = {}) {
+        self.onOpenCalendar = onOpenCalendar
+    }
 
     var body: some View {
         VStack(spacing: 16) {
             if let plan = session.activePlan {
                 ATHLTHCard {
                     HStack {
-                        ATHLTHSectionHeader(title: "Plan settings")
+                        ATHLTHSectionHeader(title: "Active Program")
 
                         Spacer()
+
+                        Button("Calendar") {
+                            onOpenCalendar()
+                        }
+                        .font(.caption.weight(.semibold))
 
                         Button("Edit") {
                             showingPlanEditor = true
@@ -204,7 +255,7 @@ struct TrainingPlanManagerView: View {
                     }
 
                     VStack(spacing: 12) {
-                        LabeledContent("Plan", value: plan.title)
+                        LabeledContent("Program", value: plan.title)
                         LabeledContent("Version", value: "\(plan.version)")
                         LabeledContent("Weeks", value: "\(plan.weeks.count)")
                         LabeledContent("Visibility", value: plan.visibility.title)
@@ -222,7 +273,7 @@ struct TrainingPlanManagerView: View {
                 if !session.planTemplates.isEmpty {
                     ATHLTHCard {
                         ATHLTHSectionHeader(
-                            title: "Saved Templates",
+                            title: "Program Library",
                             actionTitle: "\(session.planTemplates.count)"
                         )
 
@@ -233,7 +284,9 @@ struct TrainingPlanManagerView: View {
                                         Text(template.title)
                                             .font(.subheadline.weight(.semibold))
                                         Text(
-                                            "\(template.weeks.count) weeks · \(template.tags.joined(separator: ", "))"
+                                            template.tags.isEmpty
+                                                ? "\(template.weeks.count) weeks"
+                                                : "\(template.weeks.count) weeks · \(template.tags.joined(separator: ", "))"
                                         )
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
@@ -242,8 +295,8 @@ struct TrainingPlanManagerView: View {
 
                                     Spacer()
 
-                                    Button("Use") {
-                                        session.usePlanTemplate(template.id)
+                                    Button("Start") {
+                                        programToStart = template
                                     }
                                     .buttonStyle(.bordered)
                                     .controlSize(.small)
@@ -265,7 +318,7 @@ struct TrainingPlanManagerView: View {
                     HStack {
                         ATHLTHSectionHeader(
                             title: "Linked Goals",
-                            actionTitle: "Edit Plan"
+                            actionTitle: "Edit Program"
                         )
 
                         Spacer()
@@ -317,7 +370,7 @@ struct TrainingPlanManagerView: View {
                 ATHLTHCard {
                     ATHLTHSectionHeader(
                         title: "Spotify",
-                        actionTitle: "Plan only"
+                        actionTitle: "Program only"
                     )
 
                     if settings.spotifyConnected {
@@ -374,7 +427,7 @@ struct TrainingPlanManagerView: View {
                 }
 
                 ATHLTHCard {
-                    ATHLTHSectionHeader(title: "Advanced planning")
+                    ATHLTHSectionHeader(title: "Program building blocks")
 
                     VStack(alignment: .leading, spacing: 10) {
                         Label(
@@ -398,7 +451,7 @@ struct TrainingPlanManagerView: View {
                             systemImage: "arrow.triangle.2.circlepath"
                         )
                         Label(
-                            "Private, friends or public plans",
+                            "Private, friends or public programs",
                             systemImage: "person.2.fill"
                         )
                     }
@@ -411,7 +464,7 @@ struct TrainingPlanManagerView: View {
                         session.saveActivePlanAsTemplate()
                     } label: {
                         Label(
-                            "Save Template",
+                            "Save to Library",
                             systemImage: "square.and.arrow.down"
                         )
                         .frame(maxWidth: .infinity)
@@ -423,7 +476,7 @@ struct TrainingPlanManagerView: View {
                         session.duplicateActivePlan()
                     } label: {
                         Label(
-                            "Duplicate",
+                            "Duplicate Program",
                             systemImage: "doc.on.doc"
                         )
                         .frame(maxWidth: .infinity)
@@ -432,17 +485,101 @@ struct TrainingPlanManagerView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "No training plan",
-                    systemImage: "calendar.badge.plus",
+                    "No active program",
+                    systemImage: "square.stack.3d.up",
                     description: Text(
-                        "Create a plan in Calendar to manage it here."
+                        session.planTemplates.isEmpty
+                            ? "Create your first program here. Once started, its sessions appear in Calendar."
+                            : "Start a saved program from your library, or create a new one."
                     )
                 )
+
+                if session.planTemplates.isEmpty {
+                    Button {
+                        showingProgramCreation = true
+                    } label: {
+                        Label("Create Program", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
+                }
             }
         }
         .sheet(isPresented: $showingPlanEditor) {
             if let plan = session.activePlan {
                 PlanMetadataEditorView(plan: plan)
+            }
+        }
+        .sheet(isPresented: $showingProgramCreation) {
+            TrainingPlanCreationView()
+        }
+        .sheet(item: $programToStart) { program in
+            ProgramStartView(
+                program: program,
+                onStarted: onOpenCalendar
+            )
+        }
+    }
+}
+
+private struct ProgramStartView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+
+    let program: TrainingPlan
+    let onStarted: () -> Void
+
+    @State private var startDate = Calendar.current.startOfDay(for: Date())
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Program") {
+                    Text(program.title)
+                        .font(.headline)
+
+                    if !program.summary.isEmpty {
+                        Text(program.summary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    LabeledContent("Length", value: "\(program.weeks.count) weeks")
+                }
+
+                Section("Add to Calendar") {
+                    DatePicker(
+                        "Start date",
+                        selection: $startDate,
+                        displayedComponents: .date
+                    )
+
+                    Text(
+                        "Starting the program makes it your active program and places its weeks into Calendar from this date."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Start Program")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Start") {
+                        session.usePlanTemplate(
+                            program.id,
+                            startDate: startDate
+                        )
+                        dismiss()
+                        onStarted()
+                    }
+                }
             }
         }
     }
@@ -471,8 +608,8 @@ struct TrainingPlanCreationView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Plan") {
-                    TextField("Plan name", text: $title)
+                Section("Program") {
+                    TextField("Program name", text: $title)
                     TextField(
                         "What are you training for?",
                         text: $summary,
@@ -580,7 +717,7 @@ struct TrainingPlanCreationView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("New Training Plan")
+            .navigationTitle("New Program")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -664,7 +801,7 @@ struct PlanMetadataEditorView: View {
 
                     if startDateEnabled {
                         DatePicker(
-                            "Plan starts",
+                            "Program starts",
                             selection: $startDate,
                             displayedComponents: .date
                         )
@@ -679,7 +816,7 @@ struct PlanMetadataEditorView: View {
 
                 Section("Goals") {
                     if goalStore.goals.isEmpty {
-                        Text("Create a Goal in Progress to connect it to this training plan.")
+                        Text("Create a Goal in Progress to connect it to this program.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
@@ -711,13 +848,13 @@ struct PlanMetadataEditorView: View {
 
                 Section {
                     Text(
-                        "Changing a plan creates a new local version. Shared-plan backend sync can use this version number later."
+                        "Changing a program creates a new local version. Shared-program sync can use this version number later."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Edit Plan")
+            .navigationTitle("Edit Program")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 selectedGoalIDs = Set(
