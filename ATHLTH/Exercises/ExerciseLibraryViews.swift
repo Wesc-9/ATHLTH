@@ -3,6 +3,20 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+private enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
+    case library
+    case mine
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .library: return "Library"
+        case .mine: return "My Exercises"
+        }
+    }
+}
+
 struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
@@ -14,6 +28,7 @@ struct ExerciseLibraryView: View {
     @State private var selectedBodyPart = "All"
     @State private var selectedEquipment = "All"
     @State private var showingCreateExercise = false
+    @State private var selectedSection: ExerciseLibrarySection = .library
 
     init(
         selectionTitle: String? = nil,
@@ -29,24 +44,59 @@ struct ExerciseLibraryView: View {
             bodyPart: selectedBodyPart,
             equipment: selectedEquipment
         )
+        .filter { entry in
+            switch selectedSection {
+            case .library:
+                return entry.source != .custom
+            case .mine:
+                return entry.source == .custom
+            }
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
+            Picker("Exercise source", selection: $selectedSection) {
+                ForEach(ExerciseLibrarySection.allCases) { section in
+                    Text(section.title).tag(section)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+
             filters
 
-            if library.isLoading && library.repDBExercises.isEmpty {
+            if selectedSection == .library &&
+                library.isLoading &&
+                library.repDBExercises.isEmpty {
                 ProgressView("Loading exercise library…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if results.isEmpty {
-                ContentUnavailableView(
-                    query.isEmpty ? "No exercises" : "No matches",
-                    systemImage: "dumbbell",
-                    description: Text(
-                        library.errorMessage ??
-                        "Try another search or create your own exercise."
+                if selectedSection == .mine && query.isEmpty {
+                    ContentUnavailableView {
+                        Label("No custom exercises yet", systemImage: "dumbbell")
+                    } description: {
+                        Text("Create your own exercise and it will appear here.")
+                    } actions: {
+                        Button("Create Exercise") {
+                            showingCreateExercise = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accent)
+                    }
+                } else {
+                    ContentUnavailableView(
+                        query.isEmpty ? "No exercises" : "No matches",
+                        systemImage: "dumbbell",
+                        description: Text(
+                            selectedSection == .library
+                                ? (library.errorMessage ?? "Try another search or filter.")
+                                : "Try another search or filter."
+                        )
                     )
-                )
+                }
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -71,11 +121,14 @@ struct ExerciseLibraryView: View {
         .navigationTitle(selectionTitle ?? "Exercises")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingCreateExercise = true
-                } label: {
-                    Image(systemName: "plus")
+            if selectedSection == .mine {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingCreateExercise = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Create exercise")
                 }
             }
         }
