@@ -317,6 +317,7 @@ struct TrophyProgressCard: View {
 
 struct TrophyCollectionView: View {
     @EnvironmentObject private var trophies: TrophyStore
+    @State private var selectedTab: TrophyHubTab = .collection
     @State private var filter: TrophyCollectionFilter = .all
 
     private var filtered: [TrophyProgressItem] {
@@ -331,23 +332,20 @@ struct TrophyCollectionView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                collectionHero
-                filters
+                trophyHero
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 14)
-                    ],
-                    spacing: 14
-                ) {
-                    ForEach(filtered) { trophy in
-                        NavigationLink {
-                            TrophyDetailView(trophyID: trophy.id)
-                        } label: {
-                            collectionCard(trophy)
-                        }
-                        .buttonStyle(.plain)
+                Picker("Trophy view", selection: $selectedTab) {
+                    ForEach(TrophyHubTab.allCases) { tab in
+                        Text(tab.title).tag(tab)
                     }
+                }
+                .pickerStyle(.segmented)
+
+                switch selectedTab {
+                case .collection:
+                    collectionContent
+                case .cabinet:
+                    cabinetContent
                 }
             }
             .padding()
@@ -357,7 +355,7 @@ struct TrophyCollectionView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var collectionHero: some View {
+    private var trophyHero: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 16) {
                 ZStack {
@@ -369,6 +367,7 @@ struct TrophyCollectionView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
+
                     ATHLTHMarkShape()
                         .fill(.white)
                         .frame(width: 40, height: 30)
@@ -376,7 +375,7 @@ struct TrophyCollectionView: View {
                 .frame(width: 76, height: 86)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("ATHLTH TROPHY COLLECTION")
+                    Text("ATHLTH TROPHIES")
                         .font(.caption2.bold())
                         .tracking(1.4)
                         .foregroundStyle(.secondary)
@@ -384,23 +383,104 @@ struct TrophyCollectionView: View {
                     Text("\(trophies.unlockedCount) unlocked")
                         .font(.title2.bold())
 
-                    Text("Your Core evolves with the work behind it.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        selectedTab == .collection
+                            ? "Track every trophy and your progress toward the next stage."
+                            : "The trophies you have chosen to show on your profile."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
             }
-
-            Text("Trophies are verified from Apple Health, ATHLTH training or completed Goals. They are not a copy of Activity awards: each series develops instead of creating endless duplicate medals.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .padding(18)
         .background(
             Color(.secondarySystemGroupedBackground),
             in: RoundedRectangle(cornerRadius: 24, style: .continuous)
         )
+    }
+
+    @ViewBuilder
+    private var collectionContent: some View {
+        filters
+
+        LazyVGrid(
+            columns: [
+                GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 14)
+            ],
+            spacing: 14
+        ) {
+            ForEach(filtered) { trophy in
+                NavigationLink {
+                    TrophyDetailView(trophyID: trophy.id)
+                } label: {
+                    collectionCard(trophy)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var cabinetContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Your Cabinet")
+                        .font(.headline)
+
+                    Text("Choose up to five unlocked trophies to feature.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text("\(trophies.showcaseIDs.count)/5")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            if trophies.showcaseTrophies.isEmpty {
+                ContentUnavailableView {
+                    Label("Your cabinet is empty", systemImage: "trophy")
+                } description: {
+                    Text("Open an unlocked trophy in Collection and choose Show in Trophy Cabinet.")
+                } actions: {
+                    Button("Browse Collection") {
+                        withAnimation(.snappy) {
+                            selectedTab = .collection
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 26)
+            } else {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 14)
+                    ],
+                    spacing: 14
+                ) {
+                    ForEach(trophies.showcaseTrophies) { trophy in
+                        NavigationLink {
+                            TrophyDetailView(trophyID: trophy.id)
+                        } label: {
+                            collectionCard(trophy)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Text("To change your cabinet, open a trophy and add or remove it from your profile showcase.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var filters: some View {
@@ -443,7 +523,11 @@ struct TrophyCollectionView: View {
 
                 Text(trophy.stageLabel)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(trophy.isUnlocked ? ATHLTHTheme.accent : .secondary)
+                    .foregroundStyle(
+                        trophy.isUnlocked
+                            ? ATHLTHTheme.accent
+                            : .secondary
+                    )
 
                 Label(
                     trophy.verificationSource.title,
@@ -467,6 +551,22 @@ struct TrophyCollectionView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+        }
+    }
+}
+
+private enum TrophyHubTab: String, CaseIterable, Identifiable {
+    case collection
+    case cabinet
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .collection:
+            return "Collection"
+        case .cabinet:
+            return "Cabinet"
         }
     }
 }
