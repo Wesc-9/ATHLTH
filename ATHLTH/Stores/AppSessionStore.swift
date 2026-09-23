@@ -30,13 +30,15 @@ final class AppSessionStore: ObservableObject {
     private var storeEntitlement: StoreSubscriptionEntitlement?
 
     init(
-        profile: UserProfile = Self.makeSignedOutProfile(),
+        profile: UserProfile? = nil,
         activePlan: TrainingPlan? = nil,
         savedRoutes: [TrainingRoute] = [],
         previewModeEnabled: Bool = false,
         defaults: UserDefaults = .standard
     ) {
-        self.profile = profile
+        let resolvedProfile = profile ?? Self.makeSignedOutProfile()
+
+        self.profile = resolvedProfile
         self.activePlan = activePlan ?? Self.loadActivePlan(from: defaults)
         self.planTemplates = Self.loadPlanTemplates(from: defaults)
         self.savedWorkoutTemplates = Self.loadSavedWorkoutTemplates(from: defaults)
@@ -45,7 +47,7 @@ final class AppSessionStore: ObservableObject {
             : savedRoutes
         self.previewModeEnabled = previewModeEnabled
         self.defaults = defaults
-        self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? profile.displayName
+        self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? resolvedProfile.displayName
 
         if let storedRole = defaults.string(forKey: "session.accountRole"),
            let role = AccountRole(rawValue: storedRole) {
