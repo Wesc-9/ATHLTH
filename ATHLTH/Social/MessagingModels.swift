@@ -30,6 +30,12 @@ enum MessageShareKind: String, Codable, CaseIterable, Identifiable, Hashable {
     }
 }
 
+enum DirectMessageRequestStatus: String, Codable, Hashable {
+    case pending
+    case accepted
+    case declined
+}
+
 struct DirectConversationRecord: Identifiable, Codable, Hashable {
     let id: UUID
     let userA: UUID
@@ -37,6 +43,9 @@ struct DirectConversationRecord: Identifiable, Codable, Hashable {
     let createdAt: Date
     let updatedAt: Date
     let lastMessageAt: Date?
+    let requestStatus: DirectMessageRequestStatus
+    let requestedBy: UUID?
+    let respondedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -45,6 +54,9 @@ struct DirectConversationRecord: Identifiable, Codable, Hashable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case lastMessageAt = "last_message_at"
+        case requestStatus = "request_status"
+        case requestedBy = "requested_by"
+        case respondedAt = "responded_at"
     }
 
     func otherUserID(for currentUserID: UUID) -> UUID? {
@@ -193,5 +205,16 @@ struct DirectMessageInsert: Encodable {
         case shareVersion = "share_version"
         case sourceObjectID = "source_object_id"
         case sourceOwnerID = "source_owner_id"
+    }
+}
+
+
+struct DirectMessageRequestResponseParams: Encodable {
+    let conversationID: UUID
+    let acceptRequest: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case conversationID = "conversation_id"
+        case acceptRequest = "accept_request"
     }
 }
