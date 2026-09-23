@@ -62,12 +62,14 @@ enum ATHLTHFeature: Hashable, CaseIterable {
     case backgroundHealthSync
     case advancedTrainingPlans
     case advancedRecovery
+    case aiTrainingPrograms
 
     var requiresATHLTHPlus: Bool {
         switch self {
         case .backgroundHealthSync,
              .advancedTrainingPlans,
-             .advancedRecovery:
+             .advancedRecovery,
+             .aiTrainingPrograms:
             return true
         }
     }
