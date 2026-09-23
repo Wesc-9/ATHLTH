@@ -27,6 +27,17 @@ struct DeleteAccountView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if session.signInMethod == .apple {
+                Section("Sign in with Apple") {
+                    Label("Remove Apple sign-in access after deletion", systemImage: "apple.logo")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("After ATHLTH deletes your account, open Settings → [your name] → Sign in with Apple → ATHLTH, then choose Delete to stop using Sign in with Apple for ATHLTH.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section {
                 Button(role: .destructive) {
                     showingConfirmation = true
