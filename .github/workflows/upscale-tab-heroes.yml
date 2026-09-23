@@ -1,0 +1,67 @@
+name: Upscale ATHLTH Tab Heroes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.3.4
+    paths:
+      - .github/upscale-heroes-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  upscale:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v1.3.4
+          fetch-depth: 0
+
+      - name: Upscale existing hero images
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          images=(
+            "ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg"
+            "ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg"
+            "ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg"
+            "ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg"
+          )
+
+          for image in "${images[@]}"; do
+            width="$(sips -g pixelWidth "$image" | awk '/pixelWidth/ {print $2}')"
+            height="$(sips -g pixelHeight "$image" | awk '/pixelHeight/ {print $2}')"
+            echo "$image: ${width}x${height}"
+
+            if [ "$width" -lt 1800 ]; then
+              tmp="${image%.jpg}.upscaled.jpg"
+              sips -s format jpeg -s formatOptions 94 --resampleWidth 1800 "$image" --out "$tmp"
+              mv "$tmp" "$image"
+
+              new_width="$(sips -g pixelWidth "$image" | awk '/pixelWidth/ {print $2}')"
+              new_height="$(sips -g pixelHeight "$image" | awk '/pixelHeight/ {print $2}')"
+              echo "Upscaled -> ${new_width}x${new_height}"
+            else
+              echo "Already high resolution; leaving unchanged."
+            fi
+          done
+
+      - name: Commit higher-resolution hero assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet --             ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg             ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg             ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg             ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg
+          then
+            echo "No hero image changes required."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add             ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg             ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg             ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg             ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg
+          git commit -m "Upscale tab hero images for high-resolution displays"
+          git push origin HEAD:release/v1.3.4
