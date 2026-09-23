@@ -164,6 +164,82 @@ final class StrengthWorkoutStore: ObservableObject {
         return records
     }
 
+    var repPersonalRecords: [StrengthRepPersonalRecord] {
+        struct Candidate {
+            let exerciseName: String
+            let weightKilograms: Double
+            let reps: Int
+            let date: Date
+            let workoutID: UUID
+        }
+
+        var bestByExerciseAndReps: [String: Candidate] = [:]
+
+        for workout in workoutHistory where workout.isFinished {
+            for exercise in workout.exercises {
+                let exerciseName = exercise.exercise.name
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !exerciseName.isEmpty else { continue }
+
+                let normalizedExercise = exerciseName.lowercased()
+
+                for set in exercise.sets {
+                    guard set.isCompleted,
+                          let weight = set.completedWeightKilograms,
+                          let reps = set.completedReps,
+                          weight > 0,
+                          reps > 0,
+                          reps <= 20
+                    else {
+                        continue
+                    }
+
+                    let date =
+                        set.completedAt ??
+                        workout.endedAt ??
+                        workout.startedAt
+                    let key = "\(normalizedExercise)|\(reps)"
+                    let candidate = Candidate(
+                        exerciseName: exerciseName,
+                        weightKilograms: weight,
+                        reps: reps,
+                        date: date,
+                        workoutID: workout.id
+                    )
+
+                    if let existing = bestByExerciseAndReps[key] {
+                        if weight > existing.weightKilograms ||
+                            (
+                                weight == existing.weightKilograms &&
+                                date > existing.date
+                            ) {
+                            bestByExerciseAndReps[key] = candidate
+                        }
+                    } else {
+                        bestByExerciseAndReps[key] = candidate
+                    }
+                }
+            }
+        }
+
+        return bestByExerciseAndReps.values
+            .map {
+                StrengthRepPersonalRecord(
+                    exerciseName: $0.exerciseName,
+                    weightKilograms: $0.weightKilograms,
+                    reps: $0.reps,
+                    date: $0.date,
+                    sourceWorkoutID: $0.workoutID
+                )
+            }
+            .sorted {
+                if $0.date == $1.date {
+                    return $0.weightKilograms > $1.weightKilograms
+                }
+                return $0.date > $1.date
+            }
+    }
+
     var currentExercise: StrengthExerciseLog? {
         guard
             let workout = activeWorkout,
