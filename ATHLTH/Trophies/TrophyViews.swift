@@ -167,7 +167,7 @@ struct TrophyCabinetSection: View {
                 } label: {
                     Text("View Collection")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
             }
 
@@ -233,7 +233,7 @@ struct TrophyProgressCard: View {
                 } label: {
                     Text("See All")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
             }
 
@@ -279,7 +279,7 @@ struct TrophyProgressCard: View {
 
                     Text("\(Int((trophy.progress * 100).rounded()))%")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
 
                 GeometryReader { proxy in
@@ -287,7 +287,7 @@ struct TrophyProgressCard: View {
                         Capsule()
                             .fill(Color.black.opacity(0.055))
                         Capsule()
-                            .fill(.green)
+                            .fill(ATHLTHTheme.accent)
                             .frame(width: proxy.size.width * trophy.progress)
                     }
                 }
@@ -364,7 +364,7 @@ struct TrophyCollectionView: View {
                     ATHLTHTrophyPlateShape()
                         .fill(
                             LinearGradient(
-                                colors: [.black, .green.opacity(0.72)],
+                                colors: [.black, ATHLTHTheme.accent.opacity(0.72)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -419,7 +419,7 @@ struct TrophyCollectionView: View {
                             .padding(.vertical, 8)
                             .background(
                                 filter == option
-                                    ? Color.green
+                                    ? ATHLTHTheme.accent
                                     : Color(.secondarySystemGroupedBackground),
                                 in: Capsule()
                             )
@@ -443,7 +443,7 @@ struct TrophyCollectionView: View {
 
                 Text(trophy.stageLabel)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(trophy.isUnlocked ? .green : .secondary)
+                    .foregroundStyle(trophy.isUnlocked ? ATHLTHTheme.accent : .secondary)
 
                 Label(
                     trophy.verificationSource.title,
@@ -455,7 +455,7 @@ struct TrophyCollectionView: View {
 
             if !trophy.isComplete {
                 ProgressView(value: trophy.progress)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
             }
         }
         .padding(14)
@@ -505,7 +505,7 @@ struct TrophyDetailView: View {
                                 Text(trophy.stageLabel.uppercased())
                                     .font(.caption.bold())
                                     .tracking(1.2)
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
 
                                 Text(trophy.subtitle)
                                     .font(.subheadline)
@@ -537,7 +537,7 @@ struct TrophyDetailView: View {
                                 .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(trophies.isShowcased(trophy.id) ? .secondary : .green)
+                            .tint(trophies.isShowcased(trophy.id) ? .secondary : ATHLTHTheme.accent)
                             .disabled(
                                 !trophies.isShowcased(trophy.id) &&
                                 trophies.showcaseIDs.count >= 5
@@ -587,11 +587,11 @@ struct TrophyDetailView: View {
                         unlockedAt.formatted(.dateTime.day().month(.wide).year()),
                         systemImage: "checkmark.seal.fill"
                     )
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
                 }
             } else {
                 ProgressView(value: trophy.progress)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
 
                 HStack {
                     Text("\(Int((trophy.progress * 100).rounded()))%")
@@ -634,7 +634,7 @@ struct TrophyDetailView: View {
                 systemImage: trophy.verificationSource.systemImage
             )
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.green)
+            .foregroundStyle(ATHLTHTheme.accent)
 
             Text(verificationText(trophy.verificationSource))
                 .font(.caption)
