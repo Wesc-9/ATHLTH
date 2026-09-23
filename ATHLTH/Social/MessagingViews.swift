@@ -453,25 +453,42 @@ struct DirectMessageThreadView: View {
         switch message.attachmentKind {
         case .workout:
             if let workout = message.decodeSnapshot(PlannedSession.self) {
-                session.saveSharedWorkout(workout)
+                session.saveSharedWorkout(
+                    workout,
+                    sourceOwnerID: message.sourceOwnerID,
+                    sourceSessionID: message.sourceObjectID
+                )
                 savedFeedback = "\(workout.title) was saved to your workout library."
             }
 
         case .trainingPlan:
             if let plan = message.decodeSnapshot(TrainingPlan.self) {
-                session.saveSharedPlan(plan)
+                session.saveSharedPlan(
+                    plan,
+                    sourceOwnerID: message.sourceOwnerID,
+                    sourcePlanID: message.sourceObjectID,
+                    sourceVersion: message.shareVersion
+                )
                 savedFeedback = "\(plan.title) was saved as your own private copy."
             }
 
         case .runningWorkout:
             if let workout = message.decodeSnapshot(RunningWorkoutTemplate.self) {
-                _ = runningLibrary.duplicate(workout)
+                _ = runningLibrary.saveShared(
+                    workout,
+                    sourceOwnerID: message.sourceOwnerID,
+                    sourceWorkoutID: message.sourceObjectID
+                )
                 savedFeedback = "\(workout.title) was saved to Running Workouts."
             }
 
         case .route:
             if let route = message.decodeSnapshot(TrainingRoute.self) {
-                session.saveSharedRoute(route)
+                session.saveSharedRoute(
+                    route,
+                    sourceOwnerID: message.sourceOwnerID,
+                    sourceRouteID: message.sourceObjectID
+                )
                 savedFeedback = "\(route.title) was saved as a private route."
             }
 
@@ -492,6 +509,20 @@ private struct MessageBubble: View {
 
     private var isMine: Bool {
         message.senderID == currentUserID
+    }
+
+    private var provenanceText: String {
+        if let sourceOwnerID = message.sourceOwnerID {
+            if sourceOwnerID == currentUserID {
+                return "Created by you"
+            }
+            if sourceOwnerID == friend.userID {
+                return "Created by \(friend.resolvedName)"
+            }
+            return "Original creator preserved"
+        }
+
+        return isMine ? "Shared by you" : "Shared by \(friend.resolvedName)"
     }
 
     var body: some View {
@@ -522,7 +553,7 @@ private struct MessageBubble: View {
                                 .foregroundStyle(.secondary)
                         }
 
-                        Text(isMine ? "Shared by you" : "Shared by \(friend.resolvedName)")
+                        Text(provenanceText)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
 
@@ -674,8 +705,8 @@ struct MessageSharePicker: View {
                             title: workout.title,
                             subtitle: workoutSubtitle(workout),
                             snapshot: workout,
-                            sourceObjectID: workout.id,
-                            sourceOwnerID: session.profile.userID
+                            sourceObjectID: workout.sharedSourceSessionID ?? workout.id,
+                            sourceOwnerID: workout.sharedSourceOwnerID ?? session.profile.userID
                         )
                     }
                 }
@@ -701,9 +732,9 @@ struct MessageSharePicker: View {
                             title: plan.title,
                             subtitle: "\(plan.weeks.count) weeks · snapshot v\(plan.version)",
                             snapshot: plan,
-                            sourceObjectID: plan.id,
-                            sourceOwnerID: plan.ownerID,
-                            shareVersion: plan.version
+                            sourceObjectID: plan.sharedSourcePlanID ?? plan.id,
+                            sourceOwnerID: plan.sharedSourceOwnerID ?? plan.ownerID,
+                            shareVersion: plan.sharedSourceVersion ?? plan.version
                         )
                     }
                 }
@@ -728,8 +759,8 @@ struct MessageSharePicker: View {
                             title: workout.title,
                             subtitle: workout.summary,
                             snapshot: workout,
-                            sourceObjectID: workout.id,
-                            sourceOwnerID: session.profile.userID
+                            sourceObjectID: workout.sharedSourceWorkoutID ?? workout.id,
+                            sourceOwnerID: workout.sharedSourceOwnerID ?? session.profile.userID
                         )
                     }
                 }
@@ -755,8 +786,8 @@ struct MessageSharePicker: View {
                             title: route.title,
                             subtitle: routeSubtitle(safeRoute),
                             snapshot: safeRoute,
-                            sourceObjectID: route.id,
-                            sourceOwnerID: route.ownerID
+                            sourceObjectID: route.sharedSourceRouteID ?? route.id,
+                            sourceOwnerID: route.sharedSourceOwnerID ?? route.ownerID
                         )
                     }
                 }
@@ -852,9 +883,29 @@ struct MessageSharePicker: View {
                 sequence: index
             )
         }
+        copy.distanceKilometers = routeDistanceKilometers(copy.coordinates)
         copy.startName = nil
         copy.endName = nil
         return copy
+    }
+
+    private func routeDistanceKilometers(
+        _ coordinates: [RouteCoordinate]
+    ) -> Double {
+        guard coordinates.count > 1 else { return 0 }
+
+        return zip(coordinates, coordinates.dropFirst())
+            .reduce(0) { total, pair in
+                let start = CLLocation(
+                    latitude: pair.0.latitude,
+                    longitude: pair.0.longitude
+                )
+                let end = CLLocation(
+                    latitude: pair.1.latitude,
+                    longitude: pair.1.longitude
+                )
+                return total + start.distance(from: end)
+            } / 1_000
     }
 
     private func trimRoute(
