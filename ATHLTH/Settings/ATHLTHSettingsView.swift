@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 struct ATHLTHSettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -287,6 +288,27 @@ struct ATHLTHSettingsView: View {
                                     .disabled(!session.canAccess(.backgroundHealthSync))
                             }
                             .opacity(session.canAccess(.backgroundHealthSync) ? 1 : 0.64)
+
+                            SettingsDivider()
+
+                            PremiumSettingsRow(
+                                icon: health.backgroundSyncError == nil
+                                    ? "arrow.triangle.2.circlepath"
+                                    : "exclamationmark.triangle",
+                                iconTint: health.backgroundSyncError == nil
+                                    ? ATHLTHTheme.accentDeep
+                                    : .orange,
+                                title: "Sync status",
+                                subtitle: healthSyncStatusText
+                            ) {
+                                Text(health.backgroundSyncError == nil ? "Ready" : "Issue")
+                                    .font(.subheadline)
+                                    .foregroundStyle(
+                                        health.backgroundSyncError == nil
+                                            ? ATHLTHTheme.mutedText
+                                            : Color.orange
+                                    )
+                            }
                         }
                     }
 
@@ -373,7 +395,7 @@ struct ATHLTHSettingsView: View {
                                 PremiumSettingsRow(
                                     icon: "figure.strengthtraining.traditional",
                                     title: "Training",
-                                    subtitle: "Workout capture, cues and automatic publishing"
+                                    subtitle: "Workout device, strength tracking and publishing"
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
@@ -389,7 +411,7 @@ struct ATHLTHSettingsView: View {
                                 PremiumSettingsRow(
                                     icon: "bell",
                                     title: "Notifications",
-                                    subtitle: "Workouts, friends, challenges and messages"
+                                    subtitle: notificationSummary
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
@@ -715,6 +737,19 @@ struct ATHLTHSettingsView: View {
         return visibility.title
     }
 
+    private var notificationSummary: String {
+        switch notifications.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return "System notifications allowed · choose what ATHLTH sends"
+        case .denied:
+            return "System notifications are disabled in iOS Settings"
+        case .notDetermined:
+            return "System notification permission has not been requested"
+        @unknown default:
+            return "Review notification preferences"
+        }
+    }
+
     private var healthSyncStatusText: String {
         if let error = health.backgroundSyncError, !error.isEmpty {
             return "Background sync needs attention"
@@ -930,12 +965,12 @@ private struct ATHLTHTrainingSettingsView: View {
                     }
                 }
 
-                Toggle("Auto-pause outdoor workouts", isOn: $settings.autoPauseOutdoorWorkouts)
-                Toggle("Audio cues", isOn: $settings.audioCuesEnabled)
-                Toggle("Haptic cues on Apple Watch", isOn: $settings.hapticCuesEnabled)
+                Text("Only settings that are connected to the active workout flow are shown here. Auto-pause, audio cues and Watch haptic controls will return when those workout-engine features are implemented.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
-            Section("Social") {
+            Section("Completed workouts") {
                 Toggle(
                     "Publish completed workouts automatically",
                     isOn: $settings.autoPublishCompletedWorkouts
@@ -959,19 +994,66 @@ private struct ATHLTHTrainingSettingsView: View {
 }
 
 private struct ATHLTHNotificationSettingsView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
     var body: some View {
         Form {
-            Section("Notifications") {
-                Toggle("Workout reminders", isOn: $settings.workoutRemindersEnabled)
+            Section("System permission") {
+                LabeledContent("iOS notifications", value: authorizationTitle)
+
+                switch notifications.authorizationStatus {
+                case .notDetermined:
+                    Button("Allow Notifications") {
+                        Task {
+                            await notifications.requestSystemNotificationPermission()
+                        }
+                    }
+                case .denied:
+                    Button("Open iOS Notification Settings") {
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                            openURL(url)
+                        }
+                    }
+                default:
+                    EmptyView()
+                }
+            }
+
+            Section("ATHLTH alerts") {
+                Toggle("Workout updates", isOn: $settings.workoutRemindersEnabled)
                 Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
                 Toggle("Challenges", isOn: $settings.challengeNotificationsEnabled)
                 Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
+
+                Text("These switches control system alerts. Events can still appear in the ATHLTH notification center so you do not lose your activity history.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await notifications.refreshAuthorizationStatus()
+            await notifications.reconcileSystemPreferences()
+        }
+        .onChange(of: settings.challengeNotificationsEnabled) { _, _ in
+            Task {
+                await notifications.reconcileSystemPreferences()
+            }
+        }
+    }
+
+    private var authorizationTitle: String {
+        switch notifications.authorizationStatus {
+        case .notDetermined: return "Not requested"
+        case .denied: return "Disabled"
+        case .authorized: return "Allowed"
+        case .provisional: return "Provisional"
+        case .ephemeral: return "Temporary"
+        @unknown default: return "Unknown"
+        }
     }
 }
 
@@ -982,10 +1064,13 @@ private struct ATHLTHPrivacyPreferencesView: View {
     var body: some View {
         Form {
             Section("Sharing defaults") {
-                Toggle("Show “Training now” status", isOn: $settings.shareTrainingPresence)
                 Toggle("Share routes by default", isOn: $settings.shareRoutesByDefault)
                 Toggle("Hide route start/end when sharing", isOn: $settings.hideRouteStartAndEnd)
                 Toggle("Share heart rate by default", isOn: $settings.shareHeartRateByDefault)
+
+                Text("Profile visibility and “Training now” presence are managed in Social Privacy so there is one source of truth across devices.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Social") {
