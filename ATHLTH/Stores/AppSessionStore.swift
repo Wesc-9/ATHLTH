@@ -748,8 +748,13 @@ final class AppSessionStore: ObservableObject {
         persistPlanTemplates()
     }
 
-    func saveSharedPlan(_ source: TrainingPlan) {
-        let copy = TrainingPlan(
+    func saveSharedPlan(
+        _ source: TrainingPlan,
+        sourceOwnerID: UUID? = nil,
+        sourcePlanID: UUID? = nil,
+        sourceVersion: Int? = nil
+    ) {
+        var copy = TrainingPlan(
             id: UUID(),
             ownerID: profile.userID,
             title: source.title,
@@ -764,13 +769,23 @@ final class AppSessionStore: ObservableObject {
             updatedAt: Date(),
             startDate: nil
         )
+        copy.sharedSourceOwnerID =
+            source.sharedSourceOwnerID ?? sourceOwnerID ?? source.ownerID
+        copy.sharedSourcePlanID =
+            source.sharedSourcePlanID ?? sourcePlanID ?? source.id
+        copy.sharedSourceVersion =
+            source.sharedSourceVersion ?? sourceVersion ?? source.version
 
         planTemplates.insert(copy, at: 0)
         persistPlanTemplates()
     }
 
-    func saveSharedWorkout(_ source: PlannedSession) {
-        let copy = PlannedSession(
+    func saveSharedWorkout(
+        _ source: PlannedSession,
+        sourceOwnerID: UUID? = nil,
+        sourceSessionID: UUID? = nil
+    ) {
+        var copy = PlannedSession(
             id: UUID(),
             title: source.title,
             kind: source.kind,
@@ -783,6 +798,10 @@ final class AppSessionStore: ObservableObject {
             notes: source.notes,
             runningWorkout: source.runningWorkout
         )
+        copy.sharedSourceOwnerID =
+            source.sharedSourceOwnerID ?? sourceOwnerID
+        copy.sharedSourceSessionID =
+            source.sharedSourceSessionID ?? sourceSessionID ?? source.id
 
         savedWorkoutTemplates.insert(copy, at: 0)
         persistSavedWorkoutTemplates()
@@ -793,8 +812,12 @@ final class AppSessionStore: ObservableObject {
         persistSavedWorkoutTemplates()
     }
 
-    func saveSharedRoute(_ source: TrainingRoute) {
-        let copy = TrainingRoute(
+    func saveSharedRoute(
+        _ source: TrainingRoute,
+        sourceOwnerID: UUID? = nil,
+        sourceRouteID: UUID? = nil
+    ) {
+        var copy = TrainingRoute(
             id: UUID(),
             ownerID: profile.userID,
             title: source.title,
@@ -809,6 +832,10 @@ final class AppSessionStore: ObservableObject {
             expectedTravelTimeSeconds: source.expectedTravelTimeSeconds,
             routeSource: "shared"
         )
+        copy.sharedSourceOwnerID =
+            source.sharedSourceOwnerID ?? sourceOwnerID ?? source.ownerID
+        copy.sharedSourceRouteID =
+            source.sharedSourceRouteID ?? sourceRouteID ?? source.id
 
         savedRoutes.insert(copy, at: 0)
     }
