@@ -641,7 +641,11 @@ final class SocialStore: ObservableObject {
         visibility: ProfileVisibility = .friends
     ) async {
         guard let endedAt = workout.endedAt,
-              endedAt >= activationDate
+              endedAt >= activationDate,
+              let configuredVisibility = privacy.flatMap({
+                  ProfileVisibility(rawValue: $0.recentActivityVisibility)
+              }),
+              configuredVisibility != .privateOnly
         else {
             return
         }
@@ -660,7 +664,7 @@ final class SocialStore: ObservableObject {
                     "workout_id": workout.id.uuidString,
                     "kind": "strength"
                 ],
-                visibility: visibility
+                visibility: configuredVisibility
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -671,7 +675,14 @@ final class SocialStore: ObservableObject {
         result: WatchWorkoutResult,
         visibility: ProfileVisibility = .friends
     ) async {
-        guard result.endedAt >= activationDate else { return }
+        guard result.endedAt >= activationDate,
+              let configuredVisibility = privacy.flatMap({
+                  ProfileVisibility(rawValue: $0.recentActivityVisibility)
+              }),
+              configuredVisibility != .privateOnly
+        else {
+            return
+        }
 
         let distance: String
         if result.distanceMeters > 0 {
@@ -690,7 +701,7 @@ final class SocialStore: ObservableObject {
                     "workout_id": result.id.uuidString,
                     "kind": result.kind.rawValue
                 ],
-                visibility: visibility
+                visibility: configuredVisibility
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -701,7 +712,13 @@ final class SocialStore: ObservableObject {
         _ records: [HealthPersonalRecord],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard privacy?.shareRunningPRs ?? false else { return }
+        guard let configuredVisibility = privacy.flatMap({
+            ProfileVisibility(rawValue: $0.runningPRsVisibility)
+        }),
+        configuredVisibility != .privateOnly
+        else {
+            return
+        }
 
         for record in records
         where record.date >= activationDate &&
@@ -717,10 +734,11 @@ final class SocialStore: ObservableObject {
                     subtitle: record.formattedValue,
                     metadata: [
                         "record_kind": record.kind.rawValue,
+                        "pr_type": "running",
                         "verification": "apple_health",
                         "value": String(record.value)
                     ],
-                    visibility: visibility
+                    visibility: configuredVisibility
                 )
             } catch {
                 errorMessage = error.localizedDescription
@@ -736,7 +754,13 @@ final class SocialStore: ObservableObject {
         _ records: [StrengthRepPersonalRecord],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard privacy?.shareStrengthPRs ?? false else { return }
+        guard let configuredVisibility = privacy.flatMap({
+            ProfileVisibility(rawValue: $0.strengthPRsVisibility)
+        }),
+        configuredVisibility != .privateOnly
+        else {
+            return
+        }
 
         for record in records where record.date >= activationDate {
             do {
@@ -753,10 +777,11 @@ final class SocialStore: ObservableObject {
                         "exercise": record.exerciseName,
                         "reps": String(record.reps),
                         "weight_kg": String(record.weightKilograms),
+                        "pr_type": "strength",
                         "verification": "manual",
                         "source_workout_id": record.sourceWorkoutID.uuidString
                     ],
-                    visibility: visibility
+                    visibility: configuredVisibility
                 )
             } catch {
                 errorMessage = error.localizedDescription
@@ -772,7 +797,13 @@ final class SocialStore: ObservableObject {
         _ unlocks: [TrophyUnlockRecord],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard privacy?.shareTrophyCabinet ?? false else { return }
+        guard let configuredVisibility = privacy.flatMap({
+            ProfileVisibility(rawValue: $0.trophyCabinetVisibility)
+        }),
+        configuredVisibility != .privateOnly
+        else {
+            return
+        }
 
         for unlock in unlocks where unlock.unlockedAt >= activationDate {
             do {
@@ -785,7 +816,7 @@ final class SocialStore: ObservableObject {
                         "trophy_id": unlock.trophyID,
                         "rarity": unlock.rarity.title
                     ],
-                    visibility: visibility
+                    visibility: configuredVisibility
                 )
             } catch {
                 errorMessage = error.localizedDescription
@@ -797,7 +828,13 @@ final class SocialStore: ObservableObject {
         _ goals: [ATHLTHGoal],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard privacy?.shareGoals ?? false else { return }
+        guard let configuredVisibility = privacy.flatMap({
+            ProfileVisibility(rawValue: $0.goalsVisibility)
+        }),
+        configuredVisibility != .privateOnly
+        else {
+            return
+        }
 
         for goal in goals {
             guard let completedAt = goal.completedAt,
@@ -813,7 +850,7 @@ final class SocialStore: ObservableObject {
                     title: "Goal completed",
                     subtitle: goal.title,
                     metadata: ["goal_id": goal.id.uuidString],
-                    visibility: visibility
+                    visibility: configuredVisibility
                 )
             } catch {
                 errorMessage = error.localizedDescription
@@ -825,7 +862,14 @@ final class SocialStore: ObservableObject {
         _ challenges: [ATHLTHChallenge],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard let currentUserID else { return }
+        guard let currentUserID,
+              let configuredVisibility = privacy.flatMap({
+                  ProfileVisibility(rawValue: $0.recentActivityVisibility)
+              }),
+              configuredVisibility != .privateOnly
+        else {
+            return
+        }
 
         for challenge in challenges
         where challenge.creatorID == currentUserID &&
@@ -840,7 +884,7 @@ final class SocialStore: ObservableObject {
                         "challenge_id": challenge.id.uuidString,
                         "sport": challenge.sport.rawValue
                     ],
-                    visibility: visibility
+                    visibility: configuredVisibility
                 )
             } catch {
                 errorMessage = error.localizedDescription
