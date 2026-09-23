@@ -470,6 +470,52 @@ struct ATHLTHTrainView: View {
             .padding(.top, 10)
         }
 
+        if !session.savedWorkoutTemplates.isEmpty {
+            ATHLTHCard {
+                ATHLTHSectionHeader(
+                    title: "Saved Workouts",
+                    actionTitle: "From you & friends"
+                )
+
+                VStack(spacing: 13) {
+                    ForEach(session.savedWorkoutTemplates.prefix(4)) { workout in
+                        HStack(spacing: 12) {
+                            Image(systemName: workout.kind.systemImage)
+                                .foregroundStyle(ATHLTHTheme.accent)
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 11)
+                                )
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(workout.title)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(todaySessionSummary(workout))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            if workout.kind == .strength {
+                                Button("Start") {
+                                    selectedStrengthSession = workout
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            } else {
+                                Text("Saved")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 10)
+            }
+        }
+
         ATHLTHCard {
             HStack(spacing: 10) {
                 Text("Routes & Challenges")
