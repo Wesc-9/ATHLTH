@@ -2933,45 +2933,50 @@ struct ATHLTHProfileView: View {
                                         .padding(.top, 2)
                                 }
 
-                                Label(
-                                    session.profile.presence.state == .training
-                                        ? "Training now"
-                                        : "Ready to train",
-                                    systemImage: session.profile.presence.state == .training
-                                        ? "figure.run"
-                                        : "circle.fill"
-                                )
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.accent)
-                                .padding(.top, 3)
-
-                                HStack(spacing: 6) {
+                                if settings.showTrainingStatusOnProfile {
                                     Label(
-                                        trainingIdentityTitle,
-                                        systemImage: trainingIdentityIcon
+                                        session.profile.presence.state == .training
+                                            ? "Training now"
+                                            : "Ready to train",
+                                        systemImage: session.profile.presence.state == .training
+                                            ? "figure.run"
+                                            : "circle.fill"
                                     )
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 5)
-                                    .background(
-                                        ATHLTHTheme.accentSoft,
-                                        in: Capsule()
-                                    )
-
-                                    if let secondaryIdentityTitle {
-                                        Text(secondaryIdentityTitle)
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 5)
-                                            .background(
-                                                Color.primary.opacity(0.055),
-                                                in: Capsule()
-                                            )
-                                    }
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accent)
+                                    .padding(.top, 3)
                                 }
-                                .padding(.top, 2)
+
+                                if settings.showTrainingFocusOnProfile,
+                                   let focus = session.onboardingProfile?.trainingFocus {
+                                    HStack(spacing: 6) {
+                                        Label(
+                                            focus.title,
+                                            systemImage: focus.systemImage
+                                        )
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 5)
+                                        .background(
+                                            ATHLTHTheme.accentSoft,
+                                            in: Capsule()
+                                        )
+
+                                        if let currentGoal = session.onboardingProfile?.currentGoal {
+                                            Text(currentGoal.type.title)
+                                                .font(.caption2.weight(.semibold))
+                                                .foregroundStyle(.secondary)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 5)
+                                                .background(
+                                                    Color.primary.opacity(0.055),
+                                                    in: Capsule()
+                                                )
+                                        }
+                                    }
+                                    .padding(.top, 2)
+                                }
                             }
 
                             Spacer()
@@ -2993,7 +2998,12 @@ struct ATHLTHProfileView: View {
                         }
                     }
 
-                    if let primaryGoal = goalStore.primaryGoal {
+                    if settings.shouldShowProfileSetupPrompt {
+                        profileSetupPrompt
+                    }
+
+                    if settings.showCurrentGoalOnProfile,
+                       let primaryGoal = goalStore.primaryGoal {
                         NavigationLink {
                             GoalDetailView(goalID: primaryGoal.id)
                         } label: {
@@ -3002,14 +3012,20 @@ struct ATHLTHProfileView: View {
                         .buttonStyle(.plain)
                     }
 
-                    profileStatsRow
+                    if settings.showProfileStatsOnProfile {
+                        profileStatsRow
+                    }
 
-                    ProfilePerformanceSection(
-                        stats: performanceStats,
-                        isLoading: performanceStatsLoading
-                    )
+                    if settings.showPerformanceStatsOnProfile {
+                        ProfilePerformanceSection(
+                            stats: performanceStats,
+                            isLoading: performanceStatsLoading
+                        )
+                    }
 
-                    WorkoutHistoryPreviewSection()
+                    if settings.showWorkoutHistoryOnProfile {
+                        WorkoutHistoryPreviewSection()
+                    }
 
                 }
                 .padding()
@@ -3052,56 +3068,56 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    private var trainingIdentityTitle: String {
-        let interests = session.onboardingProfile?.interests ?? []
+    private var profileSetupPrompt: some View {
+        ATHLTHCard {
+            HStack(alignment: .top, spacing: 13) {
+                Image(systemName: "person.crop.circle.badge.checkmark")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accent)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    )
 
-        if interests.contains(.running) && interests.contains(.strength) {
-            return "Hybrid"
-        }
-        if interests.contains(.running) {
-            return "Runner"
-        }
-        if interests.contains(.strength) {
-            return "Strength"
-        }
-        if interests.contains(.walking) {
-            return "Walker"
-        }
-        if interests.contains(.recovery) {
-            return "Recovery focused"
-        }
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Complete your profile")
+                        .font(.headline)
 
-        return "Active"
-    }
+                    Text("Choose your training focus, what you want on your profile, and what other people are allowed to see.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-    private var trainingIdentityIcon: String {
-        let interests = session.onboardingProfile?.interests ?? []
+                    NavigationLink {
+                        ATHLTHProfileSetupView()
+                    } label: {
+                        Text("Set up profile")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .padding(.top, 3)
+                    }
+                    .buttonStyle(.plain)
+                }
 
-        if interests.contains(.running) && interests.contains(.strength) {
-            return "bolt.fill"
-        }
-        if interests.contains(.running) {
-            return "figure.run"
-        }
-        if interests.contains(.strength) {
-            return "dumbbell.fill"
-        }
-        if interests.contains(.walking) {
-            return "figure.walk"
-        }
-        if interests.contains(.recovery) {
-            return "leaf.fill"
-        }
+                Spacer()
 
-        return "figure.mixed.cardio"
-    }
-
-    private var secondaryIdentityTitle: String? {
-        guard let currentGoal = session.onboardingProfile?.currentGoal else {
-            return nil
+                Button {
+                    settings.dismissProfileSetupPrompt()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            Color.primary.opacity(0.045),
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss profile setup")
+            }
         }
-
-        return currentGoal.type.title
     }
 
     private var completedGoalCount: Int {
