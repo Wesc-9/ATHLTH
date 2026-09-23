@@ -784,36 +784,63 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
-        let fiveKCandidates = workouts.filter {
-            guard $0.workoutActivityType == .running,
-                  let distance = $0.totalDistance?.doubleValue(for: .meter())
-            else {
-                return false
-            }
+        let timedRunningTargets: [(HealthPersonalRecordKind, Double)] = [
+            (.fastest1K, 1_000),
+            (.fastestMile, 1_609.344),
+            (.fastest5K, 5_000),
+            (.fastest10K, 10_000),
+            (.fastestHalfMarathon, 21_097.5),
+            (.fastestMarathon, 42_195)
+        ]
 
-            return distance >= 5_000
-        }
+        var fastestRunningRecords:
+            [HealthPersonalRecordKind: (duration: TimeInterval, date: Date)] = [:]
 
-        var fastestFiveK: (duration: TimeInterval, date: Date)?
-
-        for workout in fiveKCandidates {
-            guard let route = try? await fetchRoute(for: workout),
-                  let duration = fastestSegmentDuration(in: route, targetDistance: 5_000)
+        for workout in workouts where workout.workoutActivityType == .running {
+            guard let reportedDistance =
+                    workout.totalDistance?.doubleValue(for: .meter()),
+                  reportedDistance >= 1_000,
+                  let route = try? await fetchRoute(for: workout),
+                  route.count >= 2
             else {
                 continue
             }
 
-            if fastestFiveK == nil || duration < fastestFiveK!.duration {
-                fastestFiveK = (duration, workout.startDate)
+            for (kind, targetDistance) in timedRunningTargets
+            where reportedDistance >= targetDistance {
+                guard let duration = fastestSegmentDuration(
+                    in: route,
+                    targetDistance: targetDistance
+                ) else {
+                    continue
+                }
+
+                if let existing = fastestRunningRecords[kind] {
+                    if duration < existing.duration {
+                        fastestRunningRecords[kind] = (
+                            duration,
+                            workout.startDate
+                        )
+                    }
+                } else {
+                    fastestRunningRecords[kind] = (
+                        duration,
+                        workout.startDate
+                    )
+                }
             }
         }
 
-        if let fastestFiveK {
+        for (kind, _) in timedRunningTargets {
+            guard let record = fastestRunningRecords[kind] else {
+                continue
+            }
+
             records.append(
                 HealthPersonalRecord(
-                    kind: .fastest5K,
-                    value: fastestFiveK.duration,
-                    date: fastestFiveK.date
+                    kind: kind,
+                    value: record.duration,
+                    date: record.date
                 )
             )
         }
