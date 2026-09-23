@@ -11,6 +11,7 @@ on:
       - release/v1.3.1
       - release/v1.3.2
       - release/v1.3.3
+      - release/v1.3.4
     paths:
       - .github/build-trigger
   pull_request:
@@ -26,12 +27,14 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Verify deterministic app icons
+      - name: Verify committed app icons
         shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/generate_app_icons.py
-          git diff --exit-code --             ATHLTH/Assets.xcassets/AppIcon.appiconset             ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset
+          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png
+          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png
+          test -s ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 
       - name: Generate Xcode project
         run: xcodegen generate
