@@ -173,7 +173,7 @@ struct ExerciseLibraryView: View {
         .padding(.horizontal, 11)
         .padding(.vertical, 7)
         .background(
-            active ? Color.green : Color(.secondarySystemGroupedBackground),
+            active ? ATHLTHTheme.accent : Color(.secondarySystemGroupedBackground),
             in: Capsule()
         )
     }
@@ -192,10 +192,10 @@ struct ExerciseLibraryView: View {
                     if entry.source == .custom {
                         Text("CUSTOM")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)
-                            .background(.green.opacity(0.10), in: Capsule())
+                            .background(ATHLTHTheme.accent.opacity(0.10), in: Capsule())
                     }
                 }
 
@@ -297,9 +297,9 @@ struct ExerciseDetailView: View {
                             HStack(alignment: .top, spacing: 10) {
                                 Text("\(index + 1)")
                                     .font(.caption.bold())
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
                                     .frame(width: 24, height: 24)
-                                    .background(.green.opacity(0.10), in: Circle())
+                                    .background(ATHLTHTheme.accent.opacity(0.10), in: Circle())
 
                                 Text(instruction)
                                     .font(.subheadline)
@@ -353,7 +353,7 @@ struct ExerciseDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                 }
 
                 if entry.source == .custom {
@@ -616,7 +616,7 @@ struct ExerciseArtwork: View {
     }
 
     private var fallback: some View {
-        Color.green.opacity(0.08)
+        ATHLTHTheme.accent.opacity(0.08)
             .overlay {
                 Image(
                     systemName: entry.source == .custom
@@ -624,7 +624,7 @@ struct ExerciseArtwork: View {
                         : "dumbbell.fill"
                 )
                 .font(.system(size: size * 0.28))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
             }
     }
 }
