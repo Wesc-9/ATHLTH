@@ -336,6 +336,8 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var exercises: [PlannedExercise]
     var notes: String?
     var runningWorkout: RunningWorkoutTemplate? = nil
+    var sharedSourceOwnerID: UUID? = nil
+    var sharedSourceSessionID: UUID? = nil
 }
 
 struct TrainingPlanDay: Identifiable, Codable, Hashable {
@@ -366,6 +368,9 @@ struct TrainingPlan: Identifiable, Codable, Hashable {
     var createdAt: Date
     var updatedAt: Date
     var startDate: Date? = nil
+    var sharedSourceOwnerID: UUID? = nil
+    var sharedSourcePlanID: UUID? = nil
+    var sharedSourceVersion: Int? = nil
 }
 
 struct RouteCoordinate: Codable, Hashable {
@@ -396,6 +401,8 @@ struct TrainingRoute: Identifiable, Codable, Hashable {
     var endName: String? = nil
     var expectedTravelTimeSeconds: TimeInterval? = nil
     var routeSource: String? = nil
+    var sharedSourceOwnerID: UUID? = nil
+    var sharedSourceRouteID: UUID? = nil
 }
 
 struct ActivityRecord: Identifiable, Codable, Hashable {
