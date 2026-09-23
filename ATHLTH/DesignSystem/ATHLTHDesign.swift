@@ -135,46 +135,104 @@ struct ATHLTHPageHeader: View {
 
 struct ATHLTHTabHero: View {
     let imageName: String
-    var height: CGFloat = 168
-    var alignment: Alignment = .center
+    let title: String
+    let subtitle: String
+    var height: CGFloat = 150
+    var alignment: Alignment = .leading
+    var focalOffsetX: CGFloat = 18
 
     var body: some View {
-        Image(imageName)
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .frame(height: height)
-            .clipped()
-            .overlay {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Image(imageName)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFill()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height,
+                        alignment: alignment
+                    )
+                    .scaleEffect(1.08)
+                    .offset(x: focalOffsetX)
+                    .clipped()
+
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.02),
+                        Color.black.opacity(0.46),
+                        Color.black.opacity(0.18),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.10),
                         Color.clear,
-                        ATHLTHTheme.canvasBottom.opacity(0.12)
+                        Color.black.opacity(0.18)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-            }
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: ATHLTHTheme.cornerRadius,
-                    style: .continuous
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("ATHLTH")
+                        .font(.system(size: 17, weight: .black))
+                        .tracking(5.5)
+
+                    Text("MOVE BETTER · LIVE LONGER")
+                        .font(.system(size: 8, weight: .semibold))
+                        .tracking(1.7)
+                        .padding(.top, 2)
+
+                    Spacer(minLength: 10)
+
+                    Text(title)
+                        .font(.system(size: 30, weight: .bold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.86)
+                        .padding(.top, 2)
+                }
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.28), radius: 5, x: 0, y: 2)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .frame(
+                    maxWidth: proxy.size.width * 0.72,
+                    maxHeight: .infinity,
+                    alignment: .leading
                 )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: ATHLTHTheme.cornerRadius,
-                    style: .continuous
-                )
-                .stroke(Color.white.opacity(0.72), lineWidth: 1)
             }
-            .shadow(
-                color: Color.black.opacity(0.055),
-                radius: 16,
-                x: 0,
-                y: 8
+        }
+        .frame(height: height)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: ATHLTHTheme.cornerRadius,
+                style: .continuous
             )
-            .accessibilityHidden(true)
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: ATHLTHTheme.cornerRadius,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.55), lineWidth: 1)
+        }
+        .shadow(
+            color: Color.black.opacity(0.055),
+            radius: 16,
+            x: 0,
+            y: 8
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(subtitle)")
     }
 }
