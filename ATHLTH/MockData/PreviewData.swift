@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 enum PreviewData {
@@ -178,3 +179,4 @@ enum PreviewData {
         readinessText: "Well recovered"
     )
 }
+#endif
