@@ -48,6 +48,12 @@ final class SupabaseAccountService: ObservableObject {
             throw SupabaseAccountError.missingAppleNonce
         }
 
+        await clearSessionBeforeInteractiveAuthenticationIfNeeded()
+
+        guard appleRawNonce == rawNonce else {
+            throw SupabaseAccountError.missingAppleNonce
+        }
+
         defer { appleRawNonce = nil }
 
         guard let idToken = credential.identityToken
@@ -121,6 +127,8 @@ final class SupabaseAccountService: ObservableObject {
         firstName: String,
         lastName: String
     ) async throws -> EmailSignUpOutcome {
+        await clearSessionBeforeInteractiveAuthenticationIfNeeded()
+
         let cleanFirstName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanLastName = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
         let fullName = [cleanFirstName, cleanLastName]
@@ -146,6 +154,8 @@ final class SupabaseAccountService: ObservableObject {
     }
 
     func signIn(email: String, password: String) async throws -> BackendUserBootstrap {
+        await clearSessionBeforeInteractiveAuthenticationIfNeeded()
+
         try await client.auth.signIn(
             email: email,
             password: password
@@ -202,18 +212,21 @@ final class SupabaseAccountService: ObservableObject {
     /// This is intentionally local-only so a fresh install on this iPhone
     /// does not sign the user out of ATHLTH on their other devices.
     func discardUnexpectedPersistedSession() async {
+        await clearSessionBeforeInteractiveAuthenticationIfNeeded()
+        appleRawNonce = nil
+    }
+
+    private func clearSessionBeforeInteractiveAuthenticationIfNeeded() async {
         guard hasPersistedSession else { return }
 
         do {
             try await client.auth.signOut(scope: .local)
         } catch {
-            // Startup must never trust an orphaned Keychain session merely
-            // because cleanup could not reach Supabase. AppRootView keeps
-            // signedIn false, so the login screen remains authoritative.
+            // A stale Keychain session must never become authoritative again.
+            // Interactive sign-in can still replace it with a new valid session.
         }
 
         passwordRecoveryPending = false
-        appleRawNonce = nil
     }
 
     func deleteAccount() async throws -> AccountDeletionResult {
