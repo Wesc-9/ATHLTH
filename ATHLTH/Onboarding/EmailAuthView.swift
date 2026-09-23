@@ -268,9 +268,9 @@ struct EmailAuthView: View {
             return "Password must contain at least 12 characters."
         }
 
-        guard value.contains(where: \.isLowercase),
-              value.contains(where: \.isUppercase),
-              value.contains(where: \.isNumber)
+        guard value.contains(where: { $0.isLowercase }),
+              value.contains(where: { $0.isUppercase }),
+              value.contains(where: { $0.isNumber })
         else {
             return "Password must include uppercase, lowercase and a number."
         }
