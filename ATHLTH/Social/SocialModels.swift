@@ -146,7 +146,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
             profileVisibility: "friends",
             discoverable: true,
             allowFriendRequests: true,
-            allowDirectMessages: "friends",
+            allowDirectMessages: "requests",
             shareTrainingPresence: true,
             sharePerformanceStats: true,
             shareTrophyCabinet: true,
