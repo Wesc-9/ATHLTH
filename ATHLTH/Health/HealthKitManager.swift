@@ -262,7 +262,13 @@ final class HealthKitManager: ObservableObject {
     }
 
     func workoutHistory() async throws -> [WorkoutSummary] {
-        try await fetchAllWorkouts()
+        let fetched = try await fetchAllWorkouts()
+
+        for workout in fetched {
+            workoutObjects[workout.uuid] = workout
+        }
+
+        return fetched
             .map(WorkoutSummary.init)
             .sorted { $0.startDate > $1.startDate }
     }
@@ -1112,8 +1118,26 @@ final class HealthKitManager: ObservableObject {
     }
 
     func workoutDetail(for summary: WorkoutSummary) async -> WorkoutDetail {
-        guard let workout = workoutObjects[summary.id] else { return WorkoutDetail() }
+        await workoutDetail(for: summary.id)
+    }
 
+    func workoutDetail(for workoutID: UUID) async -> WorkoutDetail {
+        let workout: HKWorkout?
+
+        if let cached = workoutObjects[workoutID] {
+            workout = cached
+        } else {
+            workout = try? await workoutForChallenge(uuid: workoutID)
+            if let workout {
+                workoutObjects[workout.uuid] = workout
+            }
+        }
+
+        guard let workout else { return WorkoutDetail() }
+        return await workoutDetail(for: workout)
+    }
+
+    private func workoutDetail(for workout: HKWorkout) async -> WorkoutDetail {
         async let routeTask = fetchRoute(for: workout)
         async let heartTask = fetchHeartRateStats(for: workout)
         async let stepsTask = workoutQuantity(
@@ -1173,9 +1197,11 @@ final class HealthKitManager: ObservableObject {
 
         let route = (try? await routeTask) ?? []
         let heartStats = (try? await heartTask) ?? (nil, nil)
+        let workoutLocation = storedWorkoutLocation(for: workout)
 
         return WorkoutDetail(
             route: route,
+            workoutLocation: workoutLocation,
             averageHeartRate: heartStats.0,
             maxHeartRate: heartStats.1,
             stepCount: (try? await stepsTask) ?? nil,
@@ -1188,6 +1214,60 @@ final class HealthKitManager: ObservableObject {
             averageCyclingPowerWatts: (try? await cyclingPowerTask) ?? nil,
             swimmingStrokeCount: (try? await swimmingStrokeTask) ?? nil
         )
+    }
+
+    private func storedWorkoutLocation(
+        for workout: HKWorkout
+    ) -> CLLocation? {
+        guard let metadata = workout.metadata,
+              let latitude = metadataNumber(
+                metadata[ATHLTHWorkoutMetadataKey.locationLatitude]
+              ),
+              let longitude = metadataNumber(
+                metadata[ATHLTHWorkoutMetadataKey.locationLongitude]
+              ),
+              CLLocationCoordinate2DIsValid(
+                CLLocationCoordinate2D(
+                    latitude: latitude,
+                    longitude: longitude
+                )
+              )
+        else {
+            return nil
+        }
+
+        let accuracy = metadataNumber(
+            metadata[
+                ATHLTHWorkoutMetadataKey.locationHorizontalAccuracy
+            ]
+        ) ?? 50
+
+        return CLLocation(
+            coordinate: CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            ),
+            altitude: 0,
+            horizontalAccuracy: max(accuracy, 0),
+            verticalAccuracy: -1,
+            timestamp: workout.startDate
+        )
+    }
+
+    private func metadataNumber(_ value: Any?) -> Double? {
+        if let number = value as? NSNumber {
+            return number.doubleValue
+        }
+
+        if let value = value as? Double {
+            return value
+        }
+
+        if let value = value as? String {
+            return Double(value)
+        }
+
+        return nil
     }
 
     private func workoutMatchesGoalActivity(
