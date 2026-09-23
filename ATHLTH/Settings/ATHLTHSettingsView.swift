@@ -24,7 +24,8 @@ struct ATHLTHSettingsView: View {
                         .padding(.bottom, 24)
 
                     settingsSection("App") {
-                        Menu {
+                        PremiumSettingsCard {
+                            Menu {
                             ForEach(MeasurementPreference.allCases) { preference in
                                 Button {
                                     settings.measurementPreference = preference
@@ -49,8 +50,9 @@ struct ATHLTHSettingsView: View {
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
                                 }
                             }
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
 
                     settingsSection("Membership") {
@@ -165,7 +167,8 @@ struct ATHLTHSettingsView: View {
                     }
 
                     settingsSection("Profile") {
-                        NavigationLink {
+                        PremiumSettingsCard {
+                            NavigationLink {
                             PersonalHealthProfileView()
                         } label: {
                             PremiumSettingsRow(
@@ -176,8 +179,9 @@ struct ATHLTHSettingsView: View {
                                 Image(systemName: "chevron.right")
                                     .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
                             }
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
 
                     settingsSection("Privacy") {
@@ -330,11 +334,11 @@ struct ATHLTHSettingsView: View {
                                     iconBackground: spotifyGreen.opacity(0.12),
                                     title: "Spotify",
                                     subtitle: settings.spotifyConnected
-                                        ? "Connected · training plans only"
-                                        : "Not connected"
+                                        ? "Preview connection enabled"
+                                        : "Spotify authorization is not implemented yet"
                                 ) {
                                     connectionTrailing(
-                                        settings.spotifyConnected ? "Connected" : "Connect",
+                                        settings.spotifyConnected ? "Preview" : "Open",
                                         showChevron: true
                                     )
                                 }
@@ -394,13 +398,15 @@ struct ATHLTHSettingsView: View {
                     }
 
                     settingsSection("Language") {
-                        PremiumSettingsRow(
+                        PremiumSettingsCard {
+                            PremiumSettingsRow(
                             icon: "globe",
                             title: "Language",
                             subtitle: "More languages are planned"
                         ) {
-                            Text("English")
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                Text("English")
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
                         }
                     }
 
@@ -507,7 +513,8 @@ struct ATHLTHSettingsView: View {
 
                     if session.currentRole.canAccessControlCenter {
                         settingsSection("Admin") {
-                            NavigationLink {
+                            PremiumSettingsCard {
+                                NavigationLink {
                                 AdminCenterView()
                             } label: {
                                 PremiumSettingsRow(
@@ -523,8 +530,9 @@ struct ATHLTHSettingsView: View {
                                             .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
                                     }
                                 }
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
 
