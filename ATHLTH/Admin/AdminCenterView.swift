@@ -213,12 +213,38 @@ final class AdminControlCenterStore: ObservableObject {
     let campaignDrafts: [OfferCampaignDraft]
 
     init() {
+        #if DEBUG
         users = AdminPreviewData.users
         auditEvents = AdminPreviewData.auditEvents
         safetyCases = AdminPreviewData.safetyCases
         campaignHistory = AdminPreviewData.campaignHistory
         analytics = AdminPreviewData.analytics
         campaignDrafts = AdminPreviewData.campaignDrafts
+        #else
+        users = []
+        auditEvents = []
+        safetyCases = []
+        campaignHistory = []
+        analytics = AdminAnalyticsSnapshot(
+            totalUsers: 0,
+            freeUsers: 0,
+            trialUsers: 0,
+            paidUsers: 0,
+            privilegedUsers: 0,
+            newUsers7Days: 0,
+            newUsers30Days: 0,
+            activeUsers7Days: 0,
+            activeUsers30Days: 0,
+            onboardingCompletionPercent: 0,
+            appleHealthConnectedPercent: 0,
+            appleWatchConnectedPercent: 0,
+            spotifyConnectedPercent: 0,
+            personalizedOfferConsentPercent: 0,
+            goalBreakdown: [],
+            interestBreakdown: []
+        )
+        campaignDrafts = []
+        #endif
     }
 
     func campaignEvents(for userID: UUID) -> [UserCampaignEvent] {
@@ -336,6 +362,7 @@ final class AdminControlCenterStore: ObservableObject {
     }
 }
 
+#if DEBUG
 enum AdminPreviewData {
     private static func daysAgo(_ value: Int) -> Date {
         Calendar.current.date(byAdding: .day, value: -value, to: Date()) ?? Date()
@@ -1581,3 +1608,5 @@ private struct AdminAuditLogView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
+#endif
+
