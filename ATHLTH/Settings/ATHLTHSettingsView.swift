@@ -877,6 +877,8 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
             Section("Primary training device") {
                 ForEach(TrainingDeviceProvider.allCases) { provider in
                     Button {
+                        guard provider != .garmin else { return }
+
                         settings.trainingDeviceProvider = provider
 
                         if provider != .appleWatch,
@@ -925,6 +927,8 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                         .padding(.vertical, 4)
                     }
                     .buttonStyle(.plain)
+                    .disabled(provider == .garmin)
+                    .opacity(provider == .garmin ? 0.52 : 1)
                 }
             }
 
@@ -958,14 +962,11 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                 Section("Garmin Connect") {
                     LabeledContent(
                         "Status",
-                        value: GarminDataContract.state.title
+                        value: "Coming soon"
                     )
 
-                    Button("Connect Garmin") {}
-                        .disabled(true)
-
                     Text(
-                        "The Garmin data layer is prepared, but authorization is intentionally disabled until Garmin approves ATHLTH for API access."
+                        "Garmin Connect is coming soon. ATHLTH will enable this option after Garmin integration access is approved and production-ready."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
