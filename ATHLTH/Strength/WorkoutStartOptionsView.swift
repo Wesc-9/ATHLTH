@@ -130,7 +130,7 @@ struct WorkoutStartOptionsView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "music.note")
                                     .font(.title2)
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
 
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("Spotify")
@@ -155,7 +155,7 @@ struct WorkoutStartOptionsView: View {
                     ATHLTHCard {
                         Label("Apple Watch is optional", systemImage: "checkmark.shield.fill")
                             .font(.headline)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
 
                         Text("Detailed strength tracking is optional too. HealthKit metrics can be linked later when available, while ATHLTH keeps the strength log separate.")
                             .font(.caption)
@@ -183,7 +183,7 @@ struct WorkoutStartOptionsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                 }
                 .padding()
             }
@@ -217,7 +217,7 @@ struct WorkoutStartOptionsView: View {
             HStack(spacing: 14) {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundStyle(disabled ? Color.secondary : Color.green)
+                    .foregroundStyle(disabled ? Color.secondary : ATHLTHTheme.accent)
                     .frame(width: 36)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -232,7 +232,7 @@ struct WorkoutStartOptionsView: View {
                 Spacer()
 
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected ? Color.green : Color.secondary)
+                    .foregroundStyle(selected ? ATHLTHTheme.accent : Color.secondary)
             }
             .padding(12)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
