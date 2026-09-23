@@ -231,6 +231,7 @@ struct DirectMessageThreadView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var challengeStore: ChallengeStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
     let friend: SocialProfileCard
 
@@ -416,6 +417,7 @@ struct DirectMessageThreadView: View {
             let id = try await messaging.openConversation(with: friend.userID)
             conversationID = id
             await messaging.refreshConversation(id)
+            markLocalMessageNotificationsRead(conversationID: id)
 
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 4_000_000_000)
@@ -424,6 +426,15 @@ struct DirectMessageThreadView: View {
             }
         } catch {
             loadError = error.localizedDescription
+        }
+    }
+
+    private func markLocalMessageNotificationsRead(conversationID: UUID) {
+        for item in notifications.items
+        where item.socialEventKind == "message" &&
+              item.socialEntityID == conversationID &&
+              item.isUnread {
+            notifications.markRead(item.id)
         }
     }
 
