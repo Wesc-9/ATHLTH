@@ -10,9 +10,15 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var accountService: SupabaseAccountService
 
     @State private var showingMembership = false
     @State private var healthRequestInProgress = false
+    @State private var showingSignOutConfirmation = false
+    @State private var signOutInProgress = false
+    @State private var signOutError: String?
 
     var body: some View {
         ZStack {
@@ -155,6 +161,20 @@ struct ATHLTHSettingsView: View {
                             .buttonStyle(.plain)
                             .disabled(subscriptionStore.restoreInProgress)
 
+                            SettingsDivider()
+
+                            Link(destination: URL(string: "https://apps.apple.com/account/subscriptions")!) {
+                                PremiumSettingsRow(
+                                    icon: "creditcard",
+                                    title: "Manage Subscription",
+                                    subtitle: "Open Apple subscription settings"
+                                ) {
+                                    Image(systemName: "arrow.up.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
                             if let errorMessage = subscriptionStore.errorMessage {
                                 SettingsDivider()
                                 Text(errorMessage)
@@ -186,26 +206,16 @@ struct ATHLTHSettingsView: View {
 
                     settingsSection("Privacy") {
                         PremiumSettingsCard {
-                            Menu {
-                                ForEach(ProfileVisibility.allCases) { visibility in
-                                    Button {
-                                        settings.profileVisibility = visibility
-                                    } label: {
-                                        if settings.profileVisibility == visibility {
-                                            Label(visibility.title, systemImage: "checkmark")
-                                        } else {
-                                            Text(visibility.title)
-                                        }
-                                    }
-                                }
+                            NavigationLink {
+                                SocialPrivacySettingsView()
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "person.2",
                                     title: "Profile visibility",
-                                    subtitle: "Control who can see your profile"
+                                    subtitle: "Synced with your social privacy settings"
                                 ) {
                                     HStack(spacing: 8) {
-                                        Text(settings.profileVisibility.title)
+                                        Text(profileVisibilityTitle)
                                             .font(.subheadline)
                                             .foregroundStyle(ATHLTHTheme.mutedText)
                                         Image(systemName: "chevron.right")
@@ -451,9 +461,7 @@ struct ATHLTHSettingsView: View {
                             SettingsDivider()
 
                             NavigationLink {
-                                Text("Export will package ATHLTH-owned data such as plans, routes and activities. HealthKit export stays under Apple Health controls.")
-                                    .padding()
-                                    .navigationTitle("Export Data")
+                                ATHLTHDataExportView()
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "square.and.arrow.up",
@@ -481,6 +489,29 @@ struct ATHLTHSettingsView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            Button {
+                                showingSignOutConfirmation = true
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "rectangle.portrait.and.arrow.right",
+                                    iconTint: ATHLTHTheme.accentDeep,
+                                    title: "Sign out",
+                                    subtitle: "Sign out of this ATHLTH account"
+                                ) {
+                                    if signOutInProgress {
+                                        ProgressView()
+                                            .tint(ATHLTHTheme.accent)
+                                    } else {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(signOutInProgress)
 
                             SettingsDivider()
 
@@ -528,37 +559,27 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
-                    settingsSection("Developer") {
-                        PremiumSettingsCard {
-                            NavigationLink {
-                                CapabilityLabView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "testtube.2",
-                                    title: "Capability Lab",
-                                    subtitle: "Developer diagnostics and capability tests"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                    if session.previewModeEnabled || session.currentRole.canAccessControlCenter {
+                        settingsSection("Developer") {
+                            PremiumSettingsCard {
+                                NavigationLink {
+                                    CapabilityLabView()
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "testtube.2",
+                                        title: "Capability Lab",
+                                        subtitle: "Developer diagnostics and capability tests"
+                                    ) {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
                                 }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            PremiumSettingsRow(
-                                icon: "hammer",
-                                title: "App version",
-                                subtitle: session.previewModeEnabled ? "Preview mode enabled" : "Production mode"
-                            ) {
-                                Text(appVersion)
-                                    .font(.subheadline)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                .buttonStyle(.plain)
                             }
                         }
                     }
 
-                    Text("ATHLTH · Progress lives here.")
+                    Text("ATHLTH \(appVersion) · Progress lives here.")
                         .font(.caption2.weight(.medium))
                         .tracking(1.2)
                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
@@ -575,6 +596,29 @@ struct ATHLTHSettingsView: View {
             SubscriptionOfferView {
                 showingMembership = false
             }
+        }
+        .confirmationDialog(
+            "Sign out of ATHLTH?",
+            isPresented: $showingSignOutConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Sign Out", role: .destructive) {
+                Task { await signOut() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your account stays intact. Account-owned data cached on this device will be cleared.")
+        }
+        .alert(
+            "Sign Out Failed",
+            isPresented: Binding(
+                get: { signOutError != nil },
+                set: { if !$0 { signOutError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(signOutError ?? "Please try again.")
         }
     }
 
@@ -660,6 +704,41 @@ struct ATHLTHSettingsView: View {
             content()
         }
         .padding(.bottom, 24)
+    }
+
+    private var profileVisibilityTitle: String {
+        guard let raw = social.privacy?.profileVisibility,
+              let visibility = ProfileVisibility(rawValue: raw)
+        else {
+            return settings.profileVisibility.title
+        }
+        return visibility.title
+    }
+
+    private var healthSyncStatusText: String {
+        if let error = health.backgroundSyncError, !error.isEmpty {
+            return "Background sync needs attention"
+        }
+        if let lastRefresh = health.lastSuccessfulRefreshAt {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .full
+            return "Last synced " + formatter.localizedString(for: lastRefresh, relativeTo: Date())
+        }
+        return health.hasRequestedAuthorization ? "Waiting for first Health refresh" : "Apple Health is not configured"
+    }
+
+    private func signOut() async {
+        guard !signOutInProgress else { return }
+        signOutInProgress = true
+        signOutError = nil
+        defer { signOutInProgress = false }
+
+        do {
+            try await accountService.signOut()
+            session.clearAfterSignOut()
+        } catch {
+            signOutError = error.localizedDescription
+        }
     }
 
     private var backgroundHealthSyncBinding: Binding<Bool> {
