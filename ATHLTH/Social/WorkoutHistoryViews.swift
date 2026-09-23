@@ -56,7 +56,7 @@ struct WorkoutHistoryPreviewSection: View {
                 } label: {
                     Text("View All")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
             }
 
@@ -68,7 +68,7 @@ struct WorkoutHistoryPreviewSection: View {
                 HStack(spacing: 12) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.title2)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text("No workouts yet")
@@ -223,10 +223,10 @@ struct WorkoutHistoryRow: View {
         HStack(spacing: 12) {
             Image(systemName: workout.activity.icon)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
                 .frame(width: 42, height: 42)
                 .background(
-                    .green.opacity(0.09),
+                    ATHLTHTheme.accent.opacity(0.09),
                     in: RoundedRectangle(cornerRadius: 12)
                 )
 
@@ -355,7 +355,7 @@ struct WorkoutHistoryDetailView: View {
     private var hero: some View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
-                colors: [.green.opacity(0.90), .black.opacity(0.94)],
+                colors: [ATHLTHTheme.accent.opacity(0.90), .black.opacity(0.94)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -418,7 +418,7 @@ struct WorkoutHistoryDetailView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
             Text(value)
                 .font(.headline.monospacedDigit())
             Text(title)
@@ -508,7 +508,7 @@ struct PostWorkoutReviewView: View {
                                 Text("\(Int(effort))")
                                     .font(.system(size: 38, weight: .bold))
                                     .monospacedDigit()
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
 
                                 Text("/10")
                                     .foregroundStyle(.secondary)
@@ -520,7 +520,7 @@ struct PostWorkoutReviewView: View {
                             }
 
                             Slider(value: $effort, in: 1...10, step: 1)
-                                .tint(.green)
+                                .tint(ATHLTHTheme.accent)
 
                             Text("Use this as your perceived effort for the session.")
                                 .font(.caption2)
@@ -573,7 +573,7 @@ struct PostWorkoutReviewView: View {
                                     systemImage: "bolt.fill"
                                 )
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(.green)
+                                .foregroundStyle(ATHLTHTheme.accent)
                             }
                         }
                     }
@@ -600,7 +600,7 @@ struct PostWorkoutReviewView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                     .disabled(saving)
                 }
                 .padding()
@@ -624,7 +624,7 @@ struct PostWorkoutReviewView: View {
     private var summaryCard: some View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
-                colors: [.green.opacity(0.88), .black.opacity(0.92)],
+                colors: [ATHLTHTheme.accent.opacity(0.88), .black.opacity(0.92)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
