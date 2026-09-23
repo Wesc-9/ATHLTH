@@ -102,9 +102,9 @@ struct MirroredWorkoutLiveView: View {
                 HStack(spacing: 14) {
                     Image(systemName: snapshot.kind.systemImage)
                         .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                         .frame(width: 50, height: 50)
-                        .background(.green.opacity(0.10), in: Circle())
+                        .background(ATHLTHTheme.accent.opacity(0.10), in: Circle())
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(snapshot.kind.title)
@@ -120,7 +120,7 @@ struct MirroredWorkoutLiveView: View {
                     Circle()
                         .fill(
                             mirroring.hasActiveMirroredWorkout
-                                ? Color.green
+                                ? ATHLTHTheme.accent
                                 : Color.secondary
                         )
                         .frame(width: 10, height: 10)
@@ -165,7 +165,7 @@ struct MirroredWorkoutLiveView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: icon)
                     .font(.title3)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
 
                 Text(value)
                     .font(.title2.weight(.bold))
@@ -196,7 +196,7 @@ struct MirroredWorkoutLiveView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .tint(.green)
+            .tint(ATHLTHTheme.accent)
         } else {
             HStack(spacing: 12) {
                 Button {
@@ -298,7 +298,7 @@ struct MirroredWorkoutLiveView: View {
     ) -> Color {
         switch state {
         case .running, .completed:
-            return .green
+            return ATHLTHTheme.accent
         case .paused, .preparing, .ending:
             return .orange
         case .failed:
