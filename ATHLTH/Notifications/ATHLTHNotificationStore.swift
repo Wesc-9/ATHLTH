@@ -20,6 +20,34 @@ final class ATHLTHNotificationStore: ObservableObject {
         items.filter(\.isUnread).count
     }
 
+    private func preferenceEnabled(_ key: String, defaultValue: Bool = true) -> Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: key) != nil else {
+            return defaultValue
+        }
+        return defaults.bool(forKey: key)
+    }
+
+    private func shouldDeliverSystemAlert(for item: ATHLTHNotificationItem) -> Bool {
+        if item.challengeID != nil {
+            return preferenceEnabled("settings.challengeNotifications")
+        }
+
+        if item.kind == .workoutCompleted {
+            return preferenceEnabled("settings.workoutReminders")
+        }
+
+        if item.kind == .social {
+            let eventKind = item.socialEventKind?.lowercased() ?? ""
+            if eventKind.contains("message") || eventKind.contains("dm") {
+                return preferenceEnabled("settings.messageNotifications")
+            }
+            return preferenceEnabled("settings.friendActivityNotifications")
+        }
+
+        return true
+    }
+
     func add(_ draft: ATHLTHNotificationDraft, deliverSystemAlert: Bool = true) {
         guard !items.contains(where: { $0.eventKey == draft.eventKey }) else {
             return
@@ -44,7 +72,7 @@ final class ATHLTHNotificationStore: ObservableObject {
         trimIfNeeded()
         persist()
 
-        if deliverSystemAlert {
+        if deliverSystemAlert, shouldDeliverSystemAlert(for: item) {
             Task {
                 await deliverLocalNotification(for: item)
             }
@@ -274,13 +302,37 @@ final class ATHLTHNotificationStore: ObservableObject {
         authorizationStatus = settings.authorizationStatus
     }
 
+    func reconcileSystemPreferences() async {
+        await refreshAuthorizationStatus()
+
+        guard !preferenceEnabled("settings.challengeNotifications") else {
+            return
+        }
+
+        let center = UNUserNotificationCenter.current()
+        let requests: [UNNotificationRequest] = await withCheckedContinuation { continuation in
+            center.getPendingNotificationRequests { requests in
+                continuation.resume(returning: requests)
+            }
+        }
+
+        let challengeRequestIDs = requests
+            .map(\.identifier)
+            .filter { $0.hasPrefix("challenge-") }
+
+        if !challengeRequestIDs.isEmpty {
+            center.removePendingNotificationRequests(withIdentifiers: challengeRequestIDs)
+        }
+    }
+
     private func scheduleChallengeReminders(
         _ challenge: ATHLTHChallenge,
         currentUserID: UUID
     ) async {
         await refreshAuthorizationStatus()
 
-        guard authorizationStatus == .authorized ||
+        guard preferenceEnabled("settings.challengeNotifications"),
+              authorizationStatus == .authorized ||
                 authorizationStatus == .provisional ||
                 authorizationStatus == .ephemeral,
               challenge.status != .completed,
