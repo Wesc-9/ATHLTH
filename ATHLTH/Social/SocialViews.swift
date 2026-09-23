@@ -41,7 +41,10 @@ struct ProfileFriendsSection: View {
                     SocialHubView(initialTab: .friends)
                 } label: {
                     HStack(spacing: 5) {
-                        let socialBadgeCount = social.pendingRequestCount + messaging.unreadCount
+                        let socialBadgeCount =
+                            social.pendingRequestCount +
+                            messaging.unreadCount +
+                            messaging.messageRequestCount
                         if socialBadgeCount > 0 {
                             Text("\(socialBadgeCount)")
                                 .font(.caption2.bold())
@@ -140,8 +143,11 @@ struct SocialHubView: View {
                             HStack(spacing: 6) {
                                 Text(tab.title)
 
-                                if tab == .messages, messaging.unreadCount > 0 {
-                                    Text("\(messaging.unreadCount)")
+                                let messageBadgeCount =
+                                    messaging.unreadCount +
+                                    messaging.messageRequestCount
+                                if tab == .messages, messageBadgeCount > 0 {
+                                    Text("\(messageBadgeCount)")
                                         .font(.caption2.bold())
                                         .foregroundStyle(
                                             selectedTab == tab
