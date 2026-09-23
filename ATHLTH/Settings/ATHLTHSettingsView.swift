@@ -248,9 +248,9 @@ struct ATHLTHSettingsView: View {
                                 Toggle("", isOn: backgroundHealthSyncBinding)
                                     .labelsHidden()
                                     .tint(ATHLTHTheme.accent)
-                                    .disabled(!session.canAccess(.backgroundHealthSync))
+                                    .disabled(false)
                             }
-                            .opacity(session.canAccess(.backgroundHealthSync) ? 1 : 0.64)
+                            .opacity(1)
 
                             SettingsDivider()
 
@@ -674,10 +674,6 @@ struct ATHLTHSettingsView: View {
     }
 
     private var healthSyncStatusText: String {
-        guard session.canAccess(.backgroundHealthSync) else {
-            return "Background Health Sync is available with ATHLTH+."
-        }
-
         guard settings.backgroundHealthSyncEnabled else {
             return "Background sync is turned off."
         }
@@ -700,24 +696,16 @@ struct ATHLTHSettingsView: View {
     private var backgroundHealthSyncBinding: Binding<Bool> {
         Binding(
             get: {
-                session.canAccess(.backgroundHealthSync) &&
                 settings.backgroundHealthSyncEnabled
             },
             set: { enabled in
-                guard session.canAccess(.backgroundHealthSync) else {
-                    showingMembership = true
-                    return
-                }
                 settings.backgroundHealthSyncEnabled = enabled
             }
         )
     }
 
     private var backgroundHealthSubtitle: String {
-        if session.canAccess(.backgroundHealthSync) {
-            return "Sync with Apple Health in the background. ATHLTH+ feature."
-        }
-        return "Available with ATHLTH+. Apple Health still works on Free."
+        "Sync with Apple Health automatically in the background."
     }
 
     private var spotifyGreen: Color {
