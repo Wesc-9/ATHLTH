@@ -1556,23 +1556,34 @@ final class HealthKitManager: ObservableObject {
         let hrvDays = try await hrvDaysTask
         let restingDays = try await restingDaysTask
 
-        let qualifyingBaselineDays = min(
-            sleepDays.count,
-            min(hrvDays.count, restingDays.count)
-        )
+        let commonDays = Set(sleepDays.keys)
+            .intersection(hrvDays.keys)
+            .intersection(restingDays.keys)
+        let qualifyingBaselineDays = commonDays.count
 
         let averageSleep = Self.average(
-            sleepDays.values.map(Double.init)
+            commonDays.compactMap { sleepDays[$0] }
         )
-        let averageHRV = Self.average(Array(hrvDays.values))
-        let averageRestingHR = Self.average(Array(restingDays.values))
+        let averageHRV = Self.average(
+            commonDays.compactMap { hrvDays[$0] }
+        )
+        let averageRestingHR = Self.average(
+            commonDays.compactMap { restingDays[$0] }
+        )
+
+        let now = Date()
+        let recentWindow: TimeInterval = 48 * 3_600
 
         guard qualifyingBaselineDays >= 5,
               currentSleep.totalAsleep > 0,
               let currentHRV = currentHeart.hrvMilliseconds,
               currentHRV > 0,
+              let hrvDate = currentHeart.hrvDate,
+              abs(now.timeIntervalSince(hrvDate)) <= recentWindow,
               let currentRestingHR = currentHeart.restingHeartRate,
               currentRestingHR > 0,
+              let restingDate = currentHeart.restingHeartRateDate,
+              abs(now.timeIntervalSince(restingDate)) <= recentWindow,
               let averageSleep,
               averageSleep > 0,
               let averageHRV,
