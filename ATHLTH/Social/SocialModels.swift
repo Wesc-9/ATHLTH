@@ -108,6 +108,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
     var profileVisibility: String
     var discoverable: Bool
     var allowFriendRequests: Bool
+    var allowDirectMessages: String
     var shareTrainingPresence: Bool
     var sharePerformanceStats: Bool
     var shareTrophyCabinet: Bool
@@ -125,6 +126,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
         case profileVisibility = "profile_visibility"
         case discoverable
         case allowFriendRequests = "allow_friend_requests"
+        case allowDirectMessages = "allow_direct_messages"
         case shareTrainingPresence = "share_training_presence"
         case sharePerformanceStats = "share_performance_stats"
         case shareTrophyCabinet = "share_trophy_cabinet"
@@ -144,6 +146,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
             profileVisibility: "friends",
             discoverable: true,
             allowFriendRequests: true,
+            allowDirectMessages: "friends",
             shareTrainingPresence: true,
             sharePerformanceStats: true,
             shareTrophyCabinet: true,
