@@ -295,21 +295,21 @@ struct ATHLTHSettingsView: View {
                             SettingsDivider()
 
                             PremiumSettingsRow(
-                                icon: health.backgroundSyncError == nil
-                                    ? "arrow.triangle.2.circlepath"
-                                    : "exclamationmark.triangle",
-                                iconTint: health.backgroundSyncError == nil
-                                    ? ATHLTHTheme.accentDeep
-                                    : .orange,
+                                icon: healthSyncHasIssue
+                                    ? "exclamationmark.triangle"
+                                    : "arrow.triangle.2.circlepath",
+                                iconTint: healthSyncHasIssue
+                                    ? .orange
+                                    : ATHLTHTheme.accentDeep,
                                 title: "Sync status",
                                 subtitle: healthSyncStatusText
                             ) {
-                                Text(health.backgroundSyncError == nil ? "Ready" : "Issue")
+                                Text(healthSyncStateTitle)
                                     .font(.subheadline)
                                     .foregroundStyle(
-                                        health.backgroundSyncError == nil
-                                            ? ATHLTHTheme.mutedText
-                                            : Color.orange
+                                        healthSyncHasIssue
+                                            ? Color.orange
+                                            : ATHLTHTheme.mutedText
                                     )
                             }
                         }
@@ -645,6 +645,9 @@ struct ATHLTHSettingsView: View {
         } message: {
             Text(signOutError ?? "Please try again.")
         }
+        .task {
+            await notifications.refreshAuthorizationStatus()
+        }
     }
 
     private var settingsBackground: some View {
@@ -753,16 +756,46 @@ struct ATHLTHSettingsView: View {
         }
     }
 
-    private var healthSyncStatusText: String {
-        if let error = health.backgroundSyncError, !error.isEmpty {
-            return "Background sync needs attention"
+    private var healthSyncHasIssue: Bool {
+        guard session.canAccess(.backgroundHealthSync),
+              settings.backgroundHealthSyncEnabled
+        else {
+            return false
         }
+        return !(health.backgroundSyncError?.isEmpty ?? true)
+    }
+
+    private var healthSyncStateTitle: String {
+        guard session.canAccess(.backgroundHealthSync),
+              settings.backgroundHealthSyncEnabled
+        else {
+            return "Off"
+        }
+        return healthSyncHasIssue ? "Issue" : "Active"
+    }
+
+    private var healthSyncStatusText: String {
+        guard session.canAccess(.backgroundHealthSync) else {
+            return "Background Health Sync is available with ATHLTH+."
+        }
+
+        guard settings.backgroundHealthSyncEnabled else {
+            return "Background sync is turned off."
+        }
+
+        if let error = health.backgroundSyncError, !error.isEmpty {
+            return "Background sync needs attention: \(error)"
+        }
+
         if let lastRefresh = health.lastSuccessfulRefreshAt {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .full
             return "Last synced " + formatter.localizedString(for: lastRefresh, relativeTo: Date())
         }
-        return health.hasRequestedAuthorization ? "Waiting for first Health refresh" : "Apple Health is not configured"
+
+        return health.hasRequestedAuthorization
+            ? "Waiting for the first Apple Health refresh."
+            : "Apple Health is not configured."
     }
 
     private func signOut() async {
