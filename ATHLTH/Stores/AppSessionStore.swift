@@ -305,12 +305,20 @@ final class AppSessionStore: ObservableObject {
     }
 
     func clearAfterAccountDeletion() {
+        clearAfterSignOut()
+    }
+
+    func clearAfterSignOut() {
         resetOnboardingForPreview()
         profile = PreviewData.profile
         activePlan = nil
         savedRoutes = []
+        planTemplates = []
         previewModeEnabled = false
         usernameSeed = profile.displayName
+        defaults.removeObject(forKey: "session.activeTrainingPlan")
+        defaults.removeObject(forKey: "session.savedRoutes")
+        defaults.removeObject(forKey: "session.trainingPlanTemplates")
     }
 
     func resetOnboardingForPreview() {
