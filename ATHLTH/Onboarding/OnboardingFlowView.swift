@@ -106,7 +106,9 @@ struct OnboardingFlowView: View {
                 await loadUsernameSuggestions()
             case .connections:
                 usernameFieldFocused = false
-                watchConnection.refreshStatus()
+                if settings.trainingDeviceProvider == .appleWatch {
+                    watchConnection.refreshStatus()
+                }
             case .goals, .ready:
                 usernameFieldFocused = false
             default:
@@ -118,7 +120,12 @@ struct OnboardingFlowView: View {
             await validateUsernameAfterTyping()
         }
         .onChange(of: scenePhase) {
-            guard scenePhase == .active, step == .connections else { return }
+            guard scenePhase == .active,
+                  step == .connections,
+                  settings.trainingDeviceProvider == .appleWatch
+            else {
+                return
+            }
             watchConnection.refreshStatus()
         }
         .sheet(item: $legalDocument) { document in
@@ -915,7 +922,7 @@ struct OnboardingFlowView: View {
             VStack(alignment: .leading, spacing: 8) {
                 onboardingTitle(
                     "Connect your health",
-                    subtitle: "Bring your Apple ecosystem into ATHLTH."
+                    subtitle: "Choose how you track. A watch is optional."
                 )
 
                 Text("Optional · Set it up now or anytime later in Settings.")
@@ -925,7 +932,7 @@ struct OnboardingFlowView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text("YOUR ECOSYSTEM")
+                    Text("YOUR TRACKING SETUP")
                         .font(.caption2.weight(.bold))
                         .tracking(1.25)
                         .foregroundStyle(OnboardingTheme.faintText)
@@ -944,6 +951,86 @@ struct OnboardingFlowView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
                 .padding(.bottom, 8)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Primary training device")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(OnboardingTheme.primaryText)
+
+                    HStack(spacing: 8) {
+                        ForEach(TrainingDeviceProvider.allCases) { provider in
+                            Button {
+                                settings.trainingDeviceProvider = provider
+
+                                if provider != .appleWatch,
+                                   settings.preferredWorkoutCapture == .appleWatch {
+                                    settings.preferredWorkoutCapture = .iPhone
+                                }
+
+                                if provider == .appleWatch {
+                                    watchConnection.refreshStatus()
+                                }
+                            } label: {
+                                VStack(spacing: 7) {
+                                    Image(systemName: provider.systemImage)
+                                        .font(.title3)
+
+                                    Text(provider.title)
+                                        .font(.caption2.weight(.semibold))
+                                        .lineLimit(1)
+
+                                    Image(
+                                        systemName:
+                                            settings.trainingDeviceProvider == provider
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                    )
+                                    .font(.caption)
+                                }
+                                .foregroundStyle(
+                                    settings.trainingDeviceProvider == provider
+                                        ? OnboardingTheme.accent
+                                        : OnboardingTheme.mutedText
+                                )
+                                .frame(maxWidth: .infinity, minHeight: 82)
+                                .background(
+                                    settings.trainingDeviceProvider == provider
+                                        ? OnboardingTheme.accent.opacity(0.08)
+                                        : Color.clear,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 16,
+                                        style: .continuous
+                                    )
+                                )
+                                .overlay {
+                                    RoundedRectangle(
+                                        cornerRadius: 16,
+                                        style: .continuous
+                                    )
+                                    .stroke(
+                                        settings.trainingDeviceProvider == provider
+                                            ? OnboardingTheme.accent.opacity(0.35)
+                                            : OnboardingTheme.border,
+                                        lineWidth: 1
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Text(settings.trainingDeviceProvider.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(OnboardingTheme.faintText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+
+                Rectangle()
+                    .fill(OnboardingTheme.border)
+                    .frame(height: 1)
+                    .padding(.leading, 78)
 
                 connectionRow(
                     title: "Apple Health",
@@ -989,22 +1076,51 @@ struct OnboardingFlowView: View {
                     .frame(height: 1)
                     .padding(.leading, 78)
 
-                connectionRow(
-                    title: "Apple Watch",
-                    subtitle: "Start workouts and sync live data",
-                    detail: watchConnection.isReady
-                        ? "Watch connection verified"
-                        : watchConnection.state == .appNotInstalled
-                            ? "ATHLTH Watch app not installed"
-                            : nil,
-                    icon: "applewatch",
-                    iconTint: OnboardingTheme.accent,
-                    complete: watchConnection.isReady,
-                    actionTitle: watchSetupActionTitle,
-                    actionDisabled: watchSetupActionDisabled,
-                    actionLoading: watchConnection.state == .checking
-                ) {
-                    handleWatchSetupAction()
+                switch settings.trainingDeviceProvider {
+                case .appleWatch:
+                    connectionRow(
+                        title: "Apple Watch",
+                        subtitle: "Start workouts and sync live data",
+                        detail: watchConnection.isReady
+                            ? "Watch connection verified"
+                            : watchConnection.state == .appNotInstalled
+                                ? "ATHLTH Watch app not installed"
+                                : nil,
+                        icon: "applewatch",
+                        iconTint: OnboardingTheme.accent,
+                        complete: watchConnection.isReady,
+                        actionTitle: watchSetupActionTitle,
+                        actionDisabled: watchSetupActionDisabled,
+                        actionLoading: watchConnection.state == .checking
+                    ) {
+                        handleWatchSetupAction()
+                    }
+
+                case .garmin:
+                    connectionRow(
+                        title: "Garmin",
+                        subtitle: "Prepared for Garmin Connect",
+                        detail: "Authorization will unlock after Garmin approves ATHLTH",
+                        icon: "watch.analog",
+                        iconTint: OnboardingTheme.accent,
+                        complete: true,
+                        actionTitle: "Planned",
+                        actionDisabled: true,
+                        actionLoading: false
+                    ) {}
+
+                case .none:
+                    connectionRow(
+                        title: "No watch",
+                        subtitle: "Use ATHLTH and iPhone without a wearable",
+                        detail: "Watch-only actions stay safely unavailable",
+                        icon: "iphone",
+                        iconTint: OnboardingTheme.accent,
+                        complete: true,
+                        actionTitle: "Selected",
+                        actionDisabled: true,
+                        actionLoading: false
+                    ) {}
                 }
             }
             .background(
@@ -1107,18 +1223,18 @@ struct OnboardingFlowView: View {
                     )
                 }
 
-                if watchConnection.isReady {
-                    Divider()
-                        .padding(.leading, 44)
+                Divider()
+                    .padding(.leading, 44)
 
-                    readySetupRow(
-                        title: "Apple Watch",
-                        value: "Watch connection verified",
-                        icon: "applewatch",
-                        tint: OnboardingTheme.accent,
-                        complete: true
-                    )
-                }
+                readySetupRow(
+                    title: "Training device",
+                    value: readyDeviceSummary,
+                    icon: settings.trainingDeviceProvider.systemImage,
+                    tint: OnboardingTheme.accent,
+                    complete:
+                        settings.trainingDeviceProvider != .appleWatch ||
+                        watchConnection.isReady
+                )
             }
             .padding(18)
             .background(
@@ -1171,6 +1287,19 @@ struct OnboardingFlowView: View {
             Spacer(minLength: 34)
         }
         .frame(maxWidth: .infinity, minHeight: 600)
+    }
+
+    private var readyDeviceSummary: String {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            return watchConnection.isReady
+                ? "Apple Watch connected"
+                : "Apple Watch selected · finish setup in Settings"
+        case .garmin:
+            return "Garmin selected · authorization pending"
+        case .none:
+            return "No watch · iPhone/manual mode"
+        }
     }
 
     private var readyGoalMessage: String {
