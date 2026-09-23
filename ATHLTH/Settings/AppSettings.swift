@@ -99,6 +99,49 @@ enum AppAppearance: String, CaseIterable, Identifiable, Codable {
 }
 
 
+enum TrainingDeviceProvider: String, CaseIterable, Identifiable, Codable {
+    case appleWatch
+    case garmin
+    case none
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .appleWatch: return "Apple Watch"
+        case .garmin: return "Garmin"
+        case .none: return "No watch"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .appleWatch:
+            return "Live workouts, heart rate, routes and HealthKit sync"
+        case .garmin:
+            return "Prepared for Garmin Connect · authorization pending"
+        case .none:
+            return "Use ATHLTH and iPhone without a wearable"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .appleWatch: return "applewatch"
+        case .garmin: return "watch.analog"
+        case .none: return "iphone"
+        }
+    }
+
+    var usesAppleWatchConnectivity: Bool {
+        self == .appleWatch
+    }
+
+    var supportsLiveWatchLaunch: Bool {
+        self == .appleWatch
+    }
+}
+
 enum WorkoutCapturePreference: String, CaseIterable, Identifiable, Codable {
     case automatic
     case iPhone
@@ -167,6 +210,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var shareTrainingPresence: Bool { didSet { persist() } }
     @Published var hideRouteStartAndEnd: Bool { didSet { persist() } }
 
+    @Published var trainingDeviceProvider: TrainingDeviceProvider { didSet { persist() } }
     @Published var preferredWorkoutCapture: WorkoutCapturePreference { didSet { persist() } }
     @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
@@ -204,6 +248,15 @@ final class AppSettingsStore: ObservableObject {
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? true
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
 
+        if let storedProvider = defaults.string(forKey: "settings.trainingDeviceProvider"),
+           let provider = TrainingDeviceProvider(rawValue: storedProvider) {
+            trainingDeviceProvider = provider
+        } else if defaults.object(forKey: "settings.watchConnected") as? Bool == true {
+            trainingDeviceProvider = .appleWatch
+        } else {
+            trainingDeviceProvider = .none
+        }
+
         preferredWorkoutCapture = WorkoutCapturePreference(rawValue: defaults.string(forKey: "settings.preferredWorkoutCapture") ?? "") ?? .automatic
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
@@ -237,6 +290,7 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(shareTrainingPresence, forKey: "settings.shareTrainingPresence")
         defaults.set(hideRouteStartAndEnd, forKey: "settings.hideRouteStartAndEnd")
 
+        defaults.set(trainingDeviceProvider.rawValue, forKey: "settings.trainingDeviceProvider")
         defaults.set(preferredWorkoutCapture.rawValue, forKey: "settings.preferredWorkoutCapture")
         defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
