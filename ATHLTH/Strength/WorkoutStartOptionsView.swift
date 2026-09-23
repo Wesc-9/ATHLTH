@@ -5,6 +5,7 @@ struct WorkoutStartOptionsView: View {
     @EnvironmentObject private var social: SocialStore
 
     let session: PlannedSession
+    let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let linkedSpotifyPlaylist: SpotifyPlaylistReference?
     let spotifyAutoplayEnabled: Bool
@@ -20,6 +21,7 @@ struct WorkoutStartOptionsView: View {
 
     init(
         session: PlannedSession,
+        trainingDeviceProvider: TrainingDeviceProvider,
         watchConnected: Bool,
         defaultCapture: WorkoutCapturePreference,
         defaultTracking: StrengthTrackingPreference,
@@ -32,6 +34,7 @@ struct WorkoutStartOptionsView: View {
         ) -> Void
     ) {
         self.session = session
+        self.trainingDeviceProvider = trainingDeviceProvider
         self.watchConnected = watchConnected
         self.linkedSpotifyPlaylist = linkedSpotifyPlaylist
         self.spotifyAutoplayEnabled = spotifyAutoplayEnabled
@@ -39,9 +42,11 @@ struct WorkoutStartOptionsView: View {
 
         let initialDevice: WorkoutCaptureDevice
         switch defaultCapture {
-        case .appleWatch where watchConnected:
+        case .appleWatch
+            where trainingDeviceProvider == .appleWatch && watchConnected:
             initialDevice = .appleWatch
-        case .automatic where watchConnected:
+        case .automatic
+            where trainingDeviceProvider == .appleWatch && watchConnected:
             initialDevice = .appleWatch
         default:
             initialDevice = .iPhone
@@ -79,16 +84,26 @@ struct WorkoutStartOptionsView: View {
                                 captureDevice = .iPhone
                             }
 
-                            optionRow(
-                                title: "Apple Watch",
-                                subtitle: watchConnected
-                                    ? "Record the continuous workout on Apple Watch."
-                                    : "Connect Apple Watch in Settings to use this option.",
-                                icon: "applewatch",
-                                selected: captureDevice == .appleWatch,
-                                disabled: !watchConnected
-                            ) {
-                                captureDevice = .appleWatch
+                            if trainingDeviceProvider == .appleWatch {
+                                optionRow(
+                                    title: "Apple Watch",
+                                    subtitle: watchConnected
+                                        ? "Record the continuous workout on Apple Watch."
+                                        : "Finish Apple Watch setup in Settings to use this option.",
+                                    icon: "applewatch",
+                                    selected: captureDevice == .appleWatch,
+                                    disabled: !watchConnected
+                                ) {
+                                    captureDevice = .appleWatch
+                                }
+                            } else if trainingDeviceProvider == .garmin {
+                                optionRow(
+                                    title: "Garmin",
+                                    subtitle: "Garmin sync is prepared, but workout authorization is pending Garmin approval. Use iPhone/manual capture for now.",
+                                    icon: "watch.analog",
+                                    selected: false,
+                                    disabled: true
+                                ) {}
                             }
                         }
                         .padding(.top, 12)
@@ -153,11 +168,11 @@ struct WorkoutStartOptionsView: View {
                     }
 
                     ATHLTHCard {
-                        Label("Apple Watch is optional", systemImage: "checkmark.shield.fill")
+                        Label(deviceInfoTitle, systemImage: "checkmark.shield.fill")
                             .font(.headline)
                             .foregroundStyle(ATHLTHTheme.accent)
 
-                        Text("Detailed strength tracking is optional too. HealthKit metrics can be linked later when available, while ATHLTH keeps the strength log separate.")
+                        Text(deviceInfoDetail)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 6)
@@ -201,6 +216,28 @@ struct WorkoutStartOptionsView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var deviceInfoTitle: String {
+        switch trainingDeviceProvider {
+        case .appleWatch:
+            return "Apple Watch is optional"
+        case .garmin:
+            return "Garmin sync is pending"
+        case .none:
+            return "No watch required"
+        }
+    }
+
+    private var deviceInfoDetail: String {
+        switch trainingDeviceProvider {
+        case .appleWatch:
+            return "You can still record this strength workout on iPhone if Apple Watch is unavailable."
+        case .garmin:
+            return "Until Garmin authorization is available, ATHLTH keeps the full strength log on iPhone. Garmin-derived metrics will plug into the same data model later."
+        case .none:
+            return "Strength workouts are recorded safely on iPhone. Missing wearable metrics stay empty instead of blocking or crashing the workout."
         }
     }
 
