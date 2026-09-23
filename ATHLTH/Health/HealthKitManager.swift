@@ -9,6 +9,7 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var sleep: SleepSummary = .empty
     @Published private(set) var heart: HeartSummary = .empty
     @Published private(set) var training: TrainingHealthSummary = .empty
+    @Published private(set) var recovery: RecoveryReadinessSummary = .buildingBaseline
     @Published private(set) var personalDetails: HealthProfileBasics = .empty
     @Published private(set) var isRefreshing = false
     @Published var authorizationError: String?
@@ -259,6 +260,10 @@ final class HealthKitManager: ObservableObject {
             sleep = try await fetchLatestSleep()
             heart = try await fetchHeartSummary()
             training = try await fetchTrainingSummary()
+            recovery = try await fetchRecoveryReadiness(
+                currentSleep: sleep,
+                currentHeart: heart
+            )
             await refreshPersonalDetails()
             lastSuccessfulRefreshAt = Date()
         } catch {
@@ -1351,6 +1356,7 @@ final class HealthKitManager: ObservableObject {
             start: start,
             end: end
         )
+        async let moveGoal = fetchTodayMoveGoal()
         async let basalEnergy = summedQuantity(
             identifier: .basalEnergyBurned,
             unit: .kilocalorie(),
@@ -1407,6 +1413,7 @@ final class HealthKitManager: ObservableObject {
         return TrainingHealthSummary(
             stepsToday: try await steps,
             activeEnergyKilocaloriesToday: try await activeEnergy,
+            moveGoalKilocaloriesToday: try await moveGoal,
             basalEnergyKilocaloriesToday: try await basalEnergy,
             exerciseMinutesToday: try await exerciseMinutes,
             distanceWalkingRunningMetersToday: try await walkingRunningDistance,
@@ -1480,6 +1487,236 @@ final class HealthKitManager: ObservableObject {
                 sleepByDay: sleepByDay
             )
         )
+    }
+
+    private func fetchTodayMoveGoal() async throws -> Double? {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents(
+            [.era, .year, .month, .day],
+            from: Date()
+        )
+        let predicate = HKQuery.predicateForActivitySummary(
+            with: components
+        )
+
+        let summaries = try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<[HKActivitySummary], Error>) in
+
+            let query = HKActivitySummaryQuery(predicate: predicate) {
+                _, summaries, error in
+
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: summaries ?? [])
+                }
+            }
+
+            healthStore.execute(query)
+        }
+
+        guard let summary = summaries.first else { return nil }
+
+        let goal = summary.activeEnergyBurnedGoal.doubleValue(
+            for: .kilocalorie()
+        )
+        return goal > 0 ? goal : nil
+    }
+
+    private func fetchRecoveryReadiness(
+        currentSleep: SleepSummary,
+        currentHeart: HeartSummary
+    ) async throws -> RecoveryReadinessSummary {
+        let calendar = Calendar.current
+        let baselineEnd = calendar.startOfDay(for: Date())
+        let baselineStart = calendar.date(
+            byAdding: .day,
+            value: -14,
+            to: baselineEnd
+        ) ?? baselineEnd.addingTimeInterval(-1_209_600)
+
+        async let sleepDaysTask = sleepDurationsByWakeDay(
+            startDate: baselineStart,
+            endDate: baselineEnd
+        )
+        async let hrvDaysTask = dailyAverageQuantities(
+            identifier: .heartRateVariabilitySDNN,
+            unit: .secondUnit(with: .milli),
+            startDate: baselineStart,
+            endDate: baselineEnd
+        )
+        async let restingDaysTask = dailyAverageQuantities(
+            identifier: .restingHeartRate,
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            startDate: baselineStart,
+            endDate: baselineEnd
+        )
+
+        let sleepDays = try await sleepDaysTask
+        let hrvDays = try await hrvDaysTask
+        let restingDays = try await restingDaysTask
+
+        let qualifyingBaselineDays = min(
+            sleepDays.count,
+            min(hrvDays.count, restingDays.count)
+        )
+
+        let averageSleep = Self.average(
+            sleepDays.values.map(Double.init)
+        )
+        let averageHRV = Self.average(Array(hrvDays.values))
+        let averageRestingHR = Self.average(Array(restingDays.values))
+
+        guard qualifyingBaselineDays >= 5,
+              currentSleep.totalAsleep > 0,
+              let currentHRV = currentHeart.hrvMilliseconds,
+              currentHRV > 0,
+              let currentRestingHR = currentHeart.restingHeartRate,
+              currentRestingHR > 0,
+              let averageSleep,
+              averageSleep > 0,
+              let averageHRV,
+              averageHRV > 0,
+              let averageRestingHR,
+              averageRestingHR > 0
+        else {
+            return RecoveryReadinessSummary(
+                score: nil,
+                state: .buildingBaseline,
+                detail: qualifyingBaselineDays > 0
+                    ? "ATHLTH has \(qualifyingBaselineDays) usable baseline day\(qualifyingBaselineDays == 1 ? "" : "s"). At least 5 days with sleep, HRV and resting heart rate are needed."
+                    : "ATHLTH is learning your recent sleep, HRV and resting heart-rate baseline.",
+                baselineDays: qualifyingBaselineDays,
+                averageSleepDuration: averageSleep,
+                baselineHRVMilliseconds: averageHRV,
+                baselineRestingHeartRate: averageRestingHR
+            )
+        }
+
+        let sleepReference = max(averageSleep, 7.5 * 3_600)
+        let sleepScore = Self.clamp(
+            currentSleep.totalAsleep / sleepReference,
+            lower: 0.45,
+            upper: 1.0
+        ) * 100
+
+        let hrvScore = Self.clamp(
+            currentHRV / averageHRV,
+            lower: 0.55,
+            upper: 1.0
+        ) * 100
+
+        let restingScore = Self.clamp(
+            averageRestingHR / currentRestingHR,
+            lower: 0.60,
+            upper: 1.0
+        ) * 100
+
+        let rawScore =
+            sleepScore * 0.45 +
+            hrvScore * 0.35 +
+            restingScore * 0.20
+        let score = Int(Self.clamp(rawScore, lower: 0, upper: 100).rounded())
+
+        let state: RecoveryReadinessState
+        switch score {
+        case 80...:
+            state = .ready
+        case 65..<80:
+            state = .balanced
+        case 50..<65:
+            state = .takeItEasy
+        default:
+            state = .recover
+        }
+
+        return RecoveryReadinessSummary(
+            score: score,
+            state: state,
+            detail: "Based on last night's sleep and today's HRV/resting heart rate compared with your recent baseline.",
+            baselineDays: qualifyingBaselineDays,
+            averageSleepDuration: averageSleep,
+            baselineHRVMilliseconds: averageHRV,
+            baselineRestingHeartRate: averageRestingHR
+        )
+    }
+
+    private func dailyAverageQuantities(
+        identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        startDate: Date,
+        endDate: Date
+    ) async throws -> [Date: Double] {
+        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+            return [:]
+        }
+
+        let calendar = Calendar.current
+        let anchor = calendar.startOfDay(for: startDate)
+        let predicate = HKQuery.predicateForSamples(
+            withStart: startDate,
+            end: endDate,
+            options: .strictStartDate
+        )
+
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<[Date: Double], Error>) in
+
+            let query = HKStatisticsCollectionQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: .discreteAverage,
+                anchorDate: anchor,
+                intervalComponents: DateComponents(day: 1)
+            )
+
+            query.initialResultsHandler = { _, results, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let results else {
+                    continuation.resume(returning: [:])
+                    return
+                }
+
+                var values: [Date: Double] = [:]
+                results.enumerateStatistics(
+                    from: startDate,
+                    to: endDate
+                ) { statistics, _ in
+                    guard let quantity = statistics.averageQuantity()
+                    else {
+                        return
+                    }
+
+                    let day = calendar.startOfDay(
+                        for: statistics.startDate
+                    )
+                    values[day] = quantity.doubleValue(for: unit)
+                }
+
+                continuation.resume(returning: values)
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    private static func average(
+        _ values: [Double]
+    ) -> Double? {
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    private static func clamp(
+        _ value: Double,
+        lower: Double,
+        upper: Double
+    ) -> Double {
+        min(max(value, lower), upper)
     }
 
     private func dailyCumulativeQuantities(
