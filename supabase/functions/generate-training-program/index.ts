@@ -326,6 +326,46 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Your sign-in session is no longer valid." }, 401);
   }
 
+  const { data: entitlement, error: entitlementError } = await admin
+    .from("subscription_entitlements")
+    .select("status, trial_ends_at, current_period_ends_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (entitlementError) {
+    console.error("Unable to verify ATHLTH+ entitlement", {
+      userID: user.id,
+      message: entitlementError.message,
+    });
+    return json({
+      error: "ATHLTH+ access could not be verified. Please try again.",
+      code: "ENTITLEMENT_CHECK_FAILED",
+    }, 503);
+  }
+
+  const now = Date.now();
+  const trialActive =
+    entitlement?.status === "trialing" &&
+    typeof entitlement?.trial_ends_at === "string" &&
+    Date.parse(entitlement.trial_ends_at) > now;
+
+  const paidActive =
+    entitlement?.status === "active" &&
+    (
+      entitlement?.current_period_ends_at == null ||
+      (
+        typeof entitlement.current_period_ends_at === "string" &&
+        Date.parse(entitlement.current_period_ends_at) > now
+      )
+    );
+
+  if (!trialActive && !paidActive) {
+    return json({
+      error: "ATHLTH AI requires an active ATHLTH+ plan or trial.",
+      code: "PREMIUM_REQUIRED",
+    }, 403);
+  }
+
   let body: ProgramRequest;
   try {
     body = await req.json();
