@@ -9,6 +9,7 @@ final class AppSessionStore: ObservableObject {
         }
     }
     @Published private(set) var planTemplates: [TrainingPlan]
+    @Published private(set) var savedWorkoutTemplates: [PlannedSession]
     @Published var savedRoutes: [TrainingRoute] {
         didSet {
             persistSavedRoutes()
@@ -38,6 +39,7 @@ final class AppSessionStore: ObservableObject {
         self.profile = profile
         self.activePlan = activePlan ?? Self.loadActivePlan(from: defaults)
         self.planTemplates = Self.loadPlanTemplates(from: defaults)
+        self.savedWorkoutTemplates = Self.loadSavedWorkoutTemplates(from: defaults)
         self.savedRoutes = savedRoutes.isEmpty
             ? Self.loadSavedRoutes(from: defaults)
             : savedRoutes
@@ -314,11 +316,13 @@ final class AppSessionStore: ObservableObject {
         activePlan = nil
         savedRoutes = []
         planTemplates = []
+        savedWorkoutTemplates = []
         previewModeEnabled = false
         usernameSeed = profile.displayName
         defaults.removeObject(forKey: "session.activeTrainingPlan")
         defaults.removeObject(forKey: "session.savedRoutes")
         defaults.removeObject(forKey: "session.trainingPlanTemplates")
+        defaults.removeObject(forKey: "session.savedWorkoutTemplates")
     }
 
     func resetOnboardingForPreview() {
@@ -744,6 +748,71 @@ final class AppSessionStore: ObservableObject {
         persistPlanTemplates()
     }
 
+    func saveSharedPlan(_ source: TrainingPlan) {
+        let copy = TrainingPlan(
+            id: UUID(),
+            ownerID: profile.userID,
+            title: source.title,
+            summary: source.summary,
+            visibility: .privateOnly,
+            version: 1,
+            weeks: source.weeks,
+            tags: source.tags,
+            spotifyPlaylist: source.spotifyPlaylist,
+            spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
+            createdAt: Date(),
+            updatedAt: Date(),
+            startDate: nil
+        )
+
+        planTemplates.insert(copy, at: 0)
+        persistPlanTemplates()
+    }
+
+    func saveSharedWorkout(_ source: PlannedSession) {
+        let copy = PlannedSession(
+            id: UUID(),
+            title: source.title,
+            kind: source.kind,
+            scheduledStart: nil,
+            durationMinutes: source.durationMinutes,
+            targetDistanceKilometers: source.targetDistanceKilometers,
+            targetPaceSecondsPerKilometer: source.targetPaceSecondsPerKilometer,
+            routeID: source.routeID,
+            exercises: source.exercises,
+            notes: source.notes,
+            runningWorkout: source.runningWorkout
+        )
+
+        savedWorkoutTemplates.insert(copy, at: 0)
+        persistSavedWorkoutTemplates()
+    }
+
+    func deleteSavedWorkoutTemplate(_ workoutID: UUID) {
+        savedWorkoutTemplates.removeAll { $0.id == workoutID }
+        persistSavedWorkoutTemplates()
+    }
+
+    func saveSharedRoute(_ source: TrainingRoute) {
+        let copy = TrainingRoute(
+            id: UUID(),
+            ownerID: profile.userID,
+            title: source.title,
+            visibility: .privateOnly,
+            coordinates: source.coordinates,
+            distanceKilometers: source.distanceKilometers,
+            elevationGainMeters: source.elevationGainMeters,
+            importedFilename: source.importedFilename,
+            createdAt: Date(),
+            startName: source.startName,
+            endName: source.endName,
+            expectedTravelTimeSeconds: source.expectedTravelTimeSeconds,
+            routeSource: "shared"
+        )
+
+        savedRoutes.insert(copy, at: 0)
+    }
+
     private func persistActivePlan() {
         guard let activePlan,
               let data = try? JSONEncoder().encode(activePlan)
@@ -779,6 +848,26 @@ final class AppSessionStore: ObservableObject {
         }
 
         defaults.set(data, forKey: "session.trainingPlanTemplates")
+    }
+
+    private func persistSavedWorkoutTemplates() {
+        guard let data = try? JSONEncoder().encode(savedWorkoutTemplates) else {
+            return
+        }
+
+        defaults.set(data, forKey: "session.savedWorkoutTemplates")
+    }
+
+    private static func loadSavedWorkoutTemplates(
+        from defaults: UserDefaults
+    ) -> [PlannedSession] {
+        guard let data = defaults.data(forKey: "session.savedWorkoutTemplates"),
+              let workouts = try? JSONDecoder().decode([PlannedSession].self, from: data)
+        else {
+            return []
+        }
+
+        return workouts
     }
 
     private static func loadActivePlan(from defaults: UserDefaults) -> TrainingPlan? {
