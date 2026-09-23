@@ -56,21 +56,63 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    ATHLTHTabHero(
-                        imageName: "HomeHero",
-                        title: greetingTitle,
-                        subtitle: session.profile.presence.state == .training
-                            ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
-                            : "Your health and training at a glance.",
-                        height: 150,
-                        alignment: .leading,
-                        focalOffsetX: 18
-                    )
+                    ZStack(alignment: .topTrailing) {
+                        ATHLTHTabHero(
+                            imageName: "HomeHero",
+                            title: greetingTitle,
+                            subtitle: session.profile.presence.state == .training
+                                ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
+                                : "Your health and training at a glance.",
+                            height: 150,
+                            alignment: .leading,
+                            focalOffsetX: 18
+                        )
+
+                        NavigationLink {
+                            ATHLTHNotificationCenterView()
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(
+                                    systemName:
+                                        notifications.unreadCount > 0
+                                            ? "bell.fill"
+                                            : "bell"
+                                )
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 38, height: 38)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(.white.opacity(0.38), lineWidth: 1)
+                                }
+
+                                if notifications.unreadCount > 0 {
+                                    Circle()
+                                        .fill(.red)
+                                        .frame(width: 9, height: 9)
+                                        .overlay {
+                                            Circle().stroke(.white, lineWidth: 1.5)
+                                        }
+                                        .offset(x: 1, y: -1)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 12)
+                        .padding(.trailing, 12)
+                        .accessibilityLabel(
+                            notifications.unreadCount > 0
+                                ? "Notifications, \(notifications.unreadCount) unread"
+                                : "Notifications"
+                        )
+                    }
 
                     ATHLTHCard {
                         HStack(alignment: .firstTextBaseline) {
@@ -2773,7 +2815,6 @@ extension View {
 
 struct ATHLTHProfileView: View {
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var trophyStore: TrophyStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var social: SocialStore
@@ -2956,29 +2997,6 @@ struct ATHLTHProfileView: View {
                         inboxUnreadCount > 0
                             ? "Inbox, \(inboxUnreadCount) unread"
                             : "Inbox"
-                    )
-
-                    NavigationLink {
-                        ATHLTHNotificationCenterView()
-                    } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: notifications.unreadCount > 0 ? "bell.fill" : "bell")
-
-                            if notifications.unreadCount > 0 {
-                                Circle()
-                                    .fill(.red)
-                                    .frame(width: 8, height: 8)
-                                    .overlay {
-                                        Circle().stroke(.white, lineWidth: 1.5)
-                                    }
-                                    .offset(x: 4, y: -3)
-                            }
-                        }
-                    }
-                    .accessibilityLabel(
-                        notifications.unreadCount > 0
-                            ? "Notifications, \(notifications.unreadCount) unread"
-                            : "Notifications"
                     )
 
                     NavigationLink {
