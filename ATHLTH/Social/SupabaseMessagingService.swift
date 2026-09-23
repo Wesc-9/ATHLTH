@@ -32,7 +32,7 @@ final class SupabaseMessagingService {
         try await client
             .from("direct_conversations")
             .select()
-            .order("last_message_at", ascending: false, nullsFirst: false)
+            .order("last_message_at", ascending: false)
             .execute()
             .value
     }
