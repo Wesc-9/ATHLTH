@@ -302,16 +302,16 @@ struct ATHLTHSettingsView: View {
                             SettingsDivider()
 
                             NavigationLink {
-                                AppleWatchConnectionView()
+                                ATHLTHTrainingDeviceSettingsView()
                             } label: {
                                 PremiumSettingsRow(
-                                    icon: "applewatch",
+                                    icon: settings.trainingDeviceProvider.systemImage,
                                     iconTint: ATHLTHTheme.primaryText,
-                                    title: "Apple Watch",
-                                    subtitle: watchConnection.statusText
+                                    title: "Training device",
+                                    subtitle: trainingDeviceSubtitle
                                 ) {
                                     connectionTrailing(
-                                        watchConnection.isReady ? "Connected" : "Open",
+                                        settings.trainingDeviceProvider.title,
                                         showChevron: true
                                     )
                                 }
@@ -627,6 +627,19 @@ struct ATHLTHSettingsView: View {
             : "full routes"
 
         return "\(profileTitle) profile · \(routeTitle)"
+    }
+
+    private var trainingDeviceSubtitle: String {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            return watchConnection.isReady
+                ? "Apple Watch connected"
+                : watchConnection.statusText
+        case .garmin:
+            return "Garmin Connect prepared · authorization pending"
+        case .none:
+            return "ATHLTH works without a watch"
+        }
     }
 
     private var notificationSummary: String {
