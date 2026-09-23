@@ -97,7 +97,9 @@ struct AppRootView: View {
                 }
             }
 
-            watchConnection.connect()
+            if settings.trainingDeviceProvider == .appleWatch {
+                watchConnection.connect()
+            }
 
             await subscriptionStore.start()
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
@@ -131,9 +133,11 @@ struct AppRootView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
 
-            // Refresh pairing/install state whenever ATHLTH returns to the
-            // foreground, for example after installing the Watch app.
-            watchConnection.connect()
+            // Only touch WatchConnectivity when Apple Watch is the selected
+            // provider. Garmin/no-watch users should not depend on Watch state.
+            if settings.trainingDeviceProvider == .appleWatch {
+                watchConnection.connect()
+            }
 
             Task {
                 if appSession.signedIn {
@@ -173,6 +177,13 @@ struct AppRootView: View {
                 )
             }
         }
+        .onChange(of: settings.trainingDeviceProvider) { _, provider in
+            if provider == .appleWatch {
+                watchConnection.connect()
+            } else if settings.preferredWorkoutCapture == .appleWatch {
+                settings.preferredWorkoutCapture = .iPhone
+            }
+        }
         .onChange(of: settings.backgroundHealthSyncEnabled) { _, enabled in
             guard health.hasRequestedAuthorization else {
                 return
@@ -192,7 +203,14 @@ struct AppRootView: View {
             }
         }
         .onChange(of: watchConnection.lastCompletedWorkout) { _, result in
-            guard let result else { return }
+            guard settings.trainingDeviceProvider == .appleWatch,
+                  let result
+            else {
+                if settings.trainingDeviceProvider != .appleWatch {
+                    watchConnection.clearCompletedWorkout()
+                }
+                return
+            }
 
             if result.kind == .strength {
                 strengthWorkout.attachHealthMetrics(
