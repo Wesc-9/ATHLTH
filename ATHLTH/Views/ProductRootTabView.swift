@@ -1172,6 +1172,7 @@ struct ATHLTHTrainView: View {
 
 struct ATHLTHRecoveryView: View {
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var settings: AppSettingsStore
 
     var body: some View {
         NavigationStack {
