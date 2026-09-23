@@ -1143,6 +1143,14 @@ struct SocialPrivacySettingsView: View {
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
                     Toggle("Trophy Cabinet", isOn: binding.shareTrophyCabinet)
                     Toggle("Recent activity", isOn: binding.shareRecentActivity)
+                    Toggle("Running PRs", isOn: binding.shareRunningPRs)
+                    Toggle("Strength PRs", isOn: binding.shareStrengthPRs)
+                    Toggle("Completed goals", isOn: binding.shareGoals)
+                    Toggle("Workout totals", isOn: binding.shareWorkoutTotals)
+
+                    Text("Strength PRs use manually entered reps and weight and are labeled Manual in Activity. Running PRs use qualifying Apple Health workout data.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Challenges") {
