@@ -890,8 +890,15 @@ struct ATHLTHTrainView: View {
             return strengthWorkout.activeWorkout == nil
         }
 
-        return watchWorkoutKind(for: kind) != nil &&
-            !watchConnection.workoutLaunchInProgress
+        guard watchWorkoutKind(for: kind) != nil else {
+            return false
+        }
+
+        if settings.trainingDeviceProvider == .appleWatch {
+            return !watchConnection.workoutLaunchInProgress
+        }
+
+        return true
     }
 
     private func handleQuickStart(_ kind: WorkoutKind) {
