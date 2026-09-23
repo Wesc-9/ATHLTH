@@ -83,6 +83,33 @@ struct StrengthPersonalRecord: Identifiable, Hashable {
     let score: Double
 }
 
+struct StrengthRepPersonalRecord: Identifiable, Hashable {
+    var id: String {
+        "rep-pr-\(exerciseName.lowercased())-\(reps)"
+    }
+
+    let exerciseName: String
+    let weightKilograms: Double
+    let reps: Int
+    let date: Date
+    let sourceWorkoutID: UUID
+
+    var title: String {
+        "\(exerciseName) PR"
+    }
+
+    var value: String {
+        let weight: String
+        if weightKilograms.rounded() == weightKilograms {
+            weight = String(Int(weightKilograms))
+        } else {
+            weight = String(format: "%.1f", weightKilograms)
+        }
+
+        return "\(weight) kg × \(reps)"
+    }
+}
+
 struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     let id: UUID
     var plannedSessionID: UUID?
