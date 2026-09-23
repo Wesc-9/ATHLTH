@@ -2335,7 +2335,10 @@ struct ATHLTHProfileView: View {
                         NavigationLink {
                             SocialHubView(initialTab: .messages)
                         } label: {
-                            profileStat("\(messaging.unreadCount)", "Messages")
+                            profileStat(
+                                "\(messaging.unreadCount + messaging.messageRequestCount)",
+                                "Messages"
+                            )
                         }
                         .buttonStyle(.plain)
                     }
