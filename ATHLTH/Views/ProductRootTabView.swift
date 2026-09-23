@@ -461,7 +461,9 @@ struct ATHLTHTrainView: View {
     @State private var pendingQuickStartKind: WorkoutKind?
     @State private var showingStrengthWorkout = false
 
-    private let gpxImporter = GPXRouteImporter()
+    private var gpxImporter: GPXRouteImporter {
+        GPXRouteImporter(ownerID: session.profile.userID)
+    }
 
     var body: some View {
         NavigationStack {
