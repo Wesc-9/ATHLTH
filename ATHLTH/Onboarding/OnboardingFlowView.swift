@@ -961,8 +961,10 @@ struct OnboardingFlowView: View {
                 deviceChoiceCard(
                     provider: .garmin,
                     title: "Garmin",
-                    subtitle: "Sync training, health and performance data.",
-                    icon: "watch.analog"
+                    subtitle: "Garmin Connect integration is coming soon.",
+                    icon: "watch.analog",
+                    isAvailable: false,
+                    badge: "COMING SOON"
                 )
 
                 deviceChoiceCard(
@@ -985,11 +987,15 @@ struct OnboardingFlowView: View {
         provider: TrainingDeviceProvider,
         title: String,
         subtitle: String,
-        icon: String
+        icon: String,
+        isAvailable: Bool = true,
+        badge: String? = nil
     ) -> some View {
-        let selected = settings.trainingDeviceProvider == provider
+        let selected = isAvailable && settings.trainingDeviceProvider == provider
 
         return Button {
+            guard isAvailable else { return }
+
             withAnimation(.easeInOut(duration: 0.18)) {
                 settings.trainingDeviceProvider = provider
             }
@@ -1016,20 +1022,45 @@ struct OnboardingFlowView: View {
                     Image(systemName: icon)
                         .font(.system(size: provider == .appleWatch ? 31 : 28, weight: .medium))
                         .foregroundStyle(
-                            selected
-                                ? OnboardingTheme.accent
-                                : OnboardingTheme.primaryText.opacity(0.78)
+                            !isAvailable
+                                ? OnboardingTheme.faintText.opacity(0.55)
+                                : selected
+                                    ? OnboardingTheme.accent
+                                    : OnboardingTheme.primaryText.opacity(0.78)
                         )
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(title)
-                        .font(.system(size: 19, weight: .bold))
-                        .foregroundStyle(OnboardingTheme.primaryText)
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(.system(size: 19, weight: .bold))
+                            .foregroundStyle(
+                                isAvailable
+                                    ? OnboardingTheme.primaryText
+                                    : OnboardingTheme.mutedText
+                            )
+
+                        if let badge {
+                            Text(badge)
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(0.7)
+                                .foregroundStyle(OnboardingTheme.faintText)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Color.black.opacity(0.045),
+                                    in: Capsule()
+                                )
+                        }
+                    }
 
                     Text(subtitle)
                         .font(.subheadline)
-                        .foregroundStyle(OnboardingTheme.mutedText)
+                        .foregroundStyle(
+                            isAvailable
+                                ? OnboardingTheme.mutedText
+                                : OnboardingTheme.faintText
+                        )
                         .multilineTextAlignment(.leading)
                         .lineSpacing(2)
                 }
@@ -1047,9 +1078,11 @@ struct OnboardingFlowView: View {
             .padding(16)
             .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
             .background(
-                selected
-                    ? OnboardingTheme.accent.opacity(0.045)
-                    : OnboardingTheme.card,
+                !isAvailable
+                    ? Color.black.opacity(0.025)
+                    : selected
+                        ? OnboardingTheme.accent.opacity(0.045)
+                        : OnboardingTheme.card,
                 in: RoundedRectangle(cornerRadius: 24, style: .continuous)
             )
             .overlay {
@@ -1071,8 +1104,13 @@ struct OnboardingFlowView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(!isAvailable)
         .accessibilityLabel("\(title). \(subtitle)")
-        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityValue(
+            !isAvailable
+                ? "Coming soon"
+                : selected ? "Selected" : "Not selected"
+        )
     }
 
     private var appleHealthConnectionStep: some View {
