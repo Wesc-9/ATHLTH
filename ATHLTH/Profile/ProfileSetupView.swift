@@ -7,14 +7,10 @@ struct ATHLTHProfileSetupView: View {
     @EnvironmentObject private var social: SocialStore
 
     @State private var selectedFocus: TrainingFocus?
-    @State private var shareTrainingPresence = false
-    @State private var shareGoals = false
-    @State private var shareWorkoutTotals = false
-    @State private var shareTrophies = false
-    @State private var sharePerformance = false
-    @State private var shareRecentActivity = false
-    @State private var shareRunningPRs = false
-    @State private var shareStrengthPRs = false
+    @State private var trainingStatusVisibility: ProfileVisibility = .privateOnly
+    @State private var performanceVisibility: ProfileVisibility = .privateOnly
+    @State private var trophyVisibility: ProfileVisibility = .privateOnly
+    @State private var activityVisibility: ProfileVisibility = .privateOnly
     @State private var saving = false
     @State private var errorMessage: String?
 
@@ -94,57 +90,33 @@ struct ATHLTHProfileSetupView: View {
             }
 
             Section {
-                shareToggle(
-                    "Training now status",
+                visibilityRow(
+                    "Training status",
                     icon: "figure.run",
-                    isOn: $shareTrainingPresence
+                    selection: $trainingStatusVisibility
                 )
 
-                shareToggle(
-                    "Goals",
-                    icon: "target",
-                    isOn: $shareGoals
-                )
-
-                shareToggle(
-                    "Workout totals",
-                    icon: "number.circle.fill",
-                    isOn: $shareWorkoutTotals
-                )
-
-                shareToggle(
-                    "Trophies",
-                    icon: "trophy.fill",
-                    isOn: $shareTrophies
-                )
-
-                shareToggle(
+                visibilityRow(
                     "Performance stats",
                     icon: "chart.line.uptrend.xyaxis",
-                    isOn: $sharePerformance
+                    selection: $performanceVisibility
                 )
 
-                shareToggle(
+                visibilityRow(
+                    "Trophies",
+                    icon: "trophy.fill",
+                    selection: $trophyVisibility
+                )
+
+                visibilityRow(
                     "Recent activity",
                     icon: "clock.fill",
-                    isOn: $shareRecentActivity
-                )
-
-                shareToggle(
-                    "Running PRs",
-                    icon: "figure.run",
-                    isOn: $shareRunningPRs
-                )
-
-                shareToggle(
-                    "Strength PRs",
-                    icon: "dumbbell.fill",
-                    isOn: $shareStrengthPRs
+                    selection: $activityVisibility
                 )
             } header: {
                 Text("Visible to others")
             } footer: {
-                Text("Everything starts off. Turn on only the profile data you explicitly want to share. Your HealthKit data itself is never exposed to other users.")
+                Text("Every section starts Off. Friends limits it to accepted friends. Public makes that section visible to other ATHLTH users who can open your profile.")
             }
 
             if let errorMessage {
@@ -252,38 +224,63 @@ struct ATHLTHProfileSetupView: View {
         .tint(ATHLTHTheme.accent)
     }
 
-    private func shareToggle(
+    private func visibilityRow(
         _ title: String,
         icon: String,
-        isOn: Binding<Bool>
+        selection: Binding<ProfileVisibility>
     ) -> some View {
-        Toggle(isOn: isOn) {
+        VStack(alignment: .leading, spacing: 9) {
             Label(title, systemImage: icon)
+                .font(.subheadline.weight(.semibold))
+
+            Picker(title, selection: selection) {
+                Text("Off").tag(ProfileVisibility.privateOnly)
+                Text("Friends").tag(ProfileVisibility.friends)
+                Text("Public").tag(ProfileVisibility.publicProfile)
+            }
+            .pickerStyle(.segmented)
         }
-        .tint(ATHLTHTheme.accent)
+        .padding(.vertical, 3)
     }
 
     private func loadSharingSettings() {
         guard let privacy = social.privacy else {
-            shareTrainingPresence = false
-            shareGoals = false
-            shareWorkoutTotals = false
-            shareTrophies = false
-            sharePerformance = false
-            shareRecentActivity = false
-            shareRunningPRs = false
-            shareStrengthPRs = false
+            trainingStatusVisibility = .privateOnly
+            performanceVisibility = .privateOnly
+            trophyVisibility = .privateOnly
+            activityVisibility = .privateOnly
             return
         }
 
-        shareTrainingPresence = privacy.shareTrainingPresence
-        shareGoals = privacy.shareGoals
-        shareWorkoutTotals = privacy.shareWorkoutTotals
-        shareTrophies = privacy.shareTrophyCabinet
-        sharePerformance = privacy.sharePerformanceStats
-        shareRecentActivity = privacy.shareRecentActivity
-        shareRunningPRs = privacy.shareRunningPRs
-        shareStrengthPRs = privacy.shareStrengthPRs
+        trainingStatusVisibility =
+            ProfileVisibility(rawValue: privacy.trainingPresenceVisibility)
+            ?? .privateOnly
+        performanceVisibility =
+            ProfileVisibility(rawValue: privacy.performanceStatsVisibility)
+            ?? .privateOnly
+        trophyVisibility =
+            ProfileVisibility(rawValue: privacy.trophyCabinetVisibility)
+            ?? .privateOnly
+        activityVisibility =
+            ProfileVisibility(rawValue: privacy.recentActivityVisibility)
+            ?? .privateOnly
+    }
+
+    private var broadestProfileVisibility: ProfileVisibility {
+        let values = [
+            trainingStatusVisibility,
+            performanceVisibility,
+            trophyVisibility,
+            activityVisibility
+        ]
+
+        if values.contains(.publicProfile) {
+            return .publicProfile
+        }
+        if values.contains(.friends) {
+            return .friends
+        }
+        return .privateOnly
     }
 
     @MainActor
@@ -299,14 +296,28 @@ struct ATHLTHProfileSetupView: View {
         var privacy = social.privacy
             ?? SocialPrivacySettings.fallback(userID: session.profile.userID)
 
-        privacy.shareTrainingPresence = shareTrainingPresence
-        privacy.shareGoals = shareGoals
-        privacy.shareWorkoutTotals = shareWorkoutTotals
-        privacy.shareTrophyCabinet = shareTrophies
-        privacy.sharePerformanceStats = sharePerformance
-        privacy.shareRecentActivity = shareRecentActivity
-        privacy.shareRunningPRs = shareRunningPRs
-        privacy.shareStrengthPRs = shareStrengthPRs
+        privacy.trainingPresenceVisibility = trainingStatusVisibility.rawValue
+        privacy.performanceStatsVisibility = performanceVisibility.rawValue
+        privacy.trophyCabinetVisibility = trophyVisibility.rawValue
+        privacy.recentActivityVisibility = activityVisibility.rawValue
+
+        privacy.shareTrainingPresence =
+            trainingStatusVisibility != .privateOnly
+        privacy.sharePerformanceStats =
+            performanceVisibility != .privateOnly
+        privacy.shareTrophyCabinet =
+            trophyVisibility != .privateOnly
+        privacy.shareRecentActivity =
+            activityVisibility != .privateOnly
+
+        // Keep unsupported social profile sections private until they have
+        // dedicated, enforceable profile surfaces.
+        privacy.shareGoals = false
+        privacy.shareRunningPRs = false
+        privacy.shareStrengthPRs = false
+        privacy.shareWorkoutTotals = false
+
+        privacy.profileVisibility = broadestProfileVisibility.rawValue
 
         await social.updatePrivacy(privacy)
 
@@ -315,8 +326,11 @@ struct ATHLTHProfileSetupView: View {
             return
         }
 
-        settings.shareTrainingPresence = shareTrainingPresence
+        settings.profileVisibility = broadestProfileVisibility
+        settings.shareTrainingPresence =
+            trainingStatusVisibility != .privateOnly
         settings.markProfileSetupCompleted()
         dismiss()
     }
+}
 }
