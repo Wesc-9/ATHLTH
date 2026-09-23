@@ -69,7 +69,7 @@ struct AdvancedPlannerView: View {
                                             Image(systemName: "plus.circle.fill")
                                         }
                                         .buttonStyle(.plain)
-                                        .foregroundStyle(.green)
+                                        .foregroundStyle(ATHLTHTheme.accent)
                                     }
 
                                     if day.sessions.isEmpty {
@@ -108,7 +108,7 @@ struct AdvancedPlannerView: View {
                     showingPlanCreation = true
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
             }
         }
         .sheet(isPresented: $showingSessionEditor) {
@@ -127,7 +127,7 @@ struct AdvancedPlannerView: View {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: workout.kind.systemImage)
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -274,7 +274,7 @@ struct TrainingPlanManagerView: View {
                             "\(goalStore.goals.filter { $0.linkedTrainingPlanID == plan.id }.count)"
                         )
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                     }
 
                     let linked = goalStore.goals.filter {
@@ -291,7 +291,7 @@ struct TrainingPlanManagerView: View {
                             ForEach(linked) { goal in
                                 HStack {
                                     Image(systemName: goal.category.systemImage)
-                                        .foregroundStyle(.green)
+                                        .foregroundStyle(ATHLTHTheme.accent)
 
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(goal.title)
@@ -417,7 +417,7 @@ struct TrainingPlanManagerView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
 
                     Button {
                         session.duplicateActivePlan()
@@ -520,7 +520,7 @@ struct TrainingPlanCreationView: View {
                                 )
                                 .background(
                                     !useCustomWeeks && weekCount == weeks
-                                        ? Color.green
+                                        ? ATHLTHTheme.accent
                                         : Color(.tertiarySystemGroupedBackground),
                                     in: RoundedRectangle(cornerRadius: 12)
                                 )
@@ -938,10 +938,10 @@ struct SessionEditorView: View {
                         HStack(spacing: 10) {
                             Text("\(index + 1)")
                                 .font(.caption.bold())
-                                .foregroundStyle(.green)
+                                .foregroundStyle(ATHLTHTheme.accent)
                                 .frame(width: 26, height: 26)
                                 .background(
-                                    .green.opacity(0.10),
+                                    ATHLTHTheme.accent.opacity(0.10),
                                     in: Circle()
                                 )
 
@@ -1023,7 +1023,7 @@ struct SessionEditorView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Image(systemName: workout.type.systemImage)
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
                                 Text(workout.title)
                                     .font(.headline)
                                     .foregroundStyle(.primary)
@@ -1040,7 +1040,7 @@ struct SessionEditorView: View {
                                 "\(workout.blocks.count) blocks · \(workout.type.title)"
                             )
                             .font(.caption2)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                         }
                     }
                     .buttonStyle(.plain)
