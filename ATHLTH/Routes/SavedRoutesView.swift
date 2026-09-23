@@ -62,14 +62,14 @@ struct SavedRoutesView: View {
             if route.coordinates.count >= 2 {
                 Map(initialPosition: .region(region(for: route))) {
                     MapPolyline(coordinates: route.coordinates.map(\.coordinate))
-                        .stroke(.green, lineWidth: 5)
+                        .stroke(ATHLTHTheme.accent, lineWidth: 5)
 
                     if let first = route.coordinates.first {
                         Marker(
                             route.startName ?? "Start",
                             coordinate: first.coordinate
                         )
-                        .tint(.green)
+                        .tint(ATHLTHTheme.accent)
                     }
 
                     if let last = route.coordinates.last {
@@ -146,7 +146,7 @@ struct SavedRoutesView: View {
                     systemImage: "globe.europe.africa.fill"
                 )
                 .font(.caption2)
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
             }
         }
         .padding(14)
