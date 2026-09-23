@@ -20,7 +20,14 @@ final class MessagingStore: ObservableObject {
 
     var unreadCount: Int {
         guard let currentUserID else { return 0 }
+        let acceptedConversationIDs = Set(
+            conversations
+                .filter { $0.requestStatus == .accepted }
+                .map(\.id)
+        )
+
         return recentMessages.filter {
+            acceptedConversationIDs.contains($0.conversationID) &&
             $0.recipientID == currentUserID &&
             $0.readAt == nil &&
             $0.deletedAt == nil
@@ -55,7 +62,9 @@ final class MessagingStore: ObservableObject {
     }
 
     var messageRequestCount: Int {
-        incomingMessageRequests.count
+        incomingMessageRequests.filter {
+            lastMessage(for: $0.id) != nil
+        }.count
     }
 
     func unreadCount(for conversationID: UUID) -> Int {
