@@ -236,6 +236,84 @@ struct TrainingPlanManagerView: View {
 
     var body: some View {
         VStack(spacing: 16) {
+            ATHLTHCard {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "square.stack.3d.up.fill")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Program Library")
+                            .font(.title3.weight(.bold))
+                        Text(
+                            "Programs are reusable training structures. Start one when you're ready, then manage its actual dates and sessions in Calendar."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showingProgramCreation = true
+                    } label: {
+                        Label("Create", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(ATHLTHTheme.accent)
+                }
+            }
+
+            if !session.planTemplates.isEmpty {
+                ATHLTHCard {
+                    ATHLTHSectionHeader(
+                        title: "Saved Programs",
+                        actionTitle: "\(session.planTemplates.count)"
+                    )
+
+                    VStack(spacing: 10) {
+                        ForEach(session.planTemplates) { template in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(template.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(
+                                        template.tags.isEmpty
+                                            ? "\(template.weeks.count) weeks"
+                                            : "\(template.weeks.count) weeks · \(template.tags.joined(separator: ", "))"
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                }
+
+                                Spacer()
+
+                                Button("Start") {
+                                    programToStart = template
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+
+                                Button(role: .destructive) {
+                                    session.deletePlanTemplate(template.id)
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.top, 10)
+                }
+            }
+
             if let plan = session.activePlan {
                 ATHLTHCard {
                     HStack {
@@ -270,50 +348,6 @@ struct TrainingPlanManagerView: View {
                     .padding(.top, 10)
                 }
 
-                if !session.planTemplates.isEmpty {
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(
-                            title: "Program Library",
-                            actionTitle: "\(session.planTemplates.count)"
-                        )
-
-                        VStack(spacing: 10) {
-                            ForEach(session.planTemplates) { template in
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(template.title)
-                                            .font(.subheadline.weight(.semibold))
-                                        Text(
-                                            template.tags.isEmpty
-                                                ? "\(template.weeks.count) weeks"
-                                                : "\(template.weeks.count) weeks · \(template.tags.joined(separator: ", "))"
-                                        )
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                    }
-
-                                    Spacer()
-
-                                    Button("Start") {
-                                        programToStart = template
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-
-                                    Button(role: .destructive) {
-                                        session.deletePlanTemplate(template.id)
-                                    } label: {
-                                        Image(systemName: "trash")
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                        .padding(.top, 10)
-                    }
-                }
-
                 ATHLTHCard {
                     HStack {
                         ATHLTHSectionHeader(
@@ -335,7 +369,7 @@ struct TrainingPlanManagerView: View {
                     }
 
                     if linked.isEmpty {
-                        Text("No goals are linked to this plan yet.")
+                        Text("No goals are linked to this program yet.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 8)
@@ -383,8 +417,8 @@ struct TrainingPlanManagerView: View {
 
                             Text(
                                 plan.spotifyPlaylist == nil
-                                    ? "ATHLTH no longer shows placeholder playlists here. A playlist is only shown when a real Spotify playlist has been linked."
-                                    : "This real playlist can start automatically with workouts from this plan."
+                                    ? "ATHLTH only shows real playlists linked to this program."
+                                    : "This playlist can start automatically with workouts from this program."
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -590,7 +624,7 @@ struct TrainingPlanCreationView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
 
-    @State private var title = "My Training Plan"
+    @State private var title = "My Program"
     @State private var summary = ""
     @State private var weekCount = 4
     @State private var customWeeks = 12
@@ -666,7 +700,7 @@ struct TrainingPlanCreationView: View {
                         }
                     }
 
-                    Toggle("Custom plan length", isOn: $useCustomWeeks)
+                    Toggle("Custom program length", isOn: $useCustomWeeks)
 
                     if useCustomWeeks {
                         Stepper(
