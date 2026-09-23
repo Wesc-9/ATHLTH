@@ -40,8 +40,24 @@ protocol WearableDataSource {
     var capabilities: Set<WearableDataCapability> { get }
     var isAuthorized: Bool { get }
 
+    // The Garmin adapter must populate the same core models already consumed
+    // by Home and Recovery so provider-specific data never leaks into UI code.
     func refreshDailySnapshot() async throws -> WearableDailySnapshot?
-    func refreshWorkouts(since date: Date) async throws -> [WearableWorkoutRecord]
+
+    // Historical data powers workout history, Progress and PR detection.
+    func refreshWorkouts(
+        since date: Date
+    ) async throws -> [WearableWorkoutRecord]
+
+    func refreshProgressSnapshot(
+        startDate: Date,
+        endDate: Date,
+        previousStartDate: Date,
+        previousEndDate: Date,
+        grouping: HealthProgressGrouping
+    ) async throws -> HealthProgressSnapshot?
+
+    func refreshPersonalRecords() async throws -> [HealthPersonalRecord]
 }
 
 enum GarminIntegrationState: String, Codable, Hashable {
