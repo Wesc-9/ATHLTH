@@ -586,6 +586,53 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    func replaceActivePlan(with plan: TrainingPlan) {
+        activePlan = plan
+    }
+
+    func fillEmptyDaysFromGeneratedProgram(
+        _ generated: TrainingPlan
+    ) {
+        guard var current = activePlan else {
+            activePlan = generated
+            return
+        }
+
+        let targetWeekCount = max(generated.weeks.count, 1)
+
+        if current.weeks.count < targetWeekCount {
+            for number in (current.weeks.count + 1)...targetWeekCount {
+                current.weeks.append(makeEmptyWeek(number: number))
+            }
+        } else if current.weeks.count > targetWeekCount {
+            current.weeks = Array(current.weeks.prefix(targetWeekCount))
+        }
+
+        for weekIndex in current.weeks.indices {
+            guard generated.weeks.indices.contains(weekIndex) else {
+                continue
+            }
+
+            let generatedWeek = generated.weeks[weekIndex]
+
+            for dayIndex in current.weeks[weekIndex].days.indices {
+                guard generatedWeek.days.indices.contains(dayIndex) else {
+                    continue
+                }
+
+                if current.weeks[weekIndex].days[dayIndex].sessions.isEmpty {
+                    current.weeks[weekIndex].days[dayIndex].sessions =
+                        generatedWeek.days[dayIndex].sessions
+                }
+            }
+        }
+
+        current.startDate = generated.startDate ?? current.startDate
+        current.updatedAt = Date()
+        current.version += 1
+        activePlan = current
+    }
+
     func setActivePlanWeekCount(_ weekCount: Int) {
         guard var plan = activePlan else { return }
 
