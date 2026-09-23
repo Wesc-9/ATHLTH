@@ -23,6 +23,10 @@ struct ATHLTHApp: App {
     @StateObject private var subscriptionBackend = SubscriptionBackendService()
     @StateObject private var accountService = SupabaseAccountService()
 
+    init() {
+        ATHLTHKeyboardCoordinator.shared.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             AppRootView()
