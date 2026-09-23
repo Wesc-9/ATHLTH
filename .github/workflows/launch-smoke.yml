@@ -99,7 +99,7 @@ jobs:
           PID=$(echo "$LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
           sleep 8
 
-          if [ -n "$PID" ] && xcrun simctl spawn "$UDID" ps -ax | grep -E "[[:space:]]$PID[[:space:]]" >/dev/null; then
+          if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
             echo "ATHLTH remained alive after launch (PID $PID)."
           else
             echo "::error::ATHLTH process exited shortly after launch."
