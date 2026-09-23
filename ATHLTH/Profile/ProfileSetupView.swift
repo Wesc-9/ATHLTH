@@ -10,7 +10,10 @@ struct ATHLTHProfileSetupView: View {
     @State private var trainingStatusVisibility: ProfileVisibility = .privateOnly
     @State private var performanceVisibility: ProfileVisibility = .privateOnly
     @State private var trophyVisibility: ProfileVisibility = .privateOnly
+    @State private var goalsVisibility: ProfileVisibility = .privateOnly
     @State private var activityVisibility: ProfileVisibility = .privateOnly
+    @State private var runningPRVisibility: ProfileVisibility = .privateOnly
+    @State private var strengthPRVisibility: ProfileVisibility = .privateOnly
     @State private var saving = false
     @State private var errorMessage: String?
 
@@ -109,9 +112,27 @@ struct ATHLTHProfileSetupView: View {
                 )
 
                 visibilityRow(
+                    "Goal updates",
+                    icon: "target",
+                    selection: $goalsVisibility
+                )
+
+                visibilityRow(
                     "Recent activity",
                     icon: "clock.fill",
                     selection: $activityVisibility
+                )
+
+                visibilityRow(
+                    "Running PR updates",
+                    icon: "figure.run",
+                    selection: $runningPRVisibility
+                )
+
+                visibilityRow(
+                    "Strength PR updates",
+                    icon: "dumbbell.fill",
+                    selection: $strengthPRVisibility
                 )
             } header: {
                 Text("Visible to others")
@@ -248,7 +269,10 @@ struct ATHLTHProfileSetupView: View {
             trainingStatusVisibility = .privateOnly
             performanceVisibility = .privateOnly
             trophyVisibility = .privateOnly
+            goalsVisibility = .privateOnly
             activityVisibility = .privateOnly
+            runningPRVisibility = .privateOnly
+            strengthPRVisibility = .privateOnly
             return
         }
 
@@ -261,8 +285,17 @@ struct ATHLTHProfileSetupView: View {
         trophyVisibility =
             ProfileVisibility(rawValue: privacy.trophyCabinetVisibility)
             ?? .privateOnly
+        goalsVisibility =
+            ProfileVisibility(rawValue: privacy.goalsVisibility)
+            ?? .privateOnly
         activityVisibility =
             ProfileVisibility(rawValue: privacy.recentActivityVisibility)
+            ?? .privateOnly
+        runningPRVisibility =
+            ProfileVisibility(rawValue: privacy.runningPRsVisibility)
+            ?? .privateOnly
+        strengthPRVisibility =
+            ProfileVisibility(rawValue: privacy.strengthPRsVisibility)
             ?? .privateOnly
     }
 
@@ -271,7 +304,10 @@ struct ATHLTHProfileSetupView: View {
             trainingStatusVisibility,
             performanceVisibility,
             trophyVisibility,
-            activityVisibility
+            goalsVisibility,
+            activityVisibility,
+            runningPRVisibility,
+            strengthPRVisibility
         ]
 
         if values.contains(.publicProfile) {
@@ -299,7 +335,10 @@ struct ATHLTHProfileSetupView: View {
         privacy.trainingPresenceVisibility = trainingStatusVisibility.rawValue
         privacy.performanceStatsVisibility = performanceVisibility.rawValue
         privacy.trophyCabinetVisibility = trophyVisibility.rawValue
+        privacy.goalsVisibility = goalsVisibility.rawValue
         privacy.recentActivityVisibility = activityVisibility.rawValue
+        privacy.runningPRsVisibility = runningPRVisibility.rawValue
+        privacy.strengthPRsVisibility = strengthPRVisibility.rawValue
 
         privacy.shareTrainingPresence =
             trainingStatusVisibility != .privateOnly
@@ -307,15 +346,18 @@ struct ATHLTHProfileSetupView: View {
             performanceVisibility != .privateOnly
         privacy.shareTrophyCabinet =
             trophyVisibility != .privateOnly
+        privacy.shareGoals =
+            goalsVisibility != .privateOnly
         privacy.shareRecentActivity =
             activityVisibility != .privateOnly
+        privacy.shareRunningPRs =
+            runningPRVisibility != .privateOnly
+        privacy.shareStrengthPRs =
+            strengthPRVisibility != .privateOnly
 
-        // Keep unsupported social profile sections private until they have
-        // dedicated, enforceable profile surfaces.
-        privacy.shareGoals = false
-        privacy.shareRunningPRs = false
-        privacy.shareStrengthPRs = false
-        privacy.shareWorkoutTotals = false
+        // Workout totals are part of the performance section.
+        privacy.shareWorkoutTotals =
+            performanceVisibility != .privateOnly
 
         privacy.profileVisibility = broadestProfileVisibility.rawValue
 
