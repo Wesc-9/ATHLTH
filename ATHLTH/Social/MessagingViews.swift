@@ -52,7 +52,7 @@ struct MessageInboxView: View {
                                 .tracking(2)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
 
-                            ForEach(activeConversations, id: \.friend.userID) { item in
+                            ForEach(activeConversations) { item in
                                 NavigationLink {
                                     DirectMessageThreadView(friend: item.friend)
                                 } label: {
@@ -122,11 +122,7 @@ struct MessageInboxView: View {
         }
     }
 
-    private var conversationFriends: [(
-        conversation: DirectConversationRecord,
-        friend: SocialProfileCard,
-        lastMessage: DirectMessageRecord?
-    )] {
+    private var conversationFriends: [MessageConversationItem] {
         guard let currentUserID = messaging.currentUserID else { return [] }
 
         return messaging.conversations.compactMap { conversation in
@@ -136,10 +132,10 @@ struct MessageInboxView: View {
                 return nil
             }
 
-            return (
-                conversation,
-                friend,
-                messaging.lastMessage(for: conversation.id)
+            return MessageConversationItem(
+                conversation: conversation,
+                friend: friend,
+                lastMessage: messaging.lastMessage(for: conversation.id)
             )
         }
         .sorted {
@@ -149,9 +145,17 @@ struct MessageInboxView: View {
     }
 
     private var friendsWithoutConversation: [SocialProfileCard] {
-        let conversationIDs = Set(conversationFriends.map(\.friend.userID))
+        let conversationIDs = Set(conversationFriends.map { $0.friend.userID })
         return social.friends.filter { !conversationIDs.contains($0.userID) }
     }
+}
+
+private struct MessageConversationItem: Identifiable {
+    var id: UUID { conversation.id }
+
+    let conversation: DirectConversationRecord
+    let friend: SocialProfileCard
+    let lastMessage: DirectMessageRecord?
 }
 
 private struct MessageConversationRow: View {
