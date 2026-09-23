@@ -93,6 +93,15 @@ enum WatchTransferKind: String {
     case connectivityAck
 }
 
+enum ATHLTHWorkoutMetadataKey {
+    static let locationLatitude =
+        "com.wesc9.athlth.workoutLocationLatitude"
+    static let locationLongitude =
+        "com.wesc9.athlth.workoutLocationLongitude"
+    static let locationHorizontalAccuracy =
+        "com.wesc9.athlth.workoutLocationHorizontalAccuracy"
+}
+
 enum WatchTransferMetadataKey {
     static let kind = "kind"
     static let routeID = "routeID"
