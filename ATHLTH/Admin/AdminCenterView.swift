@@ -606,6 +606,8 @@ enum AdminPreviewData {
     ]
 }
 
+#endif
+
 struct AdminCenterView: View {
     @EnvironmentObject private var session: AppSessionStore
     @StateObject private var store = AdminControlCenterStore()
@@ -1608,5 +1610,3 @@ private struct AdminAuditLogView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
-#endif
-
