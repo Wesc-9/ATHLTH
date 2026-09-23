@@ -2282,6 +2282,7 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var goalStore: GoalStore
 
@@ -2343,6 +2344,42 @@ struct ATHLTHProfileView: View {
                         summaryCard(icon: "target", value: "\(goalStore.goals.count)", title: "Goals", tint: ATHLTHTheme.accent)
                         summaryCard(icon: "point.topleft.down.to.point.bottomright.curvepath", value: "\(session.savedRoutes.count)", title: "Saved Routes", tint: .blue)
                         summaryCard(icon: "trophy.fill", value: "\(trophyStore.unlockedCount)", title: "Trophies", tint: .orange)
+                    }
+
+                    ATHLTHCard {
+                        HStack(spacing: 14) {
+                            Image(systemName: "map.fill")
+                                .font(.title3)
+                                .foregroundStyle(ATHLTHTheme.accent)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                )
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Route Privacy")
+                                    .font(.headline)
+
+                                Text(
+                                    settings.hideRouteStartAndEnd
+                                        ? "Hide roughly 250 m at the start and end when sharing routes."
+                                        : "Full route start and end points are included when sharing."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer()
+
+                            Toggle(
+                                "Hide route start and end",
+                                isOn: $settings.hideRouteStartAndEnd
+                            )
+                            .labelsHidden()
+                            .tint(ATHLTHTheme.accent)
+                        }
                     }
 
                     ProfileFriendsSection()
