@@ -408,9 +408,42 @@ final class SupabaseAccountService: ObservableObject {
                 )
             )
 
-        return try client.storage
+        let publicURL = try client.storage
             .from("profile-avatars")
             .getPublicURL(path: path)
+
+        var components = URLComponents(
+            url: publicURL,
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(
+                name: "v",
+                value: String(Int(Date().timeIntervalSince1970))
+            )
+        ]
+
+        return components?.url ?? publicURL
+    }
+
+    func removeProfileAvatar() async throws {
+        guard let userID = currentUserID else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        let path = "\(userID.uuidString.lowercased())/avatar.jpg"
+        try await client.storage
+            .from("profile-avatars")
+            .remove(paths: [path])
+
+        let bootstrap = try await updateProfile(
+            displayName: (try await loadCurrentUser()).profile.displayName ?? "",
+            username: (try await loadCurrentUser()).profile.username ?? "",
+            bio: (try await loadCurrentUser()).profile.bio ?? "",
+            avatarURL: nil
+        )
+
+        _ = bootstrap
     }
 
     func sendPasswordResetForCurrentAccount() async throws {
