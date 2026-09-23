@@ -95,7 +95,7 @@ struct RunningWorkoutLibraryView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(
-                selected ? Color.green : Color(.secondarySystemGroupedBackground),
+                selected ? ATHLTHTheme.accent : Color(.secondarySystemGroupedBackground),
                 in: Capsule()
             )
     }
@@ -105,9 +105,9 @@ struct RunningWorkoutLibraryView: View {
             HStack(alignment: .top) {
                 Image(systemName: workout.type.systemImage)
                     .font(.title2)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
                     .frame(width: 44, height: 44)
-                    .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
+                    .background(ATHLTHTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(workout.title)
@@ -116,7 +116,7 @@ struct RunningWorkoutLibraryView: View {
 
                     Text(workout.type.title)
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
 
                 Spacer()
@@ -124,10 +124,10 @@ struct RunningWorkoutLibraryView: View {
                 if !workout.isBuiltIn {
                     Text("MY WORKOUT")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 4)
-                        .background(.green.opacity(0.10), in: Capsule())
+                        .background(ATHLTHTheme.accent.opacity(0.10), in: Capsule())
                 }
             }
 
@@ -180,7 +180,7 @@ struct RunningWorkoutDetailView: View {
                 ZStack(alignment: .bottomLeading) {
                     LinearGradient(
                         colors: [
-                            Color.green.opacity(0.90),
+                            ATHLTHTheme.accent.opacity(0.90),
                             Color.black.opacity(0.92)
                         ],
                         startPoint: .topLeading,
@@ -238,7 +238,7 @@ struct RunningWorkoutDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                 }
 
                 if workout.isBuiltIn {
@@ -676,9 +676,9 @@ struct RunningWorkoutBlockRow: View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(index)")
                 .font(.caption.bold())
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
                 .frame(width: 28, height: 28)
-                .background(.green.opacity(0.10), in: Circle())
+                .background(ATHLTHTheme.accent.opacity(0.10), in: Circle())
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -688,7 +688,7 @@ struct RunningWorkoutBlockRow: View {
                     if block.repetitions > 1 {
                         Text("× \(block.repetitions)")
                             .font(.caption.bold())
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                     }
                 }
 
@@ -712,7 +712,7 @@ struct RunningWorkoutBlockRow: View {
             Spacer()
 
             Image(systemName: phaseIcon(block.kind))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
         }
         .padding(12)
         .background(
