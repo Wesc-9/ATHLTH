@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.3.3
+      - release/v1.3.4
     paths:
       - .github/testflight-trigger
 
@@ -252,14 +252,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "v1.3.3" \
+          gh release create "v1.3.4" \
             --target "$GITHUB_SHA" \
-            --title "ATHLTH 1.3.3" \
+            --title "ATHLTH 1.3.4" \
             --notes-file - <<'EOF'
-          ATHLTH 1.3.3
+          ATHLTH 1.3.4
 
-          - Built from the validated ATHLTH 1.3.2 baseline
-          - 1.3.3 improvements and fixes
+          - Built from the validated ATHLTH 1.3.3 baseline
+          - 1.3.4 improvements and fixes
           EOF
 
       - name: Upload diagnostics
