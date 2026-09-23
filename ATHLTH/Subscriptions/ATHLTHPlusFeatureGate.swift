@@ -47,7 +47,7 @@ struct ATHLTHPlusFeatureGate<Content: View>: View {
             VStack(spacing: 14) {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
 
                 Text(title)
                     .font(.title3.weight(.bold))
@@ -62,7 +62,7 @@ struct ATHLTHPlusFeatureGate<Content: View>: View {
                     showingSubscriptionOffer = true
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
