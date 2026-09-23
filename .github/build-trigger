@@ -171,3 +171,4 @@ v1.3.4-runtime-launch-smoke-1
 v1.3.4-healthkit-launch-hardening
 v1.3.4-healthkit-hardening-standard-build
 v1.3.4-startup-auth-fix
+v1.3.4-stale-keychain-login-fix
