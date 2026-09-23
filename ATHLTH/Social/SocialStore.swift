@@ -772,6 +772,8 @@ final class SocialStore: ObservableObject {
         _ unlocks: [TrophyUnlockRecord],
         visibility: ProfileVisibility = .friends
     ) async {
+        guard privacy?.shareTrophyCabinet ?? true else { return }
+
         for unlock in unlocks where unlock.unlockedAt >= activationDate {
             do {
                 try await service.publishActivity(
@@ -795,6 +797,8 @@ final class SocialStore: ObservableObject {
         _ goals: [ATHLTHGoal],
         visibility: ProfileVisibility = .friends
     ) async {
+        guard privacy?.shareGoals ?? false else { return }
+
         for goal in goals {
             guard let completedAt = goal.completedAt,
                   completedAt >= activationDate
