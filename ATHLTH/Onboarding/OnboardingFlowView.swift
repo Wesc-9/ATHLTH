@@ -2,6 +2,11 @@ import AuthenticationServices
 import SwiftUI
 import UIKit
 
+private enum ConnectionStage {
+    case device
+    case appleHealth
+}
+
 struct OnboardingFlowView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
@@ -30,6 +35,7 @@ struct OnboardingFlowView: View {
     @State private var appleSignInInProgress = false
     @State private var onboardingCompletionError: String?
     @State private var showingWatchInstallHelp = false
+    @State private var connectionStage: ConnectionStage = .device
     @FocusState private var usernameFieldFocused: Bool
 
     private let usernameService = SupabaseUsernameAvailabilityService()
@@ -917,212 +923,249 @@ struct OnboardingFlowView: View {
         }
     }
 
+    @ViewBuilder
     private var connectionsStep: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        switch connectionStage {
+        case .device:
+            deviceConnectionStep
+        case .appleHealth:
+            appleHealthConnectionStep
+        }
+    }
+
+    private var deviceConnectionStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 8) {
                 onboardingTitle(
-                    "Connect your health",
-                    subtitle: "Choose how you track. A watch is optional."
+                    "Connect your device",
+                    subtitle: "Choose how you want to train with ATHLTH."
                 )
 
-                Text("Optional · Set it up now or anytime later in Settings.")
-                    .font(.caption)
-                    .foregroundStyle(OnboardingTheme.faintText)
+                HStack(spacing: 7) {
+                    Text("DEVICE")
+                    Text("1 OF 2")
+                }
+                .font(.caption2.weight(.bold))
+                .tracking(1.15)
+                .foregroundStyle(OnboardingTheme.faintText)
             }
 
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text("YOUR TRACKING SETUP")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.25)
-                        .foregroundStyle(OnboardingTheme.faintText)
+            VStack(spacing: 12) {
+                deviceChoiceCard(
+                    provider: .appleWatch,
+                    title: "Apple Watch",
+                    subtitle: "Track workouts, heart rate, recovery and more.",
+                    icon: "applewatch"
+                )
 
-                    Spacer()
+                deviceChoiceCard(
+                    provider: .garmin,
+                    title: "Garmin",
+                    subtitle: "Sync training, health and performance data.",
+                    icon: "watch.analog"
+                )
 
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(OnboardingTheme.accent)
+                deviceChoiceCard(
+                    provider: .none,
+                    title: "No watch",
+                    subtitle: "Continue with just your iPhone. Connect a watch later.",
+                    icon: "iphone"
+                )
+            }
 
-                    Text("PRIVATE")
-                        .font(.caption2.weight(.bold))
-                        .tracking(0.9)
-                        .foregroundStyle(OnboardingTheme.accent)
+            Text("You can change your training device anytime in Settings.")
+                .font(.caption)
+                .foregroundStyle(OnboardingTheme.faintText)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 2)
+        }
+    }
+
+    private func deviceChoiceCard(
+        provider: TrainingDeviceProvider,
+        title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
+        let selected = settings.trainingDeviceProvider == provider
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                settings.trainingDeviceProvider = provider
+            }
+
+            if provider != .appleWatch,
+               settings.preferredWorkoutCapture == .appleWatch {
+                settings.preferredWorkoutCapture = .iPhone
+            }
+
+            if provider == .appleWatch {
+                watchConnection.refreshStatus()
+            }
+        } label: {
+            HStack(spacing: 17) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(
+                            selected
+                                ? OnboardingTheme.accent.opacity(0.11)
+                                : Color.black.opacity(0.035)
+                        )
+                        .frame(width: 72, height: 72)
+
+                    Image(systemName: icon)
+                        .font(.system(size: provider == .appleWatch ? 31 : 28, weight: .medium))
+                        .foregroundStyle(
+                            selected
+                                ? OnboardingTheme.accent
+                                : OnboardingTheme.primaryText.opacity(0.78)
+                        )
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .padding(.bottom, 8)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Primary training device")
-                        .font(.subheadline.weight(.semibold))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 19, weight: .bold))
                         .foregroundStyle(OnboardingTheme.primaryText)
 
-                    HStack(spacing: 8) {
-                        ForEach(TrainingDeviceProvider.allCases) { provider in
-                            Button {
-                                settings.trainingDeviceProvider = provider
-
-                                if provider != .appleWatch,
-                                   settings.preferredWorkoutCapture == .appleWatch {
-                                    settings.preferredWorkoutCapture = .iPhone
-                                }
-
-                                if provider == .appleWatch {
-                                    watchConnection.refreshStatus()
-                                }
-                            } label: {
-                                VStack(spacing: 7) {
-                                    Image(systemName: provider.systemImage)
-                                        .font(.title3)
-
-                                    Text(provider.title)
-                                        .font(.caption2.weight(.semibold))
-                                        .lineLimit(1)
-
-                                    Image(
-                                        systemName:
-                                            settings.trainingDeviceProvider == provider
-                                            ? "checkmark.circle.fill"
-                                            : "circle"
-                                    )
-                                    .font(.caption)
-                                }
-                                .foregroundStyle(
-                                    settings.trainingDeviceProvider == provider
-                                        ? OnboardingTheme.accent
-                                        : OnboardingTheme.mutedText
-                                )
-                                .frame(maxWidth: .infinity, minHeight: 82)
-                                .background(
-                                    settings.trainingDeviceProvider == provider
-                                        ? OnboardingTheme.accent.opacity(0.08)
-                                        : Color.clear,
-                                    in: RoundedRectangle(
-                                        cornerRadius: 16,
-                                        style: .continuous
-                                    )
-                                )
-                                .overlay {
-                                    RoundedRectangle(
-                                        cornerRadius: 16,
-                                        style: .continuous
-                                    )
-                                    .stroke(
-                                        settings.trainingDeviceProvider == provider
-                                            ? OnboardingTheme.accent.opacity(0.35)
-                                            : OnboardingTheme.border,
-                                        lineWidth: 1
-                                    )
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    Text(settings.trainingDeviceProvider.subtitle)
-                        .font(.caption2)
-                        .foregroundStyle(OnboardingTheme.faintText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-
-                Rectangle()
-                    .fill(OnboardingTheme.border)
-                    .frame(height: 1)
-                    .padding(.leading, 78)
-
-                connectionRow(
-                    title: "Apple Health",
-                    subtitle: "Workouts, sleep, heart & activity",
-                    detail: importedHealthDetails.hasAnyValue
-                        ? "Profile details imported"
-                        : health.hasRequestedAuthorization
-                            ? "Health access reviewed"
-                            : nil,
-                    icon: "heart.fill",
-                    iconTint: Color(red: 0.90, green: 0.25, blue: 0.34),
-                    complete: health.hasRequestedAuthorization,
-                    actionTitle: healthRequestInProgress
-                        ? "Setting up…"
-                        : health.hasRequestedAuthorization ? "Settings" : "Connect",
-                    actionDisabled: healthRequestInProgress,
-                    actionLoading: healthRequestInProgress
-                ) {
-                    if health.hasRequestedAuthorization {
-                        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                            openURL(settingsURL)
-                        }
-                    } else {
-                        Task {
-                            healthRequestInProgress = true
-                            await health.requestAuthorization()
-
-                            await health.configureBackgroundSync(
-                                allowed:
-                                    session.canAccess(.backgroundHealthSync) &&
-                                    settings.backgroundHealthSyncEnabled
-                            )
-
-                            await health.refreshPersonalDetails()
-                            importedHealthDetails = health.personalDetails
-                            healthRequestInProgress = false
-                        }
-                    }
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(OnboardingTheme.mutedText)
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(2)
                 }
 
-                Rectangle()
-                    .fill(OnboardingTheme.border)
-                    .frame(height: 1)
-                    .padding(.leading, 78)
+                Spacer(minLength: 8)
 
-                switch settings.trainingDeviceProvider {
-                case .appleWatch:
-                    connectionRow(
-                        title: "Apple Watch",
-                        subtitle: "Start workouts and sync live data",
-                        detail: watchConnection.isReady
-                            ? "Watch connection verified"
-                            : watchConnection.state == .appNotInstalled
-                                ? "ATHLTH Watch app not installed"
-                                : nil,
-                        icon: "applewatch",
-                        iconTint: OnboardingTheme.accent,
-                        complete: watchConnection.isReady,
-                        actionTitle: watchSetupActionTitle,
-                        actionDisabled: watchSetupActionDisabled,
-                        actionLoading: watchConnection.state == .checking
-                    ) {
-                        handleWatchSetupAction()
-                    }
-
-                case .garmin:
-                    connectionRow(
-                        title: "Garmin",
-                        subtitle: "Prepared for Garmin Connect",
-                        detail: "Authorization will unlock after Garmin approves ATHLTH",
-                        icon: "watch.analog",
-                        iconTint: OnboardingTheme.accent,
-                        complete: true,
-                        actionTitle: "Planned",
-                        actionDisabled: true,
-                        actionLoading: false
-                    ) {}
-
-                case .none:
-                    connectionRow(
-                        title: "No watch",
-                        subtitle: "Use ATHLTH and iPhone without a wearable",
-                        detail: "Watch-only actions stay safely unavailable",
-                        icon: "iphone",
-                        iconTint: OnboardingTheme.accent,
-                        complete: true,
-                        actionTitle: "Selected",
-                        actionDisabled: true,
-                        actionLoading: false
-                    ) {}
-                }
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 23, weight: .medium))
+                    .foregroundStyle(
+                        selected
+                            ? OnboardingTheme.accent
+                            : OnboardingTheme.faintText.opacity(0.72)
+                    )
             }
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+            .background(
+                selected
+                    ? OnboardingTheme.accent.opacity(0.045)
+                    : OnboardingTheme.card,
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(
+                        selected
+                            ? OnboardingTheme.accent.opacity(0.52)
+                            : OnboardingTheme.border,
+                        lineWidth: selected ? 1.4 : 1
+                    )
+            }
+            .shadow(
+                color: selected
+                    ? OnboardingTheme.accent.opacity(0.09)
+                    : Color.black.opacity(0.035),
+                radius: selected ? 18 : 12,
+                x: 0,
+                y: 8
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title). \(subtitle)")
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+    }
+
+    private var appleHealthConnectionStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 8) {
+                onboardingTitle(
+                    "Connect Apple Health",
+                    subtitle: "Bring your health and workout data into ATHLTH."
+                )
+
+                HStack(spacing: 7) {
+                    Text("APPLE HEALTH")
+                    Text("2 OF 2")
+                }
+                .font(.caption2.weight(.bold))
+                .tracking(1.15)
+                .foregroundStyle(OnboardingTheme.faintText)
+            }
+
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(Color(red: 0.90, green: 0.25, blue: 0.34).opacity(0.09))
+                            .frame(width: 78, height: 78)
+
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 32, weight: .semibold))
+                            .foregroundStyle(Color(red: 0.90, green: 0.25, blue: 0.34))
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(
+                            health.hasRequestedAuthorization
+                                ? "Apple Health setup finished"
+                                : "Your health. In one place."
+                        )
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(OnboardingTheme.primaryText)
+
+                        Text(
+                            health.hasRequestedAuthorization
+                                ? "You can change Health access anytime in iPhone Settings."
+                                : "Choose exactly what ATHLTH is allowed to read."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(OnboardingTheme.mutedText)
+                        .lineSpacing(2)
+                    }
+                }
+
+                VStack(spacing: 0) {
+                    healthBenefitRow(
+                        icon: "figure.run",
+                        title: "Workouts",
+                        detail: "Training history, duration, distance and routes"
+                    )
+
+                    Divider().padding(.leading, 42)
+
+                    healthBenefitRow(
+                        icon: "heart.text.square",
+                        title: "Heart & recovery",
+                        detail: "Heart rate, resting heart rate and recovery signals"
+                    )
+
+                    Divider().padding(.leading, 42)
+
+                    healthBenefitRow(
+                        icon: "bed.double.fill",
+                        title: "Sleep & activity",
+                        detail: "Sleep and activity data that helps complete the picture"
+                    )
+                }
+
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(OnboardingTheme.accent)
+                        .padding(.top, 2)
+
+                    Text("ATHLTH only requests the Health data needed for the features you use. Apple Health access is optional.")
+                        .font(.caption)
+                        .foregroundStyle(OnboardingTheme.faintText)
+                        .lineSpacing(2)
+                }
+                .padding(14)
+                .background(
+                    OnboardingTheme.accent.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+            }
+            .padding(20)
             .background(
                 OnboardingTheme.card,
                 in: RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -1131,7 +1174,7 @@ struct OnboardingFlowView: View {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .stroke(OnboardingTheme.border, lineWidth: 1)
             }
-            .shadow(color: .black.opacity(0.055), radius: 22, x: 0, y: 12)
+            .shadow(color: .black.opacity(0.05), radius: 20, x: 0, y: 10)
 
             if let healthError = health.authorizationError {
                 Label(healthError, systemImage: "exclamationmark.triangle.fill")
@@ -1155,6 +1198,37 @@ struct OnboardingFlowView: View {
                     .padding(.horizontal, 4)
             }
         }
+    }
+
+    private func healthBenefitRow(
+        icon: String,
+        title: String,
+        detail: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(OnboardingTheme.accent)
+                .frame(width: 30, height: 30)
+                .background(
+                    OnboardingTheme.accent.opacity(0.08),
+                    in: Circle()
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(OnboardingTheme.primaryText)
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(OnboardingTheme.mutedText)
+                    .lineSpacing(2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 11)
     }
 
     private var readyStep: some View {
@@ -1407,11 +1481,42 @@ struct OnboardingFlowView: View {
                 personalizedOffersFooter
 
             case .connections:
-                connectionsPrivacyFooter
+                switch connectionStage {
+                case .device:
+                    footerButton(title: "Continue") {
+                        if settings.trainingDeviceProvider == .appleWatch {
+                            watchConnection.refreshStatus()
+                        }
+                        connectionStage = .appleHealth
+                    }
 
-                footerButton(title: "Continue") {
-                    saveProfileData()
-                    step = .ready
+                case .appleHealth:
+                    connectionsPrivacyFooter
+
+                    if health.hasRequestedAuthorization {
+                        footerButton(title: "Continue") {
+                            saveProfileData()
+                            step = .ready
+                        }
+                    } else {
+                        footerButton(
+                            title: healthRequestInProgress
+                                ? "Connecting…"
+                                : "Connect Apple Health",
+                            disabled: healthRequestInProgress
+                        ) {
+                            connectAppleHealth()
+                        }
+
+                        Button("Not now") {
+                            saveProfileData()
+                            step = .ready
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(OnboardingTheme.mutedText)
+                        .buttonStyle(.plain)
+                        .padding(.top, 2)
+                    }
                 }
 
             case .ready:
@@ -1823,8 +1928,33 @@ struct OnboardingFlowView: View {
     }
 
     private func goBack() {
+        if step == .connections, connectionStage == .appleHealth {
+            connectionStage = .device
+            return
+        }
+
         guard let previous = OnboardingStep(rawValue: step.rawValue - 1) else { return }
         step = previous
+    }
+
+    private func connectAppleHealth() {
+        guard !healthRequestInProgress else { return }
+
+        Task {
+            healthRequestInProgress = true
+
+            await health.requestAuthorization()
+
+            await health.configureBackgroundSync(
+                allowed:
+                    session.canAccess(.backgroundHealthSync) &&
+                    settings.backgroundHealthSyncEnabled
+            )
+
+            await health.refreshPersonalDetails()
+            importedHealthDetails = health.personalDetails
+            healthRequestInProgress = false
+        }
     }
 
     private func saveProfileData() {
