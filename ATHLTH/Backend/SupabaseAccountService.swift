@@ -70,6 +70,15 @@ final class SupabaseAccountService: ObservableObject {
             )
         }
 
+        if let authorizationCode = credential.authorizationCode
+            .flatMap({ String(data: $0, encoding: .utf8) }),
+           !authorizationCode.isEmpty {
+            // Apple authorization codes are short-lived and single-use.
+            // Exchange them server-side immediately so ATHLTH can revoke
+            // Sign in with Apple authorization if the account is deleted.
+            _ = try? await registerAppleAuthorizationCode(authorizationCode)
+        }
+
         if let fullName = credential.fullName {
             let givenName = fullName.givenName?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -189,7 +198,7 @@ final class SupabaseAccountService: ObservableObject {
         passwordRecoveryPending = false
     }
 
-    func deleteAccount() async throws {
+    func deleteAccount() async throws -> AccountDeletionResult {
         guard currentUserID != nil else {
             throw SupabaseAccountError.notAuthenticated
         }
@@ -207,6 +216,25 @@ final class SupabaseAccountService: ObservableObject {
 
         try? await client.auth.signOut()
         passwordRecoveryPending = false
+
+        return AccountDeletionResult(
+            appleAuthorizationRevoked: response.appleRevoked,
+            appleManualRevocationRequired: response.appleManualRevokeRequired
+        )
+    }
+
+    private func registerAppleAuthorizationCode(
+        _ authorizationCode: String
+    ) async throws -> Bool {
+        let response: AppleAuthorizationRegistrationResponse =
+            try await client.functions.invoke(
+                "register-apple-authorization",
+                options: FunctionInvokeOptions(
+                    body: ["authorization_code": authorizationCode]
+                )
+            )
+
+        return response.registered
     }
 
     func restoreCurrentUser() async throws -> BackendUserBootstrap? {
@@ -489,8 +517,25 @@ final class SupabaseAccountService: ObservableObject {
 
 }
 
+struct AccountDeletionResult: Equatable {
+    let appleAuthorizationRevoked: Bool
+    let appleManualRevocationRequired: Bool
+}
+
+private struct AppleAuthorizationRegistrationResponse: Decodable {
+    let registered: Bool
+}
+
 private struct DeleteAccountResponse: Decodable {
     let deleted: Bool
+    let appleRevoked: Bool
+    let appleManualRevokeRequired: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case deleted
+        case appleRevoked = "apple_revoked"
+        case appleManualRevokeRequired = "apple_manual_revoke_required"
+    }
 }
 
 private struct UsernameAvailabilityParams: Encodable {
