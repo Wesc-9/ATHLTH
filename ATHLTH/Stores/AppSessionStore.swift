@@ -741,10 +741,17 @@ final class AppSessionStore: ObservableObject {
         persistPlanTemplates()
     }
 
-    func usePlanTemplate(_ templateID: UUID) {
+    func usePlanTemplate(
+        _ templateID: UUID,
+        startDate: Date? = nil
+    ) {
         guard let template = planTemplates.first(where: { $0.id == templateID }) else {
             return
         }
+
+        let resolvedStartDate = Calendar.current.startOfDay(
+            for: startDate ?? Date()
+        )
 
         activePlan = TrainingPlan(
             id: UUID(),
@@ -759,7 +766,7 @@ final class AppSessionStore: ObservableObject {
             spotifyAutoplayOnWorkoutStart: template.spotifyAutoplayOnWorkoutStart,
             createdAt: Date(),
             updatedAt: Date(),
-            startDate: Calendar.current.startOfDay(for: Date())
+            startDate: resolvedStartDate
         )
     }
 
