@@ -697,6 +697,77 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func publishRunningPersonalRecords(
+        _ records: [HealthPersonalRecord],
+        visibility: ProfileVisibility = .friends
+    ) async {
+        guard privacy?.shareRunningPRs ?? true else { return }
+
+        for record in records
+        where record.date >= activationDate &&
+              (record.kind == .longestRun || record.kind == .fastest5K) {
+            do {
+                try await service.publishActivity(
+                    eventKey:
+                        "running-pr-\(record.kind.rawValue)-" +
+                        "\(Int(record.date.timeIntervalSince1970))-" +
+                        "\(Int(record.value.rounded()))",
+                    kind: "personal_record",
+                    title: "New \(record.kind.title)",
+                    subtitle: record.formattedValue,
+                    metadata: [
+                        "record_kind": record.kind.rawValue,
+                        "verification": "apple_health",
+                        "value": String(record.value)
+                    ],
+                    visibility: visibility
+                )
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+
+        if !records.isEmpty {
+            feed = (try? await service.loadFeed()) ?? feed
+        }
+    }
+
+    func publishStrengthRepPersonalRecords(
+        _ records: [StrengthRepPersonalRecord],
+        visibility: ProfileVisibility = .friends
+    ) async {
+        guard privacy?.shareStrengthPRs ?? true else { return }
+
+        for record in records where record.date >= activationDate {
+            do {
+                try await service.publishActivity(
+                    eventKey:
+                        "strength-rep-pr-" +
+                        "\(record.sourceWorkoutID.uuidString)-" +
+                        "\(record.reps)-" +
+                        "\(Int((record.weightKilograms * 10).rounded()))",
+                    kind: "personal_record",
+                    title: "New \(record.reps)-rep PR · \(record.exerciseName)",
+                    subtitle: record.value,
+                    metadata: [
+                        "exercise": record.exerciseName,
+                        "reps": String(record.reps),
+                        "weight_kg": String(record.weightKilograms),
+                        "verification": "manual",
+                        "source_workout_id": record.sourceWorkoutID.uuidString
+                    ],
+                    visibility: visibility
+                )
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+
+        if !records.isEmpty {
+            feed = (try? await service.loadFeed()) ?? feed
+        }
+    }
+
     func publishTrophyUnlocks(
         _ unlocks: [TrophyUnlockRecord],
         visibility: ProfileVisibility = .friends
