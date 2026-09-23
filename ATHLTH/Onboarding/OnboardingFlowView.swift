@@ -20,6 +20,7 @@ struct OnboardingFlowView: View {
     @State private var username = ""
     @State private var selectedGoal: AchievementGoal?
     @State private var selectedGoalFocus: GoalFocusArea?
+    @State private var selectedTrainingFocus: TrainingFocus?
     @State private var interests: Set<ATHLTHInterest> = []
     @State private var allowPersonalizedOffers = false
     @State private var importedHealthDetails: HealthProfileBasics = .empty
@@ -643,8 +644,86 @@ struct OnboardingFlowView: View {
     private var goalsStep: some View {
         VStack(alignment: .leading, spacing: 24) {
             onboardingTitle(
+                "How do you train?",
+                subtitle: "Choose the training identity that fits you best. You can change it later."
+            )
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ],
+                spacing: 12
+            ) {
+                ForEach(TrainingFocus.allCases) { focus in
+                    let selected = selectedTrainingFocus == focus
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedTrainingFocus = focus
+                            applyTrainingFocusToInterests(focus)
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Image(systemName: focus.systemImage)
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(
+                                        selected
+                                            ? OnboardingTheme.accent
+                                            : OnboardingTheme.primaryText
+                                    )
+
+                                Spacer()
+
+                                Image(
+                                    systemName: selected
+                                        ? "checkmark.circle.fill"
+                                        : "circle"
+                                )
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(
+                                    selected
+                                        ? OnboardingTheme.accent
+                                        : OnboardingTheme.faintText
+                                )
+                            }
+
+                            Text(focus.title)
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(OnboardingTheme.primaryText)
+
+                            Text(focus.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(OnboardingTheme.mutedText)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(3)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
+                        .background(
+                            selected
+                                ? OnboardingTheme.selectedFill
+                                : OnboardingTheme.card,
+                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(
+                                    selected
+                                        ? OnboardingTheme.accent.opacity(0.40)
+                                        : OnboardingTheme.border,
+                                    lineWidth: 1
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            onboardingTitle(
                 "What matters most right now?",
-                subtitle: "Start with one focus. We’ll tailor ATHLTH around it."
+                subtitle: "Choose one primary goal. This personalizes ATHLTH, but does not make it public."
             )
 
             VStack(alignment: .leading, spacing: 12) {
@@ -889,6 +968,25 @@ struct OnboardingFlowView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func applyTrainingFocusToInterests(_ focus: TrainingFocus) {
+        switch focus {
+        case .running:
+            interests.insert(.running)
+        case .strength:
+            interests.insert(.strength)
+        case .hybrid:
+            interests.insert(.running)
+            interests.insert(.strength)
+        case .walking:
+            interests.insert(.walking)
+        case .generalFitness:
+            interests.insert(.healthTracking)
+            interests.insert(.trainingPlans)
+        case .recovery:
+            interests.insert(.recovery)
         }
     }
 
@@ -1494,7 +1592,10 @@ struct OnboardingFlowView: View {
                 }
 
             case .goals:
-                footerButton(title: "Continue", disabled: selectedGoal == nil) {
+                footerButton(
+                    title: "Continue",
+                    disabled: selectedGoal == nil || selectedTrainingFocus == nil
+                ) {
                     saveProfileData()
                     step = .connections
                 }
@@ -1986,6 +2087,7 @@ struct OnboardingFlowView: View {
                 weightKilograms: importedHealthDetails.weightKilograms,
                 heightCentimeters: importedHealthDetails.heightCentimeters,
                 personalDetailsSource: importedHealthDetails.hasAnyValue ? .appleHealth : .none,
+                trainingFocus: selectedTrainingFocus,
                 currentGoal: selectedGoal.map { UserGoalRecord(type: $0) },
                 interests: interests,
                 personalizedOfferConsent: allowPersonalizedOffers ? .granted : .declined
