@@ -68,7 +68,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        refreshStatus(requestVerification: true)
+        // WatchConnectivity is activated only when Apple Watch is the
+        // selected provider or the user explicitly opens Apple Watch setup.
+        // This keeps Garmin and no-watch sessions independent of Watch state.
     }
 
     var isReady: Bool {
