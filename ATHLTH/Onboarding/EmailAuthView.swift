@@ -149,6 +149,12 @@ struct EmailAuthView: View {
                         }
 
                     if mode == .createAccount {
+                        Text("Use at least 12 characters with uppercase, lowercase and a number.")
+                            .font(.caption2)
+                            .foregroundStyle(OnboardingTheme.faintText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+
                         SecureField("Confirm password", text: $confirmPassword)
                             .textContentType(.newPassword)
                             .padding(14)
@@ -257,6 +263,21 @@ struct EmailAuthView: View {
         }
     }
 
+    private func passwordValidationMessage(_ value: String) -> String? {
+        guard value.count >= 12 else {
+            return "Password must contain at least 12 characters."
+        }
+
+        guard value.contains(where: \.isLowercase),
+              value.contains(where: \.isUppercase),
+              value.contains(where: \.isNumber)
+        else {
+            return "Password must include uppercase, lowercase and a number."
+        }
+
+        return nil
+    }
+
     private func submit() {
         errorMessage = nil
 
@@ -269,12 +290,17 @@ struct EmailAuthView: View {
             return
         }
 
-        guard password.count >= 8 else {
-            errorMessage = "Password must contain at least 8 characters."
+        guard !password.isEmpty else {
+            errorMessage = "Enter your password."
             return
         }
 
         if mode == .createAccount {
+            if let validationMessage = passwordValidationMessage(password) {
+                errorMessage = validationMessage
+                return
+            }
+
             let cleanFirstName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
             let cleanLastName = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
 
