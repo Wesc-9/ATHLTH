@@ -289,7 +289,7 @@ alter table public.social_inbox_events
       'challenge_result',
       'reaction',
       'workout_invite',
-      'workout_joined',
+      'workout_invite_accepted',
       'message'
     )
   );
