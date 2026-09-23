@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 private struct ATHLTHExportPreferences: Codable {
+    let trainingDeviceProvider: String
     let measurement: String
     let defaultActivityVisibility: String
     let hideRouteStartAndEnd: Bool
@@ -103,6 +104,7 @@ struct ATHLTHDataExportView: View {
             savedRoutes: session.savedRoutes,
             socialPrivacy: social.privacy,
             preferences: ATHLTHExportPreferences(
+                trainingDeviceProvider: settings.trainingDeviceProvider.rawValue,
                 measurement: settings.measurementPreference.rawValue,
                 defaultActivityVisibility: settings.defaultActivityVisibility.rawValue,
                 hideRouteStartAndEnd: settings.hideRouteStartAndEnd,
