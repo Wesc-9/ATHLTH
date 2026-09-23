@@ -264,7 +264,19 @@ final class AppSessionStore: ObservableObject {
             .lowercased()
 
         profile.username = cleaned
+    }
 
+    func applyProfileEdits(
+        displayName: String,
+        username: String,
+        bio: String,
+        avatarURL: URL?
+    ) {
+        profile.displayName = displayName
+        profile.username = username
+        profile.bio = bio
+        profile.avatarURL = avatarURL
+        setUsernameSeed(displayName)
     }
 
     func saveOnboardingProfile(_ data: OnboardingProfileData) {
