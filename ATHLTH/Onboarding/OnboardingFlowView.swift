@@ -12,7 +12,6 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
-    @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var accountService: SupabaseAccountService
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
@@ -30,7 +29,6 @@ struct OnboardingFlowView: View {
     @State private var usernameSuggestions: [String] = []
     @State private var usernameValidation: UsernameValidationState = .idle
     @State private var usernameClaimError: String?
-    @State private var showingSubscriptionOffer = false
     @State private var authenticationError: String?
     @State private var appleSignInInProgress = false
     @State private var onboardingCompletionError: String?
@@ -151,22 +149,6 @@ struct OnboardingFlowView: View {
                 showingWatchInstallHelp = false
                 watchConnection.refreshStatus()
             }
-        }
-        .fullScreenCover(
-            isPresented: $showingSubscriptionOffer,
-            onDismiss: {
-                Task {
-                    await finishOnboarding()
-                }
-            }
-        ) {
-            SubscriptionOfferView {
-                session.applyStoreKitEntitlement(
-                    subscriptionStore.activeEntitlement
-                )
-                showingSubscriptionOffer = false
-            }
-            .environmentObject(subscriptionStore)
         }
     }
 
@@ -1375,13 +1357,8 @@ struct OnboardingFlowView: View {
             Spacer(minLength: 54)
 
             Button {
-                if session.subscriptionAccess.trialIsActive &&
-                    !subscriptionStore.hasActiveSubscription {
-                    showingSubscriptionOffer = true
-                } else {
-                    Task {
-                        await finishOnboarding()
-                    }
+                Task {
+                    await finishOnboarding()
                 }
             } label: {
                 HStack {
