@@ -659,6 +659,33 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         source = "Apple Watch"
     }
 
+    init(wearableRecord: WearableWorkoutRecord) {
+        id = UUID(uuidString: wearableRecord.id) ?? UUID()
+        title = "\(wearableRecord.kind.title) completed"
+
+        switch wearableRecord.kind {
+        case .running:
+            activity = .running
+        case .walking:
+            activity = .walking
+        case .strength:
+            activity = .strength
+        case .custom:
+            activity = .other
+        }
+
+        startDate = wearableRecord.startedAt
+        endDate = wearableRecord.endedAt ??
+            wearableRecord.startedAt.addingTimeInterval(
+                wearableRecord.duration
+            )
+        duration = wearableRecord.duration
+        distanceMeters = wearableRecord.distanceMeters
+        activeEnergyKilocalories =
+            wearableRecord.activeEnergyKilocalories
+        source = wearableRecord.provider.title
+    }
+
     var summaryText: String {
         let minutes = max(Int((duration / 60).rounded()), 0)
         let time = minutes >= 60
