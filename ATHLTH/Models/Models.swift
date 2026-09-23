@@ -97,7 +97,12 @@ struct HealthProgressSnapshot: Equatable {
 
 enum HealthPersonalRecordKind: String, Hashable {
     case longestRun
+    case fastest1K
+    case fastestMile
     case fastest5K
+    case fastest10K
+    case fastestHalfMarathon
+    case fastestMarathon
     case longestRide
     case longestWalkOrHike
     case longestWorkout
@@ -106,7 +111,12 @@ enum HealthPersonalRecordKind: String, Hashable {
     var title: String {
         switch self {
         case .longestRun: return "Longest Run"
+        case .fastest1K: return "Fastest 1K"
+        case .fastestMile: return "Fastest Mile"
         case .fastest5K: return "Fastest 5K"
+        case .fastest10K: return "Fastest 10K"
+        case .fastestHalfMarathon: return "Fastest Half Marathon"
+        case .fastestMarathon: return "Fastest Marathon"
         case .longestRide: return "Longest Ride"
         case .longestWalkOrHike: return "Longest Walk / Hike"
         case .longestWorkout: return "Longest Workout"
@@ -116,12 +126,50 @@ enum HealthPersonalRecordKind: String, Hashable {
 
     var systemImage: String {
         switch self {
-        case .longestRun: return "figure.run"
-        case .fastest5K: return "stopwatch.fill"
-        case .longestRide: return "figure.outdoor.cycle"
-        case .longestWalkOrHike: return "figure.hiking"
-        case .longestWorkout: return "clock.fill"
-        case .mostActiveCalories: return "flame.fill"
+        case .longestRun:
+            return "figure.run"
+        case .fastest1K,
+             .fastestMile,
+             .fastest5K,
+             .fastest10K,
+             .fastestHalfMarathon,
+             .fastestMarathon:
+            return "stopwatch.fill"
+        case .longestRide:
+            return "figure.outdoor.cycle"
+        case .longestWalkOrHike:
+            return "figure.hiking"
+        case .longestWorkout:
+            return "clock.fill"
+        case .mostActiveCalories:
+            return "flame.fill"
+        }
+    }
+
+    var isRunningRecord: Bool {
+        switch self {
+        case .longestRun,
+             .fastest1K,
+             .fastestMile,
+             .fastest5K,
+             .fastest10K,
+             .fastestHalfMarathon,
+             .fastestMarathon:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var targetDistanceMeters: Double? {
+        switch self {
+        case .fastest1K: return 1_000
+        case .fastestMile: return 1_609.344
+        case .fastest5K: return 5_000
+        case .fastest10K: return 10_000
+        case .fastestHalfMarathon: return 21_097.5
+        case .fastestMarathon: return 42_195
+        default: return nil
         }
     }
 }
@@ -138,10 +186,26 @@ struct HealthPersonalRecord: Identifiable, Equatable {
         case .longestRun, .longestRide, .longestWalkOrHike:
             return String(format: "%.1f km", value / 1_000)
 
-        case .fastest5K:
+        case .fastest1K,
+             .fastestMile,
+             .fastest5K,
+             .fastest10K,
+             .fastestHalfMarathon,
+             .fastestMarathon:
             let totalSeconds = max(Int(value.rounded()), 0)
-            let minutes = totalSeconds / 60
+            let hours = totalSeconds / 3_600
+            let minutes = (totalSeconds % 3_600) / 60
             let seconds = totalSeconds % 60
+
+            if hours > 0 {
+                return String(
+                    format: "%d:%02d:%02d",
+                    hours,
+                    minutes,
+                    seconds
+                )
+            }
+
             return String(format: "%d:%02d", minutes, seconds)
 
         case .longestWorkout:
