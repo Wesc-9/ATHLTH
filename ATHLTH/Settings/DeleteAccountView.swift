@@ -7,6 +7,7 @@ struct DeleteAccountView: View {
     @State private var showingConfirmation = false
     @State private var deleting = false
     @State private var errorMessage: String?
+    @State private var showingManualAppleRevocation = false
 
     var body: some View {
         Form {
@@ -29,10 +30,10 @@ struct DeleteAccountView: View {
 
             if session.signInMethod == .apple {
                 Section("Sign in with Apple") {
-                    Label("Remove Apple sign-in access after deletion", systemImage: "apple.logo")
+                    Label("Apple access is revoked with account deletion", systemImage: "apple.logo")
                         .font(.subheadline.weight(.semibold))
 
-                    Text("After ATHLTH deletes your account, open Settings → [your name] → Sign in with Apple → ATHLTH, then choose Delete to stop using Sign in with Apple for ATHLTH.")
+                    Text("ATHLTH will automatically revoke its Sign in with Apple authorization when your account is deleted. If Apple revocation cannot be completed, ATHLTH will show the manual fallback steps before returning you to sign-in.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -77,6 +78,16 @@ struct DeleteAccountView: View {
         } message: {
             Text("Your ATHLTH cloud account and associated ATHLTH data will be deleted. This cannot be undone.")
         }
+        .alert(
+            "ATHLTH account deleted",
+            isPresented: $showingManualAppleRevocation
+        ) {
+            Button("Continue") {
+                session.clearAfterAccountDeletion()
+            }
+        } message: {
+            Text("Your ATHLTH account has been deleted, but Apple authorization could not be revoked automatically. On your iPhone, open Settings → [your name] → Sign in with Apple → ATHLTH, then choose Delete.")
+        }
     }
 
     @MainActor
@@ -88,8 +99,14 @@ struct DeleteAccountView: View {
         defer { deleting = false }
 
         do {
-            try await accountService.deleteAccount()
-            session.clearAfterAccountDeletion()
+            let result = try await accountService.deleteAccount()
+
+            if result.appleManualRevocationRequired,
+               session.signInMethod == .apple {
+                showingManualAppleRevocation = true
+            } else {
+                session.clearAfterAccountDeletion()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
