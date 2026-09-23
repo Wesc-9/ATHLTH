@@ -4,9 +4,7 @@ import SwiftUI
 private struct ATHLTHExportPreferences: Codable {
     let measurement: String
     let defaultActivityVisibility: String
-    let shareRoutesByDefault: Bool
     let hideRouteStartAndEnd: Bool
-    let shareHeartRateByDefault: Bool
     let preferredWorkoutCapture: String
     let defaultStrengthTracking: String
     let autoPublishCompletedWorkouts: Bool
@@ -21,6 +19,7 @@ private struct ATHLTHDataExportEnvelope: Codable {
     let planTemplates: [TrainingPlan]
     let savedWorkoutTemplates: [PlannedSession]
     let savedRoutes: [TrainingRoute]
+    let socialPrivacy: SocialPrivacySettings?
     let preferences: ATHLTHExportPreferences
     let note: String
 }
@@ -28,6 +27,7 @@ private struct ATHLTHDataExportEnvelope: Codable {
 struct ATHLTHDataExportView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var social: SocialStore
 
     @State private var exportURL: URL?
     @State private var exportError: String?
@@ -40,6 +40,7 @@ struct ATHLTHDataExportView: View {
                 Label("Training plans and templates", systemImage: "calendar")
                 Label("Saved workout templates", systemImage: "dumbbell")
                 Label("Saved routes", systemImage: "map")
+                Label("Social privacy settings", systemImage: "hand.raised")
                 Label("App preferences", systemImage: "slider.horizontal.3")
             }
 
@@ -93,19 +94,18 @@ struct ATHLTHDataExportView: View {
         defer { isPreparing = false }
 
         let payload = ATHLTHDataExportEnvelope(
-            schemaVersion: 1,
+            schemaVersion: 2,
             exportedAt: Date(),
             profile: session.profile,
             activePlan: session.activePlan,
             planTemplates: session.planTemplates,
             savedWorkoutTemplates: session.savedWorkoutTemplates,
             savedRoutes: session.savedRoutes,
+            socialPrivacy: social.privacy,
             preferences: ATHLTHExportPreferences(
                 measurement: settings.measurementPreference.rawValue,
                 defaultActivityVisibility: settings.defaultActivityVisibility.rawValue,
-                shareRoutesByDefault: settings.shareRoutesByDefault,
                 hideRouteStartAndEnd: settings.hideRouteStartAndEnd,
-                shareHeartRateByDefault: settings.shareHeartRateByDefault,
                 preferredWorkoutCapture: settings.preferredWorkoutCapture.rawValue,
                 defaultStrengthTracking: settings.defaultStrengthTracking.rawValue,
                 autoPublishCompletedWorkouts: settings.autoPublishCompletedWorkouts,
