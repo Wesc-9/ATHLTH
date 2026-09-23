@@ -20,6 +20,7 @@ struct WorkoutDetail {
 struct TrainingHealthSummary: Equatable {
     var stepsToday: Double?
     var activeEnergyKilocaloriesToday: Double?
+    var moveGoalKilocaloriesToday: Double?
     var basalEnergyKilocaloriesToday: Double?
     var exerciseMinutesToday: Double?
     var distanceWalkingRunningMetersToday: Double?
@@ -337,4 +338,52 @@ struct HeartSummary: Equatable {
     var hrvDate: Date?
 
     static let empty = HeartSummary()
+}
+
+enum RecoveryReadinessState: String, Equatable {
+    case buildingBaseline
+    case ready
+    case balanced
+    case takeItEasy
+    case recover
+
+    var title: String {
+        switch self {
+        case .buildingBaseline: return "Building baseline"
+        case .ready: return "Ready"
+        case .balanced: return "Balanced"
+        case .takeItEasy: return "Take it easier"
+        case .recover: return "Prioritize recovery"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .buildingBaseline: return "waveform.path.ecg"
+        case .ready: return "bolt.heart.fill"
+        case .balanced: return "heart.fill"
+        case .takeItEasy: return "gauge.with.dots.needle.33percent"
+        case .recover: return "bed.double.fill"
+        }
+    }
+}
+
+struct RecoveryReadinessSummary: Equatable {
+    let score: Int?
+    let state: RecoveryReadinessState
+    let detail: String
+    let baselineDays: Int
+    let averageSleepDuration: TimeInterval?
+    let baselineHRVMilliseconds: Double?
+    let baselineRestingHeartRate: Double?
+
+    static let buildingBaseline = RecoveryReadinessSummary(
+        score: nil,
+        state: .buildingBaseline,
+        detail: "ATHLTH is learning your recent sleep, HRV and resting heart-rate baseline.",
+        baselineDays: 0,
+        averageSleepDuration: nil,
+        baselineHRVMilliseconds: nil,
+        baselineRestingHeartRate: nil
+    )
 }
