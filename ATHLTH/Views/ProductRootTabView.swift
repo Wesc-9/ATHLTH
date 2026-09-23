@@ -59,16 +59,15 @@ struct ATHLTHHomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    ATHLTHPageHeader(
+                    ATHLTHTabHero(
+                        imageName: "HomeHero",
                         title: greetingTitle,
                         subtitle: session.profile.presence.state == .training
                             ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
-                            : "Your health and training at a glance."
-                    )
-
-                    ATHLTHTabHero(
-                        imageName: "HomeHero",
-                        height: 168
+                            : "Your health and training at a glance.",
+                        height: 150,
+                        alignment: .leading,
+                        focalOffsetX: 18
                     )
 
                     ATHLTHCard {
@@ -469,11 +468,13 @@ struct ATHLTHTrainView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    ATHLTHPageHeader(title: "Train", subtitle: "Build a stronger, healthier you.")
-
                     ATHLTHTabHero(
                         imageName: "TrainHero",
-                        height: 168
+                        title: "Train",
+                        subtitle: "Build a stronger, healthier you.",
+                        height: 150,
+                        alignment: .leading,
+                        focalOffsetX: 20
                     )
 
                     Picker("Training section", selection: $selectedSection) {
@@ -1180,14 +1181,13 @@ struct ATHLTHRecoveryView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    ATHLTHPageHeader(
-                        title: "Recovery",
-                        subtitle: "Use sleep and recovery signals to guide today's load."
-                    )
-
                     ATHLTHTabHero(
                         imageName: "RecoveryHero",
-                        height: 156
+                        title: "Recovery",
+                        subtitle: "Use sleep and recovery signals to guide today's load.",
+                        height: 146,
+                        alignment: .leading,
+                        focalOffsetX: 14
                     )
 
                     ATHLTHPlusFeatureGate(
@@ -1494,14 +1494,13 @@ struct ATHLTHProgressView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    ATHLTHPageHeader(
-                        title: "Progress",
-                        subtitle: "See your training, consistency and health trends."
-                    )
-
                     ATHLTHTabHero(
                         imageName: "ProgressHero",
-                        height: 168
+                        title: "Progress",
+                        subtitle: "See your training, consistency and health trends.",
+                        height: 150,
+                        alignment: .leading,
+                        focalOffsetX: 18
                     )
 
                     periodPicker
