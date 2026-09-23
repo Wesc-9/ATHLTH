@@ -26,7 +26,7 @@ struct GoalsHubView: View {
                         Image(systemName: "plus")
                             .font(.headline)
                             .frame(width: 42, height: 42)
-                            .background(.green.opacity(0.12), in: Circle())
+                            .background(ATHLTHTheme.accent.opacity(0.12), in: Circle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -73,7 +73,7 @@ struct GoalsHubView: View {
                         showingCreateGoal = true
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -188,7 +188,7 @@ struct GoalCoverView: View {
 
     private var coverColors: [Color] {
         switch goal.coverStyle {
-        case .forest: return [.green.opacity(0.92), .black.opacity(0.88)]
+        case .forest: return [ATHLTHTheme.accent.opacity(0.92), .black.opacity(0.88)]
         case .summit: return [.blue.opacity(0.84), .indigo.opacity(0.88)]
         case .track: return [.orange.opacity(0.90), .red.opacity(0.82)]
         case .strength: return [.gray.opacity(0.92), .black]
@@ -357,11 +357,11 @@ struct GoalDetailView: View {
                 Spacer()
                 Text("\(Int((goal.progress * 100).rounded()))%")
                     .font(.title2.bold())
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
             }
 
             ProgressView(value: goal.progress)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
 
             HStack {
                 Label("\(goal.completedMilestones) complete", systemImage: "checkmark.circle.fill")
@@ -432,7 +432,7 @@ struct GoalDetailView: View {
                 } label: {
                     Image(systemName: milestone.isCompleted ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
-                        .foregroundStyle(milestone.isCompleted ? .green : .secondary)
+                        .foregroundStyle(milestone.isCompleted ? ATHLTHTheme.accent : .secondary)
                 }
                 .buttonStyle(.plain)
 
@@ -448,7 +448,7 @@ struct GoalDetailView: View {
                     if let method = milestone.completionMethod {
                         Label(completionText(method), systemImage: completionIcon(method))
                             .font(.caption2.weight(.medium))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                     } else if let rule = milestone.automationRule, rule.isEnabled {
                         Label(
                             milestone.manualOverride == .forceIncomplete
@@ -486,7 +486,7 @@ struct GoalDetailView: View {
                     }
                 }
                 .font(.caption2.bold())
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
                 .padding(.leading, 34)
             }
         }
@@ -567,7 +567,7 @@ struct GoalDetailView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
             }
 
             if goal.status != .completed {
@@ -578,7 +578,7 @@ struct GoalDetailView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
             }
         }
         .padding(.horizontal)
@@ -718,7 +718,7 @@ struct GoalCreationView: View {
     private var progressHeader: some View {
         VStack(spacing: 8) {
             ProgressView(value: Double(step + 1), total: 5)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
             Text(stepTitle)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -743,10 +743,10 @@ struct GoalCreationView: View {
                     HStack(spacing: 14) {
                         Image(systemName: option.systemImage)
                             .font(.title3)
-                            .foregroundStyle(category == option ? .white : .green)
+                            .foregroundStyle(category == option ? .white : ATHLTHTheme.accent)
                             .frame(width: 42, height: 42)
                             .background(
-                                category == option ? Color.green : Color.green.opacity(0.10),
+                                category == option ? ATHLTHTheme.accent : ATHLTHTheme.accent.opacity(0.10),
                                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                             )
 
@@ -762,7 +762,7 @@ struct GoalCreationView: View {
                         Spacer()
 
                         Image(systemName: category == option ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(category == option ? .green : .secondary)
+                            .foregroundStyle(category == option ? ATHLTHTheme.accent : .secondary)
                     }
                     .padding()
                     .goalCard()
@@ -906,11 +906,11 @@ struct GoalCreationView: View {
                 HStack(alignment: .top, spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(index == previewMilestones.count - 1 ? Color.green : Color.green.opacity(0.10))
+                            .fill(index == previewMilestones.count - 1 ? ATHLTHTheme.accent : ATHLTHTheme.accent.opacity(0.10))
                             .frame(width: 32, height: 32)
                         Text("\(index + 1)")
                             .font(.caption.bold())
-                            .foregroundStyle(index == previewMilestones.count - 1 ? .white : .green)
+                            .foregroundStyle(index == previewMilestones.count - 1 ? .white : ATHLTHTheme.accent)
                     }
 
                     VStack(alignment: .leading, spacing: 3) {
@@ -926,7 +926,7 @@ struct GoalCreationView: View {
                                 systemImage: rule.dataSource.systemImage
                             )
                             .font(.caption2)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                         } else {
                             Label("Manual", systemImage: "hand.tap.fill")
                                 .font(.caption2)
@@ -967,13 +967,13 @@ struct GoalCreationView: View {
             if linkActivePlan, let activePlan = session.activePlan {
                 Label("Linked to \(activePlan.title)", systemImage: "list.bullet.clipboard.fill")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 Label("Safe automation", systemImage: "checkmark.shield.fill")
                     .font(.headline)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
                 Text("ATHLTH will only auto-complete a milestone when its exact rule is satisfied by the configured source after this goal was created. Manual check and uncheck always remain available.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1000,7 +1000,7 @@ struct GoalCreationView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(.green)
+            .tint(ATHLTHTheme.accent)
             .frame(maxWidth: .infinity)
             .disabled(!canContinue)
         }
@@ -1533,7 +1533,7 @@ private struct GoalPreviewCard: View {
                         .scaledToFill()
                 } else {
                     LinearGradient(
-                        colors: [.green.opacity(0.88), .black.opacity(0.84)],
+                        colors: [ATHLTHTheme.accent.opacity(0.88), .black.opacity(0.84)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -1587,7 +1587,7 @@ private extension View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                Color.green.opacity(0.07),
+                ATHLTHTheme.accent.opacity(0.07),
                 in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
     }
