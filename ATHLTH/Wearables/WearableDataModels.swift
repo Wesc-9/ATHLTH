@@ -27,17 +27,12 @@ struct WearableWorkoutRecord: Identifiable, Codable, Hashable {
     let route: [RouteCoordinate]?
 }
 
-struct WearableDailySnapshot: Codable, Hashable {
+struct WearableDailySnapshot {
     let provider: TrainingDeviceProvider
     let capturedAt: Date
-    let activeEnergyKilocalories: Double?
-    let moveGoalKilocalories: Double?
-    let exerciseMinutes: Double?
-    let steps: Double?
-    let sleepDuration: TimeInterval?
-    let restingHeartRate: Double?
-    let hrvMilliseconds: Double?
-    let latestHeartRate: Double?
+    let training: TrainingHealthSummary
+    let sleep: SleepSummary
+    let heart: HeartSummary
 }
 
 protocol WearableDataSource {
