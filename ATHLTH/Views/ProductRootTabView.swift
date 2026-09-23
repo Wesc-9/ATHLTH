@@ -2772,65 +2772,6 @@ struct ATHLTHProfileView: View {
                         )
                     }
 
-                    ATHLTHCard {
-                        NavigationLink {
-                            ATHLTHPrivacyCenterView()
-                        } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: "hand.raised.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .frame(width: 44, height: 44)
-                                    .background(
-                                        ATHLTHTheme.accentSoft,
-                                        in: RoundedRectangle(
-                                            cornerRadius: 14,
-                                            style: .continuous
-                                        )
-                                    )
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Privacy")
-                                        .font(.headline)
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                                    Text(privacyStatusText)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                }
-
-                                Spacer()
-
-                                Image(systemName: "chevron.right")
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-
-                        Divider()
-                            .padding(.vertical, 12)
-
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Hide route start & end")
-                                    .font(.subheadline.weight(.semibold))
-                                Text("Removes roughly 250 m from both ends when sharing.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Toggle(
-                                "Hide route start and end",
-                                isOn: $settings.hideRouteStartAndEnd
-                            )
-                            .labelsHidden()
-                            .tint(ATHLTHTheme.accent)
-                        }
-                    }
-
                     TrophyCabinetSection()
 
                     ProfilePerformanceSection(
@@ -2873,6 +2814,38 @@ struct ATHLTHProfileView: View {
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    NavigationLink {
+                        SocialHubView(initialTab: .messages)
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(
+                                systemName:
+                                    inboxUnreadCount > 0
+                                        ? "tray.full.fill"
+                                        : "tray"
+                            )
+
+                            if inboxUnreadCount > 0 {
+                                Text(inboxBadgeText)
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 14, minHeight: 14)
+                                    .padding(.horizontal, inboxUnreadCount > 9 ? 2 : 0)
+                                    .background(.red, in: Capsule())
+                                    .overlay {
+                                        Capsule()
+                                            .stroke(.white, lineWidth: 1)
+                                    }
+                                    .offset(x: 7, y: -6)
+                            }
+                        }
+                    }
+                    .accessibilityLabel(
+                        inboxUnreadCount > 0
+                            ? "Inbox, \(inboxUnreadCount) unread"
+                            : "Inbox"
+                    )
+
                     NavigationLink {
                         ATHLTHNotificationCenterView()
                     } label: {
@@ -2943,24 +2916,12 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    private var privacyStatusText: String {
-        let route = settings.hideRouteStartAndEnd
-            ? "Route endpoints hidden"
-            : "Full routes"
+    private var inboxUnreadCount: Int {
+        messaging.unreadCount + messaging.messageRequestCount
+    }
 
-        let messages: String
-        switch social.privacy?.allowDirectMessages {
-        case "requests":
-            messages = "message requests on"
-        case "friends":
-            messages = "friends only"
-        case "nobody":
-            messages = "messages off"
-        default:
-            messages = "privacy controls"
-        }
-
-        return "\(route) · \(messages)"
+    private var inboxBadgeText: String {
+        inboxUnreadCount > 99 ? "99+" : "\(inboxUnreadCount)"
     }
 
     @MainActor
