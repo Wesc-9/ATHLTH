@@ -1025,9 +1025,9 @@ private struct ATHLTHNotificationSettingsView: View {
                 Toggle("Workout updates", isOn: $settings.workoutRemindersEnabled)
                 Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
                 Toggle("Challenges", isOn: $settings.challengeNotificationsEnabled)
-                Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
+                LabeledContent("Messages", value: "Planned")
 
-                Text("These switches control system alerts. Events can still appear in the ATHLTH notification center so you do not lose your activity history.")
+                Text("These switches control system alerts. Events can still appear in the ATHLTH notification center so you do not lose your activity history. Direct-message notifications will be enabled when messaging ships.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
