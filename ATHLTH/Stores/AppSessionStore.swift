@@ -301,6 +301,28 @@ final class AppSessionStore: ObservableObject {
         saveOnboardingProfile(profile)
     }
 
+    func setTrainingFocus(_ focus: TrainingFocus?) {
+        if var profile = onboardingProfile {
+            profile.trainingFocus = focus
+            saveOnboardingProfile(profile)
+            return
+        }
+
+        saveOnboardingProfile(
+            OnboardingProfileData(
+                dateOfBirth: nil,
+                healthSex: nil,
+                weightKilograms: nil,
+                heightCentimeters: nil,
+                personalDetailsSource: .none,
+                trainingFocus: focus,
+                currentGoal: nil,
+                interests: [],
+                personalizedOfferConsent: .declined
+            )
+        )
+    }
+
     func updatePersonalDetails(
         _ basics: HealthProfileBasics,
         source: PersonalDetailsSource
