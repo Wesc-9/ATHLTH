@@ -670,7 +670,9 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
             activity = .walking
         case .strength:
             activity = .strength
-        case .custom:
+        case .mobility:
+            activity = .yoga
+        case .recovery, .custom:
             activity = .other
         }
 
