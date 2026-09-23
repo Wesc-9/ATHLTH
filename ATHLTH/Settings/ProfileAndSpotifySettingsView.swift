@@ -620,7 +620,7 @@ struct ATHLTHPrivacyCenterView: View {
 
                 Text(
                     settings.hideRouteStartAndEnd
-                        ? "ATHLTH removes roughly 250 m from both ends before a route is shared in Messages."
+                        ? "Recommended · On by default. ATHLTH removes roughly 250 m from both ends before a route is shared in Messages."
                         : "Shared routes include their full start and end points."
                 )
                 .font(.caption)
