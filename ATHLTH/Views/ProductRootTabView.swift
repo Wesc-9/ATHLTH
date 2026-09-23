@@ -2944,6 +2944,34 @@ struct ATHLTHProfileView: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(ATHLTHTheme.accent)
                                 .padding(.top, 3)
+
+                                HStack(spacing: 6) {
+                                    Label(
+                                        trainingIdentityTitle,
+                                        systemImage: trainingIdentityIcon
+                                    )
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        ATHLTHTheme.accentSoft,
+                                        in: Capsule()
+                                    )
+
+                                    if let secondaryIdentityTitle {
+                                        Text(secondaryIdentityTitle)
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 5)
+                                            .background(
+                                                Color.primary.opacity(0.055),
+                                                in: Capsule()
+                                            )
+                                    }
+                                }
+                                .padding(.top, 2)
                             }
 
                             Spacer()
@@ -2965,31 +2993,16 @@ struct ATHLTHProfileView: View {
                         }
                     }
 
-                    HStack(spacing: 12) {
-                        summaryCard(
-                            icon: "target",
-                            value: "\(goalStore.goals.count)",
-                            title: "Goals",
-                            tint: ATHLTHTheme.accent
-                        )
-                        summaryCard(
-                            icon: "point.topleft.down.to.point.bottomright.curvepath",
-                            value: "\(session.savedRoutes.count)",
-                            title: "Routes",
-                            tint: .blue
-                        )
+                    if let primaryGoal = goalStore.primaryGoal {
                         NavigationLink {
-                            TrophyCollectionView()
+                            GoalDetailView(goalID: primaryGoal.id)
                         } label: {
-                            summaryCard(
-                                icon: "trophy.fill",
-                                value: "\(trophyStore.unlockedCount)",
-                                title: "Trophies",
-                                tint: .orange
-                            )
+                            currentFocusCard(primaryGoal)
                         }
                         .buttonStyle(.plain)
                     }
+
+                    profileStatsRow
 
                     ProfilePerformanceSection(
                         stats: performanceStats,
@@ -3035,6 +3048,171 @@ struct ATHLTHProfileView: View {
                     Image(systemName: "gearshape.fill")
                 }
                 .accessibilityLabel("Settings")
+            }
+        }
+    }
+
+    private var trainingIdentityTitle: String {
+        let interests = session.onboardingProfile?.interests ?? []
+
+        if interests.contains(.running) && interests.contains(.strength) {
+            return "Hybrid"
+        }
+        if interests.contains(.running) {
+            return "Runner"
+        }
+        if interests.contains(.strength) {
+            return "Strength"
+        }
+        if interests.contains(.walking) {
+            return "Walker"
+        }
+        if interests.contains(.recovery) {
+            return "Recovery focused"
+        }
+
+        return "Active"
+    }
+
+    private var trainingIdentityIcon: String {
+        let interests = session.onboardingProfile?.interests ?? []
+
+        if interests.contains(.running) && interests.contains(.strength) {
+            return "bolt.fill"
+        }
+        if interests.contains(.running) {
+            return "figure.run"
+        }
+        if interests.contains(.strength) {
+            return "dumbbell.fill"
+        }
+        if interests.contains(.walking) {
+            return "figure.walk"
+        }
+        if interests.contains(.recovery) {
+            return "leaf.fill"
+        }
+
+        return "figure.mixed.cardio"
+    }
+
+    private var secondaryIdentityTitle: String? {
+        guard let currentGoal = session.onboardingProfile?.currentGoal else {
+            return nil
+        }
+
+        return currentGoal.type.title
+    }
+
+    private var completedGoalCount: Int {
+        goalStore.goals.filter { $0.status == .completed }.count
+    }
+
+    private var profileStatsRow: some View {
+        HStack(spacing: 8) {
+            compactProfileStat(
+                value: performanceStats?.totalWorkoutCount.formatted() ?? "—",
+                title: "Workouts"
+            )
+
+            compactProfileStat(
+                value: completedGoalCount.formatted(),
+                title: "Goals"
+            )
+
+            NavigationLink {
+                TrophyCollectionView()
+            } label: {
+                compactProfileStat(
+                    value: trophyStore.unlockedCount.formatted(),
+                    title: "Trophies"
+                )
+            }
+            .buttonStyle(.plain)
+
+            compactProfileStat(
+                value: session.savedRoutes.count.formatted(),
+                title: "Routes"
+            )
+        }
+    }
+
+    private func compactProfileStat(
+        value: String,
+        title: String
+    ) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.headline.monospacedDigit().weight(.bold))
+                .foregroundStyle(.primary)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+
+            Text(title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+        }
+    }
+
+    private func currentFocusCard(_ goal: ATHLTHGoal) -> some View {
+        ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: goal.category.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accent)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("CURRENT FOCUS")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(.secondary)
+
+                    Text(goal.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        Text("\(Int((goal.progress * 100).rounded()))% complete")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accent)
+
+                        if let deadline = goal.deadline {
+                            Text("·")
+                                .foregroundStyle(.tertiary)
+                            Text(deadline.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    ProgressView(value: goal.progress)
+                        .tint(ATHLTHTheme.accent)
+                        .padding(.top, 2)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 4)
             }
         }
     }
@@ -3089,22 +3267,6 @@ struct ATHLTHProfileView: View {
         performanceStats = try? await health.profilePerformanceStats(
             forceRefresh: forceRefresh
         )
-    }
-
-    @ViewBuilder
-    private func summaryCard(icon: String, value: String, title: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: icon)
-                .foregroundStyle(tint)
-            Text(value)
-                .font(.title2.weight(.bold))
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
     }
 
     @ViewBuilder
