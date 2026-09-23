@@ -35,6 +35,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
     private var routeBuilder: HKWorkoutRouteBuilder?
+    private var workoutLocation: CLLocation?
+    private var workoutLocationMetadataAttached = false
     private var timer: Timer?
     private var startedAt: Date?
     private var finishing = false
@@ -106,6 +108,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workoutSession = nil
         workoutBuilder = nil
         routeBuilder = nil
+        workoutLocation = nil
+        workoutLocationMetadataAttached = false
         startedAt = nil
         finishing = false
         mirroringActive = false
@@ -146,6 +150,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.maxHeartRate = nil
             self.routePoints = []
         }
+        workoutLocation = nil
+        workoutLocationMetadataAttached = false
 
         do {
             try await requestAuthorization()
@@ -211,9 +217,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 }
             }
 
+            locationManager.requestWhenInUseAuthorization()
+
             if configuration.locationType == .outdoor {
-                locationManager.requestWhenInUseAuthorization()
                 locationManager.startUpdatingLocation()
+            } else if kind == .strength,
+                      locationManager.authorizationStatus == .authorizedWhenInUse ||
+                      locationManager.authorizationStatus == .authorizedAlways {
+                locationManager.requestLocation()
             }
 
             publishState(.running)
@@ -669,6 +680,16 @@ extension WatchWorkoutManager: CLLocationManagerDelegate {
 
         guard !filtered.isEmpty else { return }
 
+        if kind == .strength {
+            if let bestLocation = filtered.min(by: {
+                $0.horizontalAccuracy < $1.horizontalAccuracy
+            }) {
+                workoutLocation = bestLocation
+                attachWorkoutLocationMetadataIfPossible()
+            }
+            return
+        }
+
         routeBuilder?.insertRouteData(filtered) { [weak self] success, error in
             guard let self, !success, let error else { return }
             self.publish {
@@ -688,6 +709,51 @@ extension WatchWorkoutManager: CLLocationManagerDelegate {
                     )
                 }
             )
+        }
+    }
+
+    func locationManagerDidChangeAuthorization(
+        _ manager: CLLocationManager
+    ) {
+        guard kind == .strength,
+              state == .running,
+              manager.authorizationStatus == .authorizedWhenInUse ||
+              manager.authorizationStatus == .authorizedAlways
+        else {
+            return
+        }
+
+        manager.requestLocation()
+    }
+
+    private func attachWorkoutLocationMetadataIfPossible() {
+        guard kind == .strength,
+              !workoutLocationMetadataAttached,
+              let location = workoutLocation,
+              let builder = workoutBuilder
+        else {
+            return
+        }
+
+        workoutLocationMetadataAttached = true
+
+        builder.addMetadata([
+            ATHLTHWorkoutMetadataKey.locationLatitude:
+                location.coordinate.latitude,
+            ATHLTHWorkoutMetadataKey.locationLongitude:
+                location.coordinate.longitude,
+            ATHLTHWorkoutMetadataKey.locationHorizontalAccuracy:
+                location.horizontalAccuracy
+        ]) { [weak self] success, error in
+            guard let self else { return }
+
+            if !success, let error {
+                self.workoutLocationMetadataAttached = false
+                self.publish {
+                    self.errorMessage =
+                        "Workout location could not be saved: \(error.localizedDescription)"
+                }
+            }
         }
     }
 
