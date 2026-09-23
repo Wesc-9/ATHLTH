@@ -67,6 +67,11 @@ struct ATHLTHHomeView: View {
                             : "Ready to train"
                     )
 
+                    ATHLTHTabHero(
+                        imageName: "HomeHero",
+                        height: 168
+                    )
+
                     ATHLTHCard {
                         ATHLTHSectionHeader(title: "Today's Activity", actionTitle: "Apple Health")
                         HStack(spacing: 8) {
@@ -236,6 +241,11 @@ struct ATHLTHTrainView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     ATHLTHPageHeader(title: "Train", subtitle: "Build a stronger, healthier you.")
+
+                    ATHLTHTabHero(
+                        imageName: "TrainHero",
+                        height: 168
+                    )
 
                     Picker("Training section", selection: $selectedSection) {
                         Text("Today").tag(0)
@@ -882,6 +892,11 @@ struct ATHLTHRecoveryView: View {
                         subtitle: "Use sleep and recovery signals to guide today's load."
                     )
 
+                    ATHLTHTabHero(
+                        imageName: "RecoveryHero",
+                        height: 156
+                    )
+
                     ATHLTHPlusFeatureGate(
                         feature: .advancedRecovery,
                         title: "Advanced Recovery",
@@ -1022,13 +1037,17 @@ struct ATHLTHProgressView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    progressHero
-                        .padding(.horizontal, -16)
-                        .padding(.top, -14)
+                    ATHLTHPageHeader(
+                        title: "Progress",
+                        subtitle: "See your training, consistency and health trends."
+                    )
+
+                    ATHLTHTabHero(
+                        imageName: "ProgressHero",
+                        height: 168
+                    )
 
                     periodPicker
-                        .padding(.top, -42)
-                        .zIndex(2)
 
                     weeklyOverview
 
@@ -1080,95 +1099,6 @@ struct ATHLTHProgressView: View {
         .sheet(isPresented: $showingGoalCreation) {
             GoalCreationView()
         }
-    }
-
-    private var progressHero: some View {
-        ZStack(alignment: .bottomLeading) {
-            Image("OnboardingHero")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 320)
-                .frame(maxWidth: .infinity)
-                .clipped()
-
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.05),
-                    Color.white.opacity(0.10),
-                    Color.white.opacity(0.82),
-                    canvas
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.42),
-                    Color.clear
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("ATHLTH")
-                            .font(.system(size: 27, weight: .black))
-                            .tracking(7)
-
-                        Text("MOVE BETTER · LIVE LONGER")
-                            .font(.system(size: 9, weight: .semibold))
-                            .tracking(2.0)
-                            .foregroundStyle(.black.opacity(0.58))
-                    }
-
-                    Spacer()
-
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "bell.fill")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background(.black.opacity(0.12), in: Circle())
-                            .overlay {
-                                Circle()
-                                    .stroke(.white.opacity(0.35), lineWidth: 1)
-                            }
-
-                        Circle()
-                            .fill(.red)
-                            .frame(width: 9, height: 9)
-                            .overlay {
-                                Circle().stroke(.white, lineWidth: 2)
-                            }
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Your Progress")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundStyle(.black.opacity(0.92))
-
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(green)
-                            .frame(width: 8, height: 8)
-
-                        Text("Small steps. Big results.")
-                            .font(.subheadline)
-                            .foregroundStyle(.black.opacity(0.58))
-                    }
-                }
-                .padding(.bottom, 68)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-        }
-        .frame(height: 320)
     }
 
     private var periodPicker: some View {
