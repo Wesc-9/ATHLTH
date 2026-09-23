@@ -7,8 +7,6 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var settings: AppSettingsStore
 
-    @State private var homeStreakSnapshot: HealthProgressSnapshot?
-
     var body: some View {
         TabView {
             ATHLTHHomeView()
@@ -23,8 +21,8 @@ struct ProductRootTabView: View {
             ATHLTHProgressView()
                 .tabItem { Label("Progress", systemImage: "chart.bar.fill") }
 
-            ATHLTHProfileView()
-                .tabItem { Label("Profile", systemImage: "person.fill") }
+            ATHLTHCommunityView()
+                .tabItem { Label("Community", systemImage: "person.3.fill") }
         }
         .tint(ATHLTHTheme.accent)
         .sheet(
@@ -58,9 +56,10 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
+    @State private var homeStreakSnapshot: HealthProgressSnapshot?
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 VStack(spacing: 18) {
                     ZStack(alignment: .topTrailing) {
                         ATHLTHTabHero(
@@ -74,44 +73,95 @@ struct ATHLTHHomeView: View {
                             focalOffsetX: 18
                         )
 
-                        NavigationLink {
-                            ATHLTHNotificationCenterView()
-                        } label: {
-                            ZStack(alignment: .topTrailing) {
-                                Image(
-                                    systemName:
-                                        notifications.unreadCount > 0
-                                            ? "bell.fill"
-                                            : "bell"
-                                )
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 38, height: 38)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .overlay {
-                                    Circle()
-                                        .stroke(.white.opacity(0.38), lineWidth: 1)
-                                }
+                        HStack(spacing: 8) {
+                            NavigationLink {
+                                SocialHubView(initialTab: .messages)
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(
+                                        systemName:
+                                            homeInboxUnreadCount > 0
+                                                ? "tray.full.fill"
+                                                : "tray"
+                                    )
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 38, height: 38)
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .overlay {
+                                        Circle()
+                                            .stroke(.white.opacity(0.38), lineWidth: 1)
+                                    }
 
-                                if notifications.unreadCount > 0 {
-                                    Circle()
-                                        .fill(.red)
-                                        .frame(width: 9, height: 9)
-                                        .overlay {
-                                            Circle().stroke(.white, lineWidth: 1.5)
-                                        }
-                                        .offset(x: 1, y: -1)
+                                    if homeInboxUnreadCount > 0 {
+                                        Text(homeInboxBadgeText)
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .frame(minWidth: 14, minHeight: 14)
+                                            .padding(.horizontal, homeInboxUnreadCount > 9 ? 2 : 0)
+                                            .background(.red, in: Capsule())
+                                            .overlay {
+                                                Capsule()
+                                                    .stroke(.white, lineWidth: 1)
+                                            }
+                                            .offset(x: 4, y: -4)
+                                    }
                                 }
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                homeInboxUnreadCount > 0
+                                    ? "Inbox, \(homeInboxUnreadCount) unread"
+                                    : "Inbox"
+                            )
+
+                            NavigationLink {
+                                ATHLTHNotificationCenterView()
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(
+                                        systemName:
+                                            notifications.unreadCount > 0
+                                                ? "bell.fill"
+                                                : "bell"
+                                    )
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 38, height: 38)
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .overlay {
+                                        Circle()
+                                            .stroke(.white.opacity(0.38), lineWidth: 1)
+                                    }
+
+                                    if notifications.unreadCount > 0 {
+                                        Circle()
+                                            .fill(.red)
+                                            .frame(width: 9, height: 9)
+                                            .overlay {
+                                                Circle().stroke(.white, lineWidth: 1.5)
+                                            }
+                                            .offset(x: 1, y: -1)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                notifications.unreadCount > 0
+                                    ? "Notifications, \(notifications.unreadCount) unread"
+                                    : "Notifications"
+                            )
+
+                            NavigationLink {
+                                ATHLTHProfileView()
+                            } label: {
+                                homeProfileShortcut
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Profile")
                         }
-                        .buttonStyle(.plain)
                         .padding(.top, 12)
                         .padding(.trailing, 12)
-                        .accessibilityLabel(
-                            notifications.unreadCount > 0
-                                ? "Notifications, \(notifications.unreadCount) unread"
-                                : "Notifications"
-                        )
                     }
 
                     ATHLTHCard {
@@ -261,6 +311,54 @@ struct ATHLTHHomeView: View {
             previousEndDate: start,
             grouping: .day
         )
+    }
+
+    private var homeInboxUnreadCount: Int {
+        messaging.unreadCount + messaging.messageRequestCount
+    }
+
+    private var homeInboxBadgeText: String {
+        homeInboxUnreadCount > 99 ? "99+" : "\(homeInboxUnreadCount)"
+    }
+
+    @ViewBuilder
+    private var homeProfileShortcut: some View {
+        if let avatarURL = session.profile.avatarURL {
+            AsyncImage(url: avatarURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            Image(systemName: "person.fill")
+                                .foregroundStyle(.white)
+                        }
+                }
+            }
+            .frame(width: 38, height: 38)
+            .clipShape(Circle())
+            .overlay {
+                Circle()
+                    .stroke(.white.opacity(0.48), lineWidth: 1)
+            }
+        } else {
+            Circle()
+                .fill(.ultraThinMaterial)
+                .frame(width: 38, height: 38)
+                .overlay {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .overlay {
+                    Circle()
+                        .stroke(.white.opacity(0.48), lineWidth: 1)
+                }
+        }
     }
 
     private var homeHealthSourceText: String {
@@ -648,7 +746,6 @@ private struct HomeCurrentStreakCard: View {
 
 struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
@@ -971,7 +1068,7 @@ struct ATHLTHTrainView: View {
 
         ATHLTHCard {
             HStack(spacing: 10) {
-                Text("Routes & Challenges")
+                Text("Routes")
                     .font(.title3.weight(.semibold))
 
                 Spacer()
@@ -1017,26 +1114,6 @@ struct ATHLTHTrainView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if let challenge = challengeStore.visibleChallenges.first(where: {
-                        $0.status == .active || $0.status == .upcoming || $0.status == .invited
-                    }) {
-                        NavigationLink {
-                            ChallengeDetailView(challengeID: challenge.id)
-                        } label: {
-                            Label(challenge.title, systemImage: "trophy.fill")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(ATHLTHTheme.accent)
-                                .lineLimit(1)
-                        }
-                    } else {
-                        NavigationLink {
-                            ChallengeHubView()
-                        } label: {
-                            Label("Challenges", systemImage: "person.2.fill")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
                 }
                 .padding(.top, 8)
 
@@ -2820,7 +2897,6 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var settings: AppSettingsStore
-    @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var goalStore: GoalStore
 
     @State private var performanceStats: ProfilePerformanceStats?
@@ -2883,25 +2959,6 @@ struct ATHLTHProfileView: View {
                     }
 
                     HStack(spacing: 12) {
-                        NavigationLink {
-                            SocialHubView(initialTab: .friends)
-                        } label: {
-                            profileStat("\(social.friends.count)", "Friends")
-                        }
-                        .buttonStyle(.plain)
-
-                        NavigationLink {
-                            SocialHubView(initialTab: .messages)
-                        } label: {
-                            profileStat(
-                                "\(messaging.unreadCount + messaging.messageRequestCount)",
-                                "Inbox"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    HStack(spacing: 12) {
                         summaryCard(
                             icon: "target",
                             value: "\(goalStore.goals.count)",
@@ -2934,8 +2991,6 @@ struct ATHLTHProfileView: View {
 
                     WorkoutHistoryPreviewSection()
 
-                    ProfileChallengesSection()
-
                 }
                 .padding()
                 .frame(maxWidth: 900)
@@ -2965,46 +3020,14 @@ struct ATHLTHProfileView: View {
                     await social.syncOwnTrophies(trophyStore.showcaseTrophies)
                 }
             }
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    NavigationLink {
-                        SocialHubView(initialTab: .messages)
-                    } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(
-                                systemName:
-                                    inboxUnreadCount > 0
-                                        ? "tray.full.fill"
-                                        : "tray"
-                            )
-
-                            if inboxUnreadCount > 0 {
-                                Text(inboxBadgeText)
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(minWidth: 14, minHeight: 14)
-                                    .padding(.horizontal, inboxUnreadCount > 9 ? 2 : 0)
-                                    .background(.red, in: Capsule())
-                                    .overlay {
-                                        Capsule()
-                                            .stroke(.white, lineWidth: 1)
-                                    }
-                                    .offset(x: 7, y: -6)
-                            }
-                        }
-                    }
-                    .accessibilityLabel(
-                        inboxUnreadCount > 0
-                            ? "Inbox, \(inboxUnreadCount) unread"
-                            : "Inbox"
-                    )
-
-                    NavigationLink {
-                        ATHLTHSettingsView()
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                    }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    ATHLTHSettingsView()
+                } label: {
+                    Image(systemName: "gearshape.fill")
                 }
+                .accessibilityLabel("Settings")
             }
         }
     }
@@ -3046,14 +3069,6 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    private var inboxUnreadCount: Int {
-        messaging.unreadCount + messaging.messageRequestCount
-    }
-
-    private var inboxBadgeText: String {
-        inboxUnreadCount > 99 ? "99+" : "\(inboxUnreadCount)"
-    }
-
     @MainActor
     private func loadPerformanceStats(forceRefresh: Bool = false) async {
         guard health.hasRequestedAuthorization else {
@@ -3067,18 +3082,6 @@ struct ATHLTHProfileView: View {
         performanceStats = try? await health.profilePerformanceStats(
             forceRefresh: forceRefresh
         )
-    }
-
-    @ViewBuilder
-    private func profileStat(_ value: String, _ title: String) -> some View {
-        VStack {
-            Text(value)
-                .font(.title2.weight(.bold))
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
