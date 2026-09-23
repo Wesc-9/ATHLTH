@@ -192,6 +192,15 @@ struct ATHLTHHomeView: View {
     }
 
     private var homeHealthSourceText: String {
+        if !health.hasRequestedAuthorization {
+            switch settings.trainingDeviceProvider {
+            case .garmin:
+                return "Garmin sync pending"
+            case .appleWatch, .none:
+                return "No health source connected"
+            }
+        }
+
         switch settings.trainingDeviceProvider {
         case .appleWatch:
             return "Apple Health + Apple Watch"
