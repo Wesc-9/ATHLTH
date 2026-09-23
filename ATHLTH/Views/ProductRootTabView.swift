@@ -979,14 +979,8 @@ struct ATHLTHTrainView: View {
                             }
                         }
                     case 2:
-                        ATHLTHPlusFeatureGate(
-                            feature: .advancedTrainingPlans,
-                            title: "Training Programs",
-                            message: "Create, save and start reusable training programs with ATHLTH+."
-                        ) {
-                            TrainingPlanManagerView {
-                                selectedSection = 1
-                            }
+                        TrainingPlanManagerView {
+                            selectedSection = 1
                         }
                     default:
                         todayContent
