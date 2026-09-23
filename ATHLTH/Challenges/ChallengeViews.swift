@@ -37,7 +37,7 @@ struct ProfileChallengesSection: View {
                 } label: {
                     Text("View All")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
 
                 Button {
@@ -46,7 +46,7 @@ struct ProfileChallengesSection: View {
                     Image(systemName: "plus")
                         .font(.caption.bold())
                         .frame(width: 32, height: 32)
-                        .background(.green.opacity(0.10), in: Circle())
+                        .background(ATHLTHTheme.accent.opacity(0.10), in: Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -55,9 +55,9 @@ struct ProfileChallengesSection: View {
                 HStack(spacing: 13) {
                     Image(systemName: "person.2.badge.plus")
                         .font(.title2)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                         .frame(width: 42, height: 42)
-                        .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        .background(ATHLTHTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Challenge your friends")
@@ -97,9 +97,9 @@ struct ChallengeCompactRow: View {
         HStack(spacing: 12) {
             Image(systemName: challenge.sport.systemImage)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
                 .frame(width: 40, height: 40)
-                .background(.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+                .background(ATHLTHTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(challenge.title)
@@ -133,7 +133,7 @@ struct ChallengeCompactRow: View {
         }
         .padding(11)
         .background(
-            Color.green.opacity(0.035),
+            ATHLTHTheme.accent.opacity(0.035),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
     }
@@ -174,7 +174,7 @@ struct ChallengeHubView: View {
                         Image(systemName: "plus")
                             .font(.headline)
                             .frame(width: 44, height: 44)
-                            .background(.green.opacity(0.12), in: Circle())
+                            .background(ATHLTHTheme.accent.opacity(0.12), in: Circle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -252,7 +252,7 @@ struct ChallengeHeroCard: View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
                 colors: challenge.sport == .running
-                    ? [.green.opacity(0.92), .black.opacity(0.90)]
+                    ? [ATHLTHTheme.accent.opacity(0.92), .black.opacity(0.90)]
                     : [.orange.opacity(0.82), .black.opacity(0.92)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -356,7 +356,7 @@ struct ChallengeCreationView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 ProgressView(value: Double(step + 1), total: 5)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                     .padding(.horizontal)
 
                 Text(stepTitle)
@@ -461,7 +461,7 @@ struct ChallengeCreationView: View {
                         Spacer()
 
                         Image(systemName: scoring == option ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(scoring == option ? .green : .secondary)
+                            .foregroundStyle(scoring == option ? ATHLTHTheme.accent : .secondary)
                     }
                     .padding()
                     .challengeCard()
@@ -629,11 +629,11 @@ struct ChallengeCreationView: View {
                 ForEach(invitees) { participant in
                     HStack(spacing: 12) {
                         Circle()
-                            .fill(.green.opacity(0.10))
+                            .fill(ATHLTHTheme.accent.opacity(0.10))
                             .frame(width: 42, height: 42)
                             .overlay {
                                 Image(systemName: "person.fill")
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
                             }
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -678,7 +678,7 @@ struct ChallengeCreationView: View {
                         Label("Find Friends", systemImage: "person.badge.plus")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -709,7 +709,7 @@ struct ChallengeCreationView: View {
                             )
                             .foregroundStyle(
                                 invitees.contains(where: { $0.userID == friend.userID })
-                                    ? .green
+                                    ? ATHLTHTheme.accent
                                     : .secondary
                             )
                         }
@@ -855,7 +855,7 @@ struct ChallengeCreationView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Label("Fair-play rules", systemImage: "checkmark.shield.fill")
                     .font(.headline)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
                 Text("Only attempts inside the challenge window count. Rules lock at start. Verified and Manual strength results stay visibly different.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -882,7 +882,7 @@ struct ChallengeCreationView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(.green)
+            .tint(ATHLTHTheme.accent)
             .frame(maxWidth: .infinity)
             .disabled(!canContinue)
         }
@@ -1070,7 +1070,7 @@ struct ChallengeCreationView: View {
             .foregroundStyle(sport == option ? .white : .primary)
             .frame(maxWidth: .infinity, minHeight: 92)
             .background(
-                sport == option ? Color.green : Color(.secondarySystemGroupedBackground),
+                sport == option ? ATHLTHTheme.accent : Color(.secondarySystemGroupedBackground),
                 in: RoundedRectangle(cornerRadius: 20)
             )
         }
@@ -1108,11 +1108,11 @@ struct ChallengeCreationView: View {
     ) -> some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(.green.opacity(0.10))
+                .fill(ATHLTHTheme.accent.opacity(0.10))
                 .frame(width: 42, height: 42)
                 .overlay {
                     Image(systemName: "person.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -1178,7 +1178,7 @@ struct MeetupLocationPicker: View {
             Map(position: $position) {
                 if let coordinate {
                     Marker("Meet here", coordinate: coordinate)
-                        .tint(.green)
+                        .tint(ATHLTHTheme.accent)
                 }
             }
             .frame(height: 220)
@@ -1202,7 +1202,7 @@ private struct ChallengeReviewCard: View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
                 colors: sport == .running
-                    ? [.green.opacity(0.90), .black]
+                    ? [ATHLTHTheme.accent.opacity(0.90), .black]
                     : [.orange.opacity(0.80), .black],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -1284,7 +1284,7 @@ struct ChallengeDetailView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(.green)
+                            .tint(ATHLTHTheme.accent)
                         }
 
                         if challenge.creatorID == session.profile.userID &&
@@ -1361,7 +1361,7 @@ struct ChallengeDetailView: View {
                     )
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
                 .frame(maxWidth: .infinity)
             }
         }
@@ -1373,7 +1373,7 @@ struct ChallengeDetailView: View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
                 colors: challenge.sport == .running
-                    ? [.green.opacity(0.95), .black]
+                    ? [ATHLTHTheme.accent.opacity(0.95), .black]
                     : [.orange.opacity(0.86), .black],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -1436,16 +1436,16 @@ struct ChallengeDetailView: View {
                 HStack(spacing: 12) {
                     Text(entry.rank.map { "#\($0)" } ?? "—")
                         .font(.headline.monospacedDigit())
-                        .foregroundStyle(entry.rank == 1 ? .green : .secondary)
+                        .foregroundStyle(entry.rank == 1 ? ATHLTHTheme.accent : .secondary)
                         .frame(width: 34)
 
                     Circle()
-                        .fill(.green.opacity(0.10))
+                        .fill(ATHLTHTheme.accent.opacity(0.10))
                         .frame(width: 38, height: 38)
                         .overlay {
                             Text(entry.participant.displayName.prefix(1).uppercased())
                                 .font(.caption.bold())
-                                .foregroundStyle(.green)
+                                .foregroundStyle(ATHLTHTheme.accent)
                         }
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -1466,7 +1466,7 @@ struct ChallengeDetailView: View {
                             .foregroundStyle(
                                 attempt.verification == .manual
                                     ? .orange
-                                    : .green
+                                    : ATHLTHTheme.accent
                             )
                         } else {
                             Text("No result yet")
@@ -1582,7 +1582,7 @@ struct ChallengeDetailView: View {
                         longitude: meetup.longitude
                     )
                 )
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
             }
             .frame(height: 170)
             .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -1602,7 +1602,7 @@ struct ChallengeDetailView: View {
                             : "checkmark.circle.fill"
                     )
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
                 } else {
                     Button {
                         Task {
@@ -1627,7 +1627,7 @@ struct ChallengeDetailView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                     .disabled(locationStore.isLocating)
                 }
             }
@@ -1670,7 +1670,7 @@ struct ChallengeDetailView: View {
                         .foregroundStyle(
                             participant.state == .accepted ||
                             participant.state == .creator
-                                ? .green
+                                ? ATHLTHTheme.accent
                                 : .secondary
                         )
                 }
@@ -1699,7 +1699,7 @@ struct ChallengeDetailView: View {
                         )
                         .foregroundStyle(
                             attempt.isEligible
-                                ? (attempt.verification == .manual ? .orange : .green)
+                                ? (attempt.verification == .manual ? .orange : ATHLTHTheme.accent)
                                 : .orange
                         )
                         .frame(width: 24)
@@ -1715,7 +1715,7 @@ struct ChallengeDetailView: View {
                                     .foregroundStyle(
                                         attempt.verification == .manual
                                             ? .orange
-                                            : .green
+                                            : ATHLTHTheme.accent
                                     )
                             }
 
@@ -1991,7 +1991,7 @@ private extension View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                Color.green.opacity(0.06),
+                ATHLTHTheme.accent.opacity(0.06),
                 in: RoundedRectangle(cornerRadius: 14)
             )
     }
