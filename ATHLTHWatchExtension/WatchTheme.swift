@@ -1,9 +1,11 @@
 import SwiftUI
 
 enum WatchTheme {
-    static let green = Color(red: 0.10, green: 0.62, blue: 0.36)
-    static let deepGreen = Color(red: 0.05, green: 0.48, blue: 0.27)
-    static let canvas = Color(red: 0.965, green: 0.972, blue: 0.958)
+    static let accent = Color(red: 0.29, green: 0.34, blue: 0.43)
+    static let accentDeep = Color(red: 0.20, green: 0.24, blue: 0.31)
+    static let green = accent
+    static let deepGreen = accentDeep
+    static let canvas = Color(red: 0.968, green: 0.964, blue: 0.958)
     static let card = Color.white.opacity(0.94)
     static let muted = Color(red: 0.38, green: 0.43, blue: 0.50)
     static let border = Color.black.opacity(0.055)
