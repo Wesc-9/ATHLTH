@@ -56,8 +56,11 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
 
     @State private var homeStreakSnapshot: HealthProgressSnapshot?
+    @State private var showingGoalCreation = false
 
     var body: some View {
         NavigationStack {
@@ -222,6 +225,8 @@ struct ATHLTHHomeView: View {
 
                     HomeCurrentStreakCard(snapshot: homeStreakSnapshot)
 
+                    homeGoalsCard
+
                     HomeActivitySection()
 
                     if let insight = homeInsight {
@@ -280,14 +285,25 @@ struct ATHLTHHomeView: View {
             .refreshable {
                 async let healthRefresh: Void = health.refreshAll()
                 async let streakRefresh: Void = loadHomeStreak()
-                _ = await (healthRefresh, streakRefresh)
+                async let goalsRefresh: Void = goalStore.refreshAutomaticMilestones(
+                    health: health,
+                    strength: strengthWorkout
+                )
+                _ = await (healthRefresh, streakRefresh, goalsRefresh)
             }
             .task {
                 if health.lastSuccessfulRefreshAt == nil {
                     await health.refreshAll()
                 }
                 await loadHomeStreak()
+                await goalStore.refreshAutomaticMilestones(
+                    health: health,
+                    strength: strengthWorkout
+                )
             }
+        }
+        .sheet(isPresented: $showingGoalCreation) {
+            GoalCreationView()
         }
     }
 
@@ -486,6 +502,167 @@ struct ATHLTHHomeView: View {
         }
 
         return "Short night"
+    }
+
+    private var homeGoalsCard: some View {
+        ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Goals")
+                        .font(.title3.weight(.bold))
+                    Text("Keep your biggest targets visible.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                NavigationLink {
+                    GoalsHubView()
+                } label: {
+                    Text("See All")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+                }
+
+                Button {
+                    showingGoalCreation = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 34, height: 34)
+                        .background(ATHLTHTheme.accentSoft, in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let primary = goalStore.primaryGoal {
+                Text("PRIMARY")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+
+                NavigationLink {
+                    GoalDetailView(goalID: primary.id)
+                } label: {
+                    homeGoalRow(primary)
+                }
+                .buttonStyle(.plain)
+
+                let secondary = goalStore.activeGoals
+                    .filter { !$0.isPrimary }
+                    .prefix(2)
+
+                ForEach(Array(secondary)) { goal in
+                    Divider().overlay(Color.black.opacity(0.05))
+
+                    NavigationLink {
+                        GoalDetailView(goalID: goal.id)
+                    } label: {
+                        homeGoalRow(goal)
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                VStack(spacing: 10) {
+                    Image(systemName: "target")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accent)
+
+                    Text("Create your first goal")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("Set a target and milestones, then keep progress visible from Home.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    Button("Add Goal") {
+                        showingGoalCreation = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+        }
+    }
+
+    private func homeGoalRow(_ goal: ATHLTHGoal) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: goal.category.systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(goal.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text("\(Int((goal.progress * 100).rounded()))%")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+                }
+
+                HStack {
+                    Text(homeGoalDeadlineText(goal))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Text("\(goal.completedMilestones)/\(goal.milestones.count) milestones")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.black.opacity(0.055))
+                        Capsule()
+                            .fill(ATHLTHTheme.accent)
+                            .frame(width: proxy.size.width * goal.progress)
+                    }
+                }
+                .frame(height: 6)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func homeGoalDeadlineText(_ goal: ATHLTHGoal) -> String {
+        guard let deadline = goal.deadline else {
+            return goal.dataSource.title
+        }
+
+        if deadline < Date() {
+            return "Deadline passed"
+        }
+
+        let days = Calendar.current.dateComponents(
+            [.day],
+            from: Calendar.current.startOfDay(for: Date()),
+            to: Calendar.current.startOfDay(for: deadline)
+        ).day ?? 0
+
+        if days == 0 { return "Today" }
+        if days == 1 { return "1 day left" }
+        return "\(days) days left"
     }
 
     private var homeInsight: (
@@ -1771,7 +1948,6 @@ struct ATHLTHProgressView: View {
     @State private var monthlySnapshot: HealthProgressSnapshot?
     @State private var consistencySnapshot: HealthProgressSnapshot?
     @State private var personalRecords: [HealthPersonalRecord] = []
-    @State private var showingGoalCreation = false
     @State private var progressLoading = false
     @State private var progressError: String?
 
@@ -1811,8 +1987,6 @@ struct ATHLTHProgressView: View {
                         monthlyStatsCard
                         achievementsCard
                     }
-
-                    goalsCard
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 30)
@@ -1841,9 +2015,6 @@ struct ATHLTHProgressView: View {
                 strength: strengthWorkout,
                 goals: goalStore
             )
-        }
-        .sheet(isPresented: $showingGoalCreation) {
-            GoalCreationView()
         }
     }
 
@@ -2223,168 +2394,6 @@ struct ATHLTHProgressView: View {
 
     private var achievementsCard: some View {
         TrophyProgressCard()
-    }
-
-    private var goalsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Goals")
-                        .font(.title3.weight(.bold))
-                    Text("Your biggest targets, connected to real progress.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                NavigationLink {
-                    GoalsHubView()
-                } label: {
-                    Text("See All")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(green)
-                }
-
-                Button {
-                    showingGoalCreation = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(green)
-                        .frame(width: 34, height: 34)
-                        .background(green.opacity(0.09), in: Circle())
-                }
-                .buttonStyle(.plain)
-            }
-
-            if let primary = goalStore.primaryGoal {
-                Text("PRIMARY")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(.secondary)
-
-                NavigationLink {
-                    GoalDetailView(goalID: primary.id)
-                } label: {
-                    progressGoalRow(primary)
-                }
-                .buttonStyle(.plain)
-
-                let secondary = goalStore.activeGoals
-                    .filter { !$0.isPrimary }
-                    .prefix(2)
-
-                ForEach(Array(secondary)) { goal in
-                    Divider().overlay(Color.black.opacity(0.05))
-
-                    NavigationLink {
-                        GoalDetailView(goalID: goal.id)
-                    } label: {
-                        progressGoalRow(goal)
-                    }
-                    .buttonStyle(.plain)
-                }
-            } else {
-                VStack(spacing: 10) {
-                    Image(systemName: "target")
-                        .font(.title2)
-                        .foregroundStyle(green)
-
-                    Text("Create your first goal")
-                        .font(.subheadline.weight(.semibold))
-
-                    Text("Set a target, deadline, image and milestones. ATHLTH can verify selected milestones from Apple Health or ATHLTH workouts, while manual check-off always stays available.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-
-                    Button("Add Goal") {
-                        showingGoalCreation = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(green)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            }
-        }
-        .padding(18)
-        .progressReferenceCard()
-    }
-
-    private func progressGoalRow(_ goal: ATHLTHGoal) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: goal.category.systemImage)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(green)
-                .frame(width: 38, height: 38)
-                .background(
-                    green.opacity(0.09),
-                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                )
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(goal.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Text("\(Int((goal.progress * 100).rounded()))%")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(green)
-                }
-
-                HStack {
-                    Text(goalDeadlineText(goal))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    Text("\(goal.completedMilestones)/\(goal.milestones.count) milestones")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.black.opacity(0.055))
-                        Capsule()
-                            .fill(green)
-                            .frame(width: proxy.size.width * goal.progress)
-                    }
-                }
-                .frame(height: 6)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func goalDeadlineText(_ goal: ATHLTHGoal) -> String {
-        guard let deadline = goal.deadline else {
-            return goal.dataSource.title
-        }
-
-        if deadline < Date() {
-            return "Deadline passed"
-        }
-
-        let days = Calendar.current.dateComponents(
-            [.day],
-            from: Calendar.current.startOfDay(for: Date()),
-            to: Calendar.current.startOfDay(for: deadline)
-        ).day ?? 0
-
-        if days == 0 { return "Today" }
-        if days == 1 { return "1 day left" }
-        return "\(days) days left"
     }
 
     private var overviewDivider: some View {
