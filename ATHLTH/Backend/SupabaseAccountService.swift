@@ -204,6 +204,7 @@ final class SupabaseAccountService: ObservableObject {
     }
 
     func signOut() async throws {
+        await APNsPushManager.shared.unregisterCurrentDevice()
         try await client.auth.signOut()
         passwordRecoveryPending = false
     }
