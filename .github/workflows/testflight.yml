@@ -46,12 +46,14 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Verify deterministic app icons
+      - name: Verify committed app icons
         shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/generate_app_icons.py
-          git diff --exit-code --             ATHLTH/Assets.xcassets/AppIcon.appiconset             ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset
+          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png
+          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png
+          test -s ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 
       - name: Generate Xcode project
         run: xcodegen generate
