@@ -2281,6 +2281,7 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var trophyStore: TrophyStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var goalStore: GoalStore
 
@@ -2322,14 +2323,21 @@ struct ATHLTHProfileView: View {
                         Spacer()
                     }
 
-                    NavigationLink {
-                        SocialHubView(initialTab: .friends)
-                    } label: {
-                        HStack {
+                    HStack(spacing: 12) {
+                        NavigationLink {
+                            SocialHubView(initialTab: .friends)
+                        } label: {
                             profileStat("\(social.friends.count)", "Friends")
                         }
+                        .buttonStyle(.plain)
+
+                        NavigationLink {
+                            SocialHubView(initialTab: .messages)
+                        } label: {
+                            profileStat("\(messaging.unreadCount)", "Messages")
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
 
                     HStack(spacing: 12) {
                         summaryCard(icon: "target", value: "\(goalStore.goals.count)", title: "Goals", tint: ATHLTHTheme.accent)
