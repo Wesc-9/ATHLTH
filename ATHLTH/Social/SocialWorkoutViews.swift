@@ -93,10 +93,28 @@ struct QuickWorkoutStartSheet: View {
     @EnvironmentObject private var social: SocialStore
 
     let kind: WorkoutKind
+    let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let onStart: ([SocialProfileCard]) -> Void
 
     @State private var selectedFriendIDs: Set<UUID> = []
+
+    private var canStart: Bool {
+        trainingDeviceProvider == .appleWatch && watchConnected
+    }
+
+    private var deviceStatusText: String {
+        switch trainingDeviceProvider {
+        case .appleWatch:
+            return watchConnected
+                ? "Ready to start on Apple Watch."
+                : "Finish Apple Watch setup before starting this outdoor workout."
+        case .garmin:
+            return "Garmin is selected. Record this workout on Garmin for now; direct Garmin sync will unlock after authorization is approved."
+        case .none:
+            return "No watch selected. ATHLTH stays fully usable, but direct outdoor workout capture is not enabled for this quick start yet."
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -113,11 +131,7 @@ struct QuickWorkoutStartSheet: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(kind.title)
                                     .font(.title2.bold())
-                                Text(
-                                    watchConnected
-                                        ? "Ready to start on Apple Watch."
-                                        : "Apple Watch is required for this quick start."
-                                )
+                                Text(deviceStatusText)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             }
@@ -151,7 +165,7 @@ struct QuickWorkoutStartSheet: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .tint(ATHLTHTheme.accent)
-                    .disabled(!watchConnected)
+                    .disabled(!canStart)
                 }
                 .padding()
             }
