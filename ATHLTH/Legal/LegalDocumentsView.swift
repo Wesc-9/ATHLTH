@@ -23,7 +23,7 @@ private struct LegalSectionData: Identifiable {
 struct LegalDocumentView: View {
     let kind: LegalDocumentKind
 
-    private let effectiveDate = "20 September 2026"
+    private let effectiveDate = "23 September 2026"
 
     var body: some View {
         ScrollView {
