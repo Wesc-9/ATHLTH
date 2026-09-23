@@ -374,7 +374,10 @@ struct AIProgramBuilderView: View {
                 value: "\(draft.sessionCount)"
             )
 
-            ForEach(Array(draft.weeks.prefix(4))) { week in
+            ForEach(
+                Array(draft.weeks.prefix(4)),
+                id: \.weekNumber
+            ) { week in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(
                         week.title.isEmpty
