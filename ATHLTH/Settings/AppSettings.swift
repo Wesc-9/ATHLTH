@@ -165,9 +165,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var profileVisibility: ProfileVisibility { didSet { persist() } }
     @Published var defaultActivityVisibility: ProfileVisibility { didSet { persist() } }
     @Published var shareTrainingPresence: Bool { didSet { persist() } }
-    @Published var shareRoutesByDefault: Bool { didSet { persist() } }
     @Published var hideRouteStartAndEnd: Bool { didSet { persist() } }
-    @Published var shareHeartRateByDefault: Bool { didSet { persist() } }
 
     @Published var preferredWorkoutCapture: WorkoutCapturePreference { didSet { persist() } }
     @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
@@ -204,9 +202,7 @@ final class AppSettingsStore: ObservableObject {
         profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .friends
         defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .friends
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? true
-        shareRoutesByDefault = defaults.object(forKey: "settings.shareRoutes") as? Bool ?? false
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
-        shareHeartRateByDefault = defaults.object(forKey: "settings.shareHeartRate") as? Bool ?? false
 
         preferredWorkoutCapture = WorkoutCapturePreference(rawValue: defaults.string(forKey: "settings.preferredWorkoutCapture") ?? "") ?? .automatic
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
@@ -239,9 +235,7 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(profileVisibility.rawValue, forKey: "settings.profileVisibility")
         defaults.set(defaultActivityVisibility.rawValue, forKey: "settings.defaultActivityVisibility")
         defaults.set(shareTrainingPresence, forKey: "settings.shareTrainingPresence")
-        defaults.set(shareRoutesByDefault, forKey: "settings.shareRoutes")
         defaults.set(hideRouteStartAndEnd, forKey: "settings.hideRouteStartAndEnd")
-        defaults.set(shareHeartRateByDefault, forKey: "settings.shareHeartRate")
 
         defaults.set(preferredWorkoutCapture.rawValue, forKey: "settings.preferredWorkoutCapture")
         defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
