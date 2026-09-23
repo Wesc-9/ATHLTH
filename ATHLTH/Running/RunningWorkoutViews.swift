@@ -340,7 +340,7 @@ struct RunningWorkoutBuilderView: View {
                 }
 
                 Section {
-                    Text("A block can repeat work + recovery several times. This structure is also suitable for later Apple Watch workout guidance.")
+                    Text("A block can repeat work + recovery several times. This structure is ready for wearable workout guidance as supported providers are connected.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
