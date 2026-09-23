@@ -11,7 +11,7 @@ from pathlib import Path
 SIZE = 1024
 SOURCE_SIZE = 256
 SOURCE_PATH = Path("ATHLTH/Brand/AppIconSource/raw256.b64")
-EXPECTED_SOURCE_SHA256 = "d631e9a51af6709b17c596a2d7fcf80c804a2a7e148a9ad865ea735a5c76b656"
+EXPECTED_SOURCE_SHA256 = "b222baec51043a69dd9788533d994dc8c612a649aa85550dbe5105640f2e9190"
 
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
@@ -118,7 +118,7 @@ def main() -> None:
     rows = resize_bilinear(source)
     payload = png_payload(rows)
 
-    # The approved monochrome runner-A mark is intentionally identical across
+    # The approved approved ATHLTH pulse-A mark is intentionally identical across
     # normal, dark, tinted, and Apple Watch appearances so ATHLTH keeps one
     # recognizable identity everywhere.
     write_icon(IOS_DIR / "AppIcon.png", payload)
