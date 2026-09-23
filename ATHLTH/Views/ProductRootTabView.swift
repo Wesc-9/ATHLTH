@@ -2385,10 +2385,10 @@ struct ATHLTHProfileView: View {
                         )
                     }
 
-                    NavigationLink {
-                        ATHLTHPrivacyCenterView()
-                    } label: {
-                        ATHLTHCard {
+                    ATHLTHCard {
+                        NavigationLink {
+                            ATHLTHPrivacyCenterView()
+                        } label: {
                             HStack(spacing: 14) {
                                 Image(systemName: "hand.raised.fill")
                                     .font(.title3)
@@ -2419,8 +2419,30 @@ struct ATHLTHProfileView: View {
                                     .foregroundStyle(.tertiary)
                             }
                         }
+                        .buttonStyle(.plain)
+
+                        Divider()
+                            .padding(.vertical, 12)
+
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Hide route start & end")
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Removes roughly 250 m from both ends when sharing.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Toggle(
+                                "Hide route start and end",
+                                isOn: $settings.hideRouteStartAndEnd
+                            )
+                            .labelsHidden()
+                            .tint(ATHLTHTheme.accent)
+                        }
                     }
-                    .buttonStyle(.plain)
 
                     TrophyCabinetSection()
 
