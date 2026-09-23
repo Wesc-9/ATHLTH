@@ -45,6 +45,7 @@ struct ATHLTHApp: App {
                 .environmentObject(accountService)
                 .environment(\.locale, Locale(identifier: "en"))
                 .preferredColorScheme(.light)
+                .tint(ATHLTHTheme.accent)
         }
     }
 }
