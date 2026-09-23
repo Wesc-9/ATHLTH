@@ -14,40 +14,6 @@ struct AdvancedPlannerView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            ATHLTHCard {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "square.stack.3d.up.fill")
-                        .font(.title2)
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 46, height: 46)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 14)
-                        )
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Programs")
-                            .font(.title3.weight(.bold))
-                        Text(
-                            "Build or save complete training programs here. Start one when you're ready, then use Calendar to schedule and adjust the sessions."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Button {
-                        showingProgramCreation = true
-                    } label: {
-                        Label("Create", systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .tint(ATHLTHTheme.accent)
-                }
-            }
-
             if let plan = session.activePlan {
                 ATHLTHCard {
                     HStack {
