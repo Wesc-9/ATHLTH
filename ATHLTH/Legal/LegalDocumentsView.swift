@@ -35,6 +35,22 @@ struct LegalDocumentView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
+                #if DEBUG
+                if !ATHLTHLegalIdentity.isFullyConfigured {
+                    Label(
+                        "Set ATHLTH_LEGAL_OPERATOR_NAME and ATHLTH_PRIVACY_CONTACT_EMAIL before a public App Store release.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .padding(12)
+                    .background(
+                        .orange.opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                }
+                #endif
+
                 ForEach(sections) { section in
                     VStack(alignment: .leading, spacing: 7) {
                         Text(section.title)
@@ -120,7 +136,7 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "14. Contact",
-                body: "Questions about these Terms can be directed through the official ATHLTH support contact shown on the App Store product page. The App Store listing identifies the developer responsible for operating ATHLTH."
+                body: ATHLTHLegalIdentity.termsContactStatement
             )
         ]
     }
@@ -128,8 +144,8 @@ struct LegalDocumentView: View {
     private var privacySections: [LegalSectionData] {
         [
             LegalSectionData(
-                title: "1. What this policy covers",
-                body: "This Privacy Policy explains how ATHLTH handles information when you use the app, including account information, training data, optional Apple Health or supported wearable data, routes, social features and optional integrations."
+                title: "1. Controller and scope",
+                body: "\(ATHLTHLegalIdentity.controllerStatement) This Privacy Policy explains how ATHLTH handles information when you use the app, including account information, training data, optional Apple Health or supported wearable data, routes, social features and optional integrations."
             ),
             LegalSectionData(
                 title: "2. Account and profile information",
@@ -189,7 +205,7 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "16. Privacy contact",
-                body: "Privacy questions, rights requests and data-protection inquiries can be submitted through the official ATHLTH support contact shown on the App Store product page. The App Store listing identifies the developer responsible for ATHLTH. Account deletion is available directly in Settings."
+                body: "\(ATHLTHLegalIdentity.privacyContactStatement) Account deletion is available directly in Settings."
             )
         ]
     }
