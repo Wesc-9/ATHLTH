@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct ProductRootTabView: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     var body: some View {
         TabView {
@@ -25,7 +26,18 @@ struct ProductRootTabView: View {
         }
         .tint(ATHLTHTheme.accent)
         .sheet(
-            isPresented: $workoutMirroring.isPresentationRequested,
+            isPresented: Binding(
+                get: {
+                    settings.trainingDeviceProvider == .appleWatch &&
+                    workoutMirroring.isPresentationRequested
+                },
+                set: { presented in
+                    if !presented &&
+                        !workoutMirroring.hasActiveMirroredWorkout {
+                        workoutMirroring.dismissSummary()
+                    }
+                }
+            ),
             onDismiss: {
                 if !workoutMirroring.hasActiveMirroredWorkout {
                     workoutMirroring.dismissSummary()
@@ -476,7 +488,10 @@ struct ATHLTHTrainView: View {
             .sheet(item: $selectedStrengthSession) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
-                    watchConnected: watchConnection.isReady,
+                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    watchConnected:
+                        settings.trainingDeviceProvider == .appleWatch &&
+                        watchConnection.isReady,
                     defaultCapture: settings.preferredWorkoutCapture,
                     defaultTracking: settings.defaultStrengthTracking,
                     linkedSpotifyPlaylist: session.activePlan?.spotifyPlaylist,
@@ -525,7 +540,10 @@ struct ATHLTHTrainView: View {
             .sheet(item: $pendingQuickStartKind) { kind in
                 QuickWorkoutStartSheet(
                     kind: kind,
-                    watchConnected: watchConnection.isReady
+                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    watchConnected:
+                        settings.trainingDeviceProvider == .appleWatch &&
+                        watchConnection.isReady
                 ) { selectedFriends in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
@@ -649,7 +667,7 @@ struct ATHLTHTrainView: View {
         ATHLTHCard {
             ATHLTHSectionHeader(
                 title: "Quick Start",
-                actionTitle: watchConnection.isReady ? "Apple Watch" : "Connect Watch"
+                actionTitle: quickStartDeviceTitle
             )
             HStack {
                 ForEach([WorkoutKind.running, .walking, .strength]) { kind in
@@ -791,24 +809,8 @@ struct ATHLTHTrainView: View {
                 }
                 .padding(.top, 8)
 
-                HStack(spacing: 10) {
-                    Button {
-                        sendRouteToWatch(route)
-                    } label: {
-                        Label("Send to Apple Watch", systemImage: "applewatch")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accent)
-                    .disabled(!watchConnection.isReady)
-
-                    if !watchConnection.isReady {
-                        Text(watchConnection.state.subtitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                }
-                .padding(.top, 8)
+                routeDeviceActions(route)
+                    .padding(.top, 8)
             } else {
                 ContentUnavailableView(
                     "No routes yet",
@@ -877,7 +879,6 @@ struct ATHLTHTrainView: View {
         }
 
         return watchWorkoutKind(for: kind) != nil &&
-            watchConnection.isReady &&
             !watchConnection.workoutLaunchInProgress
     }
 
@@ -902,8 +903,69 @@ struct ATHLTHTrainView: View {
         pendingQuickStartKind = kind
     }
 
+    private var quickStartDeviceTitle: String {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            return watchConnection.isReady ? "Apple Watch" : "Apple Watch setup"
+        case .garmin:
+            return "Garmin · sync pending"
+        case .none:
+            return "No watch"
+        }
+    }
+
+    @ViewBuilder
+    private func routeDeviceActions(
+        _ route: TrainingRoute
+    ) -> some View {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            HStack(spacing: 10) {
+                Button {
+                    sendRouteToWatch(route)
+                } label: {
+                    Label("Send to Apple Watch", systemImage: "applewatch")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accent)
+                .disabled(!watchConnection.isReady)
+
+                if !watchConnection.isReady {
+                    Text(watchConnection.state.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+        case .garmin:
+            HStack(spacing: 10) {
+                Label("Garmin route sync", systemImage: "watch.analog")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accent)
+
+                Text("Planned · authorization pending")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+        case .none:
+            Label(
+                "Route stays available on iPhone",
+                systemImage: "iphone"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
     private func startQuickWorkoutOnWatch(_ kind: WorkoutKind) {
-        guard let watchKind = watchWorkoutKind(for: kind) else { return }
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady,
+              let watchKind = watchWorkoutKind(for: kind)
+        else {
+            return
+        }
 
         Task {
             do {
@@ -916,6 +978,12 @@ struct ATHLTHTrainView: View {
     }
 
     private func sendRouteToWatch(_ route: TrainingRoute) {
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady
+        else {
+            return
+        }
+
         do {
             try watchConnection.sendRoute(route)
             watchTransferMessage = "Sent \(route.title) to Apple Watch."
@@ -1313,7 +1381,14 @@ struct ATHLTHRecoveryView: View {
         case .recover:
             return "Recovery first"
         case .buildingBaseline:
-            return "Keep wearing your Apple Watch"
+            switch settings.trainingDeviceProvider {
+            case .appleWatch:
+                return "Keep wearing your Apple Watch"
+            case .garmin:
+                return "Garmin sync is waiting for authorization"
+            case .none:
+                return "More health data is needed"
+            }
         }
     }
 
@@ -1328,7 +1403,14 @@ struct ATHLTHRecoveryView: View {
         case .recover:
             return "Your combined recovery signals are well below baseline. A rest day, mobility or easy activity may be more appropriate."
         case .buildingBaseline:
-            return "ATHLTH needs at least five usable days with sleep, HRV and resting heart-rate data before showing a recovery score."
+            switch settings.trainingDeviceProvider {
+            case .appleWatch:
+                return "ATHLTH needs at least five usable days with sleep, HRV and resting heart-rate data before showing a recovery score."
+            case .garmin:
+                return "The recovery model is ready for Garmin sleep, HRV and resting heart-rate data. Until Garmin authorization is approved, ATHLTH uses any compatible data already available through Apple Health."
+            case .none:
+                return "Recovery scoring needs sleep, HRV and resting heart-rate data. Without a wearable, ATHLTH leaves the score unavailable instead of estimating or failing."
+            }
         }
     }
 
