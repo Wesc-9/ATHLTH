@@ -305,22 +305,22 @@ final class SupabaseAccountService: ObservableObject {
     }
 
     func isUsernameAvailable(_ username: String) async throws -> Bool {
-        guard let userID = currentUserID else {
+        guard currentUserID != nil else {
             throw SupabaseAccountError.notAuthenticated
         }
 
         let cleaned = Self.cleanedUsername(username)
         guard cleaned.count >= 3 else { return false }
 
-        let owners: [UsernameOwner] = try await client
-            .from("profiles")
-            .select("id")
-            .eq("username", value: cleaned)
-            .limit(1)
+        let available: Bool = try await client
+            .rpc(
+                "is_username_available",
+                params: UsernameAvailabilityParams(candidate: cleaned)
+            )
             .execute()
             .value
 
-        return owners.first?.id == nil || owners.first?.id == userID
+        return available
     }
 
     func updateProfile(
@@ -460,8 +460,8 @@ private struct DeleteAccountResponse: Decodable {
     let deleted: Bool
 }
 
-private struct UsernameOwner: Decodable {
-    let id: UUID
+private struct UsernameAvailabilityParams: Encodable {
+    let candidate: String
 }
 
 private struct ProfileUpdate: Encodable {
