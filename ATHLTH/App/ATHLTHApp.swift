@@ -14,6 +14,7 @@ struct ATHLTHApp: App {
     @StateObject private var notifications = ATHLTHNotificationStore()
     @StateObject private var challengeStore = ChallengeStore()
     @StateObject private var social = SocialStore()
+    @StateObject private var messaging = MessagingStore()
     @StateObject private var trophies = TrophyStore()
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
@@ -36,6 +37,7 @@ struct ATHLTHApp: App {
                 .environmentObject(notifications)
                 .environmentObject(challengeStore)
                 .environmentObject(social)
+                .environmentObject(messaging)
                 .environmentObject(trophies)
                 .environmentObject(spotifyPlayback)
                 .environmentObject(watchConnection)
@@ -64,6 +66,7 @@ struct AppRootView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
@@ -102,6 +105,7 @@ struct AppRootView: View {
 
             if appSession.signedIn {
                 await refreshSocialCore()
+                await messaging.refresh()
             }
 
             guard health.hasRequestedAuthorization else { return }
@@ -134,6 +138,7 @@ struct AppRootView: View {
             Task {
                 if appSession.signedIn {
                     await refreshSocialCore()
+                    await messaging.refresh()
                 }
 
                 guard health.hasRequestedAuthorization else { return }
