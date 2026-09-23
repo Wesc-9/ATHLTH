@@ -35,17 +35,6 @@ struct LegalDocumentView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                #if DEBUG
-                Label(
-                    "V0.1 legal draft — controller/contact details and final legal review are required before public release.",
-                    systemImage: "exclamationmark.triangle.fill"
-                )
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .padding(12)
-                .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
-                #endif
-
                 ForEach(sections) { section in
                     VStack(alignment: .leading, spacing: 7) {
                         Text(section.title)
@@ -119,7 +108,7 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "11. Suspension and deletion",
-                body: "You may request account deletion through the service when that functionality is available. ATHLTH may suspend or restrict accounts for serious or repeated violations of these Terms, security threats, unlawful use or abuse of other users."
+                body: "You can permanently delete your ATHLTH account from Settings. Account deletion removes the ATHLTH cloud account and associated ATHLTH data except information that must be retained where required by law. ATHLTH may suspend or restrict accounts for serious or repeated violations of these Terms, security threats, unlawful use or abuse of other users."
             ),
             LegalSectionData(
                 title: "12. Disclaimers and liability",
@@ -131,7 +120,7 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "14. Contact",
-                body: "The legal operator identity and formal contact details for ATHLTH must be published in the App Store listing and this document before public release."
+                body: "Questions about these Terms can be directed through the official ATHLTH support contact shown on the App Store product page. The App Store listing identifies the developer responsible for operating ATHLTH."
             )
         ]
     }
@@ -176,15 +165,15 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "10. Sharing and disclosure",
-                body: "ATHLTH does not make private HealthKit data public automatically. Information may be shared when you explicitly use a sharing feature, with processors needed to operate the service, with an integration you choose to connect, or when legally required. HealthKit-derived data must not be disclosed to third parties for advertising or unrelated purposes."
+                body: "ATHLTH does not make HealthKit-derived performance, personal-record, workout-total, recent-activity or training-presence data visible to other users by default. Social sharing controls are opt-in. Information may be shared when you explicitly enable a sharing feature, with processors needed to operate the service, with an integration you choose to connect, or when legally required. HealthKit-derived data is not used or disclosed for advertising or unrelated data mining."
             ),
             LegalSectionData(
                 title: "11. Data retention and deletion",
-                body: "ATHLTH-owned account, workout, plan, route and social data may be retained while your account is active and for as long as reasonably necessary to provide the service, maintain security or meet legal obligations. Account-deletion functionality is intended to remove ATHLTH cloud account data subject to legitimate legal or technical backup-retention requirements. Data stored by Apple Health is controlled separately through Apple."
+                body: "ATHLTH-owned account, workout, plan, route and social data may be retained while your account is active and for as long as reasonably necessary to provide the service, maintain security or meet legal obligations. You can initiate permanent account deletion from Settings. ATHLTH deletes the cloud account and associated ATHLTH data, subject only to information that must be retained where required by law or unavoidable short-term backup retention. Data stored by Apple Health is controlled separately through Apple."
             ),
             LegalSectionData(
                 title: "12. Your choices and rights",
-                body: "Depending on where you live, you may have rights to access, correct, export, restrict or delete personal data and to withdraw consent. You can also manage HealthKit permissions through Apple, change ATHLTH privacy settings, disable integrations, block users and request account deletion when those features are available."
+                body: "Depending on where you live, you may have rights to access, correct, export, restrict or delete personal data and to withdraw consent. You can manage HealthKit permissions through Apple, change ATHLTH privacy settings, disable integrations, block users and permanently delete your ATHLTH account from Settings."
             ),
             LegalSectionData(
                 title: "13. Security",
@@ -192,7 +181,7 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "14. Children",
-                body: "ATHLTH is not intended for people who do not meet the minimum age required to consent to the service and its data processing under applicable law. Age-related requirements will be finalized before public release."
+                body: "ATHLTH is intended for people who are legally able to use the service and consent to the relevant data processing in their country or region. If local law requires consent from a parent or guardian, the service must not be used without that consent."
             ),
             LegalSectionData(
                 title: "15. Changes to this policy",
@@ -200,7 +189,7 @@ struct LegalDocumentView: View {
             ),
             LegalSectionData(
                 title: "16. Privacy contact",
-                body: "The legal data-controller identity and privacy contact details must be inserted here and in the App Store listing before public release."
+                body: "Privacy questions, rights requests and data-protection inquiries can be submitted through the official ATHLTH support contact shown on the App Store product page. The App Store listing identifies the developer responsible for ATHLTH. Account deletion is available directly in Settings."
             )
         ]
     }
