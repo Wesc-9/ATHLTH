@@ -2904,8 +2904,7 @@ struct ATHLTHProfileView: View {
     @State private var performanceStatsLoading = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 VStack(spacing: 18) {
                     ATHLTHCard {
                         HStack(spacing: 18) {
