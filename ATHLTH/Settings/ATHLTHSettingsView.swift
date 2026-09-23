@@ -978,9 +978,13 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                     wearableCapabilityRow("Sleep", icon: "moon.fill")
                     wearableCapabilityRow("Steps & active energy", icon: "flame.fill")
                     wearableCapabilityRow("Distance & routes", icon: "map.fill")
+                    wearableCapabilityRow(
+                        "Progress & personal records",
+                        icon: "chart.line.uptrend.xyaxis"
+                    )
 
                     Text(
-                        "Garmin data will be normalized into the same ATHLTH fields used by Home, Recovery, Progress and workout history. Missing metrics stay unavailable rather than using placeholder values."
+                        "Garmin data will be normalized into the same ATHLTH fields used by Home, Recovery, Progress, personal records and workout history. Missing metrics stay unavailable rather than using placeholder values."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
