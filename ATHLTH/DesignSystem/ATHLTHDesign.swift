@@ -131,3 +131,50 @@ struct ATHLTHPageHeader: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+
+struct ATHLTHTabHero: View {
+    let imageName: String
+    var height: CGFloat = 168
+    var alignment: Alignment = .center
+
+    var body: some View {
+        Image(imageName)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .clipped()
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.02),
+                        Color.clear,
+                        ATHLTHTheme.canvasBottom.opacity(0.12)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: ATHLTHTheme.cornerRadius,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: ATHLTHTheme.cornerRadius,
+                    style: .continuous
+                )
+                .stroke(Color.white.opacity(0.72), lineWidth: 1)
+            }
+            .shadow(
+                color: Color.black.opacity(0.055),
+                radius: 16,
+                x: 0,
+                y: 8
+            )
+            .accessibilityHidden(true)
+    }
+}
