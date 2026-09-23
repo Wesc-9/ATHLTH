@@ -26,12 +26,17 @@ final class HealthKitManager: ObservableObject {
     private let currentAuthorizationVersion = 2
 
     init() {
-        // Apple recommends installing observer queries as early as possible
-        // so HealthKit can deliver background updates immediately after launch.
+        // Install observer queries early only when the user has left
+        // Background Health sync enabled. Subscription access is checked
+        // again by AppRootView before HealthKit background delivery is enabled.
+        let backgroundSyncEnabled =
+            UserDefaults.standard.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
+
         if (
             UserDefaults.standard.integer(forKey: authorizationVersionKey) >= currentAuthorizationVersion ||
             UserDefaults.standard.bool(forKey: legacyAuthorizationFlagKey)
         ),
+           backgroundSyncEnabled,
            HKHealthStore.isHealthDataAvailable() {
             startBackgroundObservers()
         }
