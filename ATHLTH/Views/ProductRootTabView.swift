@@ -786,7 +786,7 @@ struct ATHLTHTrainView: View {
                     Picker("Training section", selection: $selectedSection) {
                         Text("Today").tag(0)
                         Text("Calendar").tag(1)
-                        Text("Plans").tag(2)
+                        Text("Programs").tag(2)
                     }
                     .pickerStyle(.segmented)
 
@@ -794,18 +794,22 @@ struct ATHLTHTrainView: View {
                     case 1:
                         ATHLTHPlusFeatureGate(
                             feature: .advancedTrainingPlans,
-                            title: "Advanced Calendar",
-                            message: "Multi-week planning and advanced scheduling are included with ATHLTH+."
+                            title: "Training Calendar",
+                            message: "Schedule and adjust the active program across days and weeks with ATHLTH+."
                         ) {
-                            AdvancedPlannerView()
+                            AdvancedPlannerView {
+                                selectedSection = 2
+                            }
                         }
                     case 2:
                         ATHLTHPlusFeatureGate(
                             feature: .advancedTrainingPlans,
-                            title: "Advanced Training Plans",
-                            message: "Build, copy and manage advanced training plans with ATHLTH+."
+                            title: "Training Programs",
+                            message: "Create, save and start reusable training programs with ATHLTH+."
                         ) {
-                            TrainingPlanManagerView()
+                            TrainingPlanManagerView {
+                                selectedSection = 1
+                            }
                         }
                     default:
                         todayContent
