@@ -399,7 +399,7 @@ final class SupabaseAccountService: ObservableObject {
         try await client.storage
             .from("profile-avatars")
             .upload(
-                path,
+                path: path,
                 file: jpegData,
                 options: FileOptions(
                     cacheControl: "3600",
