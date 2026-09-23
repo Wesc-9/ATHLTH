@@ -797,18 +797,25 @@ struct FriendProfileView: View {
     }
 
     private func actionBar(_ profile: SocialFriendProfile) -> some View {
-        HStack(spacing: 10) {
-            relationshipButton(profile.card)
+        let relationship = social.relationshipState(with: userID)
 
-            if social.relationshipState(with: userID) == .friends {
+        return VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                relationshipButton(profile.card)
+
                 NavigationLink {
                     DirectMessageThreadView(friend: profile.card)
                 } label: {
-                    Label("Message", systemImage: "message.fill")
-                        .frame(maxWidth: .infinity)
+                    Label(
+                        relationship == .friends ? "Message" : "Message request",
+                        systemImage: "message.fill"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+            }
 
+            if relationship == .friends {
                 Button {
                     showingChallenge = true
                 } label: {
