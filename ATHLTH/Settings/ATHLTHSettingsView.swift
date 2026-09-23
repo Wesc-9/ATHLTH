@@ -339,11 +339,9 @@ struct ATHLTHSettingsView: View {
                                 iconTint: Color(red: 0.12, green: 0.58, blue: 0.86),
                                 iconBackground: Color(red: 0.12, green: 0.58, blue: 0.86).opacity(0.11),
                                 title: "Home Assistant",
-                                subtitle: settings.homeAssistantConnected
-                                    ? "Connected"
-                                    : "Integration is not configured yet"
+                                subtitle: "Home Assistant integration is planned"
                             ) {
-                                Text(settings.homeAssistantConnected ? "Connected" : "Planned")
+                                Text("Planned")
                                     .font(.subheadline)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                             }
