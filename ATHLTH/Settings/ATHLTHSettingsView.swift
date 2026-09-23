@@ -14,6 +14,7 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var accountService: SupabaseAccountService
 
     @State private var showingMembership = false
@@ -806,6 +807,7 @@ struct ATHLTHSettingsView: View {
 
         do {
             try await accountService.signOut()
+            messaging.reset()
             session.clearAfterSignOut()
         } catch {
             signOutError = error.localizedDescription
@@ -1061,9 +1063,9 @@ private struct ATHLTHNotificationSettingsView: View {
                 Toggle("Workout updates", isOn: $settings.workoutRemindersEnabled)
                 Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
                 Toggle("Challenges", isOn: $settings.challengeNotificationsEnabled)
-                LabeledContent("Messages", value: "Planned")
+                Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
 
-                Text("These switches control system alerts. Events can still appear in the ATHLTH notification center so you do not lose your activity history. Direct-message notifications will be enabled when messaging ships.")
+                Text("These switches control system alerts. Events can still appear in the ATHLTH notification center so you do not lose your activity history.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
