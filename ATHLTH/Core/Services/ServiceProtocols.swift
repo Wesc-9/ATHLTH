@@ -51,6 +51,7 @@ protocol MusicProviding {
     func play(playlistURI: String) async throws
 }
 
+#if DEBUG
 enum MockServiceError: Error {
     case notImplemented
 }
@@ -105,3 +106,4 @@ actor MockWorkoutSessionRecorder: WorkoutSessionRecording {
         )
     }
 }
+#endif
