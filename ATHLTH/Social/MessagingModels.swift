@@ -127,6 +127,11 @@ struct MessageShareDraft: Hashable {
         shareVersion: Int = 1
     ) throws {
         let data = try JSONEncoder().encode(snapshot)
+
+        guard data.count <= 1_048_576 else {
+            throw MessageShareError.snapshotTooLarge
+        }
+
         guard let payload = String(data: data, encoding: .utf8) else {
             throw MessageShareError.encodingFailed
         }
@@ -143,9 +148,15 @@ struct MessageShareDraft: Hashable {
 
 enum MessageShareError: LocalizedError {
     case encodingFailed
+    case snapshotTooLarge
 
     var errorDescription: String? {
-        "ATHLTH could not prepare this item for sharing."
+        switch self {
+        case .encodingFailed:
+            return "ATHLTH could not prepare this item for sharing."
+        case .snapshotTooLarge:
+            return "This item is too large to send in a message. Try a shorter route or a smaller training plan."
+        }
     }
 }
 
