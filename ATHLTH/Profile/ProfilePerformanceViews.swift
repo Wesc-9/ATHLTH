@@ -13,7 +13,7 @@ struct ProfilePerformanceSection: View {
 
                     Label("Verified from Apple Health", systemImage: "checkmark.seal.fill")
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
 
                 Spacer()
@@ -26,7 +26,7 @@ struct ProfilePerformanceSection: View {
                         Image(systemName: "chevron.right")
                     }
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
                 }
                 .disabled(stats == nil)
             }
@@ -109,13 +109,13 @@ struct ProfilePerformanceSection: View {
             HStack {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
 
                 Spacer()
 
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 9))
-                    .foregroundStyle(.green.opacity(0.72))
+                    .foregroundStyle(ATHLTHTheme.accent.opacity(0.72))
             }
 
             Text(value)
@@ -135,12 +135,12 @@ struct ProfilePerformanceSection: View {
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
         .background(
-            Color.green.opacity(0.045),
+            ATHLTHTheme.accent.opacity(0.045),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.green.opacity(0.09), lineWidth: 1)
+                .stroke(ATHLTHTheme.accent.opacity(0.09), lineWidth: 1)
         }
     }
 }
@@ -178,7 +178,7 @@ struct PerformanceStatsView: View {
             LinearGradient(
                 colors: [
                     Color.black,
-                    Color.green.opacity(0.78),
+                    ATHLTHTheme.accent.opacity(0.78),
                     Color.black.opacity(0.92)
                 ],
                 startPoint: .topLeading,
@@ -327,7 +327,7 @@ struct PerformanceStatsView: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.title3)
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Verified Stats")
@@ -363,10 +363,10 @@ struct PerformanceStatsView: View {
         HStack(spacing: 13) {
             Image(systemName: icon)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
                 .frame(width: 38, height: 38)
                 .background(
-                    Color.green.opacity(0.09),
+                    ATHLTHTheme.accent.opacity(0.09),
                     in: RoundedRectangle(cornerRadius: 11, style: .continuous)
                 )
 
