@@ -66,6 +66,21 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Account deletion was not confirmed." }, 400);
   }
 
+  // Remove public profile media before deleting the auth user so no public
+  // avatar object can outlive the ATHLTH account.
+  const avatarPath = `${user.id}/avatar.jpg`;
+  const { error: avatarDeleteError } = await admin.storage
+    .from("profile-avatars")
+    .remove([avatarPath]);
+
+  if (avatarDeleteError) {
+    console.error("ATHLTH avatar cleanup failed.", {
+      userID: user.id,
+      message: avatarDeleteError.message,
+    });
+    return json({ error: "Unable to remove profile media before account deletion." }, 500);
+  }
+
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
 
   if (deleteError) {
