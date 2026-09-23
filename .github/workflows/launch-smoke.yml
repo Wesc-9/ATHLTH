@@ -1,0 +1,97 @@
+name: ATHLTH Launch Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.3.4
+    paths:
+      - .github/launch-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  launch-smoke:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build simulator app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ATHLTH.xcodeproj \
+            -scheme ATHLTH \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Boot simulator and launch ATHLTH
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c '
+          import json,sys
+          data=json.load(sys.stdin)
+          runtimes=[r for r in data["runtimes"] if r.get("isAvailable") and r.get("platform")=="iOS"]
+          if not runtimes:
+              runtimes=[r for r in data["runtimes"] if r.get("isAvailable") and "iOS" in r.get("name","")]
+          print(runtimes[-1]["identifier"])
+          ')
+
+          DEVICE_TYPE=$(xcrun simctl list devicetypes -j | python3 -c '
+          import json,sys
+          data=json.load(sys.stdin)
+          phones=[d for d in data["devicetypes"] if "iPhone" in d.get("name","")]
+          print(phones[0]["identifier"])
+          ')
+
+          UDID=$(xcrun simctl create ATHLTHSmoke "$DEVICE_TYPE" "$RUNTIME")
+          trap 'xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
+
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name 'ATHLTH.app' -print -quit)
+          test -n "$APP"
+          xcrun simctl install "$UDID" "$APP"
+
+          set +e
+          LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
+          LAUNCH_STATUS=$?
+          set -e
+          echo "$LAUNCH_OUTPUT"
+
+          if [ "$LAUNCH_STATUS" -ne 0 ]; then
+            echo "::error::ATHLTH failed to launch."
+            xcrun simctl spawn "$UDID" log show --last 2m --style compact --predicate 'process == "ATHLTH"' || true
+            exit 1
+          fi
+
+          PID=$(echo "$LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+          sleep 8
+
+          if [ -n "$PID" ] && xcrun simctl spawn "$UDID" ps -ax | grep -E "[[:space:]]$PID[[:space:]]" >/dev/null; then
+            echo "ATHLTH remained alive after launch (PID $PID)."
+          else
+            echo "::error::ATHLTH process exited shortly after launch."
+            xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+            exit 1
+          fi
