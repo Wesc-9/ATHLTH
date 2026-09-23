@@ -52,6 +52,25 @@ struct ATHLTHApp: App {
     }
 }
 
+private struct ATHLTHLaunchGateView: View {
+    var body: some View {
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
+
+            VStack(spacing: 18) {
+                ATHLTHBrandMark(size: .compact, showTagline: false)
+
+                ProgressView()
+                    .controlSize(.regular)
+                    .tint(ATHLTHTheme.accent)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Opening ATHLTH")
+    }
+}
+
 struct AppRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var health: HealthKitManager
@@ -70,6 +89,7 @@ struct AppRootView: View {
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
+    @State private var startupAuthenticationResolved = false
     @State private var pendingWorkoutReview: SocialPublishableWorkout?
     @State private var queuedWorkoutReviewIDs: Set<UUID> = []
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
@@ -78,6 +98,8 @@ struct AppRootView: View {
         Group {
             if appSession.previewModeEnabled {
                 ProductRootTabView()
+            } else if appSession.signedIn && !startupAuthenticationResolved {
+                ATHLTHLaunchGateView()
             } else if !appSession.signedIn || !appSession.onboardingCompleted {
                 OnboardingFlowView()
             } else {
@@ -85,17 +107,7 @@ struct AppRootView: View {
             }
         }
         .task {
-            do {
-                if let bootstrap = try await accountService.restoreCurrentUser() {
-                    appSession.applyBackendBootstrap(bootstrap)
-                } else if appSession.signedIn && !accountService.hasPersistedSession {
-                    appSession.resetAuthenticationState()
-                }
-            } catch {
-                if !accountService.hasPersistedSession {
-                    appSession.resetAuthenticationState()
-                }
-            }
+            await resolveStartupAuthentication()
 
             if settings.trainingDeviceProvider == .appleWatch {
                 watchConnection.connect()
@@ -427,6 +439,39 @@ struct AppRootView: View {
             }
         } message: {
             Text(authCallbackError ?? "Authentication could not be completed.")
+        }
+    }
+
+    private func resolveStartupAuthentication() async {
+        defer {
+            startupAuthenticationResolved = true
+        }
+
+        // UserDefaults is removed with the app, while Supabase's iOS
+        // Keychain-backed session can survive an uninstall. Never use that
+        // orphaned session to bypass the account/onboarding screen.
+        guard appSession.signedIn else {
+            await accountService.discardUnexpectedPersistedSession()
+            return
+        }
+
+        // Existing installs may restore silently, but the main product UI is
+        // held behind ATHLTHLaunchGateView until the backend session and
+        // profile have both been validated.
+        do {
+            guard let bootstrap = try await accountService.restoreCurrentUser()
+            else {
+                appSession.resetAuthenticationState()
+                await accountService.discardUnexpectedPersistedSession()
+                return
+            }
+
+            appSession.applyBackendBootstrap(bootstrap)
+        } catch {
+            // Never enter ProductRootTabView with a stale/partial profile.
+            // Falling back to the login screen is safer and recoverable.
+            appSession.resetAuthenticationState()
+            await accountService.discardUnexpectedPersistedSession()
         }
     }
 
