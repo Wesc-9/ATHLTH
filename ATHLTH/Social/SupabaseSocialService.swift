@@ -124,6 +124,9 @@ final class SupabaseSocialService {
             performanceStatsVisibility: settings.performanceStatsVisibility,
             trophyCabinetVisibility: settings.trophyCabinetVisibility,
             recentActivityVisibility: settings.recentActivityVisibility,
+            goalsVisibility: settings.goalsVisibility,
+            runningPRsVisibility: settings.runningPRsVisibility,
+            strengthPRsVisibility: settings.strengthPRsVisibility,
             shareTrainingPresence: settings.shareTrainingPresence,
             sharePerformanceStats: settings.sharePerformanceStats,
             shareTrophyCabinet: settings.shareTrophyCabinet,
@@ -732,6 +735,9 @@ private struct SocialPrivacyUpdate: Encodable {
     let performanceStatsVisibility: String
     let trophyCabinetVisibility: String
     let recentActivityVisibility: String
+    let goalsVisibility: String
+    let runningPRsVisibility: String
+    let strengthPRsVisibility: String
     let shareTrainingPresence: Bool
     let sharePerformanceStats: Bool
     let shareTrophyCabinet: Bool
@@ -751,6 +757,9 @@ private struct SocialPrivacyUpdate: Encodable {
         case performanceStatsVisibility = "performance_stats_visibility"
         case trophyCabinetVisibility = "trophy_cabinet_visibility"
         case recentActivityVisibility = "recent_activity_visibility"
+        case goalsVisibility = "goals_visibility"
+        case runningPRsVisibility = "running_prs_visibility"
+        case strengthPRsVisibility = "strength_prs_visibility"
         case shareTrainingPresence = "share_training_presence"
         case sharePerformanceStats = "share_performance_stats"
         case shareTrophyCabinet = "share_trophy_cabinet"
