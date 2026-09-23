@@ -23,17 +23,29 @@ struct ATHLTHEditProfileView: View {
                 VStack(spacing: 14) {
                     avatarPreview
 
-                    PhotosPicker(
-                        selection: $selectedPhoto,
-                        matching: .images
-                    ) {
-                        Label(
-                            selectedAvatarData == nil ? "Choose Profile Photo" : "Change Photo",
-                            systemImage: "photo"
-                        )
+                    HStack(spacing: 10) {
+                        PhotosPicker(
+                            selection: $selectedPhoto,
+                            matching: .images
+                        ) {
+                            Label(
+                                selectedAvatarData == nil ? "Choose Photo" : "Change Photo",
+                                systemImage: "photo"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accent)
+
+                        if session.profile.avatarURL != nil || selectedAvatarData != nil {
+                            Button(role: .destructive) {
+                                Task { await removePhoto() }
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(saving)
+                        }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHTheme.accent)
 
                     Text("Your photo is shown only where your profile visibility allows it.")
                         .font(.caption)
@@ -262,6 +274,27 @@ struct ATHLTHEditProfileView: View {
         }
 
         checkingUsername = false
+    }
+
+    private func removePhoto() async {
+        if selectedAvatarData != nil {
+            selectedAvatarData = nil
+            selectedPhoto = nil
+            return
+        }
+
+        guard session.profile.avatarURL != nil else { return }
+
+        saving = true
+        errorMessage = nil
+        defer { saving = false }
+
+        do {
+            let bootstrap = try await accountService.removeProfileAvatar()
+            session.applyBackendBootstrap(bootstrap)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func saveProfile() async {
