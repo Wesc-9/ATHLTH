@@ -172,6 +172,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var preferredWorkoutCapture: WorkoutCapturePreference { didSet { persist() } }
     @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
+    @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
     @Published var autoPublishCompletedWorkouts: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
@@ -194,9 +195,11 @@ final class AppSettingsStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        language = AppLanguage(rawValue: defaults.string(forKey: "settings.language") ?? "") ?? .system
+        // ATHLTH currently ships in English with a Light-only interface.
+        // Keep the underlying types in place so localization/themes can expand later.
+        language = .english
         measurementPreference = MeasurementPreference(rawValue: defaults.string(forKey: "settings.measurement") ?? "") ?? .metric
-        appearance = AppAppearance(rawValue: defaults.string(forKey: "settings.appearance") ?? "") ?? .system
+        appearance = .light
 
         profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .friends
         defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .friends
@@ -208,6 +211,7 @@ final class AppSettingsStore: ObservableObject {
         preferredWorkoutCapture = WorkoutCapturePreference(rawValue: defaults.string(forKey: "settings.preferredWorkoutCapture") ?? "") ?? .automatic
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
+        backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
         autoPublishCompletedWorkouts = defaults.object(forKey: "settings.autoPublishCompletedWorkouts") as? Bool ?? false
         audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
         hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
@@ -242,6 +246,7 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(preferredWorkoutCapture.rawValue, forKey: "settings.preferredWorkoutCapture")
         defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
+        defaults.set(backgroundHealthSyncEnabled, forKey: "settings.backgroundHealthSyncEnabled")
         defaults.set(autoPublishCompletedWorkouts, forKey: "settings.autoPublishCompletedWorkouts")
         defaults.set(audioCuesEnabled, forKey: "settings.audioCues")
         defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
