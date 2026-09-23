@@ -1,57 +1,110 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-type DeleteAccountRequest = {
-  confirm?: boolean;
-};
+type DeleteAccountRequest = { confirm?: boolean };
 
 const json = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store",
-    },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 
+const encoder = new TextEncoder();
+
+function b64url(value: Uint8Array | string): string {
+  const bytes = typeof value === "string" ? encoder.encode(value) : value;
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function pemBytes(pem: string): Uint8Array {
+  const cleaned = pem
+    .replaceAll("\\n", "\n")
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\s+/g, "");
+  const binary = atob(cleaned);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function appleClientSecret(): Promise<string> {
+  const teamID = Deno.env.get("APPLE_TEAM_ID") ?? "D3AX7B6RMW";
+  const keyID = Deno.env.get("APPLE_KEY_ID");
+  const clientID = Deno.env.get("APPLE_CLIENT_ID") ?? "com.wesc9.athlth";
+  const privateKey = Deno.env.get("APPLE_PRIVATE_KEY");
+  if (!keyID || !privateKey) throw new Error("CONFIG_MISSING");
+
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemBytes(privateKey),
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"],
+  );
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "ES256", kid: keyID }));
+  const payload = b64url(JSON.stringify({
+    iss: teamID,
+    iat: now,
+    exp: now + 60 * 60 * 24 * 30,
+    aud: "https://appleid.apple.com",
+    sub: clientID,
+  }));
+  const signingInput = `${header}.${payload}`;
+  const signature = new Uint8Array(await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    key,
+    encoder.encode(signingInput),
+  ));
+  return `${signingInput}.${b64url(signature)}`;
+}
+
+async function revokeAppleRefreshToken(refreshToken: string): Promise<boolean> {
+  const clientID = Deno.env.get("APPLE_CLIENT_ID") ?? "com.wesc9.athlth";
+  const clientSecret = await appleClientSecret();
+
+  const response = await fetch("https://appleid.apple.com/auth/revoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientID,
+      client_secret: clientSecret,
+      token: refreshToken,
+      token_type_hint: "refresh_token",
+    }),
+  });
+
+  if (response.ok) return true;
+
+  console.error("Apple token revocation failed", {
+    status: response.status,
+    body: await response.text(),
+  });
+  return false;
+}
+
 Deno.serve(async (req: Request) => {
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed." }, 405);
-  }
+  if (req.method !== "POST") return json({ error: "Method not allowed." }, 405);
 
   const authorization = req.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) {
     return json({ error: "Missing authenticated user." }, 401);
   }
 
-  const token = authorization.slice("Bearer ".length).trim();
-  if (!token) {
-    return json({ error: "Missing authenticated user." }, 401);
-  }
-
+  const token = authorization.slice(7).trim();
   const supabaseURL = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
   if (!supabaseURL || !serviceRoleKey) {
-    console.error("delete-account is missing required Supabase environment variables.");
     return json({ error: "Account deletion is temporarily unavailable." }, 500);
   }
 
   const admin = createClient(supabaseURL, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+    auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const {
-    data: { user },
-    error: userError,
-  } = await admin.auth.getUser(token);
-
+  const { data: { user }, error: userError } = await admin.auth.getUser(token);
   if (userError || !user) {
-    console.warn("delete-account rejected an invalid user token.", {
-      message: userError?.message ?? "No user returned",
-    });
     return json({ error: "Your sign-in session is no longer valid. Please sign in again." }, 401);
   }
 
@@ -66,8 +119,43 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Account deletion was not confirmed." }, 400);
   }
 
-  // Remove public profile media before deleting the auth user so no public
-  // avatar object can outlive the ATHLTH account.
+  const isAppleUser =
+    user.app_metadata?.provider === "apple" ||
+    user.identities?.some((identity) => identity.provider === "apple") === true;
+
+  let appleRevoked = !isAppleUser;
+  let appleManualRevokeRequired = false;
+
+  if (isAppleUser) {
+    const { data: appleTokenRow, error: appleTokenError } = await admin
+      .from("apple_sign_in_tokens")
+      .select("refresh_token")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (appleTokenError) {
+      console.error("Unable to load Apple revocation token.", {
+        userID: user.id,
+        message: appleTokenError.message,
+      });
+      appleManualRevokeRequired = true;
+    } else if (!appleTokenRow?.refresh_token) {
+      appleManualRevokeRequired = true;
+    } else {
+      try {
+        appleRevoked = await revokeAppleRefreshToken(appleTokenRow.refresh_token);
+        appleManualRevokeRequired = !appleRevoked;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "UNKNOWN";
+        console.error("Apple revocation could not be completed.", {
+          userID: user.id,
+          reason: message,
+        });
+        appleManualRevokeRequired = true;
+      }
+    }
+  }
+
   const avatarPath = `${user.id}/avatar.jpg`;
   const { error: avatarDeleteError } = await admin.storage
     .from("profile-avatars")
@@ -82,7 +170,6 @@ Deno.serve(async (req: Request) => {
   }
 
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
-
   if (deleteError) {
     console.error("ATHLTH account deletion failed.", {
       userID: user.id,
@@ -91,5 +178,9 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Unable to delete the ATHLTH account." }, 500);
   }
 
-  return json({ deleted: true });
+  return json({
+    deleted: true,
+    apple_revoked: appleRevoked,
+    apple_manual_revoke_required: appleManualRevokeRequired,
+  });
 });
