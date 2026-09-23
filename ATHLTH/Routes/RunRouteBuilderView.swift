@@ -77,7 +77,7 @@ struct RunRouteBuilderView: View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
                 colors: [
-                    Color.green.opacity(0.92),
+                    ATHLTHTheme.accent.opacity(0.92),
                     Color.black.opacity(0.94)
                 ],
                 startPoint: .topLeading,
@@ -166,7 +166,7 @@ struct RunRouteBuilderView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.green)
+            .tint(ATHLTHTheme.accent)
             .disabled(startItem == nil || endItem == nil || isCalculating)
 
             Text("ATHLTH uses Apple Maps walking directions as the route network for running. You choose the final route before saving it.")
@@ -186,7 +186,7 @@ struct RunRouteBuilderView: View {
                             startItem.name ?? "Start",
                             coordinate: startItem.placemark.coordinate
                         )
-                        .tint(.green)
+                        .tint(ATHLTHTheme.accent)
                     }
 
                     if let endItem {
@@ -198,7 +198,7 @@ struct RunRouteBuilderView: View {
                     }
 
                     MapPolyline(coordinates: selectedAlternative.coordinates)
-                        .stroke(.green, lineWidth: 6)
+                        .stroke(ATHLTHTheme.accent, lineWidth: 6)
                 }
                 .frame(height: 310)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -241,7 +241,7 @@ struct RunRouteBuilderView: View {
                         )
                         .foregroundStyle(
                             selectedAlternativeID == alternative.id
-                                ? .green
+                                ? ATHLTHTheme.accent
                                 : .secondary
                         )
 
@@ -266,7 +266,7 @@ struct RunRouteBuilderView: View {
                     .padding(12)
                     .background(
                         selectedAlternativeID == alternative.id
-                            ? Color.green.opacity(0.07)
+                            ? ATHLTHTheme.accent.opacity(0.07)
                             : Color.clear,
                         in: RoundedRectangle(cornerRadius: 15)
                     )
@@ -339,7 +339,7 @@ struct RunRouteBuilderView: View {
                     systemImage: "globe.europe.africa.fill"
                 )
                 .font(.caption)
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
             }
 
             Toggle(
@@ -361,7 +361,7 @@ struct RunRouteBuilderView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.green)
+            .tint(ATHLTHTheme.accent)
             .disabled(
                 selectedAlternative == nil ||
                 title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -529,7 +529,7 @@ struct RunRouteBuilderView: View {
     ) -> some View {
         HStack(spacing: 11) {
             Image(systemName: icon)
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
                 .frame(width: 28)
 
             Text(title)
@@ -556,7 +556,7 @@ private struct RunRouteSearchField: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .foregroundStyle(title == "From" ? .green : .red)
+                    .foregroundStyle(title == "From" ? ATHLTHTheme.accent : .red)
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
