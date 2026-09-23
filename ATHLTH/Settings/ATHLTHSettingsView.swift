@@ -919,7 +919,7 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                             .foregroundStyle(
                                 settings.trainingDeviceProvider == provider
                                     ? ATHLTHTheme.accent
-                                    : .tertiary
+                                    : Color.secondary.opacity(0.55)
                             )
                         }
                         .padding(.vertical, 4)
