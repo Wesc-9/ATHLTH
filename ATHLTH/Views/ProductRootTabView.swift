@@ -2850,14 +2850,24 @@ struct ATHLTHProfileView: View {
             .refreshable {
                 await loadPerformanceStats(forceRefresh: true)
                 await social.refresh()
-                await social.syncOwnPerformance(performanceStats)
-                await social.syncOwnTrophies(trophyStore.showcaseTrophies)
+
+                if social.privacy?.sharePerformanceStats == true {
+                    await social.syncOwnPerformance(performanceStats)
+                }
+                if social.privacy?.shareTrophyCabinet == true {
+                    await social.syncOwnTrophies(trophyStore.showcaseTrophies)
+                }
             }
             .task {
                 await loadPerformanceStats()
                 await social.refresh()
-                await social.syncOwnPerformance(performanceStats)
-                await social.syncOwnTrophies(trophyStore.showcaseTrophies)
+
+                if social.privacy?.sharePerformanceStats == true {
+                    await social.syncOwnPerformance(performanceStats)
+                }
+                if social.privacy?.shareTrophyCabinet == true {
+                    await social.syncOwnTrophies(trophyStore.showcaseTrophies)
+                }
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
