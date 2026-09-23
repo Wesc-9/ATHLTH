@@ -27,6 +27,37 @@ final class MessagingStore: ObservableObject {
         }.count
     }
 
+    var incomingMessageRequests: [DirectConversationRecord] {
+        guard let currentUserID else { return [] }
+        return conversations
+            .filter {
+                $0.requestStatus == .pending &&
+                $0.requestedBy != nil &&
+                $0.requestedBy != currentUserID
+            }
+            .sorted {
+                ($0.lastMessageAt ?? $0.createdAt) >
+                ($1.lastMessageAt ?? $1.createdAt)
+            }
+    }
+
+    var outgoingMessageRequests: [DirectConversationRecord] {
+        guard let currentUserID else { return [] }
+        return conversations
+            .filter {
+                $0.requestStatus == .pending &&
+                $0.requestedBy == currentUserID
+            }
+            .sorted {
+                ($0.lastMessageAt ?? $0.createdAt) >
+                ($1.lastMessageAt ?? $1.createdAt)
+            }
+    }
+
+    var messageRequestCount: Int {
+        incomingMessageRequests.count
+    }
+
     func unreadCount(for conversationID: UUID) -> Int {
         guard let currentUserID else { return 0 }
         return recentMessages.filter {
@@ -70,12 +101,37 @@ final class MessagingStore: ObservableObject {
 
     func openConversation(with userID: UUID) async throws -> UUID {
         if let existing = conversation(with: userID) {
+            guard existing.requestStatus != .declined else {
+                throw MessagingStoreError.requestDeclined
+            }
             return existing.id
         }
 
         let conversationID = try await service.getOrCreateConversation(with: userID)
         await refresh()
         return conversationID
+    }
+
+    func respondToMessageRequest(
+        _ conversationID: UUID,
+        accept: Bool
+    ) async -> Bool {
+        errorMessage = nil
+
+        do {
+            try await service.respondToMessageRequest(
+                conversationID: conversationID,
+                accept: accept
+            )
+            await refresh()
+            if accept {
+                await refreshConversation(conversationID)
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     func refreshConversation(_ conversationID: UUID) async {
@@ -163,5 +219,17 @@ final class MessagingStore: ObservableObject {
         recentMessages = []
         messagesByConversation = [:]
         errorMessage = nil
+    }
+}
+
+
+enum MessagingStoreError: LocalizedError {
+    case requestDeclined
+
+    var errorDescription: String? {
+        switch self {
+        case .requestDeclined:
+            return "This message request was declined."
+        }
     }
 }
