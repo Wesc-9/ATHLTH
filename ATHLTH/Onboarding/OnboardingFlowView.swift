@@ -1013,9 +1013,11 @@ struct OnboardingFlowView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(
-                            selected
-                                ? OnboardingTheme.accent.opacity(0.11)
-                                : Color.black.opacity(0.035)
+                            !isAvailable
+                                ? Color.black.opacity(0.025)
+                                : selected
+                                    ? OnboardingTheme.accent.opacity(0.11)
+                                    : Color.black.opacity(0.035)
                         )
                         .frame(width: 72, height: 72)
 
@@ -1088,16 +1090,20 @@ struct OnboardingFlowView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .stroke(
-                        selected
-                            ? OnboardingTheme.accent.opacity(0.52)
-                            : OnboardingTheme.border,
+                        !isAvailable
+                            ? OnboardingTheme.border.opacity(0.55)
+                            : selected
+                                ? OnboardingTheme.accent.opacity(0.52)
+                                : OnboardingTheme.border,
                         lineWidth: selected ? 1.4 : 1
                     )
             }
             .shadow(
-                color: selected
-                    ? OnboardingTheme.accent.opacity(0.09)
-                    : Color.black.opacity(0.035),
+                color: !isAvailable
+                    ? Color.clear
+                    : selected
+                        ? OnboardingTheme.accent.opacity(0.09)
+                        : Color.black.opacity(0.035),
                 radius: selected ? 18 : 12,
                 x: 0,
                 y: 8
