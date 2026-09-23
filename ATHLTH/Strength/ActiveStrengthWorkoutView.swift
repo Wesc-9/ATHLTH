@@ -148,7 +148,7 @@ struct ActiveStrengthWorkoutView: View {
                 VStack(alignment: .trailing, spacing: 5) {
                     Label(workout.captureDevice.title, systemImage: workout.captureDevice == .appleWatch ? "applewatch" : "iphone")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
 
                     Text(workout.trackingMode.title)
                         .font(.caption)
@@ -169,7 +169,7 @@ struct ActiveStrengthWorkoutView: View {
             HStack(spacing: 12) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
@@ -192,7 +192,7 @@ struct ActiveStrengthWorkoutView: View {
                     showingExerciseLibrary = true
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
             }
         }
     }
@@ -202,7 +202,7 @@ struct ActiveStrengthWorkoutView: View {
         ATHLTHCard {
             Label("Simple tracking", systemImage: "play.circle.fill")
                 .font(.title3.weight(.bold))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
 
             Text("Just train. ATHLTH keeps the workout timer running until you press Finish. Sets, reps, weight and rest are not required.")
                 .font(.subheadline)
@@ -259,7 +259,7 @@ struct ActiveStrengthWorkoutView: View {
 
                 Image(systemName: "dumbbell.fill")
                     .font(.title)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
             }
         }
 
@@ -294,7 +294,7 @@ struct ActiveStrengthWorkoutView: View {
                 Spacer()
                 Text("Running continuously")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
             }
 
             Text(
@@ -315,7 +315,7 @@ struct ActiveStrengthWorkoutView: View {
                 .font(.subheadline.weight(.bold))
                 .frame(width: 28, height: 28)
                 .background(
-                    set.isCompleted ? Color.green.opacity(0.18) : Color.secondary.opacity(0.10),
+                    set.isCompleted ? ATHLTHTheme.accent.opacity(0.18) : Color.secondary.opacity(0.10),
                     in: Circle()
                 )
 
@@ -352,7 +352,7 @@ struct ActiveStrengthWorkoutView: View {
             Spacer()
 
             Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(set.isCompleted ? .green : .secondary)
+                .foregroundStyle(set.isCompleted ? ATHLTHTheme.accent : .secondary)
         }
         .padding(10)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
@@ -404,7 +404,7 @@ struct ActiveStrengthWorkoutView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .tint(.green)
+            .tint(ATHLTHTheme.accent)
             .padding(.top, 14)
 
             Button {
@@ -446,7 +446,7 @@ struct ActiveStrengthWorkoutView: View {
                                 strength.skipRest()
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(.green)
+                            .tint(ATHLTHTheme.accent)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -462,7 +462,7 @@ struct ActiveStrengthWorkoutView: View {
             VStack(spacing: 12) {
                 Label("Exercise complete", systemImage: "checkmark.seal.fill")
                     .font(.title3.weight(.bold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
 
                 if strength.hasNextExercise {
                     Button {
@@ -473,7 +473,7 @@ struct ActiveStrengthWorkoutView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                 } else {
                     Text("All planned exercises are complete.")
                         .font(.subheadline)
@@ -487,7 +487,7 @@ struct ActiveStrengthWorkoutView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                 }
             }
         }
