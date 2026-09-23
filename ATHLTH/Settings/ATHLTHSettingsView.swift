@@ -325,25 +325,17 @@ struct ATHLTHSettingsView: View {
 
                             SettingsDivider()
 
-                            NavigationLink {
-                                SpotifySettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "music.note",
-                                    iconTint: spotifyGreen,
-                                    iconBackground: spotifyGreen.opacity(0.12),
-                                    title: "Spotify",
-                                    subtitle: settings.spotifyConnected
-                                        ? "Preview connection enabled"
-                                        : "Spotify authorization is not implemented yet"
-                                ) {
-                                    connectionTrailing(
-                                        settings.spotifyConnected ? "Preview" : "Open",
-                                        showChevron: true
-                                    )
-                                }
+                            PremiumSettingsRow(
+                                icon: "music.note",
+                                iconTint: spotifyGreen,
+                                iconBackground: spotifyGreen.opacity(0.12),
+                                title: "Spotify",
+                                subtitle: "Spotify integration is planned"
+                            ) {
+                                Text("Planned")
+                                    .font(.subheadline)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
                             }
-                            .buttonStyle(.plain)
 
                             SettingsDivider()
 
