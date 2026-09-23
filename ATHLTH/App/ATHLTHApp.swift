@@ -42,8 +42,8 @@ struct ATHLTHApp: App {
                 .environmentObject(subscriptionStore)
                 .environmentObject(subscriptionBackend)
                 .environmentObject(accountService)
-                .environment(\.locale, settings.language.locale)
-                .preferredColorScheme(settings.appearance.colorScheme)
+                .environment(\.locale, Locale(identifier: "en"))
+                .preferredColorScheme(.light)
         }
     }
 }
@@ -104,7 +104,9 @@ struct AppRootView: View {
 
             guard health.hasRequestedAuthorization else { return }
             await health.configureBackgroundSync(
-                allowed: appSession.canAccess(.backgroundHealthSync)
+                allowed:
+                    appSession.canAccess(.backgroundHealthSync) &&
+                    settings.backgroundHealthSyncEnabled
             )
             await health.refreshAll()
             await goals.refreshAutomaticMilestones(
@@ -158,7 +160,22 @@ struct AppRootView: View {
 
             Task {
                 await health.configureBackgroundSync(
-                    allowed: appSession.canAccess(.backgroundHealthSync)
+                    allowed:
+                        appSession.canAccess(.backgroundHealthSync) &&
+                        settings.backgroundHealthSyncEnabled
+                )
+            }
+        }
+        .onChange(of: settings.backgroundHealthSyncEnabled) { _, enabled in
+            guard health.hasRequestedAuthorization else {
+                return
+            }
+
+            Task {
+                await health.configureBackgroundSync(
+                    allowed:
+                        appSession.canAccess(.backgroundHealthSync) &&
+                        enabled
                 )
             }
         }
