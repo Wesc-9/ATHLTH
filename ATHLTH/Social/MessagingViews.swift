@@ -271,7 +271,7 @@ struct MessageInboxView: View {
     }
 }
 
-private enum MessageRequestDirection {
+private enum MessageRequestDirection: Equatable {
     case incoming
     case outgoing
 }
