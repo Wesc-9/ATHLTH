@@ -33,6 +33,32 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         persist()
     }
 
+    func saveShared(
+        _ source: RunningWorkoutTemplate,
+        sourceOwnerID: UUID?,
+        sourceWorkoutID: UUID?
+    ) -> RunningWorkoutTemplate {
+        var copy = RunningWorkoutTemplate(
+            id: UUID(),
+            title: source.title,
+            type: source.type,
+            summary: source.summary,
+            blocks: source.blocks,
+            routeID: source.routeID,
+            isBuiltIn: false,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        copy.sharedSourceOwnerID =
+            source.sharedSourceOwnerID ?? sourceOwnerID
+        copy.sharedSourceWorkoutID =
+            source.sharedSourceWorkoutID ?? sourceWorkoutID ?? source.id
+
+        customTemplates.append(copy)
+        persist()
+        return copy
+    }
+
     func duplicate(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
         let duplicate = RunningWorkoutTemplate(
             id: UUID(),
