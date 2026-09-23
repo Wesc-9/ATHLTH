@@ -3,6 +3,7 @@ import SwiftUI
 struct PersonalHealthProfileView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var includeDateOfBirth = false
     @State private var dateOfBirth = Calendar.current.date(byAdding: .year, value: -30, to: Date()) ?? Date()
@@ -24,6 +25,11 @@ struct PersonalHealthProfileView: View {
                 Button {
                     Task {
                         await health.requestAuthorization()
+                        await health.configureBackgroundSync(
+                            allowed:
+                                session.canAccess(.backgroundHealthSync) &&
+                                settings.backgroundHealthSyncEnabled
+                        )
                         await health.refreshPersonalDetails()
                         session.updatePersonalDetails(
                             health.personalDetails,
