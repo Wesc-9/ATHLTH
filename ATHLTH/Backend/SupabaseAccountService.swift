@@ -198,6 +198,24 @@ final class SupabaseAccountService: ObservableObject {
         passwordRecoveryPending = false
     }
 
+    /// Clears a Supabase session that survived an app reinstall in Keychain.
+    /// This is intentionally local-only so a fresh install on this iPhone
+    /// does not sign the user out of ATHLTH on their other devices.
+    func discardUnexpectedPersistedSession() async {
+        guard hasPersistedSession else { return }
+
+        do {
+            try await client.auth.signOut(scope: .local)
+        } catch {
+            // Startup must never trust an orphaned Keychain session merely
+            // because cleanup could not reach Supabase. AppRootView keeps
+            // signedIn false, so the login screen remains authoritative.
+        }
+
+        passwordRecoveryPending = false
+        appleRawNonce = nil
+    }
+
     func deleteAccount() async throws -> AccountDeletionResult {
         guard currentUserID != nil else {
             throw SupabaseAccountError.notAuthenticated
