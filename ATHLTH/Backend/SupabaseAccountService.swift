@@ -26,6 +26,10 @@ final class SupabaseAccountService: ObservableObject {
         client.auth.currentUser?.id
     }
 
+    var currentEmail: String? {
+        client.auth.currentUser?.email
+    }
+
     var hasPersistedSession: Bool {
         client.auth.currentSession != nil
     }
@@ -291,15 +295,136 @@ final class SupabaseAccountService: ObservableObject {
             throw SupabaseAccountError.notAuthenticated
         }
 
-        let cleaned = username
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
+        let cleaned = Self.cleanedUsername(username)
 
         try await client
             .from("profiles")
             .update(["username": cleaned])
             .eq("id", value: userID)
             .execute()
+    }
+
+    func isUsernameAvailable(_ username: String) async throws -> Bool {
+        guard let userID = currentUserID else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        let cleaned = Self.cleanedUsername(username)
+        guard cleaned.count >= 3 else { return false }
+
+        let owners: [UsernameOwner] = try await client
+            .from("profiles")
+            .select("id")
+            .eq("username", value: cleaned)
+            .limit(1)
+            .execute()
+            .value
+
+        return owners.first?.id == nil || owners.first?.id == userID
+    }
+
+    func updateProfile(
+        displayName: String,
+        username: String,
+        bio: String,
+        avatarURL: URL?
+    ) async throws -> BackendUserBootstrap {
+        guard let userID = currentUserID else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        let cleanName = displayName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanUsername = Self.cleanedUsername(username)
+        let cleanBio = bio
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !cleanName.isEmpty else {
+            throw SupabaseAccountError.invalidProfile("Display name cannot be empty.")
+        }
+
+        guard cleanUsername.count >= 3 else {
+            throw SupabaseAccountError.invalidProfile("Username must be at least 3 characters.")
+        }
+
+        guard cleanUsername.allSatisfy({
+            $0.isLetter || $0.isNumber || $0 == "_" || $0 == "."
+        }) else {
+            throw SupabaseAccountError.invalidProfile(
+                "Username can use letters, numbers, underscore and periods."
+            )
+        }
+
+        guard cleanBio.count <= 160 else {
+            throw SupabaseAccountError.invalidProfile("Bio can be up to 160 characters.")
+        }
+
+        let update = ProfileUpdate(
+            username: cleanUsername,
+            displayName: cleanName,
+            bio: cleanBio,
+            avatarURL: avatarURL?.absoluteString
+        )
+
+        try await client
+            .from("profiles")
+            .update(update)
+            .eq("id", value: userID)
+            .execute()
+
+        try? await client.auth.update(
+            user: UserAttributes(
+                data: ["full_name": .string(cleanName)]
+            )
+        )
+
+        return try await loadCurrentUser()
+    }
+
+    func uploadProfileAvatar(
+        jpegData: Data
+    ) async throws -> URL {
+        guard let userID = currentUserID else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        guard jpegData.count <= 5_242_880 else {
+            throw SupabaseAccountError.invalidProfile(
+                "Profile photo must be smaller than 5 MB."
+            )
+        }
+
+        let path = "\(userID.uuidString.lowercased())/avatar.jpg"
+
+        try await client.storage
+            .from("profile-avatars")
+            .upload(
+                path,
+                file: jpegData,
+                options: FileOptions(
+                    cacheControl: "3600",
+                    contentType: "image/jpeg",
+                    upsert: true
+                )
+            )
+
+        return try client.storage
+            .from("profile-avatars")
+            .getPublicURL(path: path)
+    }
+
+    func sendPasswordResetForCurrentAccount() async throws {
+        guard let email = currentEmail, !email.isEmpty else {
+            throw SupabaseAccountError.emailUnavailable
+        }
+
+        try await sendPasswordReset(email: email)
+    }
+
+    private static func cleanedUsername(_ username: String) -> String {
+        username
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
     }
 
     private static func sha256(_ input: String) -> String {
@@ -335,12 +460,32 @@ private struct DeleteAccountResponse: Decodable {
     let deleted: Bool
 }
 
+private struct UsernameOwner: Decodable {
+    let id: UUID
+}
+
+private struct ProfileUpdate: Encodable {
+    let username: String
+    let displayName: String
+    let bio: String
+    let avatarURL: String?
+
+    enum CodingKeys: String, CodingKey {
+        case username
+        case displayName = "display_name"
+        case bio
+        case avatarURL = "avatar_url"
+    }
+}
+
 enum SupabaseAccountError: LocalizedError {
     case notAuthenticated
     case missingAppleNonce
     case missingAppleIDToken
     case invalidAppleCredential
     case accountDeletionFailed
+    case invalidProfile(String)
+    case emailUnavailable
     case appleSignInFailed(String)
 
     var errorDescription: String? {
@@ -355,6 +500,10 @@ enum SupabaseAccountError: LocalizedError {
             return "Apple returned an invalid sign-in credential."
         case .accountDeletionFailed:
             return "ATHLTH could not confirm that your account was deleted. Please try again."
+        case .invalidProfile(let message):
+            return message
+        case .emailUnavailable:
+            return "No email address is available for this account."
         case .appleSignInFailed(let message):
             return message
         }
