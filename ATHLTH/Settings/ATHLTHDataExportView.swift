@@ -19,6 +19,7 @@ private struct ATHLTHDataExportEnvelope: Codable {
     let profile: UserProfile
     let activePlan: TrainingPlan?
     let planTemplates: [TrainingPlan]
+    let savedWorkoutTemplates: [PlannedSession]
     let savedRoutes: [TrainingRoute]
     let preferences: ATHLTHExportPreferences
     let note: String
@@ -37,6 +38,7 @@ struct ATHLTHDataExportView: View {
             Section("Included") {
                 Label("ATHLTH profile", systemImage: "person")
                 Label("Training plans and templates", systemImage: "calendar")
+                Label("Saved workout templates", systemImage: "dumbbell")
                 Label("Saved routes", systemImage: "map")
                 Label("App preferences", systemImage: "slider.horizontal.3")
             }
@@ -96,6 +98,7 @@ struct ATHLTHDataExportView: View {
             profile: session.profile,
             activePlan: session.activePlan,
             planTemplates: session.planTemplates,
+            savedWorkoutTemplates: session.savedWorkoutTemplates,
             savedRoutes: session.savedRoutes,
             preferences: ATHLTHExportPreferences(
                 measurement: settings.measurementPreference.rawValue,
