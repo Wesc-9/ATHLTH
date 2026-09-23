@@ -947,7 +947,7 @@ struct ATHLTHTrainView: View {
         if let plan = session.activePlan {
             ATHLTHCard {
                 ATHLTHSectionHeader(
-                    title: "Today's Plan",
+                    title: "Today's Program",
                     actionTitle: plan.title
                 )
 
