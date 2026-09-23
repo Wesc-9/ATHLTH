@@ -251,7 +251,9 @@ final class AppSettingsStore: ObservableObject {
         if let storedProvider = defaults.string(forKey: "settings.trainingDeviceProvider"),
            let provider = TrainingDeviceProvider(rawValue: storedProvider) {
             trainingDeviceProvider = provider
-        } else if defaults.object(forKey: "settings.watchConnected") as? Bool == true {
+        } else if defaults.object(forKey: "settings.watchConnected") as? Bool == true ||
+                    defaults.string(forKey: "settings.preferredWorkoutCapture") ==
+                        WorkoutCapturePreference.appleWatch.rawValue {
             trainingDeviceProvider = .appleWatch
         } else {
             trainingDeviceProvider = .none
