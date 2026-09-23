@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SavedRoutesView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var challengeStore: ChallengeStore
 
@@ -117,17 +118,28 @@ struct SavedRoutesView: View {
                 Spacer()
 
                 Menu {
-                    Button {
-                        do {
-                            try watchConnection.sendRoute(route)
-                            watchMessage = "Sent \(route.title) to Apple Watch."
-                        } catch {
-                            watchError = error.localizedDescription
+                    if settings.trainingDeviceProvider == .appleWatch {
+                        Button {
+                            guard watchConnection.isReady else { return }
+                            do {
+                                try watchConnection.sendRoute(route)
+                                watchMessage = "Sent \(route.title) to Apple Watch."
+                            } catch {
+                                watchError = error.localizedDescription
+                            }
+                        } label: {
+                            Label("Send to Apple Watch", systemImage: "applewatch")
                         }
-                    } label: {
-                        Label("Send to Apple Watch", systemImage: "applewatch")
+                        .disabled(!watchConnection.isReady)
+                    } else if settings.trainingDeviceProvider == .garmin {
+                        Button {} label: {
+                            Label(
+                                "Garmin route sync · Planned",
+                                systemImage: "watch.analog"
+                            )
+                        }
+                        .disabled(true)
                     }
-                    .disabled(!watchConnection.isReady)
 
                     NavigationLink {
                         ChallengeCreationView(preselectedRouteID: route.id)
