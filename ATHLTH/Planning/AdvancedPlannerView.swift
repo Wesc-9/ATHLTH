@@ -585,6 +585,20 @@ private struct ProgramStartView: View {
     }
 }
 
+private enum ProgramTimelineMode: String, CaseIterable, Identifiable {
+    case weeks
+    case endDate
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .weeks: return "Weeks"
+        case .endDate: return "End date"
+        }
+    }
+}
+
 struct TrainingPlanCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -592,17 +606,49 @@ struct TrainingPlanCreationView: View {
 
     @State private var title = "My Program"
     @State private var summary = ""
+    @State private var timelineMode: ProgramTimelineMode = .weeks
     @State private var weekCount = 4
     @State private var customWeeks = 12
     @State private var useCustomWeeks = false
     @State private var startDate = Calendar.current.startOfDay(for: Date())
+    @State private var endDate = Calendar.current.date(
+        byAdding: .day,
+        value: 27,
+        to: Calendar.current.startOfDay(for: Date())
+    ) ?? Date()
     @State private var visibility: ProfileVisibility = .privateOnly
     @State private var selectedGoalIDs: Set<UUID> = []
 
     private let quickDurations = [1, 3, 4, 8, 12, 16, 24]
 
     private var resolvedWeeks: Int {
-        useCustomWeeks ? customWeeks : weekCount
+        switch timelineMode {
+        case .weeks:
+            return useCustomWeeks ? customWeeks : weekCount
+        case .endDate:
+            let calendar = Calendar.current
+            let start = calendar.startOfDay(for: startDate)
+            let end = calendar.startOfDay(for: max(endDate, startDate))
+            let days = max(
+                calendar.dateComponents([.day], from: start, to: end).day ?? 0,
+                0
+            )
+            return min(max(Int(ceil(Double(days + 1) / 7.0)), 1), 52)
+        }
+    }
+
+    private var resolvedEndDate: Date {
+        let calendar = Calendar.current
+        switch timelineMode {
+        case .weeks:
+            return calendar.date(
+                byAdding: .day,
+                value: max(resolvedWeeks * 7 - 1, 0),
+                to: calendar.startOfDay(for: startDate)
+            ) ?? startDate
+        case .endDate:
+            return calendar.startOfDay(for: endDate)
+        }
     }
 
     var body: some View {
@@ -617,12 +663,6 @@ struct TrainingPlanCreationView: View {
                     )
                     .lineLimit(2...5)
 
-                    DatePicker(
-                        "Starts",
-                        selection: $startDate,
-                        displayedComponents: .date
-                    )
-
                     Picker("Visibility", selection: $visibility) {
                         ForEach(ProfileVisibility.allCases) { option in
                             Text(option.title).tag(option)
@@ -630,59 +670,102 @@ struct TrainingPlanCreationView: View {
                     }
                 }
 
-                Section("Length") {
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.adaptive(minimum: 78), spacing: 8)
-                        ],
-                        spacing: 8
-                    ) {
-                        ForEach(quickDurations, id: \.self) { weeks in
-                            Button {
-                                weekCount = weeks
-                                useCustomWeeks = false
-                            } label: {
-                                VStack(spacing: 3) {
-                                    Text("\(weeks)")
-                                        .font(.headline)
-                                    Text(weeks == 1 ? "week" : "weeks")
-                                        .font(.caption2)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 9)
-                                .foregroundStyle(
-                                    !useCustomWeeks && weekCount == weeks
-                                        ? .white
-                                        : .primary
-                                )
-                                .background(
-                                    !useCustomWeeks && weekCount == weeks
-                                        ? ATHLTHTheme.accent
-                                        : Color(.tertiarySystemGroupedBackground),
-                                    in: RoundedRectangle(cornerRadius: 12)
-                                )
-                            }
-                            .buttonStyle(.plain)
+                Section("Timeline") {
+                    DatePicker(
+                        "Start date",
+                        selection: $startDate,
+                        displayedComponents: .date
+                    )
+
+                    Picker("Plan by", selection: $timelineMode) {
+                        ForEach(ProgramTimelineMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
                         }
                     }
+                    .pickerStyle(.segmented)
 
-                    Toggle("Custom program length", isOn: $useCustomWeeks)
+                    if timelineMode == .weeks {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.adaptive(minimum: 78), spacing: 8)
+                            ],
+                            spacing: 8
+                        ) {
+                            ForEach(quickDurations, id: \.self) { weeks in
+                                Button {
+                                    weekCount = weeks
+                                    useCustomWeeks = false
+                                } label: {
+                                    VStack(spacing: 3) {
+                                        Text("\(weeks)")
+                                            .font(.headline)
+                                        Text(weeks == 1 ? "week" : "weeks")
+                                            .font(.caption2)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 9)
+                                    .foregroundStyle(
+                                        !useCustomWeeks && weekCount == weeks
+                                            ? .white
+                                            : .primary
+                                    )
+                                    .background(
+                                        !useCustomWeeks && weekCount == weeks
+                                            ? ATHLTHTheme.accent
+                                            : Color(.tertiarySystemGroupedBackground),
+                                        in: RoundedRectangle(cornerRadius: 12)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
 
-                    if useCustomWeeks {
-                        Stepper(
-                            "\(customWeeks) weeks",
-                            value: $customWeeks,
-                            in: 1...52
+                        Toggle(
+                            "Custom program length",
+                            isOn: $useCustomWeeks
+                        )
+
+                        if useCustomWeeks {
+                            Stepper(
+                                "\(customWeeks) weeks",
+                                value: $customWeeks,
+                                in: 1...52
+                            )
+                        }
+                    } else {
+                        DatePicker(
+                            "End date",
+                            selection: $endDate,
+                            in: startDate...(
+                                Calendar.current.date(
+                                    byAdding: .weekOfYear,
+                                    value: 52,
+                                    to: startDate
+                                ) ?? startDate
+                            ),
+                            displayedComponents: .date
                         )
                     }
 
+                    LabeledContent(
+                        "Program window",
+                        value: "\(resolvedWeeks) \(resolvedWeeks == 1 ? "week" : "weeks")"
+                    )
+
                     Text(
-                        resolvedWeeks >= 12
-                            ? "About \(Int((Double(resolvedWeeks) / 4.345).rounded())) months of training."
-                            : "\(resolvedWeeks * 7) planned calendar days."
+                        "\(startDate.formatted(date: .abbreviated, time: .omitted)) – \(resolvedEndDate.formatted(date: .abbreviated, time: .omitted))"
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+                .onChange(of: startDate) { _, newStart in
+                    if endDate < newStart {
+                        endDate = Calendar.current.date(
+                            byAdding: .day,
+                            value: 6,
+                            to: newStart
+                        ) ?? newStart
+                    }
                 }
 
                 if !goalStore.goals.isEmpty {
