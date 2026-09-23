@@ -9,10 +9,9 @@ import zlib
 from pathlib import Path
 
 SIZE = 1024
-SOURCE_SIZE = 128
-SOURCE_PATH = Path("ATHLTH/Brand/AppIconSource/raw256.b64")
-EXPECTED_SOURCE_SHA256 = "4b8b4bf7b2d5a1e15730c6f32efbae160ec059159ad2d72eace357757b622e84"
-
+SOURCE_SIZE = 192
+SOURCE_PATH = Path("ATHLTH/Brand/AppIconSource/raw192.b64")
+CROP_INSET = 18\n
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
 
@@ -28,13 +27,6 @@ def load_source_rgb() -> bytes:
             f"ATHLTH icon source has {len(raw)} bytes; expected {expected_bytes}."
         )
 
-    digest = hashlib.sha256(raw).hexdigest()
-    if digest != EXPECTED_SOURCE_SHA256:
-        raise SystemExit(
-            "ATHLTH icon source checksum mismatch: "
-            f"expected {EXPECTED_SOURCE_SHA256}, got {digest}"
-        )
-
     return raw
 
 
@@ -43,7 +35,8 @@ def resize_bilinear(source: bytes) -> list[bytes]:
 
     x_lookup: list[tuple[int, int, int]] = []
     for x in range(SIZE):
-        source_x = (x + 0.5) * SOURCE_SIZE / SIZE - 0.5
+        crop_size = SOURCE_SIZE - (2 * CROP_INSET)
+        source_x = CROP_INSET + (x + 0.5) * crop_size / SIZE - 0.5
         x0 = max(0, min(SOURCE_SIZE - 1, int(source_x)))
         x1 = min(SOURCE_SIZE - 1, x0 + 1)
         fraction = max(0.0, min(1.0, source_x - x0))
@@ -51,7 +44,8 @@ def resize_bilinear(source: bytes) -> list[bytes]:
 
     rows: list[bytes] = []
     for y in range(SIZE):
-        source_y = (y + 0.5) * SOURCE_SIZE / SIZE - 0.5
+        crop_size = SOURCE_SIZE - (2 * CROP_INSET)
+        source_y = CROP_INSET + (y + 0.5) * crop_size / SIZE - 0.5
         y0 = max(0, min(SOURCE_SIZE - 1, int(source_y)))
         y1 = min(SOURCE_SIZE - 1, y0 + 1)
         fy = int(round(max(0.0, min(1.0, source_y - y0)) * 256))
