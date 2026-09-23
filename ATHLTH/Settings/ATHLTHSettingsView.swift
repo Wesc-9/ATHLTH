@@ -10,29 +10,11 @@ struct ATHLTHSettingsView: View {
     var body: some View {
         List {
             Section("App") {
-                Picker("Language", selection: $settings.language) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.title).tag(language)
-                    }
-                }
-
                 Picker("Measurements", selection: $settings.measurementPreference) {
                     ForEach(MeasurementPreference.allCases) { preference in
                         Text(preference.title).tag(preference)
                     }
                 }
-
-                Picker("Appearance", selection: $settings.appearance) {
-                    ForEach(AppAppearance.allCases) { appearance in
-                        Text(appearance.title).tag(appearance)
-                    }
-                }
-
-                LabeledContent(
-                    "Units",
-                    value: "\(settings.measurementPreference.distanceUnit) · \(settings.measurementPreference.weightUnit) · \(settings.measurementPreference.temperatureUnit)"
-                )
-                .foregroundStyle(.secondary)
             }
 
             Section("Subscription") {
@@ -67,11 +49,6 @@ struct ATHLTHSettingsView: View {
                     }
                 }
 
-                LabeledContent(
-                    "Background Health sync",
-                    value: session.canAccess(.backgroundHealthSync) ? "Included" : "ATHLTH+ feature"
-                )
-
                 Button {
                     Task {
                         _ = await subscriptionStore.restorePurchases()
@@ -93,7 +70,7 @@ struct ATHLTHSettingsView: View {
                         .foregroundStyle(.red)
                 }
 
-                Text("Apple Health and Apple Watch can still be connected on Free. Automatic Health background sync is an ATHLTH+ feature.")
+                Text("Manage your ATHLTH+ access and purchases here.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -247,6 +224,24 @@ struct ATHLTHSettingsView: View {
                 Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
             }
 
+            Section("Health & sync") {
+                Toggle(
+                    "Background Health sync",
+                    isOn: backgroundHealthSyncBinding
+                )
+                .disabled(!session.canAccess(.backgroundHealthSync))
+
+                if session.canAccess(.backgroundHealthSync) {
+                    Text("Keeps Apple Health data updated automatically in the background. You can turn this off at any time.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Background Health sync requires ATHLTH+. Apple Health and Apple Watch can still be connected on Free.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Exercise data") {
                 Link(destination: URL(string: "https://repdb.co")!) {
                     Label(
@@ -260,6 +255,10 @@ struct ATHLTHSettingsView: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            }
+
+            Section("Language") {
+                LabeledContent("Language", value: "English")
             }
 
             Section("Legal") {
@@ -324,6 +323,21 @@ struct ATHLTHSettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var backgroundHealthSyncBinding: Binding<Bool> {
+        Binding(
+            get: {
+                session.canAccess(.backgroundHealthSync) &&
+                settings.backgroundHealthSyncEnabled
+            },
+            set: { enabled in
+                guard session.canAccess(.backgroundHealthSync) else {
+                    return
+                }
+                settings.backgroundHealthSyncEnabled = enabled
+            }
+        )
     }
 
     private var appVersion: String {
