@@ -303,15 +303,15 @@ Deno.serve(async (req: Request) => {
 
   const supabaseURL = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const openAIKey = Deno.env.get("OPENAI_API_KEY");
+  const groqKey = Deno.env.get("GROQ_API_KEY");
 
   if (!supabaseURL || !serviceRoleKey) {
     return json({ error: "ATHLTH backend is unavailable." }, 503);
   }
 
-  if (!openAIKey) {
+  if (!groqKey) {
     return json({
-      error: "AI program generation is not configured yet.",
+      error: "ATHLTH AI is not configured yet.",
       code: "AI_NOT_CONFIGURED",
     }, 503);
   }
@@ -399,14 +399,14 @@ Hard rules:
 - The output is a draft the user will review before applying.
 `.trim();
 
-  const aiResponse = await fetch("https://api.openai.com/v1/responses", {
+  const aiResponse = await fetch("https://api.groq.com/openai/v1/responses", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${openAIKey}`,
+      "Authorization": `Bearer ${groqKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: Deno.env.get("OPENAI_TRAINING_MODEL") ?? "gpt-5.6-terra",
+      model: Deno.env.get("GROQ_TRAINING_MODEL") ?? "openai/gpt-oss-120b",
       reasoning: { effort: "medium" },
       instructions,
       input: JSON.stringify(constraints),
@@ -423,7 +423,7 @@ Hard rules:
 
   if (!aiResponse.ok) {
     const failure = await aiResponse.text();
-    console.error("OpenAI program generation failed", {
+    console.error("Groq program generation failed", {
       status: aiResponse.status,
       body: failure.slice(0, 2000),
       userID: user.id,
