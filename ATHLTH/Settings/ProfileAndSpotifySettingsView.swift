@@ -819,3 +819,39 @@ struct ATHLTHAccountSecurityView: View {
         }
     }
 }
+
+
+struct SpotifySettingsView: View {
+    var body: some View {
+        Form {
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: "music.note")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Spotify")
+                            .font(.headline)
+                        Text("Integration planned")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Section("Planned integration") {
+                Text("Spotify authorization and training-plan playlist playback are not enabled yet. ATHLTH will add the real connection flow before this setting becomes interactive.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Spotify")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
