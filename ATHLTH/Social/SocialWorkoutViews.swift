@@ -274,13 +274,47 @@ private struct HomeActivityRow: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text(item.activity.title)
-                    .font(.subheadline.weight(.semibold))
+                HStack(spacing: 7) {
+                    Text(item.activity.title)
+                        .font(.subheadline.weight(.semibold))
+
+                    if item.activity.kind == "personal_record" {
+                        Text("PR")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: Capsule()
+                            )
+                    }
+
+                    if item.activity.metadata?["verification"] == "manual" {
+                        Text("Manual")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Color.secondary.opacity(0.10),
+                                in: Capsule()
+                            )
+                    }
+                }
 
                 if let subtitle = item.activity.subtitle {
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(
+                            item.activity.kind == "personal_record"
+                                ? .subheadline.weight(.bold)
+                                : .caption
+                        )
+                        .foregroundStyle(
+                            item.activity.kind == "personal_record"
+                                ? .primary
+                                : .secondary
+                        )
                 }
 
                 if let names = item.activity.metadata?["with_names"],
