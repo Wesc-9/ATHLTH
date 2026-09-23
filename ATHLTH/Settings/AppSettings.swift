@@ -258,6 +258,15 @@ final class AppSettingsStore: ObservableObject {
         }
 
         preferredWorkoutCapture = WorkoutCapturePreference(rawValue: defaults.string(forKey: "settings.preferredWorkoutCapture") ?? "") ?? .automatic
+        if trainingDeviceProvider != .appleWatch &&
+            preferredWorkoutCapture == .appleWatch {
+            preferredWorkoutCapture = .iPhone
+            defaults.set(
+                WorkoutCapturePreference.iPhone.rawValue,
+                forKey: "settings.preferredWorkoutCapture"
+            )
+        }
+
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
         backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
