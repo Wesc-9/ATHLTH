@@ -972,7 +972,9 @@ struct OnboardingFlowView: View {
                             await health.requestAuthorization()
 
                             await health.configureBackgroundSync(
-                                allowed: session.canAccess(.backgroundHealthSync)
+                                allowed:
+                                    session.canAccess(.backgroundHealthSync) &&
+                                    settings.backgroundHealthSyncEnabled
                             )
 
                             await health.refreshPersonalDetails()
