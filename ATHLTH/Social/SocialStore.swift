@@ -701,7 +701,7 @@ final class SocialStore: ObservableObject {
         _ records: [HealthPersonalRecord],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard privacy?.shareRunningPRs ?? true else { return }
+        guard privacy?.shareRunningPRs ?? false else { return }
 
         for record in records
         where record.date >= activationDate &&
@@ -736,7 +736,7 @@ final class SocialStore: ObservableObject {
         _ records: [StrengthRepPersonalRecord],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard privacy?.shareStrengthPRs ?? true else { return }
+        guard privacy?.shareStrengthPRs ?? false else { return }
 
         for record in records where record.date >= activationDate {
             do {
@@ -772,7 +772,7 @@ final class SocialStore: ObservableObject {
         _ unlocks: [TrophyUnlockRecord],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard privacy?.shareTrophyCabinet ?? true else { return }
+        guard privacy?.shareTrophyCabinet ?? false else { return }
 
         for unlock in unlocks where unlock.unlockedAt >= activationDate {
             do {
