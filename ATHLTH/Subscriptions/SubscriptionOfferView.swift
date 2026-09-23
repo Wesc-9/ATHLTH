@@ -117,7 +117,7 @@ struct SubscriptionOfferView: View {
                 .font(.system(size: 36, weight: .bold))
                 .multilineTextAlignment(.center)
 
-            Text("Train deeper. Recover smarter. See more.")
+            Text("Build smarter training programs with ATHLTH AI.")
                 .font(.subheadline)
                 .foregroundStyle(OnboardingTheme.mutedText)
                 .multilineTextAlignment(.center)
@@ -145,9 +145,18 @@ struct SubscriptionOfferView: View {
                 .foregroundStyle(OnboardingTheme.accent)
 
             VStack(spacing: 10) {
-                benefit("Background Health sync", icon: "heart.fill")
-                benefit("Advanced plans & progression", icon: "calendar.badge.clock")
-                benefit("Apple Watch workout integration", icon: "applewatch")
+                benefit(
+                    "AI-generated training programs from your goals",
+                    icon: "sparkles"
+                )
+                benefit(
+                    "AI Complete fills gaps without replacing your workouts",
+                    icon: "wand.and.stars"
+                )
+                benefit(
+                    "Goal, date and availability-aware AI planning",
+                    icon: "target"
+                )
             }
         }
         .padding(16)
