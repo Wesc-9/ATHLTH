@@ -705,7 +705,7 @@ final class SocialStore: ObservableObject {
 
         for record in records
         where record.date >= activationDate &&
-              (record.kind == .longestRun || record.kind == .fastest5K) {
+              record.kind.isRunningRecord {
             do {
                 try await service.publishActivity(
                     eventKey:
