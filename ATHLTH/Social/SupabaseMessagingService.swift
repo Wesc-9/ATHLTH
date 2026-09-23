@@ -94,6 +94,25 @@ final class SupabaseMessagingService {
             .execute()
     }
 
+    func respondToMessageRequest(
+        conversationID: UUID,
+        accept: Bool
+    ) async throws {
+        guard currentUserID != nil else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        try await client
+            .rpc(
+                "respond_to_direct_message_request",
+                params: DirectMessageRequestResponseParams(
+                    conversationID: conversationID,
+                    acceptRequest: accept
+                )
+            )
+            .execute()
+    }
+
     func markConversationRead(_ conversationID: UUID) async throws {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
@@ -108,12 +127,14 @@ final class SupabaseMessagingService {
             .eq("recipient_id", value: currentUserID)
             .execute()
 
-        try await client
-            .from("social_inbox_events")
-            .update(["read_at": readAt])
-            .eq("kind", value: "message")
-            .eq("entity_type", value: "direct_conversation")
-            .eq("entity_id", value: conversationID)
-            .execute()
+        for kind in ["message", "message_request"] {
+            try await client
+                .from("social_inbox_events")
+                .update(["read_at": readAt])
+                .eq("kind", value: kind)
+                .eq("entity_type", value: "direct_conversation")
+                .eq("entity_id", value: conversationID)
+                .execute()
+        }
     }
 }
