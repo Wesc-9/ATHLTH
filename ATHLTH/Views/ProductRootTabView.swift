@@ -2764,15 +2764,18 @@ struct ATHLTHProfileView: View {
                             title: "Routes",
                             tint: .blue
                         )
-                        summaryCard(
-                            icon: "trophy.fill",
-                            value: "\(trophyStore.unlockedCount)",
-                            title: "Trophies",
-                            tint: .orange
-                        )
+                        NavigationLink {
+                            TrophyCollectionView()
+                        } label: {
+                            summaryCard(
+                                icon: "trophy.fill",
+                                value: "\(trophyStore.unlockedCount)",
+                                title: "Trophies",
+                                tint: .orange
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-
-                    TrophyCabinetSection()
 
                     ProfilePerformanceSection(
                         stats: performanceStats,
