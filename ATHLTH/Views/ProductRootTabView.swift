@@ -23,7 +23,7 @@ struct ProductRootTabView: View {
             ATHLTHProfileView()
                 .tabItem { Label("Profile", systemImage: "person.fill") }
         }
-        .tint(.green)
+        .tint(ATHLTHTheme.accent)
         .sheet(
             isPresented: $workoutMirroring.isPresentationRequested,
             onDismiss: {
@@ -75,7 +75,7 @@ struct ATHLTHHomeView: View {
                                 value: "\(Int(snapshot.activeCalories))",
                                 progress: snapshot.activeCalories / max(snapshot.activeCaloriesGoal, 1),
                                 icon: "figure.run",
-                                tint: .green
+                                tint: ATHLTHTheme.accent
                             )
                             ATHLTHProgressRing(
                                 title: "Recovery",
@@ -105,7 +105,7 @@ struct ATHLTHHomeView: View {
                                     VStack(spacing: 7) {
                                         Image(systemName: kind.systemImage)
                                             .font(.title2)
-                                            .foregroundStyle(.green)
+                                            .foregroundStyle(ATHLTHTheme.accent)
                                         Text(kind.title)
                                             .font(.caption.weight(.semibold))
                                     }
@@ -133,7 +133,7 @@ struct ATHLTHHomeView: View {
                                         .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.borderedProminent)
-                                .tint(.green)
+                                .tint(ATHLTHTheme.accent)
                                 .padding(.top, 8)
                             }
                         }
@@ -164,7 +164,7 @@ struct ATHLTHHomeView: View {
                                 title: "Recovery",
                                 value: "\(snapshot.recoveryScore ?? 0)",
                                 icon: "leaf.fill",
-                                tint: .green
+                                tint: ATHLTHTheme.accent
                             )
                         }
                         .padding(.top, 10)
@@ -198,7 +198,7 @@ struct ATHLTHHomeView: View {
             }
             .background(
                 LinearGradient(
-                    colors: [.blue.opacity(0.08), .green.opacity(0.05), .clear],
+                    colors: [.blue.opacity(0.08), ATHLTHTheme.accent.opacity(0.05), .clear],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -410,7 +410,7 @@ struct ATHLTHTrainView: View {
                         ForEach(sessions) { workout in
                             HStack {
                                 Image(systemName: workout.kind.systemImage)
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
                                     .frame(width: 34)
 
                                 VStack(alignment: .leading, spacing: 2) {
@@ -455,7 +455,7 @@ struct ATHLTHTrainView: View {
                         VStack(spacing: 7) {
                             Image(systemName: kind.systemImage)
                                 .font(.title2)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(ATHLTHTheme.accent)
                             Text(kind.title)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.primary)
@@ -490,7 +490,7 @@ struct ATHLTHTrainView: View {
                     Label("Create", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
 
                 Button {
                     showingFileImporter = true
@@ -503,7 +503,7 @@ struct ATHLTHTrainView: View {
             if let route = session.savedRoutes.first {
                 Map(initialPosition: .region(routeRegion(route))) {
                     MapPolyline(coordinates: route.coordinates.map(\.coordinate))
-                        .stroke(.green, lineWidth: 5)
+                        .stroke(ATHLTHTheme.accent, lineWidth: 5)
                 }
                 .frame(height: 190)
                 .clipShape(RoundedRectangle(cornerRadius: 18))
@@ -526,7 +526,7 @@ struct ATHLTHTrainView: View {
                         } label: {
                             Label(challenge.title, systemImage: "trophy.fill")
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(.green)
+                                .foregroundStyle(ATHLTHTheme.accent)
                                 .lineLimit(1)
                         }
                     } else {
@@ -548,7 +548,7 @@ struct ATHLTHTrainView: View {
                         Label("Send to Apple Watch", systemImage: "applewatch")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                     .disabled(!watchConnection.isReady)
 
                     if !watchConnection.isReady {
@@ -761,7 +761,7 @@ struct ATHLTHTrainView: View {
         VStack(alignment: .leading, spacing: 7) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
 
             Text(title)
                 .font(.subheadline.weight(.semibold))
@@ -850,7 +850,7 @@ struct ATHLTHRecoveryView: View {
                                         value: "\(recovery.score)",
                                         progress: Double(recovery.score) / 100,
                                         icon: "leaf.fill",
-                                        tint: .green
+                                        tint: ATHLTHTheme.accent
                                     )
                                     VStack(alignment: .leading, spacing: 8) {
                                         Text("Well recovered")
@@ -903,7 +903,7 @@ struct ATHLTHRecoveryView: View {
                                             x: .value("Day", index),
                                             y: .value("Recovery", value)
                                         )
-                                        .foregroundStyle(.green.gradient)
+                                        .foregroundStyle(ATHLTHTheme.accent.gradient)
                                     }
                                 }
                                 .frame(height: 170)
@@ -925,7 +925,7 @@ struct ATHLTHRecoveryView: View {
                                     ATHLTHSectionHeader(title: "Today's Training")
                                     Label("Moderate intensity", systemImage: "dumbbell.fill")
                                         .font(.headline)
-                                        .foregroundStyle(.green)
+                                        .foregroundStyle(ATHLTHTheme.accent)
                                         .padding(.top, 10)
                                     Text("Recovery looks good. Keep some reserve.")
                                         .font(.caption)
@@ -967,7 +967,7 @@ struct ATHLTHProgressView: View {
     @State private var progressLoading = false
     @State private var progressError: String?
 
-    private let green = Color(red: 0.16, green: 0.72, blue: 0.38)
+    private let green = ATHLTHTheme.accent
     private let blue = Color(red: 0.20, green: 0.56, blue: 0.96)
     private let purple = Color(red: 0.42, green: 0.36, blue: 0.95)
     private let canvas = Color(red: 0.965, green: 0.972, blue: 0.968)
@@ -2247,12 +2247,12 @@ struct ATHLTHProfileView: View {
                 VStack(spacing: 18) {
                     HStack(spacing: 18) {
                         Circle()
-                            .fill(.green.opacity(0.12))
+                            .fill(ATHLTHTheme.accent.opacity(0.12))
                             .frame(width: 96, height: 96)
                             .overlay {
                                 Image(systemName: "person.fill")
                                     .font(.system(size: 42))
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
                             }
 
                         VStack(alignment: .leading, spacing: 5) {
@@ -2270,7 +2270,7 @@ struct ATHLTHProfileView: View {
                                     : "circle.fill"
                             )
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                         }
 
                         Spacer()
@@ -2286,7 +2286,7 @@ struct ATHLTHProfileView: View {
                     .buttonStyle(.plain)
 
                     HStack(spacing: 12) {
-                        summaryCard(icon: "target", value: "\(goalStore.goals.count)", title: "Goals", tint: .green)
+                        summaryCard(icon: "target", value: "\(goalStore.goals.count)", title: "Goals", tint: ATHLTHTheme.accent)
                         summaryCard(icon: "point.topleft.down.to.point.bottomright.curvepath", value: "\(session.savedRoutes.count)", title: "Saved Routes", tint: .blue)
                         summaryCard(icon: "trophy.fill", value: "\(trophyStore.unlockedCount)", title: "Trophies", tint: .orange)
                     }
@@ -2320,7 +2320,7 @@ struct ATHLTHProfileView: View {
                                     .font(.caption.weight(.semibold))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
-                                    .background(.green.opacity(0.12), in: Capsule())
+                                    .background(ATHLTHTheme.accent.opacity(0.12), in: Capsule())
                             }
                         }
                         .padding(.top, 10)
@@ -2428,7 +2428,7 @@ struct ATHLTHProfileView: View {
         VStack(alignment: .leading, spacing: 7) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
             Text(title)
                 .font(.subheadline.weight(.semibold))
             Text(detail)
