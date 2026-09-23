@@ -14,14 +14,9 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
-    @EnvironmentObject private var messaging: MessagingStore
-    @EnvironmentObject private var accountService: SupabaseAccountService
 
     @State private var showingMembership = false
     @State private var healthRequestInProgress = false
-    @State private var showingSignOutConfirmation = false
-    @State private var signOutInProgress = false
-    @State private var signOutError: String?
 
     var body: some View {
         ZStack {
@@ -194,16 +189,32 @@ struct ATHLTHSettingsView: View {
                     settingsSection("Profile") {
                         PremiumSettingsCard {
                             NavigationLink {
-                            PersonalHealthProfileView()
-                        } label: {
-                            PremiumSettingsRow(
-                                icon: "person",
-                                title: "Personal & health details",
-                                subtitle: "Your profile, stats and health information"
-                            ) {
-                                Image(systemName: "chevron.right")
-                                    .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                ATHLTHEditProfileView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "person.crop.circle",
+                                    title: "Edit Profile",
+                                    subtitle: "Photo, display name, username and bio"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
                             }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                PersonalHealthProfileView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "heart.text.square",
+                                    title: "Health Profile",
+                                    subtitle: "Private health details and Apple Health source"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
                             }
                             .buttonStyle(.plain)
                         }
@@ -212,64 +223,12 @@ struct ATHLTHSettingsView: View {
                     settingsSection("Privacy") {
                         PremiumSettingsCard {
                             NavigationLink {
-                                SocialPrivacySettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "person.2",
-                                    title: "Profile visibility",
-                                    subtitle: "Synced with your social privacy settings"
-                                ) {
-                                    HStack(spacing: 8) {
-                                        Text(profileVisibilityTitle)
-                                            .font(.subheadline)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            Menu {
-                                ForEach(ProfileVisibility.allCases) { visibility in
-                                    Button {
-                                        settings.defaultActivityVisibility = visibility
-                                    } label: {
-                                        if settings.defaultActivityVisibility == visibility {
-                                            Label(visibility.title, systemImage: "checkmark")
-                                        } else {
-                                            Text(visibility.title)
-                                        }
-                                    }
-                                }
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "eye",
-                                    title: "Default activity visibility",
-                                    subtitle: "Choose who can see your activities"
-                                ) {
-                                    HStack(spacing: 8) {
-                                        Text(settings.defaultActivityVisibility.title)
-                                            .font(.subheadline)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                ATHLTHPrivacyPreferencesView()
+                                ATHLTHPrivacyCenterView()
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "hand.raised",
-                                    title: "Privacy & sharing",
-                                    subtitle: "Training status, routes, heart rate and offers"
+                                    title: "Privacy Center",
+                                    subtitle: privacySummary
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
@@ -438,7 +397,25 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
-                    settingsSection("About & Account") {
+                    settingsSection("Account") {
+                        PremiumSettingsCard {
+                            NavigationLink {
+                                ATHLTHAccountSecurityView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "person.badge.key",
+                                    title: "Account & Security",
+                                    subtitle: "Sign-in, password, export and account controls"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    settingsSection("About") {
                         PremiumSettingsCard {
                             Link(destination: URL(string: "https://repdb.co")!) {
                                 PremiumSettingsRow(
@@ -480,80 +457,6 @@ struct ATHLTHSettingsView: View {
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                ATHLTHDataExportView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "square.and.arrow.up",
-                                    title: "Export ATHLTH data",
-                                    subtitle: "Export data owned by ATHLTH"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                BlockedUsersView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "person.crop.circle.badge.xmark",
-                                    title: "Blocked users",
-                                    subtitle: "Review people you have blocked"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            Button {
-                                showingSignOutConfirmation = true
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "rectangle.portrait.and.arrow.right",
-                                    iconTint: ATHLTHTheme.accentDeep,
-                                    title: "Sign out",
-                                    subtitle: "Sign out of this ATHLTH account"
-                                ) {
-                                    if signOutInProgress {
-                                        ProgressView()
-                                            .tint(ATHLTHTheme.accent)
-                                    } else {
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(signOutInProgress)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                DeleteAccountView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "trash",
-                                    iconTint: .red,
-                                    iconBackground: Color.red.opacity(0.08),
-                                    title: "Delete account",
-                                    subtitle: "Permanently delete your ATHLTH account",
-                                    titleColor: .red
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(Color.red.opacity(0.65))
                                 }
                             }
                             .buttonStyle(.plain)
@@ -622,29 +525,6 @@ struct ATHLTHSettingsView: View {
             SubscriptionOfferView {
                 showingMembership = false
             }
-        }
-        .confirmationDialog(
-            "Sign out of ATHLTH?",
-            isPresented: $showingSignOutConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Sign Out", role: .destructive) {
-                Task { await signOut() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Your account stays intact. Account-owned data cached on this device will be cleared.")
-        }
-        .alert(
-            "Sign Out Failed",
-            isPresented: Binding(
-                get: { signOutError != nil },
-                set: { if !$0 { signOutError = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(signOutError ?? "Please try again.")
         }
         .task {
             await notifications.refreshAuthorizationStatus()
@@ -735,13 +615,20 @@ struct ATHLTHSettingsView: View {
         .padding(.bottom, 24)
     }
 
-    private var profileVisibilityTitle: String {
-        guard let raw = social.privacy?.profileVisibility,
-              let visibility = ProfileVisibility(rawValue: raw)
-        else {
-            return settings.profileVisibility.title
+    private var privacySummary: String {
+        let profileTitle: String
+        if let raw = social.privacy?.profileVisibility,
+           let visibility = ProfileVisibility(rawValue: raw) {
+            profileTitle = visibility.title
+        } else {
+            profileTitle = settings.profileVisibility.title
         }
-        return visibility.title
+
+        let routeTitle = settings.hideRouteStartAndEnd
+            ? "route endpoints hidden"
+            : "full routes"
+
+        return "\(profileTitle) profile · \(routeTitle)"
     }
 
     private var notificationSummary: String {
@@ -797,21 +684,6 @@ struct ATHLTHSettingsView: View {
         return health.hasRequestedAuthorization
             ? "Waiting for the first Apple Health refresh."
             : "Apple Health is not configured."
-    }
-
-    private func signOut() async {
-        guard !signOutInProgress else { return }
-        signOutInProgress = true
-        signOutError = nil
-        defer { signOutInProgress = false }
-
-        do {
-            try await accountService.signOut()
-            messaging.reset()
-            session.clearAfterSignOut()
-        } catch {
-            signOutError = error.localizedDescription
-        }
     }
 
     private var backgroundHealthSyncBinding: Binding<Bool> {
