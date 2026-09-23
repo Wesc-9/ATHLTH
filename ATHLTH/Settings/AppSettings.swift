@@ -119,7 +119,7 @@ enum TrainingDeviceProvider: String, CaseIterable, Identifiable, Codable {
         case .appleWatch:
             return "Live workouts, heart rate, routes and HealthKit sync"
         case .garmin:
-            return "Prepared for Garmin Connect · authorization pending"
+            return "Coming soon · Garmin Connect"
         case .none:
             return "Use ATHLTH and iPhone without a wearable"
         }
@@ -253,7 +253,7 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.trainingDeviceProvider"
         ),
            let provider = TrainingDeviceProvider(rawValue: storedProvider) {
-            resolvedProvider = provider
+            resolvedProvider = provider == .garmin ? .none : provider
         } else if defaults.object(forKey: "settings.watchConnected") as? Bool == true ||
                     defaults.string(forKey: "settings.preferredWorkoutCapture") ==
                         WorkoutCapturePreference.appleWatch.rawValue {
