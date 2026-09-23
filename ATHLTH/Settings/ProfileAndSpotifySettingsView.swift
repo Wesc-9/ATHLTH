@@ -85,6 +85,21 @@ struct ATHLTHEditProfileView: View {
                 }
             }
 
+            Section("Profile setup") {
+                NavigationLink {
+                    ATHLTHProfileSetupView()
+                } label: {
+                    Label(
+                        "Training focus & visibility",
+                        systemImage: "person.crop.circle.badge.checkmark"
+                    )
+                }
+
+                Text("Choose what appears on your profile and what other ATHLTH users are allowed to see.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Button {
                     Task { await saveProfile() }
