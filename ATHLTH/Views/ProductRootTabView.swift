@@ -1074,7 +1074,7 @@ struct ATHLTHTrainView: View {
 }
 
 struct ATHLTHRecoveryView: View {
-    private let recovery = PreviewData.recoverySnapshot
+    @EnvironmentObject private var health: HealthKitManager
 
     var body: some View {
         NavigationStack {
@@ -1097,32 +1097,79 @@ struct ATHLTHRecoveryView: View {
                     ) {
                         VStack(spacing: 18) {
                             ATHLTHCard {
-                                ATHLTHSectionHeader(title: "Recovery Score", actionTitle: "Today")
-                                HStack(spacing: 24) {
-                                    ATHLTHProgressRing(
-                                        title: recovery.readinessText,
-                                        value: "\(recovery.score)",
-                                        progress: Double(recovery.score) / 100,
-                                        icon: "leaf.fill",
-                                        tint: ATHLTHTheme.accent
-                                    )
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("Well recovered")
-                                            .font(.title2.weight(.bold))
-                                        Text("Your sleep and HRV support a normal training session today.")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
+                                ATHLTHSectionHeader(
+                                    title: "Recovery",
+                                    actionTitle: "Today"
+                                )
+
+                                if let score = health.recovery.score {
+                                    HStack(spacing: 24) {
+                                        ATHLTHProgressRing(
+                                            title: health.recovery.state.title,
+                                            value: "\(score)",
+                                            progress: Double(score) / 100,
+                                            icon: health.recovery.state.systemImage,
+                                            tint: ATHLTHTheme.accent
+                                        )
+
+                                        VStack(
+                                            alignment: .leading,
+                                            spacing: 8
+                                        ) {
+                                            Text(recoveryHeadline)
+                                                .font(.title2.weight(.bold))
+
+                                            Text(health.recovery.detail)
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
+                                    .padding(.top, 12)
+                                } else {
+                                    HStack(spacing: 16) {
+                                        Image(
+                                            systemName:
+                                                "waveform.path.ecg"
+                                        )
+                                        .font(.title2)
+                                        .foregroundStyle(
+                                            ATHLTHTheme.accent
+                                        )
+                                        .frame(width: 54, height: 54)
+                                        .background(
+                                            ATHLTHTheme.accentSoft,
+                                            in: RoundedRectangle(
+                                                cornerRadius: 16,
+                                                style: .continuous
+                                            )
+                                        )
+
+                                        VStack(
+                                            alignment: .leading,
+                                            spacing: 5
+                                        ) {
+                                            Text("Building your baseline")
+                                                .font(.headline)
+
+                                            Text(health.recovery.detail)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        Spacer()
+                                    }
+                                    .padding(.top, 12)
                                 }
-                                .padding(.top, 12)
                             }
 
                             HStack(spacing: 12) {
                                 ATHLTHCard {
                                     ATHLTHSectionHeader(title: "Sleep")
                                     ATHLTHMetric(
-                                        title: "Sleep quality",
-                                        value: recovery.sleepDuration.shortDuration,
+                                        title: "Last sleep",
+                                        value: health.sleep.totalAsleep > 0
+                                            ? health.sleep.totalAsleep.shortDuration
+                                            : "—",
                                         icon: "moon.fill",
                                         tint: .purple
                                     )
@@ -1130,17 +1177,28 @@ struct ATHLTHRecoveryView: View {
                                 }
 
                                 ATHLTHCard {
-                                    ATHLTHSectionHeader(title: "Heart & HRV")
+                                    ATHLTHSectionHeader(
+                                        title: "Heart & HRV"
+                                    )
                                     HStack {
                                         ATHLTHMetric(
                                             title: "HRV",
-                                            value: recovery.hrvMilliseconds.map { "\(Int($0)) ms" } ?? "—",
+                                            value:
+                                                health.heart.hrvMilliseconds
+                                                .map {
+                                                    "\(Int($0.rounded())) ms"
+                                                } ?? "—",
                                             icon: "waveform.path.ecg",
                                             tint: .blue
                                         )
+
                                         ATHLTHMetric(
                                             title: "Resting HR",
-                                            value: recovery.restingHeartRate.map { "\(Int($0)) bpm" } ?? "—",
+                                            value:
+                                                health.heart.restingHeartRate
+                                                .map {
+                                                    "\(Int($0.rounded())) bpm"
+                                                } ?? "—",
                                             icon: "heart.fill",
                                             tint: .red
                                         )
@@ -1150,41 +1208,70 @@ struct ATHLTHRecoveryView: View {
                             }
 
                             ATHLTHCard {
-                                ATHLTHSectionHeader(title: "Recovery Trend")
-                                Chart {
-                                    ForEach(Array([72, 75, 81, 84, 79, 86, 82].enumerated()), id: \.offset) { index, value in
-                                        BarMark(
-                                            x: .value("Day", index),
-                                            y: .value("Recovery", value)
-                                        )
-                                        .foregroundStyle(ATHLTHTheme.accent.gradient)
-                                    }
+                                ATHLTHSectionHeader(
+                                    title: "Baseline",
+                                    actionTitle:
+                                        health.recovery.baselineDays > 0
+                                        ? "\(health.recovery.baselineDays) days"
+                                        : nil
+                                )
+
+                                HStack(spacing: 18) {
+                                    baselineMetric(
+                                        title: "Sleep",
+                                        value:
+                                            health.recovery
+                                            .averageSleepDuration
+                                            .map(\.shortDuration) ?? "—"
+                                    )
+
+                                    baselineMetric(
+                                        title: "HRV",
+                                        value:
+                                            health.recovery
+                                            .baselineHRVMilliseconds
+                                            .map {
+                                                "\(Int($0.rounded())) ms"
+                                            } ?? "—"
+                                    )
+
+                                    baselineMetric(
+                                        title: "Resting HR",
+                                        value:
+                                            health.recovery
+                                            .baselineRestingHeartRate
+                                            .map {
+                                                "\(Int($0.rounded())) bpm"
+                                            } ?? "—"
+                                    )
                                 }
-                                .frame(height: 170)
                                 .padding(.top, 12)
+
+                                Text(
+                                    "ATHLTH uses recent sleep, HRV and resting heart rate to compare today with your own baseline."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 10)
                             }
 
-                            HStack(spacing: 12) {
-                                ATHLTHCard {
-                                    ATHLTHSectionHeader(title: "Breathing & Mobility")
-                                    Label("5 min box breathing", systemImage: "wind")
-                                        .font(.headline)
-                                        .padding(.top, 10)
-                                    Text("Calm down and reset before training.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                            ATHLTHCard {
+                                ATHLTHSectionHeader(
+                                    title: "Today's Guidance"
+                                )
 
-                                ATHLTHCard {
-                                    ATHLTHSectionHeader(title: "Today's Training")
-                                    Label("Moderate intensity", systemImage: "dumbbell.fill")
-                                        .font(.headline)
-                                        .foregroundStyle(ATHLTHTheme.accent)
-                                        .padding(.top, 10)
-                                    Text("Recovery looks good. Keep some reserve.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                Label(
+                                    guidanceTitle,
+                                    systemImage: health.recovery.state.systemImage
+                                )
+                                .font(.headline)
+                                .foregroundStyle(ATHLTHTheme.accent)
+                                .padding(.top, 10)
+
+                                Text(guidanceDetail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.top, 2)
                             }
                         }
                     }
@@ -1193,7 +1280,70 @@ struct ATHLTHRecoveryView: View {
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
+            .refreshable {
+                await health.refreshAll()
+            }
         }
+    }
+
+    private var recoveryHeadline: String {
+        switch health.recovery.state {
+        case .ready:
+            return "Well recovered"
+        case .balanced:
+            return "Balanced recovery"
+        case .takeItEasy:
+            return "A lighter day may fit"
+        case .recover:
+            return "Prioritize recovery"
+        case .buildingBaseline:
+            return "Building your baseline"
+        }
+    }
+
+    private var guidanceTitle: String {
+        switch health.recovery.state {
+        case .ready:
+            return "Normal training load"
+        case .balanced:
+            return "Train as planned"
+        case .takeItEasy:
+            return "Consider lower intensity"
+        case .recover:
+            return "Recovery first"
+        case .buildingBaseline:
+            return "Keep wearing your Apple Watch"
+        }
+    }
+
+    private var guidanceDetail: String {
+        switch health.recovery.state {
+        case .ready:
+            return "Your current recovery signals support a normal session today."
+        case .balanced:
+            return "Your signals are close to baseline. Follow the plan and adjust if effort feels unusually high."
+        case .takeItEasy:
+            return "Sleep, HRV or resting heart rate are below your recent pattern. Consider reducing intensity or volume."
+        case .recover:
+            return "Your combined recovery signals are well below baseline. A rest day, mobility or easy activity may be more appropriate."
+        case .buildingBaseline:
+            return "ATHLTH needs at least five usable days with sleep, HRV and resting heart-rate data before showing a recovery score."
+        }
+    }
+
+    @ViewBuilder
+    private func baselineMetric(
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(.headline.weight(.semibold))
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
