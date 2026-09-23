@@ -99,11 +99,21 @@ final class SupabaseMessagingService {
             throw SocialServiceError.notAuthenticated
         }
 
+        let readAt = ISO8601DateFormatter().string(from: Date())
+
         try await client
             .from("direct_messages")
-            .update(["read_at": ISO8601DateFormatter().string(from: Date())])
+            .update(["read_at": readAt])
             .eq("conversation_id", value: conversationID)
             .eq("recipient_id", value: currentUserID)
+            .execute()
+
+        try await client
+            .from("social_inbox_events")
+            .update(["read_at": readAt])
+            .eq("kind", value: "message")
+            .eq("entity_type", value: "direct_conversation")
+            .eq("entity_id", value: conversationID)
             .execute()
     }
 }
