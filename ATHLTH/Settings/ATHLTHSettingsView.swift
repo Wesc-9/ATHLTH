@@ -868,16 +868,191 @@ private struct SettingsDivider: View {
     }
 }
 
+private struct ATHLTHTrainingDeviceSettingsView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+
+    var body: some View {
+        Form {
+            Section("Primary training device") {
+                ForEach(TrainingDeviceProvider.allCases) { provider in
+                    Button {
+                        settings.trainingDeviceProvider = provider
+
+                        if provider != .appleWatch,
+                           settings.preferredWorkoutCapture == .appleWatch {
+                            settings.preferredWorkoutCapture = .iPhone
+                        }
+
+                        if provider == .appleWatch {
+                            watchConnection.connect()
+                        }
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: provider.systemImage)
+                                .font(.title3)
+                                .foregroundStyle(
+                                    settings.trainingDeviceProvider == provider
+                                        ? ATHLTHTheme.accent
+                                        : .secondary
+                                )
+                                .frame(width: 34)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(provider.title)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                Text(provider.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    settings.trainingDeviceProvider == provider
+                                    ? "checkmark.circle.fill"
+                                    : "circle"
+                            )
+                            .foregroundStyle(
+                                settings.trainingDeviceProvider == provider
+                                    ? ATHLTHTheme.accent
+                                    : .tertiary
+                            )
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            switch settings.trainingDeviceProvider {
+            case .appleWatch:
+                Section("Apple Watch") {
+                    LabeledContent(
+                        "Status",
+                        value: watchConnection.statusText
+                    )
+
+                    NavigationLink {
+                        AppleWatchConnectionView()
+                    } label: {
+                        Label(
+                            watchConnection.isReady
+                                ? "Apple Watch details"
+                                : "Set up Apple Watch",
+                            systemImage: "applewatch"
+                        )
+                    }
+
+                    Text(
+                        "Apple Watch can start ATHLTH workouts, mirror live workout data and receive routes when the ATHLTH Watch app is installed."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+            case .garmin:
+                Section("Garmin Connect") {
+                    LabeledContent(
+                        "Status",
+                        value: GarminDataContract.state.title
+                    )
+
+                    Button("Connect Garmin") {}
+                        .disabled(true)
+
+                    Text(
+                        "The Garmin data layer is prepared, but authorization is intentionally disabled until Garmin approves ATHLTH for API access."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section("Prepared data") {
+                    wearableCapabilityRow("Workouts", icon: "figure.run")
+                    wearableCapabilityRow("Heart rate & resting HR", icon: "heart.fill")
+                    wearableCapabilityRow("HRV", icon: "waveform.path.ecg")
+                    wearableCapabilityRow("Sleep", icon: "moon.fill")
+                    wearableCapabilityRow("Steps & active energy", icon: "flame.fill")
+                    wearableCapabilityRow("Distance & routes", icon: "map.fill")
+
+                    Text(
+                        "Garmin data will be normalized into the same ATHLTH fields used by Home, Recovery, Progress and workout history. Missing metrics stay unavailable rather than using placeholder values."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+            case .none:
+                Section("No watch") {
+                    Label(
+                        "ATHLTH works without a wearable",
+                        systemImage: "checkmark.shield.fill"
+                    )
+                    .foregroundStyle(ATHLTHTheme.accent)
+
+                    Text(
+                        "Strength logging, plans, friends, challenges, routes and manual workout data remain available. Apple Health data from iPhone or other apps is used when available. Watch-only actions are hidden or disabled safely."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .navigationTitle("Training Device")
+        .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: settings.trainingDeviceProvider) { _, provider in
+            if provider != .appleWatch,
+               settings.preferredWorkoutCapture == .appleWatch {
+                settings.preferredWorkoutCapture = .iPhone
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func wearableCapabilityRow(
+        _ title: String,
+        icon: String
+    ) -> some View {
+        Label(title, systemImage: icon)
+            .foregroundStyle(.primary)
+    }
+}
+
 private struct ATHLTHTrainingSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
 
     var body: some View {
         Form {
             Section("Workout") {
-                Picker("Preferred workout device", selection: $settings.preferredWorkoutCapture) {
-                    ForEach(WorkoutCapturePreference.allCases) { preference in
-                        Text(preference.title).tag(preference)
+                Picker(
+                    "Preferred workout device",
+                    selection: $settings.preferredWorkoutCapture
+                ) {
+                    Text("Automatic").tag(WorkoutCapturePreference.automatic)
+                    Text("iPhone").tag(WorkoutCapturePreference.iPhone)
+
+                    if settings.trainingDeviceProvider == .appleWatch {
+                        Text("Apple Watch")
+                            .tag(WorkoutCapturePreference.appleWatch)
                     }
+                }
+
+                if settings.trainingDeviceProvider == .garmin {
+                    Text(
+                        "Garmin is your selected wearable. Until Garmin authorization is available, workouts started in ATHLTH use iPhone/manual capture and Garmin sync remains pending."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else if settings.trainingDeviceProvider == .none {
+                    Text(
+                        "No watch selected. ATHLTH will never require an Apple Watch to open or use training features."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Picker("Strength tracking", selection: $settings.defaultStrengthTracking) {
