@@ -46,7 +46,7 @@ struct ATHLTHDataExportView: View {
             }
 
             Section {
-                Text("Apple Health / HealthKit data is not included. Health data remains under Apple’s Health permissions and export controls.")
+                Text("Apple Health / HealthKit and third-party wearable source data are not included. Source health data remains under the connected provider’s permissions and export controls.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -113,7 +113,7 @@ struct ATHLTHDataExportView: View {
                 autoPublishCompletedWorkouts: settings.autoPublishCompletedWorkouts,
                 backgroundHealthSyncEnabled: settings.backgroundHealthSyncEnabled
             ),
-            note: "This export contains ATHLTH-owned app data only. Apple Health / HealthKit data is intentionally excluded."
+            note: "This export contains ATHLTH-owned app data only. Apple Health / HealthKit and third-party wearable source data are intentionally excluded."
         )
 
         do {
