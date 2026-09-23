@@ -3,6 +3,7 @@ import SwiftUI
 enum SocialHubTab: String, CaseIterable, Identifiable {
     case feed
     case friends
+    case messages
     case requests
     case discover
 
@@ -12,6 +13,7 @@ enum SocialHubTab: String, CaseIterable, Identifiable {
         switch self {
         case .feed: return "Feed"
         case .friends: return "Friends"
+        case .messages: return "Messages"
         case .requests: return "Requests"
         case .discover: return "Discover"
         }
@@ -20,6 +22,7 @@ enum SocialHubTab: String, CaseIterable, Identifiable {
 
 struct ProfileFriendsSection: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
 
     var body: some View {
         ATHLTHCard {
@@ -38,8 +41,9 @@ struct ProfileFriendsSection: View {
                     SocialHubView(initialTab: .friends)
                 } label: {
                     HStack(spacing: 5) {
-                        if social.pendingRequestCount > 0 {
-                            Text("\(social.pendingRequestCount)")
+                        let socialBadgeCount = social.pendingRequestCount + messaging.unreadCount
+                        if socialBadgeCount > 0 {
+                            Text("\(socialBadgeCount)")
                                 .font(.caption2.bold())
                                 .foregroundStyle(.white)
                                 .frame(minWidth: 18, minHeight: 18)
@@ -113,6 +117,7 @@ struct ProfileFriendsSection: View {
 
 struct SocialHubView: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
 
     let initialTab: SocialHubTab
 
@@ -126,13 +131,54 @@ struct SocialHubView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Social", selection: $selectedTab) {
-                ForEach(SocialHubTab.allCases) { tab in
-                    Text(tab.title).tag(tab)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(SocialHubTab.allCases) { tab in
+                        Button {
+                            selectedTab = tab
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(tab.title)
+
+                                if tab == .messages, messaging.unreadCount > 0 {
+                                    Text("\(messaging.unreadCount)")
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(
+                                            selectedTab == tab
+                                                ? ATHLTHTheme.accent
+                                                : Color.white
+                                        )
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            selectedTab == tab
+                                                ? Color.white
+                                                : ATHLTHTheme.accent,
+                                            in: Capsule()
+                                        )
+                                }
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                selectedTab == tab
+                                    ? Color.white
+                                    : ATHLTHTheme.primaryText
+                            )
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 9)
+                            .background(
+                                selectedTab == tab
+                                    ? ATHLTHTheme.accent
+                                    : Color(.secondarySystemGroupedBackground),
+                                in: Capsule()
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 12)
             }
-            .pickerStyle(.segmented)
-            .padding()
 
             if let error = social.errorMessage {
                 Text(error)
@@ -148,6 +194,8 @@ struct SocialHubView: View {
                     SocialFeedView()
                 case .friends:
                     friendsContent
+                case .messages:
+                    MessageInboxView()
                 case .requests:
                     requestsContent
                 case .discover:
@@ -169,9 +217,11 @@ struct SocialHubView: View {
         }
         .task {
             await social.refresh()
+            await messaging.refresh()
         }
         .refreshable {
             await social.refresh()
+            await messaging.refresh()
         }
     }
 
@@ -751,6 +801,14 @@ struct FriendProfileView: View {
             relationshipButton(profile.card)
 
             if social.relationshipState(with: userID) == .friends {
+                NavigationLink {
+                    DirectMessageThreadView(friend: profile.card)
+                } label: {
+                    Label("Message", systemImage: "message.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
                 Button {
                     showingChallenge = true
                 } label: {
