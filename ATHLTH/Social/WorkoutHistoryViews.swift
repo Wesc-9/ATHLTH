@@ -1,3 +1,4 @@
+import MapKit
 import SwiftUI
 
 private enum WorkoutHistoryFilter: String, CaseIterable, Identifiable {
@@ -261,16 +262,50 @@ struct WorkoutHistoryRow: View {
 struct WorkoutHistoryDetailView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var health: HealthKitManager
 
     let workout: SocialPublishableWorkout
 
     @State private var activity: SocialActivityRecord?
+    @State private var healthDetail = WorkoutDetail()
+    @State private var healthDetailLoaded = false
     @State private var showingReview = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
                 hero
+
+                if healthDetailLoaded {
+                    if healthDetail.route.count >= 2 ||
+                        healthDetail.workoutLocation != nil ||
+                        healthDetail.route.count == 1 {
+                        WorkoutLocationMapCard(
+                            detail: healthDetail,
+                            activity: workout.activity
+                        )
+                    } else if workout.activity == .strength {
+                        ATHLTHCard {
+                            HStack(spacing: 12) {
+                                Image(systemName: "location.slash.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Workout location unavailable")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(
+                                        "This strength workout did not contain a saved location in Apple Health."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+                            }
+                        }
+                    }
+                }
 
                 metricGrid
 
@@ -337,8 +372,11 @@ struct WorkoutHistoryDetailView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Workout")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
+        .task(id: workout.id) {
+            healthDetailLoaded = false
             activity = await social.workoutActivity(for: workout.id)
+            healthDetail = await health.workoutDetail(for: workout.id)
+            healthDetailLoaded = true
         }
         .sheet(isPresented: $showingReview, onDismiss: {
             Task {
@@ -482,6 +520,145 @@ struct WorkoutHistoryDetailView: View {
         }
 
         return String(format: "%d:%02d", minutes, remainder)
+    }
+}
+
+private struct WorkoutLocationMapCard: View {
+    let detail: WorkoutDetail
+    let activity: WorkoutActivity
+
+    private var routeCoordinates: [CLLocationCoordinate2D] {
+        detail.route.map(\.coordinate)
+    }
+
+    private var singleLocation: CLLocation? {
+        if let workoutLocation = detail.workoutLocation {
+            return workoutLocation
+        }
+
+        return detail.route.count == 1 ? detail.route.first : nil
+    }
+
+    private var isRoute: Bool {
+        routeCoordinates.count >= 2
+    }
+
+    private var mapRegion: MKCoordinateRegion {
+        let coordinates: [CLLocationCoordinate2D]
+
+        if isRoute {
+            coordinates = routeCoordinates
+        } else if let singleLocation {
+            coordinates = [singleLocation.coordinate]
+        } else {
+            coordinates = []
+        }
+
+        guard let first = coordinates.first else {
+            return MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                span: MKCoordinateSpan(
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01
+                )
+            )
+        }
+
+        var minLatitude = first.latitude
+        var maxLatitude = first.latitude
+        var minLongitude = first.longitude
+        var maxLongitude = first.longitude
+
+        for coordinate in coordinates.dropFirst() {
+            minLatitude = min(minLatitude, coordinate.latitude)
+            maxLatitude = max(maxLatitude, coordinate.latitude)
+            minLongitude = min(minLongitude, coordinate.longitude)
+            maxLongitude = max(maxLongitude, coordinate.longitude)
+        }
+
+        let latitudeDelta = max((maxLatitude - minLatitude) * 1.45, 0.004)
+        let longitudeDelta = max((maxLongitude - minLongitude) * 1.45, 0.004)
+
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: (minLatitude + maxLatitude) / 2,
+                longitude: (minLongitude + maxLongitude) / 2
+            ),
+            span: MKCoordinateSpan(
+                latitudeDelta: latitudeDelta,
+                longitudeDelta: longitudeDelta
+            )
+        )
+    }
+
+    var body: some View {
+        ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(isRoute ? "Route" : "Workout Location")
+                        .font(.headline)
+
+                    Text(
+                        isRoute
+                            ? "GPS route from Apple Health"
+                            : locationSubtitle
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        isRoute
+                            ? "point.topleft.down.to.point.bottomright.curvepath"
+                            : "mappin.and.ellipse"
+                )
+                .foregroundStyle(ATHLTHTheme.accent)
+            }
+
+            Map(initialPosition: .region(mapRegion)) {
+                if isRoute {
+                    MapPolyline(coordinates: routeCoordinates)
+                        .stroke(ATHLTHTheme.accent, lineWidth: 5)
+
+                    if let start = routeCoordinates.first {
+                        Marker("Start", coordinate: start)
+                            .tint(.green)
+                    }
+
+                    if let finish = routeCoordinates.last {
+                        Marker("Finish", coordinate: finish)
+                            .tint(.red)
+                    }
+                } else if let singleLocation {
+                    Marker(
+                        activity == .strength
+                            ? "Training location"
+                            : "Workout location",
+                        coordinate: singleLocation.coordinate
+                    )
+                    .tint(ATHLTHTheme.accent)
+                }
+            }
+            .frame(height: 220)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .padding(.top, 10)
+        }
+    }
+
+    private var locationSubtitle: String {
+        if activity == .strength {
+            return "Location saved with this strength workout"
+        }
+
+        return "Location saved with this workout"
     }
 }
 
