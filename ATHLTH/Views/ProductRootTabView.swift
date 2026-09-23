@@ -53,6 +53,7 @@ struct ProductRootTabView: View {
 struct ATHLTHHomeView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     var body: some View {
         NavigationStack {
@@ -75,7 +76,7 @@ struct ATHLTHHomeView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Your Day")
                                     .font(.title3.weight(.bold))
-                                Text("Live from Apple Health")
+                                Text(homeHealthSourceText)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -187,6 +188,17 @@ struct ATHLTHHomeView: View {
                     await health.refreshAll()
                 }
             }
+        }
+    }
+
+    private var homeHealthSourceText: String {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            return "Apple Health + Apple Watch"
+        case .garmin:
+            return "Apple Health · Garmin sync pending"
+        case .none:
+            return "Apple Health / iPhone"
         }
     }
 
