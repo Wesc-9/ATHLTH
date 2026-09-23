@@ -30,7 +30,7 @@ final class AppSessionStore: ObservableObject {
     private var storeEntitlement: StoreSubscriptionEntitlement?
 
     init(
-        profile: UserProfile = PreviewData.profile,
+        profile: UserProfile = Self.makeSignedOutProfile(),
         activePlan: TrainingPlan? = nil,
         savedRoutes: [TrainingRoute] = [],
         previewModeEnabled: Bool = false,
@@ -90,6 +90,23 @@ final class AppSessionStore: ObservableObject {
         } else {
             self.onboardingProfile = nil
         }
+    }
+
+    private static func makeSignedOutProfile() -> UserProfile {
+        UserProfile(
+            id: UUID(),
+            userID: UUID(),
+            username: "",
+            displayName: "",
+            bio: "",
+            avatarURL: nil,
+            presence: TrainingPresence(
+                state: .available,
+                workoutTitle: nil,
+                startedAt: nil,
+                visibility: .friends
+            )
+        )
     }
 
     var hasPaidAccess: Bool {
@@ -247,17 +264,6 @@ final class AppSessionStore: ObservableObject {
         defaults.set(clean, forKey: "session.usernameSeed")
     }
 
-    func beginMockSignIn(method: SignInMethod, isNewUser: Bool = false) {
-        signedIn = true
-        signInMethod = method
-        defaults.set(true, forKey: "session.signedIn")
-        defaults.set(method.rawValue, forKey: "session.signInMethod")
-
-        if isNewUser {
-            startNewUserPaidTrialIfNeeded()
-        }
-    }
-
     func setPendingUsername(_ username: String) {
         let cleaned = username
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -323,8 +329,8 @@ final class AppSessionStore: ObservableObject {
     }
 
     func clearAfterSignOut() {
-        resetOnboardingForPreview()
-        profile = PreviewData.profile
+        resetAuthenticationState()
+        profile = Self.makeSignedOutProfile()
         activePlan = nil
         savedRoutes = []
         planTemplates = []
@@ -337,7 +343,7 @@ final class AppSessionStore: ObservableObject {
         defaults.removeObject(forKey: "session.savedWorkoutTemplates")
     }
 
-    func resetOnboardingForPreview() {
+    func resetAuthenticationState() {
         signedIn = false
         onboardingCompleted = false
         signInMethod = nil
@@ -350,7 +356,7 @@ final class AppSessionStore: ObservableObject {
         defaults.removeObject(forKey: "session.accountCreatedAt")
         defaults.removeObject(forKey: "session.accountRole")
         defaults.removeObject(forKey: "session.subscriptionAccess")
-        usernameSeed = profile.displayName
+        usernameSeed = ""
         accountCreatedAt = Date()
         currentRole = .user
         backendSubscriptionAccess = .free
