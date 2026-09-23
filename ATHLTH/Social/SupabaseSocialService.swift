@@ -120,6 +120,10 @@ final class SupabaseSocialService {
             discoverable: settings.discoverable,
             allowFriendRequests: settings.allowFriendRequests,
             allowDirectMessages: settings.allowDirectMessages,
+            trainingPresenceVisibility: settings.trainingPresenceVisibility,
+            performanceStatsVisibility: settings.performanceStatsVisibility,
+            trophyCabinetVisibility: settings.trophyCabinetVisibility,
+            recentActivityVisibility: settings.recentActivityVisibility,
             shareTrainingPresence: settings.shareTrainingPresence,
             sharePerformanceStats: settings.sharePerformanceStats,
             shareTrophyCabinet: settings.shareTrophyCabinet,
@@ -724,6 +728,10 @@ private struct SocialPrivacyUpdate: Encodable {
     let discoverable: Bool
     let allowFriendRequests: Bool
     let allowDirectMessages: String
+    let trainingPresenceVisibility: String
+    let performanceStatsVisibility: String
+    let trophyCabinetVisibility: String
+    let recentActivityVisibility: String
     let shareTrainingPresence: Bool
     let sharePerformanceStats: Bool
     let shareTrophyCabinet: Bool
@@ -739,6 +747,10 @@ private struct SocialPrivacyUpdate: Encodable {
         case discoverable
         case allowFriendRequests = "allow_friend_requests"
         case allowDirectMessages = "allow_direct_messages"
+        case trainingPresenceVisibility = "training_presence_visibility"
+        case performanceStatsVisibility = "performance_stats_visibility"
+        case trophyCabinetVisibility = "trophy_cabinet_visibility"
+        case recentActivityVisibility = "recent_activity_visibility"
         case shareTrainingPresence = "share_training_presence"
         case sharePerformanceStats = "share_performance_stats"
         case shareTrophyCabinet = "share_trophy_cabinet"
