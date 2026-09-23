@@ -2,10 +2,10 @@ import SwiftUI
 
 enum OnboardingTheme {
     static let accent = Color(red: 0.78, green: 0.58, blue: 0.37)
-    static let success = Color(red: 0.34, green: 0.56, blue: 0.43)
+    static let success = ATHLTHTheme.accent
 
-    static let green = success
-    static let deepGreen = Color(red: 0.23, green: 0.50, blue: 0.34)
+    static let green = ATHLTHTheme.accent
+    static let deepGreen = ATHLTHTheme.accentDeep
     static let warmHighlight = accent
 
     static let canvasTop = Color.white
