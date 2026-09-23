@@ -16,14 +16,14 @@ struct WorkoutFriendPicker: View {
                 if !selectedFriendIDs.isEmpty {
                     Text("\(selectedFriendIDs.count) selected")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
             }
 
             if social.friends.isEmpty {
                 HStack(spacing: 11) {
                     Image(systemName: "person.badge.plus")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("No friends to select yet")
@@ -57,7 +57,7 @@ struct WorkoutFriendPicker: View {
                                         .font(.system(size: 18))
                                         .foregroundStyle(
                                             selectedFriendIDs.contains(friend.userID)
-                                                ? .green
+                                                ? ATHLTHTheme.accent
                                                 : .secondary
                                         )
                                         .background(.white, in: Circle())
@@ -106,9 +106,9 @@ struct QuickWorkoutStartSheet: View {
                         HStack(spacing: 14) {
                             Image(systemName: kind.systemImage)
                                 .font(.system(size: 28, weight: .semibold))
-                                .foregroundStyle(.green)
+                                .foregroundStyle(ATHLTHTheme.accent)
                                 .frame(width: 52, height: 52)
-                                .background(.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 15))
+                                .background(ATHLTHTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 15))
 
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(kind.title)
@@ -150,7 +150,7 @@ struct QuickWorkoutStartSheet: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                     .disabled(!watchConnected)
                 }
                 .padding()
@@ -197,14 +197,14 @@ struct HomeActivitySection: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
 
                 NavigationLink {
                     SocialHubView(initialTab: .feed)
                 } label: {
                     Text("See All")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
             }
 
@@ -212,7 +212,7 @@ struct HomeActivitySection: View {
                 HStack(spacing: 12) {
                     Image(systemName: "bolt.heart.fill")
                         .font(.title2)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Activity starts here")
@@ -287,7 +287,7 @@ private struct HomeActivityRow: View {
                    !names.isEmpty {
                     Label("with \(names)", systemImage: "person.2.fill")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
 
                 if let caption = item.activity.metadata?["caption"],
@@ -313,7 +313,7 @@ private struct HomeActivityRow: View {
 
             Image(systemName: activityIcon(item.activity.kind))
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
         }
     }
 
@@ -380,7 +380,7 @@ struct WorkoutPublishView: View {
                                 HStack(spacing: 12) {
                                     Image(systemName: workout.activity.icon)
                                         .font(.title3)
-                                        .foregroundStyle(.green)
+                                        .foregroundStyle(ATHLTHTheme.accent)
                                         .frame(width: 36)
 
                                     VStack(alignment: .leading, spacing: 3) {
@@ -408,7 +408,7 @@ struct WorkoutPublishView: View {
                                     )
                                     .foregroundStyle(
                                         selectedWorkoutID == workout.id
-                                            ? .green
+                                            ? ATHLTHTheme.accent
                                             : .secondary
                                     )
                                 }
@@ -429,7 +429,7 @@ struct WorkoutPublishView: View {
                                 partners.joined(separator: ", "),
                                 systemImage: "person.2.fill"
                             )
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
 
                             Text("Only friends who accepted the training invite are attached to this post.")
                                 .font(.caption)
@@ -456,7 +456,7 @@ struct WorkoutPublishView: View {
                                 "This workout is already published.",
                                 systemImage: "checkmark.circle.fill"
                             )
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                         }
                     }
                 }
@@ -464,7 +464,7 @@ struct WorkoutPublishView: View {
                 if let successMessage {
                     Section {
                         Label(successMessage, systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                     }
                 }
             }
