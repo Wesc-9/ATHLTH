@@ -123,8 +123,8 @@ Deno.serve(async (req: Request) => {
     user.app_metadata?.provider === "apple" ||
     user.identities?.some((identity) => identity.provider === "apple") === true;
 
-  let appleRevoked = !isAppleUser;
-  let appleManualRevokeRequired = false;
+  let appleRefreshToken: string | null = null;
+  let appleTokenLookupFailed = false;
 
   if (isAppleUser) {
     const { data: appleTokenRow, error: appleTokenError } = await admin
@@ -138,21 +138,9 @@ Deno.serve(async (req: Request) => {
         userID: user.id,
         message: appleTokenError.message,
       });
-      appleManualRevokeRequired = true;
-    } else if (!appleTokenRow?.refresh_token) {
-      appleManualRevokeRequired = true;
+      appleTokenLookupFailed = true;
     } else {
-      try {
-        appleRevoked = await revokeAppleRefreshToken(appleTokenRow.refresh_token);
-        appleManualRevokeRequired = !appleRevoked;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "UNKNOWN";
-        console.error("Apple revocation could not be completed.", {
-          userID: user.id,
-          reason: message,
-        });
-        appleManualRevokeRequired = true;
-      }
+      appleRefreshToken = appleTokenRow?.refresh_token ?? null;
     }
   }
 
@@ -176,6 +164,27 @@ Deno.serve(async (req: Request) => {
       message: deleteError.message,
     });
     return json({ error: "Unable to delete the ATHLTH account." }, 500);
+  }
+
+  // The ATHLTH account is gone at this point. Apple revocation is intentionally
+  // performed afterwards so a temporary Apple/API failure can never block the
+  // user's account-deletion request.
+  let appleRevoked = !isAppleUser;
+  let appleManualRevokeRequired =
+    isAppleUser && (appleTokenLookupFailed || !appleRefreshToken);
+
+  if (isAppleUser && appleRefreshToken) {
+    try {
+      appleRevoked = await revokeAppleRefreshToken(appleRefreshToken);
+      appleManualRevokeRequired = !appleRevoked;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "UNKNOWN";
+      console.error("Apple revocation could not be completed after account deletion.", {
+        userID: user.id,
+        reason: message,
+      });
+      appleManualRevokeRequired = true;
+    }
   }
 
   return json({
