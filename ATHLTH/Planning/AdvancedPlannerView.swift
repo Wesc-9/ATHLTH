@@ -189,6 +189,7 @@ struct TrainingPlanManagerView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
     let onOpenCalendar: () -> Void
 
@@ -196,6 +197,7 @@ struct TrainingPlanManagerView: View {
     @State private var showingProgramCreation = false
     @State private var programToStart: TrainingPlan?
     @State private var aiMode: AIProgramGenerationMode?
+    @State private var showingAISubscriptionOffer = false
 
     init(onOpenCalendar: @escaping () -> Void = {}) {
         self.onOpenCalendar = onOpenCalendar
@@ -249,8 +251,22 @@ struct TrainingPlanManagerView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("ATHLTH AI")
-                            .font(.title3.weight(.bold))
+                        HStack(spacing: 7) {
+                            Text("ATHLTH AI")
+                                .font(.title3.weight(.bold))
+
+                            if !session.canAccess(.aiTrainingPrograms) {
+                                Label("ATHLTH+", systemImage: "lock.fill")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(ATHLTHTheme.accent)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        ATHLTHTheme.accentSoft,
+                                        in: Capsule()
+                                    )
+                            }
+                        }
                         Text(
                             "Generate a program from your goals, dates and available training days — or let AI fill only the gaps in the program you already started."
                         )
@@ -259,7 +275,7 @@ struct TrainingPlanManagerView: View {
 
                         HStack(spacing: 8) {
                             Button {
-                                aiMode = .generate
+                                openAI(.generate)
                             } label: {
                                 Label(
                                     "Generate",
@@ -272,7 +288,7 @@ struct TrainingPlanManagerView: View {
 
                             if session.activePlan != nil {
                                 Button {
-                                    aiMode = .complete
+                                    openAI(.complete)
                                 } label: {
                                     Label(
                                         "Complete",
@@ -582,6 +598,27 @@ struct TrainingPlanManagerView: View {
         .sheet(item: $aiMode) { mode in
             AIProgramBuilderView(mode: mode)
         }
+        .sheet(isPresented: $showingAISubscriptionOffer) {
+            SubscriptionOfferView {
+                session.applyStoreKitEntitlement(
+                    subscriptionStore.activeEntitlement
+                )
+
+                if session.canAccess(.aiTrainingPrograms) {
+                    showingAISubscriptionOffer = false
+                }
+            }
+            .environmentObject(subscriptionStore)
+        }
+    }
+
+    private func openAI(_ mode: AIProgramGenerationMode) {
+        guard session.canAccess(.aiTrainingPrograms) else {
+            showingAISubscriptionOffer = true
+            return
+        }
+
+        aiMode = mode
     }
 }
 
