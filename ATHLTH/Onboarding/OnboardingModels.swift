@@ -50,6 +50,50 @@ struct HealthProfileBasics: Codable, Hashable {
     }
 }
 
+enum TrainingFocus: String, CaseIterable, Identifiable, Codable, Hashable {
+    case running
+    case strength
+    case hybrid
+    case walking
+    case generalFitness
+    case recovery
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .running: return "Running"
+        case .strength: return "Strength"
+        case .hybrid: return "Hybrid"
+        case .walking: return "Walking"
+        case .generalFitness: return "General Fitness"
+        case .recovery: return "Recovery"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .running: return "Running performance, endurance and structured run training."
+        case .strength: return "Strength, muscle and progressive resistance training."
+        case .hybrid: return "Combine running and strength training."
+        case .walking: return "Walking, daily movement and active lifestyle."
+        case .generalFitness: return "A balanced mix of health, fitness and movement."
+        case .recovery: return "Recovery, sleep and readiness as the main focus."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .running: return "figure.run"
+        case .strength: return "dumbbell.fill"
+        case .hybrid: return "bolt.heart.fill"
+        case .walking: return "figure.walk"
+        case .generalFitness: return "figure.mixed.cardio"
+        case .recovery: return "leaf.fill"
+        }
+    }
+}
+
 enum AchievementGoal: String, CaseIterable, Identifiable, Codable, Hashable {
     case loseWeight
     case buildMuscle
@@ -251,6 +295,7 @@ struct OnboardingProfileData: Codable, Hashable {
     var weightKilograms: Double?
     var heightCentimeters: Double?
     var personalDetailsSource: PersonalDetailsSource
+    var trainingFocus: TrainingFocus? = nil
 
     var currentGoal: UserGoalRecord?
     var interests: Set<ATHLTHInterest>
