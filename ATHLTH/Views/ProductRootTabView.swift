@@ -272,14 +272,15 @@ struct ATHLTHHomeView: View {
                 : "−\(minutes)m vs baseline"
         }
 
-        switch health.sleep.totalAsleep {
-        case 7.5 * 3_600...:
+        if health.sleep.totalAsleep >= 7.5 * 3_600 {
             return "Good duration"
-        case 6.5 * 3_600..<7.5 * 3_600:
-            return "A little short"
-        default:
-            return "Short night"
         }
+
+        if health.sleep.totalAsleep >= 6.5 * 3_600 {
+            return "A little short"
+        }
+
+        return "Short night"
     }
 
     private var homeInsight: (
