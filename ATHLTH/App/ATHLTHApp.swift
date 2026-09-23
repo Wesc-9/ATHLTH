@@ -453,6 +453,18 @@ struct AppRootView: View {
             await social.syncOwnPerformance(stats)
         }
 
+        if let runningRecords = try? await health.personalRecords() {
+            await social.publishRunningPersonalRecords(
+                runningRecords,
+                visibility: settings.defaultActivityVisibility
+            )
+        }
+
+        await social.publishStrengthRepPersonalRecords(
+            strengthWorkout.repPersonalRecords,
+            visibility: settings.defaultActivityVisibility
+        )
+
         await social.syncOwnTrophies(trophies.showcaseTrophies)
         await social.publishTrophyUnlocks(
             trophies.unlocks,
