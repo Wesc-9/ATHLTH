@@ -4,6 +4,7 @@ import HealthKit
 
 struct WorkoutDetail {
     var route: [CLLocation] = []
+    var workoutLocation: CLLocation?
     var averageHeartRate: Double?
     var maxHeartRate: Double?
     var stepCount: Double?
