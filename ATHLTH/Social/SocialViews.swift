@@ -51,7 +51,7 @@ struct ProfileFriendsSection: View {
                         Image(systemName: "chevron.right")
                             .font(.caption2.bold())
                     }
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
                 }
             }
 
@@ -62,9 +62,9 @@ struct ProfileFriendsSection: View {
                     HStack(spacing: 13) {
                         Image(systemName: "person.2.badge.plus")
                             .font(.title2)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(ATHLTHTheme.accent)
                             .frame(width: 44, height: 44)
-                            .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
+                            .background(ATHLTHTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Find your training crew")
@@ -205,7 +205,7 @@ struct SocialHubView: View {
                             SocialProfileRow(profile: friend) {
                                 Text("Friends")
                                     .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(ATHLTHTheme.accent)
                             }
                         }
                         .buttonStyle(.plain)
@@ -240,10 +240,10 @@ struct SocialHubView: View {
                                     SocialAvatar(profile: creator, size: 46)
                                 } else {
                                     Image(systemName: "person.fill")
-                                        .foregroundStyle(.green)
+                                        .foregroundStyle(ATHLTHTheme.accent)
                                         .frame(width: 46, height: 46)
                                         .background(
-                                            .green.opacity(0.10),
+                                            ATHLTHTheme.accent.opacity(0.10),
                                             in: Circle()
                                         )
                                 }
@@ -287,7 +287,7 @@ struct SocialHubView: View {
                                     }
                                 }
                                 .buttonStyle(.borderedProminent)
-                                .tint(.green)
+                                .tint(ATHLTHTheme.accent)
                                 .frame(maxWidth: .infinity)
                             }
                         }
@@ -316,7 +316,7 @@ struct SocialHubView: View {
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .controlSize(.small)
-                                .tint(.green)
+                                .tint(ATHLTHTheme.accent)
                             }
                         }
                     }
@@ -418,7 +418,7 @@ struct SocialHubView: View {
         case .friends:
             Text("Friends")
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
 
         case .outgoingPending:
             Text("Requested")
@@ -441,7 +441,7 @@ struct SocialHubView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
-            .tint(.green)
+            .tint(ATHLTHTheme.accent)
 
         case .selfUser:
             EmptyView()
@@ -506,7 +506,7 @@ private struct SocialActivityCard: View {
                 Spacer()
 
                 Image(systemName: activityIcon(item.activity.kind))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -526,7 +526,7 @@ private struct SocialActivityCard: View {
                         systemImage: "person.2.fill"
                     )
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
                 }
 
                 if let caption = item.activity.metadata?["caption"],
@@ -566,7 +566,7 @@ private struct SocialActivityCard: View {
                                 $0.userID == social.currentUserID &&
                                 $0.reaction == reaction
                             })
-                                ? Color.green.opacity(0.12)
+                                ? ATHLTHTheme.accent.opacity(0.12)
                                 : Color(.tertiarySystemGroupedBackground),
                             in: Capsule()
                         )
@@ -739,7 +739,7 @@ struct FriendProfileView: View {
                         : "circle.fill"
                 )
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(ATHLTHTheme.accent)
             }
         }
         .frame(maxWidth: .infinity)
@@ -758,7 +758,7 @@ struct FriendProfileView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(ATHLTHTheme.accent)
             }
         }
     }
@@ -799,7 +799,7 @@ struct FriendProfileView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    .tint(ATHLTHTheme.accent)
                     .frame(maxWidth: .infinity)
                 }
             } else {
@@ -926,7 +926,7 @@ struct FriendProfileView: View {
                                 ATHLTHTrophyPlateShape()
                                     .fill(
                                         LinearGradient(
-                                            colors: [.black, .green.opacity(0.62)],
+                                            colors: [.black, ATHLTHTheme.accent.opacity(0.62)],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
                                         )
@@ -964,9 +964,9 @@ struct FriendProfileView: View {
             ForEach(items.prefix(5)) { item in
                 HStack(spacing: 10) {
                     Image(systemName: socialIcon(item.activity.kind))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ATHLTHTheme.accent)
                         .frame(width: 30, height: 30)
-                        .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+                        .background(ATHLTHTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.activity.title)
@@ -1256,11 +1256,11 @@ struct SocialAvatar: View {
 
     private var fallback: some View {
         Circle()
-            .fill(.green.opacity(0.12))
+            .fill(ATHLTHTheme.accent.opacity(0.12))
             .overlay {
                 Text(profile.resolvedName.prefix(1).uppercased())
                     .font(.system(size: size * 0.34, weight: .bold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHTheme.accent)
             }
     }
 }
