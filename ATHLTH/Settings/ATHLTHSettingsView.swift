@@ -163,19 +163,21 @@ struct ATHLTHSettingsView: View {
                             .buttonStyle(.plain)
                             .disabled(subscriptionStore.restoreInProgress)
 
-                            SettingsDivider()
+                            if session.subscriptionAccess.hasPaidAccess {
+                                SettingsDivider()
 
-                            Link(destination: URL(string: "https://apps.apple.com/account/subscriptions")!) {
-                                PremiumSettingsRow(
-                                    icon: "creditcard",
-                                    title: "Manage Subscription",
-                                    subtitle: "Open Apple subscription settings"
-                                ) {
-                                    Image(systemName: "arrow.up.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                Link(destination: URL(string: "https://apps.apple.com/account/subscriptions")!) {
+                                    PremiumSettingsRow(
+                                        icon: "creditcard",
+                                        title: "Manage Subscription",
+                                        subtitle: "Open Apple subscription settings"
+                                    ) {
+                                        Image(systemName: "arrow.up.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
 
                             if let errorMessage = subscriptionStore.errorMessage {
                                 SettingsDivider()
