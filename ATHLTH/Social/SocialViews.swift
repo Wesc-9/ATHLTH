@@ -1115,11 +1115,12 @@ struct SocialPrivacySettingsView: View {
 
                 Section("Messages") {
                     Picker("Who can message me", selection: binding.allowDirectMessages) {
-                        Text("Friends").tag("friends")
+                        Text("Friends + requests").tag("requests")
+                        Text("Friends only").tag("friends")
                         Text("Nobody").tag("nobody")
                     }
 
-                    Text("ATHLTH currently allows direct messages only between accepted friends. Blocking a user also blocks messaging.")
+                    Text("Message requests let people who are not your friends send one text message. They cannot send another message or share workouts, plans, routes or challenges until you accept. Blocking always stops messaging.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
