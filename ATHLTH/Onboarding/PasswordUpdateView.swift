@@ -51,6 +51,11 @@ struct PasswordUpdateView: View {
                                     RoundedRectangle(cornerRadius: 14)
                                         .stroke(OnboardingTheme.border, lineWidth: 1)
                                 }
+
+                            Text("Use at least 12 characters with uppercase, lowercase and a number.")
+                                .font(.caption2)
+                                .foregroundStyle(OnboardingTheme.faintText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
 
@@ -96,11 +101,26 @@ struct PasswordUpdateView: View {
         }
     }
 
+    private func passwordValidationMessage(_ value: String) -> String? {
+        guard value.count >= 12 else {
+            return "Password must contain at least 12 characters."
+        }
+
+        guard value.contains(where: \.isLowercase),
+              value.contains(where: \.isUppercase),
+              value.contains(where: \.isNumber)
+        else {
+            return "Password must include uppercase, lowercase and a number."
+        }
+
+        return nil
+    }
+
     private func updatePassword() {
         errorMessage = nil
 
-        guard password.count >= 8 else {
-            errorMessage = "Password must contain at least 8 characters."
+        if let validationMessage = passwordValidationMessage(password) {
+            errorMessage = validationMessage
             return
         }
 
