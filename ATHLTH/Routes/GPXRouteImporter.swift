@@ -16,7 +16,13 @@ enum GPXImportError: LocalizedError {
 }
 
 final class GPXRouteImporter: NSObject, RouteImporting, XMLParserDelegate {
+    private let ownerID: UUID
     private var coordinates: [RouteCoordinate] = []
+
+    init(ownerID: UUID) {
+        self.ownerID = ownerID
+        super.init()
+    }
     private var currentAltitudeText = ""
     private var activePointIndex: Int?
     private var parseError: Error?
@@ -56,7 +62,7 @@ final class GPXRouteImporter: NSObject, RouteImporting, XMLParserDelegate {
 
         return TrainingRoute(
             id: UUID(),
-            ownerID: PreviewData.userID,
+            ownerID: ownerID,
             title: title,
             visibility: .privateOnly,
             coordinates: coordinates,
