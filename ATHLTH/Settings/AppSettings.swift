@@ -245,7 +245,7 @@ final class AppSettingsStore: ObservableObject {
 
         profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .friends
         defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .friends
-        shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? true
+        shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? false
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
 
         let resolvedProvider: TrainingDeviceProvider
