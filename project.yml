@@ -36,6 +36,9 @@ targets:
         NSHealthUpdateUsageDescription: "ATHLTH saves workouts and related training data to Apple Health so workouts recorded with ATHLTH and Apple Watch stay in sync."
         NSLocationWhenInUseUsageDescription: "ATHLTH uses your location only when you ask to verify a meetup check-in or when recording an outdoor workout."
         ITSAppUsesNonExemptEncryption: false
+        ATHLTHLegalOperatorName: "$(ATHLTH_LEGAL_OPERATOR_NAME)"
+        ATHLTHPrivacyContactEmail: "$(ATHLTH_PRIVACY_CONTACT_EMAIL)"
+        ATHLTHSupportURL: "$(ATHLTH_SUPPORT_URL)"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -55,6 +58,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth
         PRODUCT_NAME: ATHLTH
+        ATHLTH_LEGAL_OPERATOR_NAME: ""
+        ATHLTH_PRIVACY_CONTACT_EMAIL: ""
+        ATHLTH_SUPPORT_URL: ""
         CODE_SIGN_ENTITLEMENTS: ATHLTH/Resources/ATHLTH.entitlements
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
