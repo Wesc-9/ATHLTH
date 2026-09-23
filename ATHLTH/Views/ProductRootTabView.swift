@@ -7,6 +7,8 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var settings: AppSettingsStore
 
+    @State private var homeStreakSnapshot: HealthProgressSnapshot?
+
     var body: some View {
         TabView {
             ATHLTHHomeView()
@@ -124,6 +126,8 @@ struct ATHLTHHomeView: View {
                         .padding(.top, 14)
                     }
 
+                    HomeCurrentStreakCard(snapshot: homeStreakSnapshot)
+
                     HomeActivitySection()
 
                     if let insight = homeInsight {
@@ -180,14 +184,41 @@ struct ATHLTHHomeView: View {
                 )
             )
             .refreshable {
-                await health.refreshAll()
+                async let healthRefresh: Void = health.refreshAll()
+                async let streakRefresh: Void = loadHomeStreak()
+                _ = await (healthRefresh, streakRefresh)
             }
             .task {
                 if health.lastSuccessfulRefreshAt == nil {
                     await health.refreshAll()
                 }
+                await loadHomeStreak()
             }
         }
+    }
+
+    @MainActor
+    private func loadHomeStreak() async {
+        guard health.healthDataAvailable, health.hasRequestedAuthorization else {
+            homeStreakSnapshot = nil
+            return
+        }
+
+        let calendar = Calendar.current
+        let now = Date()
+        let today = calendar.startOfDay(for: now)
+        let start = calendar.date(byAdding: .day, value: -90, to: today)
+            ?? now.addingTimeInterval(-7_776_000)
+        let previousStart = calendar.date(byAdding: .day, value: -90, to: start)
+            ?? start.addingTimeInterval(-7_776_000)
+
+        homeStreakSnapshot = try? await health.progressSnapshot(
+            startDate: start,
+            endDate: now,
+            previousStartDate: previousStart,
+            previousEndDate: start,
+            grouping: .day
+        )
     }
 
     private var homeHealthSourceText: String {
@@ -435,6 +466,140 @@ private struct HomeDayStatus: View {
                 style: .continuous
             )
             .stroke(ATHLTHTheme.border, lineWidth: 1)
+        }
+    }
+}
+
+private struct HomeCurrentStreakCard: View {
+    let snapshot: HealthProgressSnapshot?
+
+    private var currentWeekDays: [Date] {
+        let calendar = Calendar.current
+        let start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start
+            ?? calendar.startOfDay(for: Date())
+
+        return (0..<7).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: start)
+        }
+    }
+
+    private func isWorkoutDay(_ date: Date) -> Bool {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: date)
+        return snapshot?.activeWorkoutDays.contains {
+            calendar.isDate($0, inSameDayAs: day)
+        } ?? false
+    }
+
+    private var workoutStreak: Int {
+        guard let days = snapshot?.activeWorkoutDays, !days.isEmpty else {
+            return 0
+        }
+
+        let calendar = Calendar.current
+        let active = Set(days.map { calendar.startOfDay(for: $0) })
+        let today = calendar.startOfDay(for: Date())
+
+        var cursor: Date
+        if active.contains(today) {
+            cursor = today
+        } else if let yesterday = calendar.date(byAdding: .day, value: -1, to: today),
+                  active.contains(yesterday) {
+            cursor = yesterday
+        } else {
+            return 0
+        }
+
+        var streak = 0
+        while active.contains(cursor) {
+            streak += 1
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else {
+                break
+            }
+            cursor = previous
+        }
+
+        return streak
+    }
+
+    private var activeDaysThisWeek: Int {
+        currentWeekDays.filter(isWorkoutDay).count
+    }
+
+    var body: some View {
+        ATHLTHCard {
+            HStack(spacing: 14) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(
+                        workoutStreak > 0
+                            ? ATHLTHTheme.accent
+                            : Color.secondary.opacity(0.45)
+                    )
+                    .frame(width: 48, height: 48)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: Circle()
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Current Streak")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(
+                        workoutStreak > 0
+                            ? "\(workoutStreak) day\(workoutStreak == 1 ? "" : "s")"
+                            : "Start your streak"
+                    )
+                    .font(.title3.weight(.bold))
+
+                    Text(
+                        workoutStreak > 0
+                            ? "Keep it going."
+                            : "Complete a workout to begin."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 6) {
+                ForEach(currentWeekDays, id: \.self) { day in
+                    VStack(spacing: 5) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    isWorkoutDay(day)
+                                        ? ATHLTHTheme.accent
+                                        : Color.black.opacity(0.055)
+                                )
+                                .frame(width: 26, height: 26)
+
+                            if isWorkoutDay(day) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+
+                        Text(day.formatted(.dateTime.weekday(.narrow)))
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.top, 12)
+
+            Text(
+                "\(activeDaysThisWeek) active \(activeDaysThisWeek == 1 ? "day" : "days") this week"
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(.top, 2)
         }
     }
 }
@@ -1769,7 +1934,7 @@ struct ATHLTHProgressView: View {
 
     private var consistencyCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            compactHeader("Consistency Streak")
+            compactHeader("Consistency")
 
             HStack(spacing: 13) {
                 ZStack {
@@ -1777,44 +1942,25 @@ struct ATHLTHProgressView: View {
                         .fill(green.opacity(0.08))
                         .frame(width: 78, height: 78)
 
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 38))
-                        .foregroundStyle(workoutStreak > 0 ? green : Color.secondary.opacity(0.45))
+                    Image(systemName: "calendar.badge.checkmark")
+                        .font(.system(size: 32))
+                        .foregroundStyle(green)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(workoutStreak > 0 ? "\(workoutStreak) days" : "No streak")
+                    Text("\(activeDaysLast30) active days")
                         .font(.title2.weight(.bold))
-                    Text(workoutStreak > 0 ? "Keep it going!" : "A workout today starts one.")
+
+                    Text("Last 30 days")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
                 }
             }
 
-            HStack(spacing: 6) {
-                ForEach(currentWeekDays, id: \.self) { day in
-                    VStack(spacing: 5) {
-                        Image(systemName: isWorkoutDay(day) ? "checkmark" : "")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 27, height: 27)
-                            .background(
-                                isWorkoutDay(day)
-                                    ? green
-                                    : Color.black.opacity(0.055),
-                                in: Circle()
-                            )
+            ProgressView(value: Double(activeDaysLast30), total: 30)
+                .tint(green)
 
-                        Text(day.formatted(.dateTime.weekday(.narrow)))
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-
-            Text("\(workoutDaysThisWeek) active \(workoutDaysThisWeek == 1 ? "day" : "days") this week")
+            Text("\(consistencyPercentLast30)% of the last 30 days included training.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -2335,58 +2481,22 @@ struct ATHLTHProgressView: View {
         )
     }
 
-    private var currentWeekDays: [Date] {
-        let calendar = Calendar.current
-        let start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start
-            ?? calendar.startOfDay(for: Date())
-
-        return (0..<7).compactMap {
-            calendar.date(byAdding: .day, value: $0, to: start)
-        }
-    }
-
-    private var workoutDaysThisWeek: Int {
-        currentWeekDays.filter(isWorkoutDay).count
-    }
-
-    private func isWorkoutDay(_ date: Date) -> Bool {
-        let calendar = Calendar.current
-        let day = calendar.startOfDay(for: date)
-        return consistencySnapshot?.activeWorkoutDays.contains {
-            calendar.isDate($0, inSameDayAs: day)
-        } ?? false
-    }
-
-    private var workoutStreak: Int {
-        guard let days = consistencySnapshot?.activeWorkoutDays, !days.isEmpty else {
+    private var activeDaysLast30: Int {
+        guard let days = consistencySnapshot?.activeWorkoutDays else {
             return 0
         }
 
         let calendar = Calendar.current
-        let active = Set(days.map { calendar.startOfDay(for: $0) })
         let today = calendar.startOfDay(for: Date())
+        let start = calendar.date(byAdding: .day, value: -29, to: today) ?? today
 
-        var cursor: Date
-        if active.contains(today) {
-            cursor = today
-        } else if let yesterday = calendar.date(byAdding: .day, value: -1, to: today),
-                  active.contains(yesterday) {
-            cursor = yesterday
-        } else {
-            return 0
-        }
+        return Set(days.map { calendar.startOfDay(for: $0) })
+            .filter { $0 >= start && $0 <= today }
+            .count
+    }
 
-        var streak = 0
-
-        while active.contains(cursor) {
-            streak += 1
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: cursor) else {
-                break
-            }
-            cursor = previous
-        }
-
-        return streak
+    private var consistencyPercentLast30: Int {
+        Int(((Double(activeDaysLast30) / 30) * 100).rounded())
     }
 
     private var monthlyRange: (
