@@ -298,16 +298,22 @@ struct AppRootView: View {
             notifications.syncGoalEvents(from: updatedGoals)
 
             Task {
-                await social.publishCompletedGoals(
-                    updatedGoals,
-                    visibility: settings.defaultActivityVisibility
-                )
+                if social.privacy?.shareGoals == true {
+                    await social.publishCompletedGoals(
+                        updatedGoals,
+                        visibility: settings.defaultActivityVisibility
+                    )
+                }
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
             }
         }
         .onChange(of: appSession.profile.presence) { _, presence in
-            guard appSession.signedIn else { return }
+            guard appSession.signedIn,
+                  social.privacy?.shareTrainingPresence == true
+            else {
+                return
+            }
 
             Task {
                 await social.syncPresence(presence)
@@ -331,6 +337,13 @@ struct AppRootView: View {
                     profileVisibility: settings.profileVisibility,
                     shareTrainingPresence: sharePresence
                 )
+            }
+        }
+        .onChange(of: social.privacy) { _, privacy in
+            guard appSession.signedIn, privacy != nil else { return }
+
+            Task {
+                await syncSocialOwnedData()
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
@@ -461,33 +474,49 @@ struct AppRootView: View {
             settings.shareTrainingPresence = privacy.shareTrainingPresence
         }
 
-        await social.syncPresence(appSession.profile.presence)
+        if social.privacy?.shareTrainingPresence == true {
+            await social.syncPresence(appSession.profile.presence)
+        }
     }
 
     private func syncSocialOwnedData() async {
-        guard appSession.signedIn else { return }
+        guard appSession.signedIn,
+              let privacy = social.privacy
+        else {
+            return
+        }
 
-        if let stats = try? await health.profilePerformanceStats() {
+        if privacy.sharePerformanceStats,
+           let stats = try? await health.profilePerformanceStats() {
             await social.syncOwnPerformance(stats)
         }
 
-        if let runningRecords = try? await health.personalRecords() {
+        if privacy.shareRunningPRs,
+           let runningRecords = try? await health.personalRecords() {
             await social.publishRunningPersonalRecords(
                 runningRecords,
                 visibility: settings.defaultActivityVisibility
             )
         }
 
-        await social.publishStrengthRepPersonalRecords(
-            strengthWorkout.repPersonalRecords,
-            visibility: settings.defaultActivityVisibility
-        )
+        if privacy.shareStrengthPRs {
+            await social.publishStrengthRepPersonalRecords(
+                strengthWorkout.repPersonalRecords,
+                visibility: settings.defaultActivityVisibility
+            )
+        }
 
-        await social.syncOwnTrophies(trophies.showcaseTrophies)
-        await social.publishTrophyUnlocks(
-            trophies.unlocks,
-            visibility: settings.defaultActivityVisibility
-        )
+        if privacy.shareTrophyCabinet {
+            await social.syncOwnTrophies(trophies.showcaseTrophies)
+
+            if privacy.shareRecentActivity {
+                await social.publishTrophyUnlocks(
+                    trophies.unlocks,
+                    visibility: settings.defaultActivityVisibility
+                )
+            }
+        }
+
         await social.syncChallenges(challengeStore)
     }
 
