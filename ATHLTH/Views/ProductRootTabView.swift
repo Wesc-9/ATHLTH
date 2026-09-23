@@ -2293,35 +2293,56 @@ struct ATHLTHProfileView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    HStack(spacing: 18) {
-                        Circle()
-                            .fill(ATHLTHTheme.accent.opacity(0.12))
-                            .frame(width: 96, height: 96)
-                            .overlay {
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 42))
-                                    .foregroundStyle(ATHLTHTheme.accent)
+                    ATHLTHCard {
+                        HStack(spacing: 18) {
+                            profileAvatar
+
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(session.profile.displayName)
+                                    .font(.title2.weight(.bold))
+
+                                Text("@\(session.profile.username)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+
+                                if !session.profile.bio.isEmpty {
+                                    Text(session.profile.bio)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                        .padding(.top, 2)
+                                }
+
+                                Label(
+                                    session.profile.presence.state == .training
+                                        ? "Training now"
+                                        : "Ready to train",
+                                    systemImage: session.profile.presence.state == .training
+                                        ? "figure.run"
+                                        : "circle.fill"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accent)
+                                .padding(.top, 3)
                             }
 
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(session.profile.displayName)
-                                .font(.title.weight(.bold))
-                            Text("@\(session.profile.username)")
-                                .foregroundStyle(.secondary)
+                            Spacer()
 
-                            Label(
-                                session.profile.presence.state == .training
-                                    ? "Training now"
-                                    : "Ready to train",
-                                systemImage: session.profile.presence.state == .training
-                                    ? "figure.run"
-                                    : "circle.fill"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.accent)
+                            NavigationLink {
+                                ATHLTHEditProfileView()
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 42, height: 42)
+                                    .background(
+                                        ATHLTHTheme.accentSoft,
+                                        in: Circle()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Edit Profile")
                         }
-
-                        Spacer()
                     }
 
                     HStack(spacing: 12) {
@@ -2337,55 +2358,69 @@ struct ATHLTHProfileView: View {
                         } label: {
                             profileStat(
                                 "\(messaging.unreadCount + messaging.messageRequestCount)",
-                                "Messages"
+                                "Inbox"
                             )
                         }
                         .buttonStyle(.plain)
                     }
 
                     HStack(spacing: 12) {
-                        summaryCard(icon: "target", value: "\(goalStore.goals.count)", title: "Goals", tint: ATHLTHTheme.accent)
-                        summaryCard(icon: "point.topleft.down.to.point.bottomright.curvepath", value: "\(session.savedRoutes.count)", title: "Saved Routes", tint: .blue)
-                        summaryCard(icon: "trophy.fill", value: "\(trophyStore.unlockedCount)", title: "Trophies", tint: .orange)
+                        summaryCard(
+                            icon: "target",
+                            value: "\(goalStore.goals.count)",
+                            title: "Goals",
+                            tint: ATHLTHTheme.accent
+                        )
+                        summaryCard(
+                            icon: "point.topleft.down.to.point.bottomright.curvepath",
+                            value: "\(session.savedRoutes.count)",
+                            title: "Routes",
+                            tint: .blue
+                        )
+                        summaryCard(
+                            icon: "trophy.fill",
+                            value: "\(trophyStore.unlockedCount)",
+                            title: "Trophies",
+                            tint: .orange
+                        )
                     }
 
-                    ATHLTHCard {
-                        HStack(spacing: 14) {
-                            Image(systemName: "map.fill")
-                                .font(.title3)
-                                .foregroundStyle(ATHLTHTheme.accent)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                )
+                    NavigationLink {
+                        ATHLTHPrivacyCenterView()
+                    } label: {
+                        ATHLTHCard {
+                            HStack(spacing: 14) {
+                                Image(systemName: "hand.raised.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(ATHLTHTheme.accent)
+                                    .frame(width: 44, height: 44)
+                                    .background(
+                                        ATHLTHTheme.accentSoft,
+                                        in: RoundedRectangle(
+                                            cornerRadius: 14,
+                                            style: .continuous
+                                        )
+                                    )
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Route Privacy")
-                                    .font(.headline)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Privacy")
+                                        .font(.headline)
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
 
-                                Text(
-                                    settings.hideRouteStartAndEnd
-                                        ? "Hide roughly 250 m at the start and end when sharing routes."
-                                        : "Full route start and end points are included when sharing."
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                                    Text(privacyStatusText)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(.tertiary)
                             }
-
-                            Spacer()
-
-                            Toggle(
-                                "Hide route start and end",
-                                isOn: $settings.hideRouteStartAndEnd
-                            )
-                            .labelsHidden()
-                            .tint(ATHLTHTheme.accent)
                         }
                     }
-
-                    ProfileFriendsSection()
+                    .buttonStyle(.plain)
 
                     TrophyCabinetSection()
 
@@ -2397,28 +2432,6 @@ struct ATHLTHProfileView: View {
                     WorkoutHistoryPreviewSection()
 
                     ProfileChallengesSection()
-
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Share Your Plans")
-                        HStack {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("Public, friends or private")
-                                    .font(.headline)
-                                Text("Plan visibility is stored per plan and can be changed at any time.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if let plan = session.activePlan {
-                                Text(plan.visibility.title)
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(ATHLTHTheme.accent.opacity(0.12), in: Capsule())
-                            }
-                        }
-                        .padding(.top, 10)
-                    }
 
                 }
                 .padding()
@@ -2472,6 +2485,63 @@ struct ATHLTHProfileView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var profileAvatar: some View {
+        if let avatarURL = session.profile.avatarURL {
+            AsyncImage(url: avatarURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    Circle()
+                        .fill(ATHLTHTheme.accentSoft)
+                        .overlay {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 40))
+                                .foregroundStyle(ATHLTHTheme.accent)
+                        }
+                }
+            }
+            .frame(width: 96, height: 96)
+            .clipShape(Circle())
+            .overlay {
+                Circle()
+                    .stroke(ATHLTHTheme.border, lineWidth: 1)
+            }
+        } else {
+            Circle()
+                .fill(ATHLTHTheme.accentSoft)
+                .frame(width: 96, height: 96)
+                .overlay {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(ATHLTHTheme.accent)
+                }
+        }
+    }
+
+    private var privacyStatusText: String {
+        let route = settings.hideRouteStartAndEnd
+            ? "Route endpoints hidden"
+            : "Full routes"
+
+        let messages: String
+        switch social.privacy?.allowDirectMessages {
+        case "requests":
+            messages = "message requests on"
+        case "friends":
+            messages = "friends only"
+        case "nobody":
+            messages = "messages off"
+        default:
+            messages = "privacy controls"
+        }
+
+        return "\(route) · \(messages)"
     }
 
     @MainActor
