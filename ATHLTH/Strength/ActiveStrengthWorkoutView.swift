@@ -5,12 +5,14 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     @State private var reps = 8
     @State private var weightKilograms = 20.0
     @State private var rpe = 8.0
     @State private var showingFinishConfirmation = false
+    @State private var finishInProgress = false
     @State private var showingExerciseLibrary = false
     @State private var pendingExercise: ExerciseLibraryEntry?
 
@@ -93,14 +95,11 @@ struct ActiveStrengthWorkoutView: View {
                 titleVisibility: .visible
             ) {
                 Button("Finish Workout", role: .destructive) {
-                    if strength.activeWorkout?.captureDevice == .appleWatch {
-                        watchConnection.sendWorkoutCommand(.end)
+                    Task {
+                        await finishWorkout()
                     }
-
-                    strength.finish()
-                    appSession.endTrainingStatus()
-                    dismiss()
                 }
+                .disabled(finishInProgress)
                 Button("Keep Training", role: .cancel) {}
             } message: {
                 Text(finishMessage)
@@ -117,6 +116,46 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
+    @MainActor
+    private func finishWorkout() async {
+        guard !finishInProgress,
+              let workout = strength.activeWorkout
+        else {
+            return
+        }
+
+        finishInProgress = true
+        defer { finishInProgress = false }
+
+        let endDate = Date()
+
+        switch workout.captureDevice {
+        case .appleWatch:
+            watchConnection.sendWorkoutCommand(.end)
+            strength.finish(
+                duration: endDate.timeIntervalSince(workout.startedAt)
+            )
+
+        case .iPhone:
+            // ATHLTH is the source of truth for the strength log. When Health
+            // write access is available, also create a real HealthKit workout
+            // so Apple Health, Progress and streak all see the same session.
+            let healthWorkoutUUID = await health.saveManualStrengthWorkout(
+                startDate: workout.startedAt,
+                endDate: endDate,
+                externalID: workout.id
+            )
+
+            strength.finish(
+                healthKitWorkoutUUID: healthWorkoutUUID,
+                duration: endDate.timeIntervalSince(workout.startedAt)
+            )
+        }
+
+        appSession.endTrainingStatus()
+        dismiss()
+    }
+
     private var finishMessage: String {
         guard let workout = strength.activeWorkout else {
             return "Finish the ATHLTH workout."
@@ -126,7 +165,9 @@ struct ActiveStrengthWorkoutView: View {
         case .appleWatch:
             return "This finishes the ATHLTH log and ends the linked HealthKit workout on Apple Watch."
         case .iPhone:
-            return "This finishes the ATHLTH workout on iPhone. A wearable is not required."
+            return health.canWriteWorkouts
+                ? "This finishes the ATHLTH workout on iPhone and saves it to Apple Health."
+                : "This finishes the ATHLTH workout on iPhone. It will still count toward your ATHLTH streak even without Health write access."
         }
     }
 
