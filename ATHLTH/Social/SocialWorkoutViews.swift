@@ -8,7 +8,7 @@ struct WorkoutFriendPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Train with friends", systemImage: "person.2.fill")
+                Label("Invite friends (optional)", systemImage: "person.2.fill")
                     .font(.headline)
 
                 Spacer()
@@ -26,9 +26,9 @@ struct WorkoutFriendPicker: View {
                         .foregroundStyle(ATHLTHTheme.accent)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("No friends to select yet")
+                        Text("Train solo")
                             .font(.subheadline.weight(.semibold))
-                        Text("Add friends from Profile → Social.")
+                        Text("Friends are optional. You can start this workout by yourself.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -77,9 +77,13 @@ struct WorkoutFriendPicker: View {
                 }
             }
 
-            Text("Selected friends receive an invite. They are only shown as training partners after they accept.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Text(
+                selectedFriendIDs.isEmpty
+                    ? "No invite is required to start."
+                    : "Selected friends receive an invite and appear as training partners after they accept."
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -140,6 +144,39 @@ struct QuickWorkoutStartSheet: View {
                         }
                     }
 
+                    if kind == .running {
+                        ATHLTHCard {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Route")
+                                        .font(.headline)
+                                    Text("Optional · create or pick a saved route before you start.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                NavigationLink {
+                                    RunRouteBuilderView()
+                                } label: {
+                                    Label("Create", systemImage: "map.fill")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .tint(ATHLTHTheme.accent)
+                            }
+
+                            NavigationLink {
+                                SavedRoutesView()
+                            } label: {
+                                Label("Saved Routes", systemImage: "map")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .padding(.top, 10)
+                        }
+                    }
+
                     ATHLTHCard {
                         WorkoutFriendPicker(
                             selectedFriendIDs: $selectedFriendIDs
@@ -155,7 +192,7 @@ struct QuickWorkoutStartSheet: View {
                     } label: {
                         Label(
                             selectedFriendIDs.isEmpty
-                                ? "Start Workout"
+                                ? "Start Solo"
                                 : "Start with \(selectedFriendIDs.count) Friend\(selectedFriendIDs.count == 1 ? "" : "s")",
                             systemImage: "play.fill"
                         )
