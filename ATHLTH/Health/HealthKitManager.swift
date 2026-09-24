@@ -140,6 +140,16 @@ final class HealthKitManager: ObservableObject {
         ]
     }
 
+    private var shareTypes: Set<HKSampleType> {
+        [HKObjectType.workoutType()]
+    }
+
+    var canWriteWorkouts: Bool {
+        healthStore.authorizationStatus(
+            for: HKObjectType.workoutType()
+        ) == .sharingAuthorized
+    }
+
     private var readTypes: Set<HKObjectType> {
         var types: Set<HKObjectType> = [
             HKObjectType.workoutType(),
@@ -180,7 +190,10 @@ final class HealthKitManager: ObservableObject {
         }
 
         do {
-            try await healthStore.requestAuthorization(toShare: [], read: readTypes)
+            try await healthStore.requestAuthorization(
+                toShare: shareTypes,
+                read: readTypes
+            )
             UserDefaults.standard.set(true, forKey: legacyAuthorizationFlagKey)
             UserDefaults.standard.set(currentAuthorizationVersion, forKey: authorizationVersionKey)
             UserDefaults.standard.set(
@@ -437,6 +450,43 @@ final class HealthKitManager: ObservableObject {
 
     var shouldDeferAutomaticHealthWork: Bool {
         automaticRefreshSuspended || deferFullRefreshUntilNextLaunch
+    }
+
+    func saveManualStrengthWorkout(
+        startDate: Date,
+        endDate: Date,
+        externalID: UUID
+    ) async -> UUID? {
+        guard healthDataAvailable,
+              canWriteWorkouts,
+              endDate > startDate
+        else {
+            return nil
+        }
+
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .traditionalStrengthTraining
+        configuration.locationType = .indoor
+
+        let builder = HKWorkoutBuilder(
+            healthStore: healthStore,
+            configuration: configuration,
+            device: nil
+        )
+
+        do {
+            try await builder.beginCollection(at: startDate)
+            try await builder.addMetadata([
+                HKMetadataKeyExternalUUID: externalID.uuidString
+            ])
+            try await builder.endCollection(at: endDate)
+            let workout = try await builder.finishWorkout()
+            return workout?.uuid
+        } catch {
+            authorizationError =
+                "Could not save the ATHLTH strength workout to Apple Health: \(error.localizedDescription)"
+            return nil
+        }
     }
 
     func workoutHistory() async throws -> [WorkoutSummary] {
@@ -1235,7 +1285,10 @@ final class HealthKitManager: ObservableObject {
 
     func authorizationRequestStatusDescription() async -> String {
         await withCheckedContinuation { continuation in
-            healthStore.getRequestStatusForAuthorization(toShare: [], read: readTypes) { status, error in
+            healthStore.getRequestStatusForAuthorization(
+                toShare: shareTypes,
+                read: readTypes
+            ) { status, error in
                 if let error {
                     continuation.resume(returning: "Error: \(error.localizedDescription)")
                     return
