@@ -1058,6 +1058,7 @@ struct ATHLTHTrainView: View {
     @State private var watchTransferError: String?
     @State private var selectedStrengthSession: PlannedSession?
     @State private var pendingQuickStartKind: WorkoutKind?
+    @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
 
     private var gpxImporter: GPXRouteImporter {
@@ -1176,6 +1177,16 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingCustomQuickStart) {
+                CustomQuickStartSheet(
+                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    watchConnected:
+                        settings.trainingDeviceProvider == .appleWatch &&
+                        watchConnection.isReady
+                ) { configuration in
+                    startCustomWorkoutOnWatch(configuration)
+                }
+            }
             .fullScreenCover(isPresented: $showingStrengthWorkout) {
                 ActiveStrengthWorkoutView()
                     .environmentObject(strengthWorkout)
@@ -1286,26 +1297,44 @@ struct ATHLTHTrainView: View {
         ATHLTHCard {
             ATHLTHSectionHeader(
                 title: "Quick Start",
-                actionTitle: quickStartDeviceTitle
+                actionTitle: "Get moving now"
             )
-            HStack {
-                ForEach(quickStartKinds) { kind in
-                    Button {
-                        handleQuickStart(kind)
-                    } label: {
-                        VStack(spacing: 7) {
-                            Image(systemName: kind.systemImage)
-                                .font(.title2)
-                                .foregroundStyle(ATHLTHTheme.accent)
-                            Text(kind.title)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.primary)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 76)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!quickStartAvailable(kind))
-                    .opacity(quickStartAvailable(kind) ? 1 : 0.45)
+
+            HStack(spacing: 8) {
+                quickStartTile(
+                    title: "Run",
+                    subtitle: "Outdoor",
+                    icon: "figure.run",
+                    enabled: quickStartAvailable(.running)
+                ) {
+                    handleQuickStart(.running)
+                }
+
+                quickStartTile(
+                    title: "Walk",
+                    subtitle: "Outdoor",
+                    icon: "figure.walk",
+                    enabled: quickStartAvailable(.walking)
+                ) {
+                    handleQuickStart(.walking)
+                }
+
+                quickStartTile(
+                    title: "Strength",
+                    subtitle: "Gym / Home",
+                    icon: "dumbbell.fill",
+                    enabled: quickStartAvailable(.strength)
+                ) {
+                    handleQuickStart(.strength)
+                }
+
+                quickStartTile(
+                    title: "Custom",
+                    subtitle: "Build yours",
+                    icon: "plus",
+                    enabled: true
+                ) {
+                    showingCustomQuickStart = true
                 }
             }
             .padding(.top, 10)
@@ -1469,6 +1498,54 @@ struct ATHLTHTrainView: View {
 
     }
 
+    @ViewBuilder
+    private func quickStartTile(
+        title: String,
+        subtitle: String,
+        icon: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accent)
+                    .frame(height: 26)
+
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                Text(subtitle)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity, minHeight: 88)
+            .padding(.horizontal, 4)
+            .background(
+                ATHLTHTheme.accentSoft.opacity(enabled ? 0.72 : 0.34),
+                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .stroke(
+                        enabled
+                            ? ATHLTHTheme.accent.opacity(0.10)
+                            : ATHLTHTheme.border,
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.48)
+    }
+
     private func watchWorkoutKind(
         for kind: WorkoutKind
     ) -> WatchWorkoutKind? {
@@ -1583,6 +1660,28 @@ struct ATHLTHTrainView: View {
 
         case .none:
             EmptyView()
+        }
+    }
+
+    private func startCustomWorkoutOnWatch(
+        _ configuration: CustomQuickWorkoutConfiguration
+    ) {
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady
+        else {
+            return
+        }
+
+        Task {
+            do {
+                try await watchConnection.startWorkoutOnWatch(
+                    configuration.activity.watchKind
+                )
+                watchTransferMessage =
+                    "\(configuration.title) started on Apple Watch · \(configuration.detail)."
+            } catch {
+                watchTransferError = error.localizedDescription
+            }
         }
     }
 
