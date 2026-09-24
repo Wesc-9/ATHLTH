@@ -2245,7 +2245,7 @@ struct ATHLTHTrainView: View {
             HStack(spacing: 8) {
                 quickStartTile(
                     title: "Run",
-                    subtitle: "Outdoor",
+                    subtitle: quickStartSubtitle(.running),
                     icon: "figure.run",
                     enabled: quickStartAvailable(.running)
                 ) {
@@ -2254,7 +2254,7 @@ struct ATHLTHTrainView: View {
 
                 quickStartTile(
                     title: "Walk",
-                    subtitle: "Outdoor",
+                    subtitle: quickStartSubtitle(.walking),
                     icon: "figure.walk",
                     enabled: quickStartAvailable(.walking)
                 ) {
@@ -2272,9 +2272,9 @@ struct ATHLTHTrainView: View {
 
                 quickStartTile(
                     title: "Custom",
-                    subtitle: "Build yours",
+                    subtitle: quickStartCustomSubtitle,
                     icon: "plus",
-                    enabled: true
+                    enabled: customQuickStartAvailable
                 ) {
                     showingCustomQuickStart = true
                 }
@@ -2580,6 +2580,34 @@ struct ATHLTHTrainView: View {
             // presenting dead or empty wearable-only choices.
             return [.strength]
         }
+    }
+
+    private var customQuickStartAvailable: Bool {
+        settings.trainingDeviceProvider == .appleWatch &&
+        watchConnection.isReady
+    }
+
+    private var quickStartCustomSubtitle: String {
+        customQuickStartAvailable
+            ? "Build yours"
+            : "Watch required"
+    }
+
+    private func quickStartSubtitle(
+        _ kind: WorkoutKind
+    ) -> String {
+        guard kind == .running || kind == .walking else {
+            return kind == .strength ? "Gym / Home" : kind.title
+        }
+
+        if settings.trainingDeviceProvider == .appleWatch &&
+            watchConnection.isReady {
+            return "Outdoor"
+        }
+
+        return settings.trainingDeviceProvider == .appleWatch
+            ? "Connect Watch"
+            : "Watch required"
     }
 
     private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
