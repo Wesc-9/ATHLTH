@@ -246,6 +246,7 @@ final class HealthKitManager: ObservableObject {
         }
 
         var failures: [String] = []
+        var successfulRegistrations = 0
 
         for (type, frequency) in registrations {
             let result: (Bool, String?) = await withCheckedContinuation { continuation in
@@ -256,14 +257,19 @@ final class HealthKitManager: ObservableObject {
                 }
             }
 
-            if !result.0 {
+            if result.0 {
+                successfulRegistrations += 1
+            } else {
                 failures.append(
                     result.1 ?? "HealthKit rejected background delivery for \(type.identifier)."
                 )
             }
         }
 
-        if !failures.isEmpty {
+        // A user can intentionally deny individual Health types. Treat that as
+        // partial availability rather than a global sync failure. Surface an
+        // issue only when HealthKit could not enable any background delivery.
+        if successfulRegistrations == 0, !failures.isEmpty {
             backgroundSyncError = failures.joined(separator: "\n")
         }
     }
