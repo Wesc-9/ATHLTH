@@ -32,6 +32,7 @@ struct OnboardingFlowView: View {
     @State private var usernameClaimError: String?
     @State private var authenticationError: String?
     @State private var appleSignInInProgress = false
+    @State private var skipInProgress = false
     @State private var onboardingCompletionError: String?
     @State private var showingWatchInstallHelp = false
     @State private var showingGarminSetup = false
@@ -185,8 +186,29 @@ struct OnboardingFlowView: View {
 
                 Spacer()
 
-                Color.clear
-                    .frame(width: 40, height: 40)
+                if step != .account {
+                    Button {
+                        skipCurrentStep()
+                    } label: {
+                        Group {
+                            if skipInProgress {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text("Skip")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                        }
+                        .foregroundStyle(OnboardingTheme.mutedText)
+                        .frame(minWidth: 40, minHeight: 40, alignment: .trailing)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(skipInProgress)
+                    .accessibilityLabel("Skip this step")
+                } else {
+                    Color.clear
+                        .frame(width: 40, height: 40)
+                }
             }
 
             HStack(spacing: 6) {
@@ -2163,6 +2185,71 @@ struct OnboardingFlowView: View {
             interests.remove(interest)
         } else {
             interests.insert(interest)
+        }
+    }
+
+    private func skipCurrentStep() {
+        guard !skipInProgress else { return }
+
+        switch step {
+        case .account:
+            return
+
+        case .username:
+            skipUsernameStep()
+
+        case .goals:
+            saveProfileData()
+            step = .connections
+
+        case .connections:
+            saveProfileData()
+            connectionStage = .device
+            step = .ready
+
+        case .ready:
+            skipInProgress = true
+            Task {
+                await finishOnboarding()
+                skipInProgress = false
+            }
+        }
+    }
+
+    private func skipUsernameStep() {
+        skipInProgress = true
+        usernameClaimError = nil
+
+        Task {
+            defer { skipInProgress = false }
+
+            if !session.profile.username.isEmpty {
+                step = .goals
+                return
+            }
+
+            var candidates = usernameSuggestions
+            if candidates.isEmpty {
+                candidates = await usernameService.suggestions(
+                    for: session.usernameSeed
+                )
+            }
+
+            for candidate in candidates {
+                do {
+                    try await usernameService.claim(candidate)
+                    username = candidate
+                    session.setPendingUsername(candidate)
+                    step = .goals
+                    return
+                } catch {
+                    continue
+                }
+            }
+
+            usernameClaimError =
+                "ATHLTH couldn't create a username automatically. Choose one to continue."
+            await loadUsernameSuggestions()
         }
     }
 
