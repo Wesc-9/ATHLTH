@@ -447,14 +447,8 @@ struct ATHLTHCommunityView: View {
             }
             .ignoresSafeArea(edges: .top)
             .background(
-                LinearGradient(
-                    colors: [
-                        .blue.opacity(0.045),
-                        ATHLTHTheme.accent.opacity(0.03),
-                        .clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                ATHLTHPremiumCanvas(
+                    accent: Color.purple.opacity(0.42)
                 )
             )
             .refreshable {
