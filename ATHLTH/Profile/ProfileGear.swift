@@ -232,15 +232,18 @@ final class ProfileGearStore: ObservableObject {
                 itemID: item.id
             )
             let resolvedImage = uploaded?.absoluteString ?? item.imageURL
+            let categoryItems = items(in: item.category)
+            let shouldFeature =
+                showOnProfile || (item.isFeatured && categoryItems.count == 1)
 
-            if showOnProfile {
+            if shouldFeature {
                 try await clearFeatured(item.category)
             }
 
             let payload = ProfileGearUpdate(
                 name: cleanName,
                 imageURL: resolvedImage,
-                isFeatured: showOnProfile
+                isFeatured: shouldFeature
             )
 
             try await client
@@ -307,8 +310,10 @@ final class ProfileGearStore: ObservableObject {
 
             await refresh()
 
-            if featuredItem(in: item.category) == nil,
-               let replacement = items(in: item.category).first {
+            if !items.contains(where: {
+                $0.category == item.category && $0.isFeatured
+            }),
+            let replacement = items(in: item.category).first {
                 await setFeatured(replacement)
             }
         } catch {
@@ -682,10 +687,10 @@ private struct ProfileGearEditorView: View {
                 .foregroundStyle(.secondary)
             }
 
-            if let localError ?? gear.errorMessage {
+            if let displayedError = localError ?? gear.errorMessage {
                 Section {
                     Label(
-                        localError ?? gear.errorMessage ?? "",
+                        displayedError,
                         systemImage: "exclamationmark.triangle.fill"
                     )
                     .font(.caption)
