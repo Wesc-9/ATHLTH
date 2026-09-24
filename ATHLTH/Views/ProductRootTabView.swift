@@ -93,7 +93,7 @@ struct ATHLTHHomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 0) {
                     ZStack(alignment: .topTrailing) {
                         ATHLTHTabHero(
                             imageName: "HomeHero",
@@ -101,7 +101,7 @@ struct ATHLTHHomeView: View {
                             subtitle: session.profile.presence.state == .training
                                 ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
                                 : "Your health and training at a glance.",
-                            height: 150,
+                            height: 190,
                             alignment: .leading,
                             focalOffsetX: 18
                         )
@@ -193,10 +193,11 @@ struct ATHLTHHomeView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Profile")
                         }
-                        .padding(.top, 12)
+                        .padding(.top, 52)
                         .padding(.trailing, 12)
                     }
 
+                    VStack(spacing: 18) {
                     ATHLTHCard {
                         HStack(alignment: .firstTextBaseline) {
                             VStack(alignment: .leading, spacing: 3) {
@@ -318,7 +319,9 @@ struct ATHLTHHomeView: View {
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
+                }
             }
+            .ignoresSafeArea(edges: .top)
             .background(
                 LinearGradient(
                     colors: [
@@ -1051,16 +1054,17 @@ struct ATHLTHTrainView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 0) {
                     ATHLTHTabHero(
                         imageName: "TrainHero",
                         title: "Train",
                         subtitle: "Build a stronger, healthier you.",
-                        height: 150,
+                        height: 190,
                         alignment: .leading,
                         focalOffsetX: 20
                     )
 
+                    VStack(spacing: 18) {
                     Picker("Training section", selection: $selectedSection) {
                         Text("Today").tag(0)
                         Text("Calendar").tag(1)
@@ -1090,7 +1094,9 @@ struct ATHLTHTrainView: View {
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
+                }
             }
+            .ignoresSafeArea(edges: .top)
             .sheet(item: $selectedStrengthSession) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
@@ -1772,16 +1778,17 @@ struct ATHLTHRecoveryView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 0) {
                     ATHLTHTabHero(
                         imageName: "RecoveryHero",
                         title: "Recovery",
                         subtitle: "Use sleep and recovery signals to guide today's load.",
-                        height: 146,
+                        height: 190,
                         alignment: .leading,
                         focalOffsetX: 14
                     )
 
+                    VStack(spacing: 18) {
                     if shouldShowWearableRecoveryContent {
                         ATHLTHPlusFeatureGate(
                             feature: .advancedRecovery,
@@ -2002,7 +2009,9 @@ struct ATHLTHRecoveryView: View {
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
+                }
             }
+            .ignoresSafeArea(edges: .top)
             .refreshable {
                 await health.refreshAll()
             }
@@ -2145,16 +2154,17 @@ struct ATHLTHProgressView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
+                VStack(spacing: 0) {
                     ATHLTHTabHero(
                         imageName: "ProgressHero",
                         title: "Progress",
                         subtitle: "See your training, consistency and health trends.",
-                        height: 150,
+                        height: 190,
                         alignment: .leading,
                         focalOffsetX: 18
                     )
 
+                    VStack(spacing: 14) {
                     if health.hasRequestedAuthorization {
                         periodPicker
 
@@ -2184,10 +2194,13 @@ struct ATHLTHProgressView: View {
                     }
                 }
                 .padding(.horizontal, 16)
+                .padding(.top, 14)
                 .padding(.bottom, 30)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
+                }
             }
+            .ignoresSafeArea(edges: .top)
             .background(canvas.ignoresSafeArea())
             .refreshable {
                 async let selected: Void = loadProgressData()
