@@ -1441,7 +1441,7 @@ struct ATHLTHTrainView: View {
         case .garmin:
             return "Garmin · sync pending"
         case .none:
-            return "No watch"
+            return "iPhone"
         }
     }
 
@@ -1481,12 +1481,7 @@ struct ATHLTHTrainView: View {
             }
 
         case .none:
-            Label(
-                "Route stays available on iPhone",
-                systemImage: "iphone"
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            EmptyView()
         }
     }
 
