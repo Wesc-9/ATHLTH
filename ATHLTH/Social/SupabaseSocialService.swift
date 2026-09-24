@@ -425,12 +425,12 @@ final class SupabaseSocialService {
         )
     }
 
-    func loadFeed() async throws -> [SocialFeedItem] {
+    func loadFeed(limit: Int = 60) async throws -> [SocialFeedItem] {
         let activities: [SocialActivityRecord] = try await client
             .from("social_activities")
             .select()
             .order("created_at", ascending: false)
-            .limit(60)
+            .limit(limit)
             .execute()
             .value
 
