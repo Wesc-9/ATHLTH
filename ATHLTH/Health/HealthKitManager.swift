@@ -501,6 +501,30 @@ final class HealthKitManager: ObservableObject {
             .sorted { $0.startDate > $1.startDate }
     }
 
+    func activeWorkoutDays(
+        startDate: Date,
+        endDate: Date
+    ) async throws -> [Date] {
+        guard startDate <= endDate else {
+            return []
+        }
+
+        let workouts = try await fetchWorkouts(
+            startDate: startDate,
+            endDate: endDate
+        )
+        let calendar = Calendar.current
+
+        return Array(
+            Set(
+                workouts.map {
+                    calendar.startOfDay(for: $0.startDate)
+                }
+            )
+        )
+        .sorted()
+    }
+
     func progressSnapshot(
         startDate: Date,
         endDate: Date,
