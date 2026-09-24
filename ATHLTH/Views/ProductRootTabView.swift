@@ -90,9 +90,11 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var community: CommunityEventStore
 
     @State private var homeStreakDays: [Date]?
-    @State private var showingGoalCreation = false
+    @State private var homeWeekSnapshot: HealthProgressSnapshot?
+    @State private var homeWeekLoading = false
 
     var body: some View {
         NavigationStack {
@@ -277,11 +279,21 @@ struct ATHLTHHomeView: View {
                         }
                     }
 
+                    if let nextUp = homeNextUp {
+                        homeNextUpCard(nextUp)
+                    }
+
+                    HomeWeeklyTrendsCard(
+                        snapshot: homeWeekSnapshot,
+                        isLoading: homeWeekLoading,
+                        hasHealthAccess: health.hasRequestedAuthorization
+                    )
+
                     HomeCurrentStreakCard(activeWorkoutDays: homeStreakDays)
 
-                    homeGoalsCard
-
                     HomeActivitySection()
+
+                    HomeAroundYouSection()
 
                     if let insight = homeInsight {
                         ATHLTHCard {
@@ -334,6 +346,7 @@ struct ATHLTHHomeView: View {
             )
             .refreshable {
                 async let streakRefresh: Void = loadHomeStreak()
+                async let communityRefresh: Void = community.refresh()
 
                 if !health.shouldDeferAutomaticHealthWork {
                     async let healthRefresh: Void = health.refreshAll()
@@ -342,17 +355,24 @@ struct ATHLTHHomeView: View {
                         strength: strengthWorkout
                     )
                     _ = await (healthRefresh, goalsRefresh)
+                    await loadHomeWeek()
+                } else {
+                    homeWeekSnapshot = nil
                 }
 
-                _ = await streakRefresh
+                _ = await (streakRefresh, communityRefresh)
             }
             .task {
                 // Streak only reads workout dates, so it can safely load even
                 // on the post-update safe launch where the heavier Health
                 // refresh is intentionally deferred.
+                async let communityRefresh: Void = community.refresh()
                 await loadHomeStreak()
 
-                guard !health.shouldDeferAutomaticHealthWork else { return }
+                guard !health.shouldDeferAutomaticHealthWork else {
+                    _ = await communityRefresh
+                    return
+                }
 
                 if health.lastSuccessfulRefreshAt == nil {
                     await health.refreshAll()
@@ -361,11 +381,14 @@ struct ATHLTHHomeView: View {
                 // Refresh once more after the full Health sync in case a
                 // workout was added while ATHLTH was launching.
                 await loadHomeStreak()
+                await loadHomeWeek()
 
                 await goalStore.refreshAutomaticMilestones(
                     health: health,
                     strength: strengthWorkout
                 )
+
+                _ = await communityRefresh
             }
             .onChange(of: strengthWorkout.workoutHistory.count) {
                 Task {
@@ -377,9 +400,6 @@ struct ATHLTHHomeView: View {
                     await loadHomeStreak()
                 }
             }
-        }
-        .sheet(isPresented: $showingGoalCreation) {
-            GoalCreationView()
         }
     }
 
@@ -429,6 +449,48 @@ struct ATHLTHHomeView: View {
         }
 
         homeStreakDays = Array(activeDays).sorted()
+    }
+
+    @MainActor
+    private func loadHomeWeek() async {
+        guard health.hasRequestedAuthorization,
+              !health.shouldDeferAutomaticHealthWork
+        else {
+            homeWeekSnapshot = nil
+            return
+        }
+
+        homeWeekLoading = true
+        defer { homeWeekLoading = false }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let endDate =
+            calendar.date(byAdding: .day, value: 1, to: today) ??
+            Date()
+        let startDate =
+            calendar.date(byAdding: .day, value: -6, to: today) ??
+            today.addingTimeInterval(-6 * 86_400)
+        let previousEndDate = startDate
+        let previousStartDate =
+            calendar.date(
+                byAdding: .day,
+                value: -7,
+                to: previousEndDate
+            ) ??
+            previousEndDate.addingTimeInterval(-7 * 86_400)
+
+        do {
+            homeWeekSnapshot = try await health.progressSnapshot(
+                startDate: startDate,
+                endDate: endDate,
+                previousStartDate: previousStartDate,
+                previousEndDate: previousEndDate,
+                grouping: .day
+            )
+        } catch {
+            homeWeekSnapshot = nil
+        }
     }
 
     private var homeInboxUnreadCount: Int {
@@ -664,165 +726,124 @@ struct ATHLTHHomeView: View {
         return "Short night"
     }
 
-    private var homeGoalsCard: some View {
+    private var homeNextUp: HomeNextUpItem? {
+        let now = Date()
+        let horizon = now.addingTimeInterval(24 * 60 * 60)
+
+        var candidates: [HomeNextUpItem] = []
+
+        if let plan = session.activePlan {
+            for week in plan.weeks {
+                for day in week.days {
+                    for workout in day.sessions {
+                        guard let start = workout.scheduledStart,
+                              start >= now,
+                              start <= horizon
+                        else {
+                            continue
+                        }
+
+                        candidates.append(
+                            .workout(
+                                planID: plan.id,
+                                workout: workout
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        for event in community.upcomingEvents {
+            guard event.event.startsAt <= horizon,
+                  event.event.creatorID == session.profile.userID ||
+                    community.isJoined(event)
+            else {
+                continue
+            }
+
+            candidates.append(.event(event))
+        }
+
+        return candidates.min {
+            $0.date < $1.date
+        }
+    }
+
+    @ViewBuilder
+    private func homeNextUpCard(
+        _ item: HomeNextUpItem
+    ) -> some View {
+        switch item {
+        case .workout(let planID, let workout):
+            NavigationLink {
+                PlannedWorkoutDetailView(
+                    planID: planID,
+                    workout: workout,
+                    isHealthCompleted: false
+                )
+            } label: {
+                homeNextUpContent(item)
+            }
+            .buttonStyle(.plain)
+
+        case .event(let event):
+            NavigationLink {
+                CommunityEventDetailView(eventID: event.id)
+            } label: {
+                homeNextUpContent(item)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func homeNextUpContent(
+        _ item: HomeNextUpItem
+    ) -> some View {
         ATHLTHCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Goals")
-                        .font(.title3.weight(.bold))
-                    Text("Keep your biggest targets visible.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            HStack(spacing: 13) {
+                Image(systemName: item.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(item.tint)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        item.tint.opacity(0.10),
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("NEXT UP")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.3)
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep.opacity(0.72)
+                        )
+
+                    Text(item.title)
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+
+                    Text(
+                        item.date.formatted(
+                            date: .abbreviated,
+                            time: .shortened
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
                 Spacer()
 
-                NavigationLink {
-                    GoalsHubView()
-                } label: {
-                    Text("See All")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                }
-
-                Button {
-                    showingGoalCreation = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 34, height: 34)
-                        .background(ATHLTHTheme.accentSoft, in: Circle())
-                }
-                .buttonStyle(.plain)
-            }
-
-            if let primary = goalStore.primaryGoal {
-                Text("PRIMARY")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 2)
-
-                NavigationLink {
-                    GoalDetailView(goalID: primary.id)
-                } label: {
-                    homeGoalRow(primary)
-                }
-                .buttonStyle(.plain)
-
-                let secondary = goalStore.activeGoals
-                    .filter { !$0.isPrimary }
-                    .prefix(2)
-
-                ForEach(Array(secondary)) { goal in
-                    Divider().overlay(Color.black.opacity(0.05))
-
-                    NavigationLink {
-                        GoalDetailView(goalID: goal.id)
-                    } label: {
-                        homeGoalRow(goal)
-                    }
-                    .buttonStyle(.plain)
-                }
-            } else {
-                VStack(spacing: 10) {
-                    Image(systemName: "target")
-                        .font(.title2)
-                        .foregroundStyle(ATHLTHTheme.accent)
-
-                    Text("Create your first goal")
-                        .font(.subheadline.weight(.semibold))
-
-                    Text("Set a target and milestones, then keep progress visible from Home.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-
-                    Button("Add Goal") {
-                        showingGoalCreation = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accent)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
             }
         }
-    }
-
-    private func homeGoalRow(_ goal: ATHLTHGoal) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: goal.category.systemImage)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
-                .frame(width: 38, height: 38)
-                .background(
-                    ATHLTHTheme.accentSoft,
-                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                )
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(goal.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Text("\(Int((goal.progress * 100).rounded()))%")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                }
-
-                HStack {
-                    Text(homeGoalDeadlineText(goal))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    Text("\(goal.completedMilestones)/\(goal.milestones.count) milestones")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.black.opacity(0.055))
-                        Capsule()
-                            .fill(ATHLTHTheme.accent)
-                            .frame(width: proxy.size.width * goal.progress)
-                    }
-                }
-                .frame(height: 6)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func homeGoalDeadlineText(_ goal: ATHLTHGoal) -> String {
-        guard let deadline = goal.deadline else {
-            return goal.dataSource.title
-        }
-
-        if deadline < Date() {
-            return "Deadline passed"
-        }
-
-        let days = Calendar.current.dateComponents(
-            [.day],
-            from: Calendar.current.startOfDay(for: Date()),
-            to: Calendar.current.startOfDay(for: deadline)
-        ).day ?? 0
-
-        if days == 0 { return "Today" }
-        if days == 1 { return "1 day left" }
-        return "\(days) days left"
     }
 
     private var homeInsight: (
@@ -874,6 +895,54 @@ struct ATHLTHHomeView: View {
         }
 
         return nil
+    }
+}
+
+private enum HomeNextUpItem {
+    case workout(planID: UUID, workout: PlannedSession)
+    case event(CommunityEventItem)
+
+    var date: Date {
+        switch self {
+        case .workout(_, let workout):
+            return workout.scheduledStart ?? .distantFuture
+        case .event(let event):
+            return event.event.startsAt
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .workout(_, let workout):
+            return workout.title
+        case .event(let event):
+            return event.event.title
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .workout(_, let workout):
+            return workout.kind.systemImage
+        case .event(let event):
+            return event.event.activityType.systemImage
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .workout(_, let workout):
+            switch workout.kind {
+            case .running: return .green
+            case .walking: return .blue
+            case .strength: return .purple
+            case .mobility: return .teal
+            case .recovery: return .indigo
+            case .custom: return ATHLTHTheme.accent
+            }
+        case .event:
+            return .purple
+        }
     }
 }
 
