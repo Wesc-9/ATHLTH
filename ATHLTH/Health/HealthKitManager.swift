@@ -793,8 +793,10 @@ final class HealthKitManager: ObservableObject {
             longestWorkoutActivity: longestWorkout.map {
                 WorkoutActivity(healthKitType: $0.workoutActivityType)
             },
-            longestWorkoutDistanceMeters: longestDistanceWorkout?.totalDistance?
-                .doubleValue(for: .meter()),
+            longestWorkoutDistanceMeters: Self.safeDoubleValue(
+                longestDistanceWorkout?.totalDistance,
+                unit: .meter()
+            ),
             longestWorkoutDistanceDate: longestDistanceWorkout?.startDate,
             longestWorkoutDistanceActivity: longestDistanceWorkout.map {
                 WorkoutActivity(healthKitType: $0.workoutActivityType)
@@ -2163,7 +2165,7 @@ final class HealthKitManager: ObservableObject {
                 }
 
                 continuation.resume(
-                    returning: (sample.Self.safeDoubleValue(quantity, unit: unit) ?? 0, sample.endDate)
+                    returning: (Self.safeDoubleValue(sample.quantity, unit: unit) ?? 0, sample.endDate)
                 )
             }
 
@@ -2201,7 +2203,7 @@ final class HealthKitManager: ObservableObject {
                 }
 
                 continuation.resume(
-                    returning: (sample.Self.safeDoubleValue(quantity, unit: unit) ?? 0, sample.endDate)
+                    returning: (Self.safeDoubleValue(sample.quantity, unit: unit) ?? 0, sample.endDate)
                 )
             }
 
@@ -2236,7 +2238,7 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
 
-        let values = samples.map { $0.Self.safeDoubleValue(quantity, unit: unit) ?? 0 }
+        let values = samples.map { Self.safeDoubleValue($0.quantity, unit: unit) ?? 0 }
         guard !values.isEmpty else { return (nil, nil) }
 
         return (
