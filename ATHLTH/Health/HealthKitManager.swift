@@ -2223,21 +2223,84 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
 
-        var durations: [Date: TimeInterval] = [:]
-
-        for sample in samples {
-            guard sample.endDate >= startDate && sample.endDate <= endDate,
-                  let value = HKCategoryValueSleepAnalysis(rawValue: sample.value)
-            else {
-                continue
+        let asleepSamples = samples.filter { sample in
+            guard let value = HKCategoryValueSleepAnalysis(rawValue: sample.value) else {
+                return false
             }
 
             switch value {
             case .asleepCore, .asleepDeep, .asleepREM, .asleepUnspecified:
-                let wakeDay = calendar.startOfDay(for: sample.endDate)
-                durations[wakeDay, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
+                return sample.endDate > sample.startDate
             default:
+                return false
+            }
+        }
+        .sorted { $0.startDate < $1.startDate }
+
+        guard !asleepSamples.isEmpty else { return [:] }
+
+        func mergedDuration(_ input: [HKCategorySample]) -> TimeInterval {
+            let sorted = input.sorted { $0.startDate < $1.startDate }
+            guard let first = sorted.first else { return 0 }
+
+            var total: TimeInterval = 0
+            var currentStart = first.startDate
+            var currentEnd = first.endDate
+
+            for sample in sorted.dropFirst() {
+                if sample.startDate <= currentEnd {
+                    currentEnd = max(currentEnd, sample.endDate)
+                } else {
+                    total += currentEnd.timeIntervalSince(currentStart)
+                    currentStart = sample.startDate
+                    currentEnd = sample.endDate
+                }
+            }
+
+            total += currentEnd.timeIntervalSince(currentStart)
+            return max(total, 0)
+        }
+
+        // Build complete sleep sessions first. A normal awake period inside a
+        // night does not create a new session, while a long daytime gap does.
+        var sessions: [[HKCategorySample]] = []
+
+        for sample in asleepSamples {
+            guard !sessions.isEmpty else {
+                sessions.append([sample])
                 continue
+            }
+
+            let currentIndex = sessions.index(before: sessions.endIndex)
+            let latestEnd = sessions[currentIndex]
+                .map(\.endDate)
+                .max() ?? sample.startDate
+
+            if sample.startDate.timeIntervalSince(latestEnd) <= 2 * 60 * 60 {
+                sessions[currentIndex].append(sample)
+            } else {
+                sessions.append([sample])
+            }
+        }
+
+        // Tie the complete session to its wake-up day. If a nap and an
+        // overnight sleep end on the same day, keep the longer session for
+        // sleep trends/recovery instead of inflating the nightly duration.
+        var durations: [Date: TimeInterval] = [:]
+
+        for session in sessions {
+            guard let wakeTime = session.map(\.endDate).max(),
+                  wakeTime >= startDate,
+                  wakeTime <= endDate
+            else {
+                continue
+            }
+
+            let wakeDay = calendar.startOfDay(for: wakeTime)
+            let duration = mergedDuration(session)
+
+            if duration > (durations[wakeDay] ?? 0) {
+                durations[wakeDay] = duration
             }
         }
 
