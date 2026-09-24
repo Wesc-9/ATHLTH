@@ -4247,9 +4247,7 @@ struct ATHLTHProfileView: View {
                 trainingIdentityCard
                 ProfileGearSummaryView()
 
-                if settings.showWorkoutHistoryOnProfile {
-                    WorkoutHistoryPreviewSection()
-                }
+                WorkoutHistoryPreviewSection()
 
                 goalsAndTrophies
 
