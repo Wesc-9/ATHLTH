@@ -91,6 +91,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var community: CommunityEventStore
+    @EnvironmentObject private var social: SocialStore
 
     @State private var homeStreakDays: [Date]?
     @State private var homeWeekSnapshot: HealthProgressSnapshot?
@@ -104,112 +105,117 @@ struct ATHLTHHomeView: View {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
                         imageName: "HomeHero",
-                            title: greetingTitle,
-                            subtitle: session.profile.presence.state == .training
+                        title: greetingTitle,
+                        subtitle:
+                            session.profile.presence.state == .training
                                 ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
-                                : "Your health and training at a glance.",
-                            height: 190,
-                            alignment: .leading,
-                            focalOffsetX: 18,
-                            focalOffsetY: 14
+                                : "Today, training and recovery at a glance.",
+                        height: 190,
+                        alignment: .leading,
+                        focalOffsetX: 18,
+                        focalOffsetY: 14
+                    )
+
+                    HStack(spacing: 8) {
+                        NavigationLink {
+                            SocialHubView(initialTab: .messages)
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(
+                                    systemName:
+                                        homeInboxUnreadCount > 0
+                                            ? "tray.full.fill"
+                                            : "tray"
+                                )
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 38, height: 38)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(.white.opacity(0.38), lineWidth: 1)
+                                }
+
+                                if homeInboxUnreadCount > 0 {
+                                    Text(homeInboxBadgeText)
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(minWidth: 14, minHeight: 14)
+                                        .padding(
+                                            .horizontal,
+                                            homeInboxUnreadCount > 9 ? 2 : 0
+                                        )
+                                        .background(.red, in: Capsule())
+                                        .overlay {
+                                            Capsule()
+                                                .stroke(.white, lineWidth: 1)
+                                        }
+                                        .offset(x: 4, y: -4)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            homeInboxUnreadCount > 0
+                                ? "Inbox, \(homeInboxUnreadCount) unread"
+                                : "Inbox"
                         )
 
-                        HStack(spacing: 8) {
-                            NavigationLink {
-                                SocialHubView(initialTab: .messages)
-                            } label: {
-                                ZStack(alignment: .topTrailing) {
-                                    Image(
-                                        systemName:
-                                            homeInboxUnreadCount > 0
-                                                ? "tray.full.fill"
-                                                : "tray"
-                                    )
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 38, height: 38)
-                                    .background(.ultraThinMaterial, in: Circle())
-                                    .overlay {
-                                        Circle()
-                                            .stroke(.white.opacity(0.38), lineWidth: 1)
-                                    }
+                        NavigationLink {
+                            ATHLTHNotificationCenterView()
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(
+                                    systemName:
+                                        notifications.unreadCount > 0
+                                            ? "bell.fill"
+                                            : "bell"
+                                )
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 38, height: 38)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(.white.opacity(0.38), lineWidth: 1)
+                                }
 
-                                    if homeInboxUnreadCount > 0 {
-                                        Text(homeInboxBadgeText)
-                                            .font(.system(size: 8, weight: .bold))
-                                            .foregroundStyle(.white)
-                                            .frame(minWidth: 14, minHeight: 14)
-                                            .padding(.horizontal, homeInboxUnreadCount > 9 ? 2 : 0)
-                                            .background(.red, in: Capsule())
-                                            .overlay {
-                                                Capsule()
-                                                    .stroke(.white, lineWidth: 1)
-                                            }
-                                            .offset(x: 4, y: -4)
-                                    }
+                                if notifications.unreadCount > 0 {
+                                    Circle()
+                                        .fill(.red)
+                                        .frame(width: 9, height: 9)
+                                        .overlay {
+                                            Circle()
+                                                .stroke(.white, lineWidth: 1.5)
+                                        }
+                                        .offset(x: 1, y: -1)
                                 }
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                homeInboxUnreadCount > 0
-                                    ? "Inbox, \(homeInboxUnreadCount) unread"
-                                    : "Inbox"
-                            )
-
-                            NavigationLink {
-                                ATHLTHNotificationCenterView()
-                            } label: {
-                                ZStack(alignment: .topTrailing) {
-                                    Image(
-                                        systemName:
-                                            notifications.unreadCount > 0
-                                                ? "bell.fill"
-                                                : "bell"
-                                    )
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 38, height: 38)
-                                    .background(.ultraThinMaterial, in: Circle())
-                                    .overlay {
-                                        Circle()
-                                            .stroke(.white.opacity(0.38), lineWidth: 1)
-                                    }
-
-                                    if notifications.unreadCount > 0 {
-                                        Circle()
-                                            .fill(.red)
-                                            .frame(width: 9, height: 9)
-                                            .overlay {
-                                                Circle().stroke(.white, lineWidth: 1.5)
-                                            }
-                                            .offset(x: 1, y: -1)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                notifications.unreadCount > 0
-                                    ? "Notifications, \(notifications.unreadCount) unread"
-                                    : "Notifications"
-                            )
-
-                            NavigationLink {
-                                ATHLTHProfileView()
-                            } label: {
-                                homeProfileShortcut
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Profile")
                         }
-                        .padding(.top, 52)
-                        .padding(.trailing, 12)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            notifications.unreadCount > 0
+                                ? "Notifications, \(notifications.unreadCount) unread"
+                                : "Notifications"
+                        )
+
+                        NavigationLink {
+                            ATHLTHProfileView()
+                        } label: {
+                            homeProfileShortcut
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Profile")
+                    }
+                    .padding(.top, 52)
+                    .padding(.trailing, 12)
                 }
             } content: {
-                VStack(spacing: 18) {
+                LazyVStack(spacing: 18) {
                     ATHLTHCard {
-                        HStack(alignment: .firstTextBaseline) {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Your Day")
+                                Text("Daily Pulse")
                                     .font(.title3.weight(.bold))
                                 Text(homeHealthSourceText)
                                     .font(.caption)
@@ -218,25 +224,43 @@ struct ATHLTHHomeView: View {
 
                             Spacer()
 
-                            if health.isRefreshing {
+                            if homeStreakDays == nil {
                                 ProgressView()
                                     .controlSize(.small)
-                            } else if let refreshed = health.lastSuccessfulRefreshAt {
-                                Text(refreshed, style: .relative)
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
+                            } else {
+                                Label(
+                                    homeStreakCount > 0
+                                        ? "\(homeStreakCount) day streak"
+                                        : "Start your streak",
+                                    systemImage: "flame.fill"
+                                )
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(
+                                    homeStreakCount > 0
+                                        ? Color.orange
+                                        : ATHLTHTheme.mutedText
+                                )
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 6)
+                                .background(
+                                    (homeStreakCount > 0
+                                        ? Color.orange.opacity(0.09)
+                                        : ATHLTHTheme.surfaceStone),
+                                    in: Capsule()
+                                )
                             }
                         }
 
                         if shouldShowAnyDaySummary {
-                            HStack(alignment: .top, spacing: 10) {
+                            HStack(alignment: .top, spacing: 9) {
                                 if shouldShowMoveSummary {
                                     HomeDayStatus(
                                         title: "Move",
                                         value: moveValue,
                                         subtitle: moveSubtitle,
                                         icon: "flame.fill",
-                                        progress: moveProgress
+                                        progress: moveProgress,
+                                        tint: .orange
                                     )
                                 }
 
@@ -248,7 +272,8 @@ struct ATHLTHHomeView: View {
                                         icon: health.recovery.state.systemImage,
                                         progress: health.recovery.score.map {
                                             Double($0) / 100
-                                        }
+                                        },
+                                        tint: ATHLTHTheme.recoveryBlue
                                     )
                                 }
 
@@ -258,25 +283,70 @@ struct ATHLTHHomeView: View {
                                         value: sleepValue,
                                         subtitle: sleepSubtitle,
                                         icon: "moon.fill",
-                                        progress: health.sleep.totalAsleep > 0
-                                            ? min(health.sleep.totalAsleep / (8 * 3_600), 1)
-                                            : nil
+                                        progress:
+                                            health.sleep.totalAsleep > 0
+                                                ? min(
+                                                    health.sleep.totalAsleep /
+                                                        (8 * 3_600),
+                                                    1
+                                                )
+                                                : nil,
+                                        tint: .purple
                                     )
                                 }
                             }
                             .padding(.top, 14)
                         } else {
                             HStack(alignment: .top, spacing: 10) {
-                                Image(systemName: health.hasRequestedAuthorization ? "heart.text.square" : "iphone")
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .frame(width: 28)
+                                Image(
+                                    systemName:
+                                        health.hasRequestedAuthorization
+                                            ? "heart.text.square"
+                                            : "iphone"
+                                )
+                                .foregroundStyle(ATHLTHTheme.vitality)
+                                .frame(width: 28)
 
                                 Text(homeNoHealthDetail)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
                             }
-                            .padding(.top, 12)
+                            .padding(.top, 14)
+                        }
+
+                        if let insight = homeInsight {
+                            Divider()
+                                .padding(.vertical, 12)
+
+                            HStack(alignment: .top, spacing: 11) {
+                                Image(systemName: insight.icon)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(ATHLTHTheme.vitality)
+                                    .frame(width: 34, height: 34)
+                                    .background(
+                                        ATHLTHTheme.vitalitySoft,
+                                        in: RoundedRectangle(
+                                            cornerRadius: 11,
+                                            style: .continuous
+                                        )
+                                    )
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(insight.title)
+                                        .font(.subheadline.weight(.semibold))
+
+                                    Text(insight.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(3)
+                                }
+
+                                Spacer()
+                            }
                         }
                     }
 
@@ -284,87 +354,62 @@ struct ATHLTHHomeView: View {
                         homeNextUpCard(nextUp)
                     }
 
+                    HomeActivitySection()
+
                     HomeWeeklyTrendsCard(
                         snapshot: homeWeekSnapshot,
                         isLoading: homeWeekLoading,
                         hasHealthAccess: health.hasRequestedAuthorization
                     )
-
-                    HomeCurrentStreakCard(activeWorkoutDays: homeStreakDays)
-
-                    HomeActivitySection()
-
-                    HomeAroundYouSection()
-
-                    if let insight = homeInsight {
-                        ATHLTHCard {
-                            HStack(alignment: .top, spacing: 14) {
-                                Image(systemName: insight.icon)
-                                    .font(.title2)
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .frame(width: 46, height: 46)
-                                    .background(
-                                        ATHLTHTheme.accentSoft,
-                                        in: RoundedRectangle(
-                                            cornerRadius: 14,
-                                            style: .continuous
-                                        )
-                                    )
-
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text("For You")
-                                        .font(.caption.weight(.semibold))
-                                        .tracking(1.4)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-
-                                    Text(insight.title)
-                                        .font(.headline)
-
-                                    Text(insight.detail)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(
-                                            horizontal: false,
-                                            vertical: true
-                                        )
-                                }
-
-                                Spacer()
-                            }
+                    .task {
+                        if homeWeekSnapshot == nil &&
+                            !homeWeekLoading &&
+                            !health.shouldDeferAutomaticHealthWork {
+                            await loadHomeWeek()
                         }
                     }
+
+                    HomeAroundYouSection()
                 }
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
             .refreshable {
-                async let streakRefresh: Void = loadHomeStreak()
                 async let communityRefresh: Void = community.refresh()
+                async let activityRefresh: Void =
+                    social.refreshHomeFeed(force: true)
 
                 if !health.shouldDeferAutomaticHealthWork {
-                    async let healthRefresh: Void = health.refreshAll()
-                    async let goalsRefresh: Void = goalStore.refreshAutomaticMilestones(
-                        health: health,
-                        strength: strengthWorkout
+                    await health.refreshAll()
+
+                    async let streakRefresh: Void = loadHomeStreak()
+                    async let weekRefresh: Void = loadHomeWeek()
+                    async let goalsRefresh: Void =
+                        goalStore.refreshAutomaticMilestones(
+                            health: health,
+                            strength: strengthWorkout
+                        )
+
+                    _ = await (
+                        streakRefresh,
+                        weekRefresh,
+                        goalsRefresh
                     )
-                    _ = await (healthRefresh, goalsRefresh)
-                    await loadHomeWeek()
                 } else {
                     homeWeekSnapshot = nil
+                    await loadHomeStreak()
                 }
 
-                _ = await (streakRefresh, communityRefresh)
+                _ = await (communityRefresh, activityRefresh)
             }
             .task {
-                // Streak only reads workout dates, so it can safely load even
-                // on the post-update safe launch where the heavier Health
-                // refresh is intentionally deferred.
                 async let communityRefresh: Void = community.refresh()
-                await loadHomeStreak()
+                async let activityRefresh: Void = social.refreshHomeFeed()
 
                 guard !health.shouldDeferAutomaticHealthWork else {
-                    _ = await communityRefresh
+                    await loadHomeStreak()
+                    _ = await (communityRefresh, activityRefresh)
                     return
                 }
 
@@ -372,17 +417,19 @@ struct ATHLTHHomeView: View {
                     await health.refreshAll()
                 }
 
-                // Refresh once more after the full Health sync in case a
-                // workout was added while ATHLTH was launching.
-                await loadHomeStreak()
-                await loadHomeWeek()
+                async let streakRefresh: Void = loadHomeStreak()
+                async let goalsRefresh: Void =
+                    goalStore.refreshAutomaticMilestones(
+                        health: health,
+                        strength: strengthWorkout
+                    )
 
-                await goalStore.refreshAutomaticMilestones(
-                    health: health,
-                    strength: strengthWorkout
+                _ = await (
+                    streakRefresh,
+                    goalsRefresh,
+                    communityRefresh,
+                    activityRefresh
                 )
-
-                _ = await communityRefresh
             }
             .onChange(of: strengthWorkout.workoutHistory.count) {
                 Task {
@@ -493,6 +540,55 @@ struct ATHLTHHomeView: View {
 
     private var homeInboxBadgeText: String {
         homeInboxUnreadCount > 99 ? "99+" : "\(homeInboxUnreadCount)"
+    }
+
+    private var homeStreakCount: Int {
+        guard let homeStreakDays,
+              !homeStreakDays.isEmpty
+        else {
+            return 0
+        }
+
+        let calendar = Calendar.current
+        let active = Set(
+            homeStreakDays.map {
+                calendar.startOfDay(for: $0)
+            }
+        )
+        let today = calendar.startOfDay(for: Date())
+
+        let startDay: Date
+        if active.contains(today) {
+            startDay = today
+        } else if let yesterday = calendar.date(
+            byAdding: .day,
+            value: -1,
+            to: today
+        ),
+        active.contains(yesterday) {
+            startDay = yesterday
+        } else {
+            return 0
+        }
+
+        var streak = 0
+        var cursor = startDay
+
+        while active.contains(cursor) {
+            streak += 1
+
+            guard let previous = calendar.date(
+                byAdding: .day,
+                value: -1,
+                to: cursor
+            ) else {
+                break
+            }
+
+            cursor = previous
+        }
+
+        return streak
     }
 
     @ViewBuilder
@@ -946,15 +1042,16 @@ private struct HomeDayStatus: View {
     let subtitle: String
     let icon: String
     let progress: Double?
+    var tint: Color = ATHLTHTheme.accent
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
+                .foregroundStyle(tint)
                 .frame(width: 30, height: 30)
                 .background(
-                    ATHLTHTheme.accentSoft,
+                    tint.opacity(0.10),
                     in: RoundedRectangle(
                         cornerRadius: 10,
                         style: .continuous
@@ -982,7 +1079,7 @@ private struct HomeDayStatus: View {
 
             if let progress {
                 ProgressView(value: progress)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(tint)
             } else {
                 Capsule()
                     .fill(ATHLTHTheme.border)
@@ -996,7 +1093,14 @@ private struct HomeDayStatus: View {
             alignment: .topLeading
         )
         .background(
-            Color.white.opacity(0.72),
+            LinearGradient(
+                colors: [
+                    tint.opacity(0.055),
+                    ATHLTHTheme.cardWarm.opacity(0.62)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
                 cornerRadius: 18,
                 style: .continuous
