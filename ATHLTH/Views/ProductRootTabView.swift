@@ -579,47 +579,7 @@ struct ATHLTHHomeView: View {
         homeStreakDays = Array(activeDays).sorted()
     }
 
-    @MainActor
-    private func loadHomeWeek() async {
-        guard health.hasRequestedAuthorization,
-              !health.shouldDeferAutomaticHealthWork
-        else {
-            homeWeekSnapshot = nil
-            return
-        }
 
-        homeWeekLoading = true
-        defer { homeWeekLoading = false }
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let endDate =
-            calendar.date(byAdding: .day, value: 1, to: today) ??
-            Date()
-        let startDate =
-            calendar.date(byAdding: .day, value: -6, to: today) ??
-            today.addingTimeInterval(-6 * 86_400)
-        let previousEndDate = startDate
-        let previousStartDate =
-            calendar.date(
-                byAdding: .day,
-                value: -7,
-                to: previousEndDate
-            ) ??
-            previousEndDate.addingTimeInterval(-7 * 86_400)
-
-        do {
-            homeWeekSnapshot = try await health.progressSnapshot(
-                startDate: startDate,
-                endDate: endDate,
-                previousStartDate: previousStartDate,
-                previousEndDate: previousEndDate,
-                grouping: .day
-            )
-        } catch {
-            homeWeekSnapshot = nil
-        }
-    }
 
     private var homeInboxUnreadCount: Int {
         messaging.unreadCount + messaging.messageRequestCount
@@ -901,6 +861,463 @@ struct ATHLTHHomeView: View {
         }
 
         return "Short night"
+    }
+
+    private var shouldShowGettingStarted: Bool {
+        !health.hasRequestedAuthorization ||
+        session.activePlan == nil ||
+        goalStore.activeGoals.isEmpty
+    }
+
+    private var readinessTint: Color {
+        switch health.recovery.state {
+        case .ready:
+            return ATHLTHTheme.vitality
+        case .balanced:
+            return ATHLTHTheme.recoveryBlue
+        case .takeItEasy:
+            return .orange
+        case .recover:
+            return .red
+        case .buildingBaseline:
+            return ATHLTHTheme.mutedText
+        }
+    }
+
+    private var homeTodayPlanWorkout: (
+        planID: UUID,
+        workout: PlannedSession
+    )? {
+        guard let plan = session.activePlan else { return nil }
+
+        let sessions = homeTodaySessions(in: plan)
+
+        guard let workout = sessions.first else {
+            return nil
+        }
+
+        return (plan.id, workout)
+    }
+
+    @ViewBuilder
+    private var homeTodayCard: some View {
+        ATHLTHCard {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Today")
+                        .font(.title3.weight(.bold))
+
+                    Text(
+                        session.activePlan?.title ??
+                        "Choose what you want to train."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Spacer()
+
+                if session.activePlan != nil {
+                    Button("Train") {
+                        onSelectTab(1)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if let active = strengthWorkout.activeWorkout {
+                HStack(spacing: 13) {
+                    Image(systemName: "dumbbell.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.purple)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            Color.purple.opacity(0.10),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("WORKOUT IN PROGRESS")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Text(active.title)
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+
+                        Text(active.startedAt, style: .timer)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 14)
+
+                Button {
+                    showingHomeStrengthWorkout = true
+                } label: {
+                    Label("Continue Workout", systemImage: "play.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+                .padding(.top, 12)
+            } else if let selection = homeTodayPlanWorkout {
+                let workout = selection.workout
+
+                HStack(spacing: 13) {
+                    Image(systemName: workout.kind.systemImage)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(homeWorkoutTint(workout.kind))
+                        .frame(width: 46, height: 46)
+                        .background(
+                            homeWorkoutTint(workout.kind).opacity(0.10),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("TODAY'S WORKOUT")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Text(workout.title)
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+
+                        Text(homeSessionSummary(workout))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 14)
+
+                if homeCanStartDirectly(workout) {
+                    Button {
+                        startHomeWorkout(workout)
+                    } label: {
+                        Label("Start Workout", systemImage: "play.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .padding(.top, 12)
+                } else {
+                    NavigationLink {
+                        PlannedWorkoutDetailView(
+                            planID: selection.planID,
+                            workout: workout,
+                            isHealthCompleted: false
+                        )
+                    } label: {
+                        Label("Open Workout", systemImage: "arrow.right")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .padding(.top, 12)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            ATHLTHTheme.vitalitySoft,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(
+                            session.activePlan == nil
+                                ? "No workout planned"
+                                : "Recovery day"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Text(
+                            session.activePlan == nil
+                                ? "Quick start a session or build a plan."
+                                : "Nothing is scheduled today. Train if you feel ready."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 14)
+
+                HStack(spacing: 10) {
+                    homeQuickStartButton(
+                        title: "Run",
+                        icon: "figure.run",
+                        tint: .green
+                    ) {
+                        pendingHomePlanSession = nil
+                        pendingHomeQuickStartKind = .running
+                    }
+
+                    homeQuickStartButton(
+                        title: "Strength",
+                        icon: "dumbbell.fill",
+                        tint: .purple
+                    ) {
+                        selectedHomeStrengthSession =
+                            homeFreestyleStrengthSession
+                    }
+                }
+                .padding(.top, 12)
+            }
+        }
+    }
+
+    private var homeFreestyleStrengthSession: PlannedSession {
+        PlannedSession(
+            id: UUID(),
+            title: "Freestyle Strength",
+            kind: .strength,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: "Freestyle gym session",
+            runningWorkout: nil
+        )
+    }
+
+    private func homeTodaySessions(
+        in plan: TrainingPlan
+    ) -> [PlannedSession] {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: Date())
+        let dayIndex = ((weekday + 5) % 7) + 1
+
+        let week: TrainingPlanWeek?
+
+        if let startDate = plan.startDate {
+            let start = calendar.startOfDay(for: startDate)
+            let today = calendar.startOfDay(for: Date())
+            let days = max(
+                calendar.dateComponents(
+                    [.day],
+                    from: start,
+                    to: today
+                ).day ?? 0,
+                0
+            )
+            let weekIndex = min(
+                days / 7,
+                max(plan.weeks.count - 1, 0)
+            )
+            week = plan.weeks.indices.contains(weekIndex)
+                ? plan.weeks[weekIndex]
+                : plan.weeks.first
+        } else {
+            week = plan.weeks.first
+        }
+
+        return week?
+            .days
+            .first(where: { $0.dayIndex == dayIndex })?
+            .sessions ?? []
+    }
+
+    private func homeSessionSummary(
+        _ workout: PlannedSession
+    ) -> String {
+        var parts: [String] = []
+
+        if let running = workout.runningWorkout {
+            parts.append(running.type.title)
+            if !running.blocks.isEmpty {
+                parts.append("\(running.blocks.count) blocks")
+            }
+        } else if let duration = workout.durationMinutes {
+            parts.append("\(duration) min")
+        }
+
+        if let distance = workout.targetDistanceKilometers {
+            parts.append(
+                String(format: "%.1f km", distance)
+            )
+        }
+
+        if !workout.exercises.isEmpty {
+            parts.append("\(workout.exercises.count) exercises")
+        }
+
+        return parts.isEmpty
+            ? workout.kind.title
+            : parts.joined(separator: " · ")
+    }
+
+    private func homeWorkoutTint(_ kind: WorkoutKind) -> Color {
+        switch kind {
+        case .running: return .green
+        case .walking: return .blue
+        case .strength: return .purple
+        case .mobility: return .teal
+        case .recovery: return .indigo
+        case .custom: return ATHLTHTheme.accentDeep
+        }
+    }
+
+    private func homeCanStartDirectly(
+        _ workout: PlannedSession
+    ) -> Bool {
+        switch workout.kind {
+        case .strength:
+            return strengthWorkout.activeWorkout == nil
+        case .running, .walking:
+            return settings.trainingDeviceProvider == .appleWatch &&
+                watchConnection.isReady &&
+                !watchConnection.workoutLaunchInProgress
+        case .mobility, .recovery, .custom:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private func homeQuickStartButton(
+        title: String,
+        icon: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                Text(title)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .background(
+                tint.opacity(0.08),
+                in: RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+                .stroke(tint.opacity(0.13), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func startHomeWorkout(
+        _ workout: PlannedSession
+    ) {
+        switch workout.kind {
+        case .strength:
+            selectedHomeStrengthSession = workout
+
+        case .running, .walking:
+            pendingHomePlanSession = workout
+            pendingHomeQuickStartKind = workout.kind
+
+        case .mobility, .recovery, .custom:
+            break
+        }
+    }
+
+    private func homeWatchKind(
+        _ kind: WorkoutKind
+    ) -> WatchWorkoutKind? {
+        switch kind {
+        case .running:
+            return .running
+        case .walking:
+            return .walking
+        case .strength:
+            return .strength
+        case .mobility, .recovery, .custom:
+            return nil
+        }
+    }
+
+    private func startHomeQuickWorkoutOnWatch(
+        _ kind: WorkoutKind
+    ) {
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady,
+              let watchKind = homeWatchKind(kind)
+        else {
+            homeWatchTransferError =
+                "Apple Watch is not ready for this workout."
+            return
+        }
+
+        Task {
+            do {
+                try await watchConnection.startWorkoutOnWatch(watchKind)
+                homeWatchTransferMessage =
+                    "\(watchKind.title) started on Apple Watch."
+            } catch {
+                homeWatchTransferError = error.localizedDescription
+            }
+        }
+    }
+
+    private func startHomePlannedWorkoutOnWatch(
+        _ workout: PlannedSession
+    ) {
+        guard let watchKind = homeWatchKind(workout.kind),
+              settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady
+        else {
+            homeWatchTransferError =
+                "Apple Watch is not ready for this workout."
+            return
+        }
+
+        if let routeID = workout.routeID,
+           let route = session.savedRoutes.first(
+                where: { $0.id == routeID }
+           ) {
+            do {
+                try watchConnection.sendRoute(route)
+            } catch {
+                homeWatchTransferError = error.localizedDescription
+                return
+            }
+        }
+
+        Task {
+            do {
+                try await watchConnection.startWorkoutOnWatch(watchKind)
+                session.beginTrainingStatus(for: workout)
+                homeWatchTransferMessage =
+                    "\(workout.title) started on Apple Watch."
+            } catch {
+                homeWatchTransferError = error.localizedDescription
+            }
+        }
     }
 
     private var homeNextUp: HomeNextUpItem? {
