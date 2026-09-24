@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.3.6
+      - release/v1.3.7
     paths:
       - .github/upscale-heroes-trigger
 
@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: release/v1.3.6
+          ref: release/v1.3.7
           fetch-depth: 0
 
       - name: Upscale existing hero images
@@ -64,4 +64,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add             ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg             ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg             ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg             ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg
           git commit -m "Upscale tab hero images for high-resolution displays"
-          git push origin HEAD:release/v1.3.6
+          git push origin HEAD:release/v1.3.7
