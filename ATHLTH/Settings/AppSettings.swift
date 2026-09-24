@@ -280,16 +280,25 @@ final class AppSettingsStore: ObservableObject {
         // ATHLTH currently ships in English with a Light-only interface.
         // Keep the underlying types in place so localization/themes can expand later.
         language = .english
-        measurementPreference = MeasurementPreference(rawValue: defaults.string(forKey: "settings.measurement") ?? "") ?? .metric
+
+        let resolvedMeasurementPreference =
+            MeasurementPreference(
+                rawValue: defaults.string(
+                    forKey: "settings.measurement"
+                ) ?? ""
+            ) ?? .metric
+        measurementPreference = resolvedMeasurementPreference
+
         timeFormatPreference =
             TimeFormatPreference(
                 rawValue: defaults.string(
                     forKey: "settings.timeFormat"
                 ) ?? ""
             )
-            ?? (measurementPreference == .metric
+            ?? (resolvedMeasurementPreference == .metric
                 ? .twentyFourHour
                 : .twelveHour)
+
         appearance = .light
 
         profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .privateOnly
