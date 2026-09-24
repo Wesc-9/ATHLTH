@@ -176,14 +176,29 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         switch kind {
         case .running:
             configuration.activityType = .running
-            configuration.locationType = .outdoor
         case .walking:
             configuration.activityType = .walking
-            configuration.locationType = .outdoor
         case .strength:
             configuration.activityType = .traditionalStrengthTraining
-            configuration.locationType = .indoor
+        case .hiit:
+            configuration.activityType = .highIntensityIntervalTraining
+        case .functional:
+            configuration.activityType = .functionalStrengthTraining
+        case .cycling:
+            configuration.activityType = .cycling
+        case .rowing:
+            configuration.activityType = .rowing
+        case .stairClimbing:
+            configuration.activityType = .stairClimbing
+        case .yoga:
+            configuration.activityType = .yoga
+        case .other:
+            configuration.activityType = .other
         }
+
+        configuration.locationType = kind.usesOutdoorLocation
+            ? .outdoor
+            : .indoor
 
         do {
             try await healthStore.startWatchApp(toHandle: configuration)
