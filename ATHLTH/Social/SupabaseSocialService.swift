@@ -120,6 +120,7 @@ final class SupabaseSocialService {
             discoverable: settings.discoverable,
             allowFriendRequests: settings.allowFriendRequests,
             allowDirectMessages: settings.allowDirectMessages,
+            trainingFocusVisibility: settings.trainingFocusVisibility,
             trainingPresenceVisibility: settings.trainingPresenceVisibility,
             performanceStatsVisibility: settings.performanceStatsVisibility,
             trophyCabinetVisibility: settings.trophyCabinetVisibility,
@@ -202,6 +203,23 @@ final class SupabaseSocialService {
                     reportedID: userID,
                     reason: reason,
                     details: details?.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            )
+            .execute()
+    }
+
+    func syncTrainingFocus(_ focus: TrainingFocus) async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        try await client
+            .from("social_training_focus")
+            .upsert(
+                SocialTrainingFocusRecord(
+                    userID: currentUserID,
+                    focus: focus,
+                    updatedAt: Date()
                 )
             )
             .execute()
@@ -296,6 +314,13 @@ final class SupabaseSocialService {
             updatedAt: rawCard.updatedAt
         )
 
+        let focusRows: [SocialTrainingFocusRecord] = try await client
+            .from("social_training_focus")
+            .select()
+            .eq("user_id", value: userID)
+            .execute()
+            .value
+
         let presenceRows: [SocialPresenceRecord] = try await client
             .from("social_presence")
             .select()
@@ -343,6 +368,7 @@ final class SupabaseSocialService {
 
         return SocialFriendProfile(
             card: card,
+            trainingFocus: focusRows.first?.focus,
             presence: presenceRows.first,
             performance: performanceRows.first,
             trophies: trophyRows.first?.items ?? [],
@@ -731,6 +757,7 @@ private struct SocialPrivacyUpdate: Encodable {
     let discoverable: Bool
     let allowFriendRequests: Bool
     let allowDirectMessages: String
+    let trainingFocusVisibility: String
     let trainingPresenceVisibility: String
     let performanceStatsVisibility: String
     let trophyCabinetVisibility: String
@@ -753,6 +780,7 @@ private struct SocialPrivacyUpdate: Encodable {
         case discoverable
         case allowFriendRequests = "allow_friend_requests"
         case allowDirectMessages = "allow_direct_messages"
+        case trainingFocusVisibility = "training_focus_visibility"
         case trainingPresenceVisibility = "training_presence_visibility"
         case performanceStatsVisibility = "performance_stats_visibility"
         case trophyCabinetVisibility = "trophy_cabinet_visibility"
