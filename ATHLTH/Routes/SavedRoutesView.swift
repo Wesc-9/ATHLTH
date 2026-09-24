@@ -6,8 +6,19 @@ struct SavedRoutesView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
+    let selectionTitle: String?
+    let onSelect: ((TrainingRoute) -> Void)?
+
     @State private var watchMessage: String?
     @State private var watchError: String?
+
+    init(
+        selectionTitle: String? = nil,
+        onSelect: ((TrainingRoute) -> Void)? = nil
+    ) {
+        self.selectionTitle = selectionTitle
+        self.onSelect = onSelect
+    }
 
     var body: some View {
         ScrollView {
@@ -36,7 +47,7 @@ struct SavedRoutesView: View {
             )
             .ignoresSafeArea()
         )
-        .navigationTitle("Routes")
+        .navigationTitle(selectionTitle ?? "Routes")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -250,7 +261,19 @@ struct SavedRoutesView: View {
             }
             .padding(.top, 11)
 
-            if settings.trainingDeviceProvider == .appleWatch {
+            if let onSelect {
+                Button {
+                    onSelect(route)
+                } label: {
+                    Label(
+                        "Use This Route",
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accent)
+            } else if settings.trainingDeviceProvider == .appleWatch {
                 Button {
                     sendToWatch(route)
                 } label: {
