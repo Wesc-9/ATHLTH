@@ -70,6 +70,32 @@ final class APNsPushManager: ObservableObject {
         }
     }
 
+    func syncNotificationPreferences(
+        workoutUpdates: Bool,
+        friendActivity: Bool,
+        challenges: Bool,
+        messages: Bool
+    ) async {
+        guard let userID = client.auth.currentUser?.id else { return }
+
+        let payload = NotificationPreferenceWrite(
+            workoutRemindersEnabled: workoutUpdates,
+            friendActivityNotificationsEnabled: friendActivity,
+            challengeNotificationsEnabled: challenges,
+            messageNotificationsEnabled: messages
+        )
+
+        do {
+            try await client
+                .from("user_preferences")
+                .update(payload)
+                .eq("user_id", value: userID)
+                .execute()
+        } catch {
+            lastRegistrationError = error.localizedDescription
+        }
+    }
+
     func unregisterCurrentDevice() async {
         guard client.auth.currentUser != nil else { return }
 
@@ -110,6 +136,23 @@ final class APNsPushManager: ObservableObject {
         let generated = UUID().uuidString.lowercased()
         UserDefaults.standard.set(generated, forKey: key)
         return generated
+    }
+}
+
+private struct NotificationPreferenceWrite: Encodable {
+    let workoutRemindersEnabled: Bool
+    let friendActivityNotificationsEnabled: Bool
+    let challengeNotificationsEnabled: Bool
+    let messageNotificationsEnabled: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case workoutRemindersEnabled = "workout_reminders_enabled"
+        case friendActivityNotificationsEnabled =
+            "friend_activity_notifications_enabled"
+        case challengeNotificationsEnabled =
+            "challenge_notifications_enabled"
+        case messageNotificationsEnabled =
+            "message_notifications_enabled"
     }
 }
 
