@@ -258,9 +258,12 @@ final class AppSettingsStore: ObservableObject {
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
 
         profileSetupPromptDismissed = defaults.object(forKey: "settings.profileSetupPromptDismissed") as? Bool ?? false
-        profileSetupCompleted = defaults.object(forKey: "settings.profileSetupCompleted") as? Bool ?? false
+        let resolvedProfileSetupCompleted =
+            defaults.object(forKey: "settings.profileSetupCompleted") as? Bool
+            ?? false
+        profileSetupCompleted = resolvedProfileSetupCompleted
 
-        if !profileSetupCompleted {
+        if !resolvedProfileSetupCompleted {
             profileVisibility = .privateOnly
             defaultActivityVisibility = .privateOnly
             defaults.set(
