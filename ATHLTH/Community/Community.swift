@@ -1,4 +1,5 @@
 import Foundation
+import MapKit
 import Supabase
 import SwiftUI
 
@@ -115,6 +116,8 @@ struct CommunityEventDraft {
     var startsAt = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     var meetingName = ""
     var meetingDetails = ""
+    var latitude: Double? = nil
+    var longitude: Double? = nil
     var maxParticipants: Int? = nil
     var paceLabel = ""
     var routeID: UUID? = nil
@@ -131,6 +134,8 @@ private struct CommunityEventWrite: Encodable {
     let startsAt: Date
     let meetingName: String
     let meetingDetails: String?
+    let latitude: Double?
+    let longitude: Double?
     let maxParticipants: Int?
     let paceLabel: String?
     let routeID: UUID?
@@ -147,6 +152,8 @@ private struct CommunityEventWrite: Encodable {
         case startsAt = "starts_at"
         case meetingName = "meeting_name"
         case meetingDetails = "meeting_details"
+        case latitude
+        case longitude
         case maxParticipants = "max_participants"
         case paceLabel = "pace_label"
         case routeID = "route_id"
@@ -227,6 +234,17 @@ final class SupabaseCommunityService {
             throw CommunityEventError.invalidEvent
         }
 
+        let resolvedCoordinate: CLLocationCoordinate2D?
+        if let latitude = draft.latitude,
+           let longitude = draft.longitude {
+            resolvedCoordinate = CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            )
+        } else {
+            resolvedCoordinate = await resolveMeetingCoordinate(cleanMeeting)
+        }
+
         try await client
             .from("community_events")
             .insert(
@@ -240,6 +258,8 @@ final class SupabaseCommunityService {
                     startsAt: draft.startsAt,
                     meetingName: cleanMeeting,
                     meetingDetails: draft.meetingDetails.nilIfBlank,
+                    latitude: resolvedCoordinate?.latitude,
+                    longitude: resolvedCoordinate?.longitude,
                     maxParticipants: draft.maxParticipants,
                     paceLabel: draft.paceLabel.nilIfBlank,
                     routeID: draft.routeID,
@@ -248,6 +268,21 @@ final class SupabaseCommunityService {
                 )
             )
             .execute()
+    }
+
+    private func resolveMeetingCoordinate(
+        _ query: String
+    ) async -> CLLocationCoordinate2D? {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+        request.resultTypes = [.address, .pointOfInterest]
+
+        do {
+            let response = try await MKLocalSearch(request: request).start()
+            return response.mapItems.first?.placemark.coordinate
+        } catch {
+            return nil
+        }
     }
 
     func join(eventID: UUID) async throws {
