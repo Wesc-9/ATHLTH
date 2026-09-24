@@ -128,13 +128,13 @@ struct AdvancedPlannerView: View {
             ) {
                 plannerMetric(
                     title: "Sessions",
-                    value: "(allSessions(in: plan).count)",
+                    value: "\(allSessions(in: plan).count)",
                     icon: "figure.run"
                 )
 
                 plannerMetric(
                     title: "Training days",
-                    value: "(trainingDayCount(in: plan))",
+                    value: "\(trainingDayCount(in: plan))",
                     icon: "calendar"
                 )
 
@@ -190,13 +190,13 @@ struct AdvancedPlannerView: View {
                             selectBestDay(in: week, plan: plan)
                         } label: {
                             VStack(spacing: 3) {
-                                Text("W(week.weekNumber)")
+                                Text("W\(week.weekNumber)")
                                     .font(.subheadline.weight(.bold))
 
                                 Text(
                                     count == 1
                                         ? "1 session"
-                                        : "(count) sessions"
+                                        : "\(count) sessions"
                                 )
                                 .font(.system(size: 9, weight: .semibold))
                                 .opacity(0.78)
@@ -260,7 +260,7 @@ struct AdvancedPlannerView: View {
                             Text(
                                 date?.formatted(
                                     .dateTime.day()
-                                ) ?? "(day.dayIndex)"
+                                ) ?? "\(day.dayIndex)"
                             )
                             .font(.title3.weight(.bold))
 
@@ -278,7 +278,7 @@ struct AdvancedPlannerView: View {
                                 Text(
                                     day.sessions.isEmpty
                                         ? "Rest"
-                                        : "(day.sessions.count)"
+                                        : "\(day.sessions.count)"
                                 )
                                 .font(.system(size: 9, weight: .semibold))
                             }
@@ -414,7 +414,7 @@ struct AdvancedPlannerView: View {
                 Spacer()
 
                 Text(
-                    "(week.days.reduce(0) { $0 + $1.sessions.count }) total"
+                    "\(week.days.reduce(0) { $0 + $1.sessions.count }) total"
                 )
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(ATHLTHTheme.accent)
@@ -469,7 +469,7 @@ struct AdvancedPlannerView: View {
                             Spacer()
 
                             if !day.sessions.isEmpty {
-                                Text("(day.sessions.count)")
+                                Text("\(day.sessions.count)")
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(ATHLTHTheme.accent)
                                     .frame(width: 24, height: 24)
@@ -685,14 +685,14 @@ struct AdvancedPlannerView: View {
         guard minutes > 0 else { return "—" }
 
         if minutes < 60 {
-            return "(minutes)m"
+            return "\(minutes)m"
         }
 
         let hours = minutes / 60
         let remaining = minutes % 60
         return remaining == 0
-            ? "(hours)h"
-            : "(hours)h (remaining)m"
+            ? "\(hours)h"
+            : "\(hours)h \(remaining)m"
     }
 
     private func plannedDistanceText(
@@ -711,7 +711,7 @@ struct AdvancedPlannerView: View {
         _ plan: TrainingPlan
     ) -> String {
         guard let start = plan.startDate else {
-            return "(plan.weeks.count) weeks · (plan.visibility.title)"
+            return "\(plan.weeks.count) weeks · \(plan.visibility.title)"
         }
 
         let end = Calendar.current.date(
@@ -720,7 +720,7 @@ struct AdvancedPlannerView: View {
             to: start
         ) ?? start
 
-        return "(start.formatted(date: .abbreviated, time: .omitted)) – (end.formatted(date: .abbreviated, time: .omitted)) · (plan.weeks.count) weeks"
+        return "\(start.formatted(date: .abbreviated, time: .omitted)) – \(end.formatted(date: .abbreviated, time: .omitted)) · \(plan.weeks.count) weeks"
     }
 
     private func daySubtitle(
@@ -737,7 +737,7 @@ struct AdvancedPlannerView: View {
             )
         }
 
-        return "Week (week.weekNumber) · (day.sessions.count) planned"
+        return "Week \(week.weekNumber) · \(day.sessions.count) planned"
     }
 
     private func shortDayLabel(
@@ -883,10 +883,10 @@ struct AdvancedPlannerView: View {
 
         if let running = workout.runningWorkout {
             parts.append(running.type.title)
-            parts.append("(running.blocks.count) blocks")
+            parts.append("\(running.blocks.count) blocks")
         } else {
             if let duration = workout.durationMinutes {
-                parts.append("(duration) min")
+                parts.append("\(duration) min")
             }
 
             if let distance = workout.targetDistanceKilometers {
@@ -898,7 +898,7 @@ struct AdvancedPlannerView: View {
 
         if !workout.exercises.isEmpty {
             parts.append(
-                "(workout.exercises.count) exercises"
+                "\(workout.exercises.count) exercises"
             )
         }
 
@@ -1677,7 +1677,7 @@ struct TrainingPlanCreationView: View {
 
             Section("Weekly Rhythm") {
                 Stepper(
-                    "(simpleSessionsPerWeek) sessions per week",
+                    "\(simpleSessionsPerWeek) sessions per week",
                     value: $simpleSessionsPerWeek,
                     in: 2...6
                 )
@@ -1690,7 +1690,7 @@ struct TrainingPlanCreationView: View {
                         VStack(spacing: 5) {
                             Image(systemName: kind.systemImage)
                                 .font(.system(size: 15, weight: .semibold))
-                            Text("(index + 1)")
+                            Text("\(index + 1)")
                                 .font(.caption2.weight(.bold))
                         }
                         .foregroundStyle(ATHLTHTheme.accent)
@@ -1725,7 +1725,7 @@ struct TrainingPlanCreationView: View {
                             simpleWeekCount = weeks
                         } label: {
                             VStack(spacing: 2) {
-                                Text("(weeks)")
+                                Text("\(weeks)")
                                     .font(.headline)
                                 Text("weeks")
                                     .font(.caption2)
@@ -1810,7 +1810,7 @@ struct TrainingPlanCreationView: View {
                                 useCustomWeeks = false
                             } label: {
                                 VStack(spacing: 3) {
-                                    Text("(weeks)")
+                                    Text("\(weeks)")
                                         .font(.headline)
                                     Text(
                                         weeks == 1
@@ -1850,7 +1850,7 @@ struct TrainingPlanCreationView: View {
 
                     if useCustomWeeks {
                         Stepper(
-                            "(customWeeks) weeks",
+                            "\(customWeeks) weeks",
                             value: $customWeeks,
                             in: 1...52
                         )
@@ -1873,12 +1873,12 @@ struct TrainingPlanCreationView: View {
                 LabeledContent(
                     "Program window",
                     value:
-                        "(resolvedWeeks) " +
+                        "\(resolvedWeeks) " +
                         (resolvedWeeks == 1 ? "week" : "weeks")
                 )
 
                 Text(
-                    "(startDate.formatted(date: .abbreviated, time: .omitted)) – (resolvedEndDate.formatted(date: .abbreviated, time: .omitted))"
+                    "\(startDate.formatted(date: .abbreviated, time: .omitted)) – \(resolvedEndDate.formatted(date: .abbreviated, time: .omitted))"
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1969,8 +1969,8 @@ struct TrainingPlanCreationView: View {
         switch mode {
         case .simple:
             let autoSummary =
-                "(simpleFocus.title) · " +
-                "(simpleSessionsPerWeek) sessions per week"
+                "\(simpleFocus.title) · " +
+                "\(simpleSessionsPerWeek) sessions per week"
 
             session.createSimpleTrainingPlan(
                 title: title,
