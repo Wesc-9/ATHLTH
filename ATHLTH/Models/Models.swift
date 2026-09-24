@@ -51,6 +51,7 @@ struct HealthProgressBucket: Identifiable, Equatable {
     let averageDailySteps: Double?
     let averageSleepDuration: TimeInterval?
     let trainingDuration: TimeInterval
+    let workoutDistanceMeters: Double
 }
 
 struct HealthProgressSnapshot: Equatable {
@@ -61,6 +62,7 @@ struct HealthProgressSnapshot: Equatable {
     let averageDailySteps: Double?
     let averageSleepDuration: TimeInterval?
     let trainingDuration: TimeInterval
+    let workoutDistanceMeters: Double
     let activeWorkoutDays: [Date]
     let buckets: [HealthProgressBucket]
 
@@ -69,6 +71,7 @@ struct HealthProgressSnapshot: Equatable {
     let previousAverageDailySteps: Double?
     let previousAverageSleepDuration: TimeInterval?
     let previousTrainingDuration: TimeInterval
+    let previousWorkoutDistanceMeters: Double
 
     var workoutChangePercent: Double? {
         Self.percentChange(current: Double(workoutCount), previous: Double(previousWorkoutCount))
@@ -88,6 +91,13 @@ struct HealthProgressSnapshot: Equatable {
 
     var trainingDurationChangePercent: Double? {
         Self.percentChange(current: trainingDuration, previous: previousTrainingDuration)
+    }
+
+    var workoutDistanceChangePercent: Double? {
+        Self.percentChange(
+            current: workoutDistanceMeters,
+            previous: previousWorkoutDistanceMeters
+        )
     }
 
     private static func percentChange(current: Double?, previous: Double?) -> Double? {
