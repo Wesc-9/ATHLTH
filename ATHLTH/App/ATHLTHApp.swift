@@ -147,9 +147,7 @@ struct AppRootView: View {
             }
 
             await health.configureBackgroundSync(
-                allowed:
-                    appSession.canAccess(.backgroundHealthSync) &&
-                    settings.backgroundHealthSyncEnabled
+                allowed: settings.backgroundHealthSyncEnabled
             )
             await health.refreshAll()
             await goals.refreshAutomaticMilestones(
@@ -210,9 +208,7 @@ struct AppRootView: View {
 
             Task {
                 await health.configureBackgroundSync(
-                    allowed:
-                        appSession.canAccess(.backgroundHealthSync) &&
-                        settings.backgroundHealthSyncEnabled
+                    allowed: settings.backgroundHealthSyncEnabled
                 )
             }
         }
@@ -230,9 +226,7 @@ struct AppRootView: View {
 
             Task {
                 await health.configureBackgroundSync(
-                    allowed:
-                        appSession.canAccess(.backgroundHealthSync) &&
-                        enabled
+                    allowed: enabled
                 )
             }
         }
