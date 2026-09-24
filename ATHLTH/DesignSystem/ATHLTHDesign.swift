@@ -13,10 +13,13 @@ enum ATHLTHTheme {
     static let accentSoft = accent.opacity(0.10)
     static let premiumGold = Color(red: 0.72, green: 0.55, blue: 0.31)
     static let premiumGoldSoft = premiumGold.opacity(0.14)
+    static let champagne = Color(red: 0.93, green: 0.87, blue: 0.76)
+    static let champagneSoft = champagne.opacity(0.18)
 
-    static let canvasTop = Color(red: 0.992, green: 0.989, blue: 0.984)
-    static let canvasBottom = Color(red: 0.968, green: 0.964, blue: 0.958)
-    static let card = Color.white.opacity(0.96)
+    static let canvasTop = Color(red: 0.995, green: 0.992, blue: 0.986)
+    static let canvasBottom = Color(red: 0.966, green: 0.962, blue: 0.955)
+    static let card = Color.white.opacity(0.97)
+    static let cardWarm = Color(red: 0.992, green: 0.985, blue: 0.972)
     static let primaryText = Color(red: 0.07, green: 0.08, blue: 0.10)
     static let mutedText = Color(red: 0.43, green: 0.46, blue: 0.53)
     static let border = Color.black.opacity(0.055)
@@ -30,7 +33,60 @@ struct ATHLTHCard<Content: View>: View {
         content
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: ATHLTHTheme.cornerRadius))
+            .background {
+                RoundedRectangle(
+                    cornerRadius: ATHLTHTheme.cornerRadius,
+                    style: .continuous
+                )
+                .fill(.thinMaterial)
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: ATHLTHTheme.cornerRadius,
+                        style: .continuous
+                    )
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.42),
+                                ATHLTHTheme.cardWarm.opacity(0.22),
+                                ATHLTHTheme.champagneSoft.opacity(0.16)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                }
+            }
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: ATHLTHTheme.cornerRadius,
+                    style: .continuous
+                )
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.90),
+                            ATHLTHTheme.premiumGold.opacity(0.10),
+                            Color.black.opacity(0.035)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.8
+                )
+            }
+            .shadow(
+                color: ATHLTHTheme.accentDeep.opacity(0.055),
+                radius: 18,
+                x: 0,
+                y: 9
+            )
+            .shadow(
+                color: ATHLTHTheme.premiumGold.opacity(0.025),
+                radius: 26,
+                x: 0,
+                y: 14
+            )
     }
 }
 
@@ -39,14 +95,36 @@ struct ATHLTHSectionHeader: View {
     var actionTitle: String? = nil
 
     var body: some View {
-        HStack {
+        HStack(spacing: 9) {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.premiumGold,
+                            ATHLTHTheme.accent
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 3, height: 19)
+
             Text(title)
                 .font(.title3.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
             Spacer()
+
             if let actionTitle {
                 Text(actionTitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.78))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        ATHLTHTheme.champagneSoft,
+                        in: Capsule()
+                    )
             }
         }
     }
@@ -59,16 +137,28 @@ struct ATHLTHMetric: View {
     var tint: Color = ATHLTHTheme.accent
 
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 8) {
             Image(systemName: icon)
                 .foregroundStyle(tint)
-                .font(.title3)
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 34, height: 34)
+                .background(
+                    tint.opacity(0.09),
+                    in: RoundedRectangle(
+                        cornerRadius: 11,
+                        style: .continuous
+                    )
+                )
+
             Text(value)
                 .font(.title3.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .monospacedDigit()
                 .contentTransition(.numericText())
+
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ATHLTHTheme.mutedText)
         }
         .frame(maxWidth: .infinity)
     }
@@ -182,6 +272,28 @@ struct ATHLTHTabHero: View {
                     endPoint: .bottom
                 )
 
+                RadialGradient(
+                    colors: [
+                        ATHLTHTheme.champagne.opacity(0.17),
+                        Color.clear
+                    ],
+                    center: .topTrailing,
+                    startRadius: 0,
+                    endRadius: max(proxy.size.width * 0.72, 260)
+                )
+                .blendMode(.screen)
+                .allowsHitTesting(false)
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.white.opacity(0.08)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+
                 VStack(alignment: .leading, spacing: 0) {
                     Text("ATHLTH")
                         .font(.system(size: 17, weight: .black))
@@ -221,5 +333,114 @@ struct ATHLTHTabHero: View {
         .frame(height: height)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(subtitle)")
+    }
+}
+
+
+struct ATHLTHPremiumSegmentedControl: View {
+    let titles: [String]
+    @Binding var selection: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(titles.enumerated()), id: \.offset) { index, title in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.20)) {
+                        selection = index
+                    }
+                } label: {
+                    Text(title)
+                        .font(
+                            .subheadline.weight(
+                                selection == index ? .semibold : .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            selection == index
+                                ? ATHLTHTheme.primaryText
+                                : ATHLTHTheme.mutedText
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 42)
+                        .background {
+                            if selection == index {
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color.white,
+                                                ATHLTHTheme.cardWarm
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .overlay {
+                                        Capsule()
+                                            .stroke(
+                                                ATHLTHTheme.premiumGold.opacity(0.16),
+                                                lineWidth: 0.8
+                                            )
+                                    }
+                                    .shadow(
+                                        color: ATHLTHTheme.accentDeep.opacity(0.09),
+                                        radius: 8,
+                                        x: 0,
+                                        y: 4
+                                    )
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(
+            ATHLTHTheme.accentDeep.opacity(0.055),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
+        }
+    }
+}
+
+struct ATHLTHPremiumCanvas: View {
+    var accent: Color = ATHLTHTheme.accent
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.canvasTop,
+                    Color.white,
+                    ATHLTHTheme.canvasBottom
+                ],
+                startPoint: .top,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    accent.opacity(0.055),
+                    Color.clear
+                ],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 420
+            )
+
+            RadialGradient(
+                colors: [
+                    ATHLTHTheme.premiumGold.opacity(0.045),
+                    Color.clear
+                ],
+                center: .bottomTrailing,
+                startRadius: 10,
+                endRadius: 460
+            )
+        }
+        .ignoresSafeArea()
     }
 }
