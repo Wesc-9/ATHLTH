@@ -124,13 +124,26 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         for activityType: HKWorkoutActivityType
     ) -> WatchWorkoutKind {
         switch activityType {
+        case .running:
+            return .running
         case .walking:
             return .walking
-        case .traditionalStrengthTraining,
-             .functionalStrengthTraining:
+        case .traditionalStrengthTraining:
             return .strength
+        case .functionalStrengthTraining:
+            return .functional
+        case .highIntensityIntervalTraining:
+            return .hiit
+        case .cycling:
+            return .cycling
+        case .rowing:
+            return .rowing
+        case .stairClimbing:
+            return .stairClimbing
+        case .yoga:
+            return .yoga
         default:
-            return .running
+            return .other
         }
     }
 
