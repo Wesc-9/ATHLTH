@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AppleWatchConnectionView: View {
-    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     var body: some View {
@@ -77,24 +77,48 @@ struct AppleWatchConnectionView: View {
 
             if watchConnection.state == .appNotInstalled {
                 Section("Install ATHLTH on Apple Watch") {
-                    Text(
-                        "ATHLTH is not installed on your paired Apple Watch. Open the Watch app on this iPhone, find ATHLTH under Available Apps and tap Install."
-                    )
-                    .font(.subheadline)
+                    VStack(alignment: .leading, spacing: 14) {
+                        Label(
+                            "Your Watch is paired — only the ATHLTH app is missing.",
+                            systemImage: "applewatch"
+                        )
+                        .font(.subheadline.weight(.semibold))
 
-                    Button {
-                        if let url = URL(string: "itms-watch://") {
-                            openURL(url)
+                        VStack(alignment: .leading, spacing: 9) {
+                            installStep(
+                                "1",
+                                "Open Apple’s Watch app"
+                            )
+                            installStep(
+                                "2",
+                                "Scroll to Available Apps"
+                            )
+                            installStep(
+                                "3",
+                                "Tap Install next to ATHLTH"
+                            )
                         }
-                    } label: {
-                        Label("Open Watch app", systemImage: "applewatch")
-                    }
 
-                    Text(
-                        "After installation, return to ATHLTH and tap “Check Apple Watch again”."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                        Button {
+                            AppleWatchInstallSupport.openWatchApp()
+                        } label: {
+                            Label(
+                                "Install ATHLTH on Apple Watch",
+                                systemImage: "arrow.down.app.fill"
+                            )
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+
+                        Text(
+                            "When you return to ATHLTH, installation status is checked automatically."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
                 }
             }
         }
@@ -102,6 +126,49 @@ struct AppleWatchConnectionView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             watchConnection.connect()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            refreshAfterInstallReturn()
+        }
+    }
+
+    private func refreshAfterInstallReturn() {
+        watchConnection.connect()
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            guard watchConnection.state == .appNotInstalled else {
+                return
+            }
+
+            watchConnection.connect()
+
+            try? await Task.sleep(for: .seconds(2))
+            guard watchConnection.state == .appNotInstalled else {
+                return
+            }
+
+            watchConnection.connect()
+        }
+    }
+
+    private func installStep(
+        _ number: String,
+        _ title: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(number)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(
+                    ATHLTHTheme.accentDeep,
+                    in: Circle()
+                )
+
+            Text(title)
+                .font(.subheadline)
         }
     }
 
