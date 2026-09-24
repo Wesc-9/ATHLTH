@@ -27,6 +27,7 @@ enum PersonalDetailsSource: String, Codable {
     case none
     case appleHealth
     case manual
+    case mixed
 }
 
 struct HealthProfileBasics: Codable, Hashable {
