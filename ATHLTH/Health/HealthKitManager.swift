@@ -42,8 +42,11 @@ final class HealthKitManager: ObservableObject {
             defaults.integer(forKey: safeRefreshVersionKey) <
             currentSafeRefreshVersion
 
-        automaticRefreshSuspended =
+        let shouldUseSafeLaunch =
             interruptedRefresh || needsSafeLaunchMigration
+
+        automaticRefreshSuspended = shouldUseSafeLaunch
+        deferFullRefreshUntilNextLaunch = shouldUseSafeLaunch
 
         // A process termination during a Health refresh must never create an
         // endless crash loop. The next launch starts with automatic Health
