@@ -261,7 +261,7 @@ struct RunQuickStartSheet: View {
                             .foregroundStyle(
                                 mode == option
                                     ? ATHLTHTheme.accent
-                                    : .tertiary
+                                    : Color.secondary
                             )
                         }
                         .padding(10)
