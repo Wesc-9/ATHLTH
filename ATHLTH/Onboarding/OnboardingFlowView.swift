@@ -2098,6 +2098,7 @@ struct OnboardingFlowView: View {
 
 private struct WatchInstallHelpView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     let onCheckAgain: () -> Void
 
@@ -2150,6 +2151,21 @@ private struct WatchInstallHelpView: View {
                 Spacer()
 
                 Button {
+                    if let url = URL(string: "itms-watch://") {
+                        openURL(url)
+                    }
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text("Open Watch app")
+                            .font(.headline)
+                        Image(systemName: "arrow.up.right")
+                        Spacer()
+                    }
+                }
+                .buttonStyle(OnboardingPrimaryButtonStyle())
+
+                Button {
                     onCheckAgain()
                 } label: {
                     HStack {
@@ -2160,7 +2176,8 @@ private struct WatchInstallHelpView: View {
                         Spacer()
                     }
                 }
-                .buttonStyle(OnboardingPrimaryButtonStyle())
+                .buttonStyle(.bordered)
+                .controlSize(.large)
 
                 Button("Not now") {
                     dismiss()
