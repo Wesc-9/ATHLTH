@@ -1,4 +1,5 @@
 import Charts
+import Combine
 import Foundation
 import SwiftUI
 
@@ -88,7 +89,6 @@ struct RecoverySorenessEntry: Codable, Hashable {
     var ratings: [String: RecoverySorenessLevel]
 }
 
-@MainActor
 final class RecoverySorenessStore: ObservableObject {
     @Published private(set) var entries: [RecoverySorenessEntry]
 
