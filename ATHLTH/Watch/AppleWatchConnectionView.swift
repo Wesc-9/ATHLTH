@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AppleWatchConnectionView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     var body: some View {
@@ -77,9 +78,23 @@ struct AppleWatchConnectionView: View {
             if watchConnection.state == .appNotInstalled {
                 Section("Install ATHLTH on Apple Watch") {
                     Text(
-                        "Install the ATHLTH Watch app on the paired Apple Watch, then return here and tap “Check Apple Watch again”."
+                        "ATHLTH is not installed on your paired Apple Watch. Open the Watch app on this iPhone, find ATHLTH under Available Apps and tap Install."
                     )
                     .font(.subheadline)
+
+                    Button {
+                        if let url = URL(string: "itms-watch://") {
+                            openURL(url)
+                        }
+                    } label: {
+                        Label("Open Watch app", systemImage: "applewatch")
+                    }
+
+                    Text(
+                        "After installation, return to ATHLTH and tap “Check Apple Watch again”."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
         }
