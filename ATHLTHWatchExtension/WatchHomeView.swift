@@ -10,74 +10,41 @@ struct WatchHomeView: View {
                 VStack(spacing: 10) {
                     header
 
-                    HStack(spacing: 8) {
-                        NavigationLink {
-                            WatchRoutesListView()
-                        } label: {
-                            actionCard(
-                                title: "Routes",
-                                subtitle: routeStore.routes.isEmpty
-                                    ? "Explore"
+                    NavigationLink {
+                        WatchWorkoutStartView(route: nil)
+                    } label: {
+                        primaryCard(
+                            title: "Start Workout",
+                            subtitle: "Run · Walk · Strength",
+                            icon: "play.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        WatchRoutesListView()
+                    } label: {
+                        compactCard(
+                            title: "Routes",
+                            subtitle:
+                                routeStore.routes.isEmpty
+                                    ? "No saved routes"
                                     : "\(routeStore.routes.count) saved",
-                                icon: "point.topleft.down.to.point.bottomright.curvepath"
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        NavigationLink {
-                            WatchWorkoutStartView(route: nil)
-                        } label: {
-                            actionCard(
-                                title: "Start Workout",
-                                subtitle: workoutManager.isActive
-                                    ? "Workout active"
-                                    : "Run · Walk · Strength",
-                                icon: "figure.run"
-                            )
-                        }
-                        .buttonStyle(.plain)
+                            icon: "point.topleft.down.to.point.bottomright.curvepath",
+                            showsChevron: true
+                        )
                     }
+                    .buttonStyle(.plain)
 
-                    VStack(alignment: .leading, spacing: 9) {
-                        HStack {
-                            Text("Today")
-                                .font(.system(size: 14, weight: .bold))
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(WatchTheme.muted)
-                        }
-
-                        HStack(spacing: 0) {
-                            todayMetric(
-                                icon: "iphone",
-                                value: routeStore.companionLinked
-                                    ? "Ready"
-                                    : "Waiting",
-                                label: "iPhone"
-                            )
-
-                            Divider()
-
-                            todayMetric(
-                                icon: "map",
-                                value: "\(routeStore.routes.count)",
-                                label: "Routes"
-                            )
-
-                            Divider()
-
-                            todayMetric(
-                                icon: "applewatch",
-                                value: "ATHLTH",
-                                label: "Watch"
-                            )
-                        }
-                    }
-                    .padding(12)
-                    .watchSurface()
+                    compactCard(
+                        title: "iPhone",
+                        subtitle: connectionSubtitle,
+                        icon:
+                            routeStore.companionLinked
+                                ? "iphone.radiowaves.left.and.right"
+                                : "iphone.slash",
+                        showsChevron: false
+                    )
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 10)
@@ -89,7 +56,8 @@ struct WatchHomeView: View {
             isPresented: Binding(
                 get: { workoutManager.isWorkoutPresented },
                 set: { presented in
-                    if !presented, workoutManager.state == .completed {
+                    if !presented,
+                       workoutManager.state == .completed {
                         workoutManager.reset()
                     }
                 }
@@ -101,98 +69,133 @@ struct WatchHomeView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 8) {
+        VStack(spacing: 5) {
             ATHLTHBrandMark(size: .watch)
 
-            Spacer(minLength: 4)
-
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(
-                            routeStore.companionLinked
-                                ? WatchTheme.green
-                                : Color.secondary
-                        )
-                        .frame(width: 6, height: 6)
-
-                    Text(
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(
                         routeStore.companionLinked
-                            ? "Connected"
-                            : "Ready"
+                            ? WatchTheme.green
+                            : Color.secondary
                     )
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(WatchTheme.muted)
-                }
+                    .frame(width: 6, height: 6)
 
-                Text("to iPhone")
-                    .font(.system(size: 9))
-                    .foregroundStyle(WatchTheme.muted)
+                Text(
+                    routeStore.companionLinked
+                        ? "Connected"
+                        : "Watch ready"
+                )
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(WatchTheme.muted)
             }
         }
-        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity)
         .padding(.top, 2)
+        .padding(.bottom, 2)
     }
 
-    @ViewBuilder
-    private func actionCard(
+    private var connectionSubtitle: String {
+        if routeStore.companionLinked {
+            return "Connected to ATHLTH on iPhone"
+        }
+
+        return routeStore.connectionText
+    }
+
+    private func primaryCard(
         title: String,
         subtitle: String,
         icon: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        HStack(spacing: 12) {
             ZStack {
-                Circle()
-                    .fill(Color.black.opacity(0.035))
-                    .frame(width: 34, height: 34)
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+                .fill(WatchTheme.green.opacity(0.12))
+                .frame(width: 46, height: 46)
 
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 19, weight: .bold))
                     .foregroundStyle(WatchTheme.green)
             }
 
-            HStack(spacing: 3) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(WatchTheme.muted)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(WatchTheme.muted)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 72)
+        .watchSurface(radius: 18)
+    }
+
+    private func compactCard(
+        title: String,
+        subtitle: String,
+        icon: String,
+        showsChevron: Bool
+    ) -> some View {
+        HStack(spacing: 11) {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.035))
+                    .frame(width: 38, height: 38)
+
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(
+                        title == "iPhone" &&
+                        !routeStore.companionLinked
+                            ? WatchTheme.muted
+                            : WatchTheme.green
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
 
-                Spacer(minLength: 2)
+                Text(subtitle)
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.muted)
+                    .lineLimit(2)
+            }
 
+            Spacer(minLength: 4)
+
+            if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(WatchTheme.muted)
+            } else {
+                Circle()
+                    .fill(
+                        routeStore.companionLinked
+                            ? WatchTheme.green
+                            : Color.secondary
+                    )
+                    .frame(width: 7, height: 7)
             }
-
-            Text(subtitle)
-                .font(.system(size: 10))
-                .foregroundStyle(WatchTheme.muted)
         }
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
         .padding(11)
-        .watchSurface()
-    }
-
-    @ViewBuilder
-    private func todayMetric(
-        icon: String,
-        value: String,
-        label: String
-    ) -> some View {
-        VStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(WatchTheme.green)
-
-            Text(value)
-                .font(.system(size: 12, weight: .bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-
-            Text(label)
-                .font(.system(size: 8))
-                .foregroundStyle(WatchTheme.muted)
-        }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 60)
+        .watchSurface(radius: 17)
     }
 }
 
