@@ -279,12 +279,16 @@ struct ATHLTHSettingsView: View {
                                     iconTint: .pink,
                                     iconBackground: Color.pink.opacity(0.10),
                                     title: "Apple Health",
-                                    subtitle: health.hasRequestedAuthorization
-                                        ? "Health access has been configured"
-                                        : "Connect your Apple Health data"
+                                    subtitle: appleHealthConnectionSubtitle
                                 ) {
                                     connectionTrailing(
-                                        health.hasRequestedAuthorization ? "Configured" : "Connect",
+                                        health.isRefreshing
+                                            ? "Syncing"
+                                            : !health.hasRequestedAuthorization
+                                                ? "Connect"
+                                                : health.hasReadableHealthData
+                                                    ? "Connected"
+                                                    : "Configured",
                                         showChevron: true,
                                         loading: healthRequestInProgress
                                     )
@@ -662,10 +666,9 @@ struct ATHLTHSettingsView: View {
     }
 
     private var healthSyncHasIssue: Bool {
-        guard settings.backgroundHealthSyncEnabled else {
-            return false
-        }
-        return !(health.backgroundSyncError?.isEmpty ?? true)
+        let backgroundIssue = !(health.backgroundSyncError?.isEmpty ?? true)
+        let readIssue = !(health.authorizationError?.isEmpty ?? true)
+        return backgroundIssue || readIssue
     }
 
     private var healthSyncStateTitle: String {
@@ -734,6 +737,26 @@ struct ATHLTHSettingsView: View {
 
     private var backgroundHealthSubtitle: String {
         "Sync with Apple Health automatically in the background."
+    }
+
+    private var appleHealthConnectionSubtitle: String {
+        guard health.hasRequestedAuthorization else {
+            return "Connect your Apple Health data"
+        }
+
+        if health.isRefreshing {
+            return "Reading Apple Health data now"
+        }
+
+        if health.hasReadableHealthData {
+            return "Connected · compatible health data is available"
+        }
+
+        if health.lastSuccessfulRefreshAt != nil {
+            return "Permission configured · no readable data found yet"
+        }
+
+        return "Permission configured · run the first sync"
     }
 
     private var spotifyGreen: Color {
