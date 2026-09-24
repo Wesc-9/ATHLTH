@@ -53,6 +53,8 @@ struct HomeWeeklyTrendsCard: View {
     let isLoading: Bool
     let hasHealthAccess: Bool
 
+    @State private var selectedMetric: HomeWeeklyMetric = .movement
+
     var body: some View {
         ATHLTHCard {
             HStack(alignment: .firstTextBaseline) {
@@ -91,23 +93,65 @@ struct HomeWeeklyTrendsCard: View {
                 .frame(maxWidth: .infinity)
             } else if let snapshot,
                       snapshotHasData(snapshot) {
-                VStack(spacing: 0) {
-                    ForEach(HomeWeeklyMetric.allCases) { metric in
-                        HomeWeeklyTrendRow(
-                            metric: metric,
-                            summary: summary(metric, snapshot: snapshot),
-                            change: change(metric, snapshot: snapshot),
-                            points: points(metric, snapshot: snapshot)
-                        )
-
-                        if metric != .sleep {
-                            Divider()
-                                .overlay(ATHLTHTheme.divider.opacity(0.7))
-                                .padding(.leading, 46)
+                VStack(spacing: 14) {
+                    HStack(spacing: 6) {
+                        ForEach(HomeWeeklyMetric.allCases) { metric in
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    selectedMetric = metric
+                                }
+                            } label: {
+                                Label(metric.title, systemImage: metric.icon)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(
+                                        selectedMetric == metric
+                                            ? ATHLTHTheme.primaryText
+                                            : ATHLTHTheme.mutedText
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 34)
+                                    .background {
+                                        if selectedMetric == metric {
+                                            Capsule()
+                                                .fill(metric.tint.opacity(0.10))
+                                                .overlay {
+                                                    Capsule()
+                                                        .stroke(
+                                                            metric.tint.opacity(0.14),
+                                                            lineWidth: 1
+                                                        )
+                                                }
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
+                    .padding(4)
+                    .background(
+                        ATHLTHTheme.surfaceStone.opacity(0.80),
+                        in: Capsule()
+                    )
+
+                    HomeWeeklyTrendRow(
+                        metric: selectedMetric,
+                        summary: summary(
+                            selectedMetric,
+                            snapshot: snapshot
+                        ),
+                        change: change(
+                            selectedMetric,
+                            snapshot: snapshot
+                        ),
+                        points: points(
+                            selectedMetric,
+                            snapshot: snapshot
+                        )
+                    )
+                    .id(selectedMetric.id)
+                    .transition(.opacity)
                 }
-                .padding(.top, 10)
+                .padding(.top, 12)
             } else {
                 HStack(alignment: .top, spacing: 12) {
                     Image(
@@ -246,50 +290,64 @@ private struct HomeWeeklyTrendRow: View {
     let points: [HomeWeeklyTrendPoint]
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: metric.icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(metric.tint)
-                .frame(width: 36, height: 36)
-                .background(
-                    metric.tint.opacity(0.09),
-                    in: RoundedRectangle(
-                        cornerRadius: 12,
-                        style: .continuous
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 11) {
+                Image(systemName: metric.icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(metric.tint)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        metric.tint.opacity(0.10),
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
                     )
-                )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(metric.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(metric.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
 
-                HStack(spacing: 6) {
-                    Text(summary)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    HStack(spacing: 7) {
+                        Text(summary)
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
 
-                    if let change,
-                       change.isFinite {
-                        Text(changeText(change))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(
-                                change >= 0 ? Color.green : Color.orange
-                            )
+                        if let change,
+                           change.isFinite {
+                            Text(changeText(change))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(
+                                    change >= 0
+                                        ? Color.green
+                                        : Color.orange
+                                )
+                        }
                     }
                 }
 
-                Text(metric.subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                Spacer()
             }
 
-            Spacer(minLength: 4)
-
             trendChart
-                .frame(width: 128, height: 58)
+                .frame(height: 132)
         }
-        .padding(.vertical, 11)
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [
+                    metric.tint.opacity(0.055),
+                    ATHLTHTheme.cardWarm.opacity(0.48)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
     }
 
     @ViewBuilder
