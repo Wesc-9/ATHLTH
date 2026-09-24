@@ -430,7 +430,8 @@ struct ATHLTHCommunityView: View {
                         subtitle: "Train together. Go further.",
                         height: 190,
                         alignment: .leading,
-                        focalOffsetX: -18
+                        focalOffsetX: -18,
+                        focalOffsetY: 18
                     )
 
                     VStack(spacing: 18) {
