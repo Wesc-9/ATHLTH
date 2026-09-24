@@ -286,15 +286,28 @@ final class ATHLTHNotificationStore: ObservableObject {
     }
 
     func requestSystemNotificationPermission() async {
-        do {
-            _ = try await UNUserNotificationCenter.current().requestAuthorization(
-                options: [.alert, .sound, .badge]
-            )
-        } catch {
-            // The in-app notification center still works without system permission.
+        _ = await requestSystemNotificationPermissionIfNeeded()
+    }
+
+    @discardableResult
+    func requestSystemNotificationPermissionIfNeeded() async -> Bool {
+        await refreshAuthorizationStatus()
+
+        if authorizationStatus == .notDetermined {
+            do {
+                _ = try await UNUserNotificationCenter.current().requestAuthorization(
+                    options: [.alert, .sound, .badge]
+                )
+            } catch {
+                // The in-app notification center still works without system permission.
+            }
+
+            await refreshAuthorizationStatus()
         }
 
-        await refreshAuthorizationStatus()
+        return authorizationStatus == .authorized ||
+            authorizationStatus == .provisional ||
+            authorizationStatus == .ephemeral
     }
 
     func refreshAuthorizationStatus() async {
