@@ -137,7 +137,7 @@ struct ATHLTHTabHero: View {
     let imageName: String
     let title: String
     let subtitle: String
-    var height: CGFloat = 150
+    var height: CGFloat = 190
     var alignment: Alignment = .leading
     var focalOffsetX: CGFloat = 18
 
@@ -160,8 +160,8 @@ struct ATHLTHTabHero: View {
 
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.46),
-                        Color.black.opacity(0.18),
+                        Color.black.opacity(0.48),
+                        Color.black.opacity(0.16),
                         Color.clear
                     ],
                     startPoint: .leading,
@@ -170,9 +170,9 @@ struct ATHLTHTabHero: View {
 
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.10),
+                        Color.black.opacity(0.20),
                         Color.clear,
-                        Color.black.opacity(0.18)
+                        Color.black.opacity(0.20)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -188,7 +188,7 @@ struct ATHLTHTabHero: View {
                         .tracking(1.7)
                         .padding(.top, 2)
 
-                    Spacer(minLength: 10)
+                    Spacer(minLength: 12)
 
                     Text(title)
                         .font(.system(size: 30, weight: .bold))
@@ -202,36 +202,19 @@ struct ATHLTHTabHero: View {
                         .padding(.top, 2)
                 }
                 .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.28), radius: 5, x: 0, y: 2)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 14)
+                .shadow(color: .black.opacity(0.30), radius: 5, x: 0, y: 2)
+                .padding(.leading, 20)
+                .padding(.trailing, 18)
+                .padding(.top, 48)
+                .padding(.bottom, 16)
                 .frame(
-                    maxWidth: proxy.size.width * 0.72,
+                    maxWidth: proxy.size.width * 0.74,
                     maxHeight: .infinity,
                     alignment: .leading
                 )
             }
         }
         .frame(height: height)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: ATHLTHTheme.cornerRadius,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: ATHLTHTheme.cornerRadius,
-                style: .continuous
-            )
-            .stroke(Color.white.opacity(0.55), lineWidth: 1)
-        }
-        .shadow(
-            color: Color.black.opacity(0.055),
-            radius: 16,
-            x: 0,
-            y: 8
-        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(subtitle)")
     }
