@@ -93,7 +93,7 @@ final class SocialStore: ObservableObject {
         challengeStore: ChallengeStore? = nil,
         notificationStore: ATHLTHNotificationStore? = nil
     ) async {
-        guard service.currentUserID != nil else {
+        guard let currentUserID = service.currentUserID else {
             reset()
             return
         }
@@ -107,8 +107,8 @@ final class SocialStore: ObservableObject {
         do {
             async let cardsTask = service.loadVisibleProfileCards()
             async let friendshipsTask = service.loadFriendships()
-            async let followersTask = service.loadFollowers(for: service.currentUserID!)
-            async let followingTask = service.loadFollowing(for: service.currentUserID!)
+            async let followersTask = service.loadFollowers(for: currentUserID)
+            async let followingTask = service.loadFollowing(for: currentUserID)
             async let requestsTask = service.loadFriendRequests()
             async let privacyTask = service.loadPrivacySettings()
             async let feedTask = service.loadFeed()
