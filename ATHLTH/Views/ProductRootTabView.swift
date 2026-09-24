@@ -4124,60 +4124,92 @@ struct ATHLTHProfileView: View {
     }
 
     private var profileStatsRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             compactProfileStat(
+                icon: "dumbbell.fill",
                 value: performanceStats?.totalWorkoutCount.formatted() ?? "—",
-                title: "Workouts"
+                title: "Workouts",
+                tint: .green
             )
 
+            profileStatDivider
+
             compactProfileStat(
+                icon: "target",
                 value: completedGoalCount.formatted(),
-                title: "Goals"
+                title: "Goals",
+                tint: .blue
             )
+
+            profileStatDivider
 
             NavigationLink {
                 TrophyCollectionView()
             } label: {
                 compactProfileStat(
+                    icon: "trophy.fill",
                     value: trophyStore.unlockedCount.formatted(),
-                    title: "Trophies"
+                    title: "Trophies",
+                    tint: .orange
                 )
             }
             .buttonStyle(.plain)
 
+            profileStatDivider
+
             compactProfileStat(
+                icon: "point.topleft.down.to.point.bottomright.curvepath",
                 value: session.savedRoutes.count.formatted(),
-                title: "Routes"
+                title: "Routes",
+                tint: .purple
             )
         }
+        .padding(.vertical, 13)
+        .padding(.horizontal, 6)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.white.opacity(0.28))
+                .allowsHitTesting(false)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.white.opacity(0.78), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.09), radius: 22, x: 0, y: 12)
+    }
+
+    private var profileStatDivider: some View {
+        Rectangle()
+            .fill(Color.black.opacity(0.07))
+            .frame(width: 1, height: 48)
     }
 
     private func compactProfileStat(
+        icon: String,
         value: String,
-        title: String
+        title: String,
+        tint: Color
     ) -> some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 26, height: 26)
+                .background(tint.opacity(0.10), in: Circle())
+
             Text(value)
                 .font(.headline.monospacedDigit().weight(.bold))
-                .foregroundStyle(.primary)
-                .minimumScaleFactor(0.7)
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .minimumScaleFactor(0.68)
                 .lineLimit(1)
 
             Text(title)
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ATHLTHTheme.mutedText)
                 .lineLimit(1)
         }
-        .padding(.vertical, 11)
         .frame(maxWidth: .infinity)
-        .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-        }
     }
 
     private func currentFocusCard(_ goal: ATHLTHGoal) -> some View {
@@ -4251,21 +4283,27 @@ struct ATHLTHProfileView: View {
                         }
                 }
             }
-            .frame(width: 96, height: 96)
+            .frame(width: 94, height: 94)
             .clipShape(Circle())
             .overlay {
                 Circle()
-                    .stroke(ATHLTHTheme.border, lineWidth: 1)
+                    .stroke(Color.white.opacity(0.94), lineWidth: 4)
             }
+            .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 7)
         } else {
             Circle()
-                .fill(ATHLTHTheme.accentSoft)
-                .frame(width: 96, height: 96)
+                .fill(Color.white.opacity(0.84))
+                .frame(width: 94, height: 94)
                 .overlay {
                     Image(systemName: "person.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(ATHLTHTheme.accent)
+                        .font(.system(size: 38))
+                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.78))
                 }
+                .overlay {
+                    Circle()
+                        .stroke(Color.white.opacity(0.94), lineWidth: 4)
+                }
+                .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 7)
         }
     }
 
