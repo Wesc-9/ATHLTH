@@ -99,6 +99,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var challenges: ChallengeStore
 
     @State private var homeStreakDays: [Date]?
+    @State private var showingGlobalSearch = false
     @State private var selectedHomeStrengthSession: PlannedSession?
     @State private var pendingHomeQuickStartKind: WorkoutKind?
     @State private var pendingHomePlanSession: PlannedSession?
@@ -126,6 +127,25 @@ struct ATHLTHHomeView: View {
                     )
 
                     HStack(spacing: 8) {
+                        Button {
+                            showingGlobalSearch = true
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 38, height: 38)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(
+                                            .white.opacity(0.38),
+                                            lineWidth: 1
+                                        )
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Search ATHLTH")
+
                         NavigationLink {
                             SocialHubView(initialTab: .messages)
                         } label: {
@@ -357,6 +377,9 @@ struct ATHLTHHomeView: View {
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
+            }
+            .sheet(isPresented: $showingGlobalSearch) {
+                ATHLTHGlobalSearchView()
             }
             .sheet(item: $selectedHomeStrengthSession) { workout in
                 WorkoutStartOptionsView(
