@@ -1008,6 +1008,13 @@ struct ATHLTHPrivacyCenterView: View {
                 Text("You can still change visibility during post-workout review before an activity is shared.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Label(
+                    "Leaderboards only use activity that is already visible to the viewer.",
+                    systemImage: "trophy.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Section("Routes") {
@@ -1066,7 +1073,7 @@ struct ATHLTHPrivacyCenterView: View {
                 }
             }
         }
-        .navigationTitle("Privacy Center")
+        .navigationTitle("Privacy & Visibility")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await social.refresh()
