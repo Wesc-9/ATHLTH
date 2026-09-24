@@ -42,8 +42,17 @@ struct OnboardingFlowView: View {
 
     var body: some View {
         ZStack {
-            OnboardingBackground()
-                .ignoresSafeArea()
+            if step == .account {
+                // Keep the login artwork at the window/root level so it can
+                // paint underneath every safe-area inset. Constraining the
+                // photo inside the account GeometryReader left the bottom
+                // safe area showing the fallback background on iPhone.
+                OnboardingHeroPhoto()
+                    .ignoresSafeArea()
+            } else {
+                OnboardingBackground()
+                    .ignoresSafeArea()
+            }
 
             if step == .account {
                 accountStep
@@ -224,16 +233,6 @@ struct OnboardingFlowView: View {
             let spacerMinimum: CGFloat = usesTabletWidth ? 56 : 170
 
             ZStack {
-                OnboardingHeroPhoto()
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height
-                    )
-                    .scaleEffect(1.025)
-                    .offset(y: 8)
-                    .clipped()
-                    .ignoresSafeArea()
-
                 LinearGradient(
                     colors: [
                         Color.black.opacity(0.44),
@@ -288,7 +287,6 @@ struct OnboardingFlowView: View {
                 )
             }
         }
-        .background(Color.black.ignoresSafeArea())
     }
 
     private var accountBrand: some View {
