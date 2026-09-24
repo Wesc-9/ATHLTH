@@ -255,7 +255,7 @@ struct HomeGettingStartedCard: View {
                     title: "Create a training plan",
                     complete: hasPlan,
                     destination: AnyView(
-                        AdvancedPlannerView(onOpenLibrary: {})
+                        AdvancedPlannerView(onOpenPrograms: {})
                     )
                 )
 
