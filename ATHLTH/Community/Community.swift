@@ -444,14 +444,47 @@ struct ATHLTHCommunityView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
 
     @State private var showingCreateEvent = false
+    @State private var showingCreateChallenge = false
+    @State private var challengeTarget: SocialProfileCard?
 
     private var activeChallenges: [ATHLTHChallenge] {
         challenges.visibleChallenges.filter {
             $0.status == .active ||
             $0.status == .upcoming ||
             $0.status == .invited
+        }
+    }
+
+
+    private var activeFriendsThisWeek: Int {
+        let threshold = Calendar.current.date(
+            byAdding: .day,
+            value: -7,
+            to: Date()
+        ) ?? .distantPast
+        let friendIDs = Set(social.friends.map(\.userID))
+
+        return Set(
+            social.feed.compactMap { item in
+                guard item.activity.kind == "workout",
+                      item.activity.createdAt >= threshold,
+                      friendIDs.contains(item.actor.userID)
+                else {
+                    return nil
+                }
+
+                return item.actor.userID
+            }
+        ).count
+    }
+
+    private var discoverPeople: [SocialProfileCard] {
+        social.visibleProfiles.filter { profile in
+            profile.userID != session.profile.userID &&
+            social.relationshipState(with: profile.userID) == .none
         }
     }
 
@@ -470,13 +503,40 @@ struct ATHLTHCommunityView: View {
                     focalOffsetY: 18
                 )
             } content: {
-                VStack(spacing: 18) {
-                        quickActions
-                        upcomingEvents
-                        friendsSection
-                        challengesSection
-                        activitySection
+                LazyVStack(spacing: 18) {
+                    CommunityPulseCard(
+                        activeFriends: activeFriendsThisWeek,
+                        activeChallenges: activeChallenges.count,
+                        upcomingEvents: community.upcomingEvents.count
+                    )
+
+                    CommunityLeaderboardCard(
+                        currentUserID: session.profile.userID,
+                        currentDisplayName: session.profile.displayName,
+                        currentUsername: session.profile.username,
+                        currentAvatarURL: session.profile.avatarURL,
+                        friends: social.friends,
+                        visibleProfiles: social.visibleProfiles,
+                        feed: social.feed,
+                        ownWorkouts: health.workouts
+                    ) { friend in
+                        challengeTarget = friend
                     }
+
+                    challengesSection
+                    upcomingEvents
+                    activitySection
+
+                    CommunityDiscoverPeopleCard(
+                        profiles: discoverPeople
+                    ) { profile in
+                        Task {
+                            await social.sendFriendRequest(to: profile)
+                        }
+                    } relationship: { userID in
+                        social.relationshipState(with: userID)
+                    }
+                }
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
@@ -491,6 +551,14 @@ struct ATHLTHCommunityView: View {
                 CommunityEventCreateView()
                     .environmentObject(community)
                     .environmentObject(session)
+            }
+            .sheet(isPresented: $showingCreateChallenge) {
+                ChallengeCreationView()
+            }
+            .sheet(item: $challengeTarget) { friend in
+                ChallengeCreationView(
+                    preselectedFriends: [friend]
+                )
             }
             .alert(
                 "Community",
@@ -650,46 +718,111 @@ struct ATHLTHCommunityView: View {
 
     private var challengesSection: some View {
         ATHLTHCard {
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Challenges")
+                    Text("Active Challenges")
                         .font(.title3.weight(.bold))
-                    Text("Compete with friends or take on a shared route.")
+                    Text("Compete, close the gap and invite someone new.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
                 Spacer()
 
+                Button {
+                    showingCreateChallenge = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.caption.bold())
+                        .foregroundStyle(.orange)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Color.orange.opacity(0.09),
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Create challenge")
+
                 NavigationLink {
                     ChallengeHubView()
                 } label: {
-                    Text("See All")
+                    Text("All")
                         .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
             }
 
             if activeChallenges.isEmpty {
-                NavigationLink {
-                    ChallengeHubView()
+                Button {
+                    showingCreateChallenge = true
                 } label: {
-                    Label("Create a challenge", systemImage: "bolt.badge.plus")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 12)
+                    HStack(spacing: 13) {
+                        Image(systemName: "bolt.badge.plus")
+                            .font(.title2)
+                            .foregroundStyle(.orange)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                Color.orange.opacity(0.09),
+                                in: RoundedRectangle(
+                                    cornerRadius: 14,
+                                    style: .continuous
+                                )
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Start some friendly competition")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(
+                                "Challenge a friend on running, strength, routes or total work."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .multilineTextAlignment(.leading)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.top, 12)
                 }
+                .buttonStyle(.plain)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(activeChallenges.prefix(3))) { challenge in
+                VStack(spacing: 12) {
+                    if let featured = activeChallenges.first {
                         NavigationLink {
-                            ChallengeDetailView(challengeID: challenge.id)
+                            ChallengeDetailView(
+                                challengeID: featured.id
+                            )
                         } label: {
-                            ChallengeCompactRow(challenge: challenge)
+                            ChallengeHeroCard(
+                                challenge: featured
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(
+                        Array(activeChallenges.dropFirst().prefix(2))
+                    ) { challenge in
+                        NavigationLink {
+                            ChallengeDetailView(
+                                challengeID: challenge.id
+                            )
+                        } label: {
+                            ChallengeCompactRow(
+                                challenge: challenge
+                            )
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.top, 8)
+                .padding(.top, 12)
             }
         }
     }
@@ -698,9 +831,9 @@ struct ATHLTHCommunityView: View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("From Your Community")
+                    Text("Friends Activity")
                         .font(.title3.weight(.bold))
-                    Text("Workouts, trophies, goals and shared moments.")
+                    Text("Workouts, PRs, trophies and shared moments.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
