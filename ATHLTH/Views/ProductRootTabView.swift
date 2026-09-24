@@ -3597,93 +3597,15 @@ struct ATHLTHProfileView: View {
 
     var body: some View {
         ScrollView {
+            VStack(spacing: 0) {
+                premiumProfileHero
+
+                profileStatsRow
+                    .padding(.horizontal, 16)
+                    .offset(y: -28)
+                    .padding(.bottom, -10)
+
                 VStack(spacing: 18) {
-                    ATHLTHCard {
-                        HStack(spacing: 18) {
-                            profileAvatar
-
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(session.profile.displayName)
-                                    .font(.title2.weight(.bold))
-
-                                Text("@\(session.profile.username)")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-
-                                if !session.profile.bio.isEmpty {
-                                    Text(session.profile.bio)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                        .padding(.top, 2)
-                                }
-
-                                if settings.showTrainingStatusOnProfile {
-                                    Label(
-                                        session.profile.presence.state == .training
-                                            ? "Training now"
-                                            : "Ready to train",
-                                        systemImage: session.profile.presence.state == .training
-                                            ? "figure.run"
-                                            : "circle.fill"
-                                    )
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .padding(.top, 3)
-                                }
-
-                                if settings.showTrainingFocusOnProfile,
-                                   let focus = session.onboardingProfile?.trainingFocus {
-                                    HStack(spacing: 6) {
-                                        Label(
-                                            focus.title,
-                                            systemImage: focus.systemImage
-                                        )
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 5)
-                                        .background(
-                                            ATHLTHTheme.accentSoft,
-                                            in: Capsule()
-                                        )
-
-                                        if let currentGoal = session.onboardingProfile?.currentGoal {
-                                            Text(currentGoal.type.title)
-                                                .font(.caption2.weight(.semibold))
-                                                .foregroundStyle(.secondary)
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 5)
-                                                .background(
-                                                    Color.primary.opacity(0.055),
-                                                    in: Capsule()
-                                                )
-                                        }
-                                    }
-                                    .padding(.top, 2)
-                                }
-                            }
-
-                            Spacer()
-
-                            NavigationLink {
-                                ATHLTHEditProfileView()
-                            } label: {
-                                Label("Edit profile", systemImage: "pencil")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 38)
-                                    .background(
-                                        ATHLTHTheme.accentSoft,
-                                        in: Capsule()
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Edit Profile")
-                        }
-                    }
-
                     if settings.shouldShowProfileSetupPrompt {
                         profileSetupPrompt
                     }
@@ -3698,10 +3620,6 @@ struct ATHLTHProfileView: View {
                         .buttonStyle(.plain)
                     }
 
-                    if settings.showProfileStatsOnProfile {
-                        profileStatsRow
-                    }
-
                     if settings.showPerformanceStatsOnProfile {
                         ProfilePerformanceSection(
                             stats: performanceStats,
@@ -3709,49 +3627,444 @@ struct ATHLTHProfileView: View {
                         )
                     }
 
+                    if performanceStats != nil || !trophyStore.trophies.isEmpty {
+                        profileHighlights
+                    }
+
                     if settings.showWorkoutHistoryOnProfile {
                         WorkoutHistoryPreviewSection()
                     }
-
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 120)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle("ATHLTH")
-            .navigationBarTitleDisplayMode(.inline)
-            .refreshable {
-                await loadPerformanceStats(forceRefresh: true)
-                await social.refresh()
+        }
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.canvasTop,
+                    ATHLTHTheme.canvasBottom
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .refreshable {
+            await loadPerformanceStats(forceRefresh: true)
+            await social.refresh()
 
-                if social.privacy?.sharePerformanceStats == true {
-                    await social.syncOwnPerformance(performanceStats)
-                }
-                if social.privacy?.shareTrophyCabinet == true {
-                    await social.syncOwnTrophies(trophyStore.showcaseTrophies)
-                }
+            if social.privacy?.sharePerformanceStats == true {
+                await social.syncOwnPerformance(performanceStats)
             }
-            .task {
-                await loadPerformanceStats()
-                await social.refresh()
+            if social.privacy?.shareTrophyCabinet == true {
+                await social.syncOwnTrophies(trophyStore.showcaseTrophies)
+            }
+        }
+        .task {
+            await loadPerformanceStats()
+            await social.refresh()
 
-                if social.privacy?.sharePerformanceStats == true {
-                    await social.syncOwnPerformance(performanceStats)
-                }
-                if social.privacy?.shareTrophyCabinet == true {
-                    await social.syncOwnTrophies(trophyStore.showcaseTrophies)
-                }
+            if social.privacy?.sharePerformanceStats == true {
+                await social.syncOwnPerformance(performanceStats)
             }
+            if social.privacy?.shareTrophyCabinet == true {
+                await social.syncOwnTrophies(trophyStore.showcaseTrophies)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
                     ATHLTHSettingsView()
                 } label: {
                     Image(systemName: "gearshape.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 40, height: 40)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(Color.white.opacity(0.72), lineWidth: 1)
+                        }
                 }
                 .accessibilityLabel("Settings")
             }
         }
+    }
+
+    private var premiumProfileHero: some View {
+        ZStack(alignment: .bottom) {
+            Image("ProgressHero")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 330)
+                .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.08),
+                    Color.clear,
+                    ATHLTHTheme.canvasTop.opacity(0.38),
+                    ATHLTHTheme.canvasTop
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            HStack(alignment: .bottom, spacing: 14) {
+                profileAvatar
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(session.profile.displayName)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+
+                    Text("@\(session.profile.username)")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    if settings.showTrainingStatusOnProfile {
+                        HStack(spacing: 7) {
+                            Circle()
+                                .fill(
+                                    session.profile.presence.state == .training
+                                        ? ATHLTHTheme.accent
+                                        : Color.green
+                                )
+                                .frame(width: 9, height: 9)
+
+                            Text(
+                                session.profile.presence.state == .training
+                                    ? "Training now"
+                                    : "Ready to train"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                    }
+
+                    if settings.showTrainingFocusOnProfile {
+                        profileIdentityChips
+                    }
+                }
+
+                Spacer(minLength: 6)
+
+                NavigationLink {
+                    ATHLTHEditProfileView()
+                } label: {
+                    Label("Edit profile", systemImage: "pencil")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.horizontal, 12)
+                        .frame(height: 40)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(Color.white.opacity(0.74), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Edit Profile")
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 46)
+        }
+        .frame(height: 330)
+        .overlay(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ATHLTH")
+                    .font(.system(size: 18, weight: .bold))
+                    .tracking(5.5)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text("YOUR BODY. YOUR DATA. YOUR PROGRESS.")
+                    .font(.system(size: 7.5, weight: .semibold))
+                    .tracking(1.35)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .padding(.leading, 20)
+            .padding(.top, 12)
+        }
+    }
+
+    @ViewBuilder
+    private var profileIdentityChips: some View {
+        HStack(spacing: 7) {
+            if let focus = session.onboardingProfile?.trainingFocus {
+                Label(
+                    focus.title,
+                    systemImage: focus.systemImage
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(
+                    ATHLTHTheme.accentSoft.opacity(0.92),
+                    in: Capsule()
+                )
+            }
+
+            if let currentGoal = session.onboardingProfile?.currentGoal {
+                Label(
+                    currentGoal.type.title,
+                    systemImage: currentGoal.type.systemImage
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(
+                    Color.white.opacity(0.76),
+                    in: Capsule()
+                )
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+    }
+
+    private var profileHighlights: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                recentRecordsCard
+                achievementsCard
+            }
+
+            VStack(spacing: 12) {
+                recentRecordsCard
+                achievementsCard
+            }
+        }
+    }
+
+    private var recentRecordsCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text("Recent Records")
+                    .font(.headline)
+
+                Spacer()
+
+                NavigationLink {
+                    PerformanceStatsView(stats: performanceStats)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .disabled(performanceStats == nil)
+            }
+
+            if let stats = performanceStats {
+                premiumRecordRow(
+                    icon: "figure.run",
+                    title: "Fastest 1K",
+                    value: stats.fastestOneKilometer?.formattedTime ?? "—"
+                )
+
+                Divider().opacity(0.45)
+
+                premiumRecordRow(
+                    icon: "figure.run.circle",
+                    title: "Fastest 5K",
+                    value: stats.fastestFiveKilometers?.formattedTime ?? "—"
+                )
+
+                Divider().opacity(0.45)
+
+                premiumRecordRow(
+                    icon: "point.topleft.down.to.point.bottomright.curvepath",
+                    title: "Longest Run",
+                    value: profileDistance(stats.longestRunMeters)
+                )
+
+                Divider().opacity(0.45)
+
+                premiumRecordRow(
+                    icon: "clock",
+                    title: "Longest Session",
+                    value: profileDuration(stats.longestWorkoutDuration)
+                )
+            } else {
+                Text("Connect Apple Health to build your records.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .padding(.vertical, 12)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(
+            Color.white.opacity(0.82),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(ATHLTHTheme.border.opacity(0.7), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.035), radius: 16, x: 0, y: 8)
+    }
+
+    private var achievementsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Achievements")
+                    .font(.headline)
+
+                Spacer()
+
+                NavigationLink {
+                    TrophyCollectionView()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("View All")
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+
+            HStack(spacing: 10) {
+                ForEach(Array(profileShowcaseTrophies.prefix(3))) { trophy in
+                    VStack(spacing: 7) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(trophyTint(trophy).opacity(0.12))
+                                .frame(width: 54, height: 54)
+
+                            Image(systemName: trophy.systemImage)
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(trophyTint(trophy))
+                        }
+
+                        Text(trophy.stageLabel)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+
+                if profileShowcaseTrophies.isEmpty {
+                    Text("Your unlocked trophies will appear here.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            NavigationLink {
+                TrophyCollectionView()
+            } label: {
+                Label("View All Achievements", systemImage: "trophy")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .background(
+                        ATHLTHTheme.accentSoft.opacity(0.72),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(
+            Color.white.opacity(0.82),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(ATHLTHTheme.border.opacity(0.7), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.035), radius: 16, x: 0, y: 8)
+    }
+
+    private var profileShowcaseTrophies: [TrophyProgressItem] {
+        let showcase = trophyStore.showcaseTrophies
+        if !showcase.isEmpty {
+            return showcase
+        }
+
+        return trophyStore.trophies
+            .filter(\.isUnlocked)
+            .sorted {
+                ($0.unlockedAt ?? .distantPast) >
+                ($1.unlockedAt ?? .distantPast)
+            }
+    }
+
+    @ViewBuilder
+    private func premiumRecordRow(
+        icon: String,
+        title: String,
+        value: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+                .frame(width: 31, height: 31)
+                .background(
+                    ATHLTHTheme.accentSoft.opacity(0.78),
+                    in: Circle()
+                )
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Spacer(minLength: 8)
+
+            Text(value)
+                .font(.caption.monospacedDigit().weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+        }
+    }
+
+    private func trophyTint(_ trophy: TrophyProgressItem) -> Color {
+        switch trophy.displayRarity {
+        case .core:
+            return ATHLTHTheme.accent
+        case .rare:
+            return .blue
+        case .epic:
+            return .purple
+        case .signature:
+            return .orange
+        }
+    }
+
+    private func profileDistance(_ meters: Double?) -> String {
+        guard let meters, meters > 0 else { return "—" }
+        return String(format: "%.2f km", meters / 1_000)
+    }
+
+    private func profileDuration(_ duration: TimeInterval?) -> String {
+        guard let duration, duration > 0 else { return "—" }
+        let totalMinutes = Int(duration / 60)
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+
+        return "\(minutes)m"
     }
 
     private var profileSetupPrompt: some View {
