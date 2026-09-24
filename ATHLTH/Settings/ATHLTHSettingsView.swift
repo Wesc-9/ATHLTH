@@ -96,133 +96,6 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
-                    settingsSection("Membership") {
-                        PremiumSettingsCard {
-                            Button {
-                                showingMembership = true
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "crown.fill",
-                                    iconTint: ATHLTHTheme.premiumGold,
-                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
-                                    title: "Plan",
-                                    subtitle: "Your current plan"
-                                ) {
-                                    HStack(spacing: 8) {
-                                        Text(session.subscriptionAccess.displayTitle)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                            .lineLimit(1)
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            if let billingPeriod = session.subscriptionAccess.billingPeriodTitle {
-                                SettingsDivider()
-                                PremiumSettingsRow(
-                                    icon: "creditcard",
-                                    title: "Billing",
-                                    subtitle: "Your billing cycle"
-                                ) {
-                                    Text(billingPeriod)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-                                }
-                            }
-
-                            if session.subscriptionAccess.trialIsActive,
-                               let trialEndsAt = session.subscriptionAccess.trialEndsAt {
-                                SettingsDivider()
-                                PremiumSettingsRow(
-                                    icon: "calendar",
-                                    title: "7-day trial ends",
-                                    subtitle: "Keep going. You’re almost there."
-                                ) {
-                                    Text(trialEndsAt.formatted(date: .abbreviated, time: .omitted))
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-                                        .multilineTextAlignment(.trailing)
-                                }
-                            }
-
-                            if let periodEndsAt = session.subscriptionAccess.currentPeriodEndsAt {
-                                switch session.subscriptionAccess.lifecycleState {
-                                case .active:
-                                    SettingsDivider()
-                                    PremiumSettingsRow(
-                                        icon: "calendar.badge.clock",
-                                        title: "Current period",
-                                        subtitle: "Your current ATHLTH+ access"
-                                    ) {
-                                        Text(periodEndsAt.formatted(date: .abbreviated, time: .omitted))
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                    }
-                                case .expired:
-                                    SettingsDivider()
-                                    PremiumSettingsRow(
-                                        icon: "calendar.badge.exclamationmark",
-                                        title: "Access ended",
-                                        subtitle: "Your ATHLTH+ access has ended"
-                                    ) {
-                                        Text(periodEndsAt.formatted(date: .abbreviated, time: .omitted))
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                    }
-                                default:
-                                    EmptyView()
-                                }
-                            }
-
-                            SettingsDivider()
-
-                            Button {
-                                Task {
-                                    _ = await subscriptionStore.restorePurchases()
-                                }
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "arrow.counterclockwise",
-                                    title: "Restore Purchases",
-                                    subtitle: "Restore your ATHLTH+ purchase"
-                                ) {
-                                    if subscriptionStore.restoreInProgress {
-                                        ProgressView()
-                                            .tint(ATHLTHTheme.accent)
-                                    } else {
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(subscriptionStore.restoreInProgress)
-
-                            if session.subscriptionAccess.hasPaidAccess {
-                                SettingsDivider()
-
-                                Link(destination: URL(string: "https://apps.apple.com/account/subscriptions")!) {
-                                    PremiumSettingsRow(
-                                        icon: "creditcard",
-                                        title: "Manage Subscription",
-                                        subtitle: "Open Apple subscription settings"
-                                    ) {
-                                        Image(systemName: "arrow.up.right")
-                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            if let errorMessage = subscriptionStore.errorMessage {
-                                SettingsDivider()
-                                Text(errorMessage)
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                            }
-                        }
-                    }
-
                     settingsSection("Profile") {
                         PremiumSettingsCard {
                             NavigationLink {
@@ -426,6 +299,133 @@ struct ATHLTHSettingsView: View {
                         ) {
                                 Text("English")
                                     .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                    }
+
+                    settingsSection("Membership") {
+                        PremiumSettingsCard {
+                            Button {
+                                showingMembership = true
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "crown.fill",
+                                    iconTint: ATHLTHTheme.premiumGold,
+                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                    title: "Plan",
+                                    subtitle: "Your current plan"
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text(session.subscriptionAccess.displayTitle)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                            .lineLimit(1)
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            if let billingPeriod = session.subscriptionAccess.billingPeriodTitle {
+                                SettingsDivider()
+                                PremiumSettingsRow(
+                                    icon: "creditcard",
+                                    title: "Billing",
+                                    subtitle: "Your billing cycle"
+                                ) {
+                                    Text(billingPeriod)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            }
+
+                            if session.subscriptionAccess.trialIsActive,
+                               let trialEndsAt = session.subscriptionAccess.trialEndsAt {
+                                SettingsDivider()
+                                PremiumSettingsRow(
+                                    icon: "calendar",
+                                    title: "7-day trial ends",
+                                    subtitle: "Keep going. You’re almost there."
+                                ) {
+                                    Text(trialEndsAt.formatted(date: .abbreviated, time: .omitted))
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                            }
+
+                            if let periodEndsAt = session.subscriptionAccess.currentPeriodEndsAt {
+                                switch session.subscriptionAccess.lifecycleState {
+                                case .active:
+                                    SettingsDivider()
+                                    PremiumSettingsRow(
+                                        icon: "calendar.badge.clock",
+                                        title: "Current period",
+                                        subtitle: "Your current ATHLTH+ access"
+                                    ) {
+                                        Text(periodEndsAt.formatted(date: .abbreviated, time: .omitted))
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                case .expired:
+                                    SettingsDivider()
+                                    PremiumSettingsRow(
+                                        icon: "calendar.badge.exclamationmark",
+                                        title: "Access ended",
+                                        subtitle: "Your ATHLTH+ access has ended"
+                                    ) {
+                                        Text(periodEndsAt.formatted(date: .abbreviated, time: .omitted))
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                default:
+                                    EmptyView()
+                                }
+                            }
+
+                            SettingsDivider()
+
+                            Button {
+                                Task {
+                                    _ = await subscriptionStore.restorePurchases()
+                                }
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "arrow.counterclockwise",
+                                    title: "Restore Purchases",
+                                    subtitle: "Restore your ATHLTH+ purchase"
+                                ) {
+                                    if subscriptionStore.restoreInProgress {
+                                        ProgressView()
+                                            .tint(ATHLTHTheme.accent)
+                                    } else {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(subscriptionStore.restoreInProgress)
+
+                            if session.subscriptionAccess.hasPaidAccess {
+                                SettingsDivider()
+
+                                Link(destination: URL(string: "https://apps.apple.com/account/subscriptions")!) {
+                                    PremiumSettingsRow(
+                                        icon: "creditcard",
+                                        title: "Manage Subscription",
+                                        subtitle: "Open Apple subscription settings"
+                                    ) {
+                                        Image(systemName: "arrow.up.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            if let errorMessage = subscriptionStore.errorMessage {
+                                SettingsDivider()
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
                             }
                         }
                     }
@@ -996,141 +996,48 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     var body: some View {
-        Form {
-            Section("Primary training device") {
-                ForEach(TrainingDeviceProvider.allCases) { provider in
-                    HStack(spacing: 10) {
-                        Button {
-                            select(provider)
-                        } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: provider.systemImage)
-                                    .font(.title3)
-                                    .foregroundStyle(
-                                        settings.trainingDeviceProvider == provider
-                                            ? ATHLTHTheme.accent
-                                            : .secondary
-                                    )
-                                    .frame(width: 34)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("PRIMARY TRAINING DEVICE")
+                        .font(.caption.weight(.semibold))
+                        .tracking(2.4)
+                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+                        .padding(.leading, 16)
 
-                                VStack(alignment: .leading, spacing: 3) {
-                                    HStack(spacing: 7) {
-                                        Text(provider.title)
-                                            .font(.headline)
-                                            .foregroundStyle(.primary)
+                    PremiumSettingsCard {
+                        deviceRow(.appleWatch)
 
-                                        if provider == .garmin {
-                                            Text("COMING SOON")
-                                                .font(.system(size: 8, weight: .bold))
-                                                .tracking(0.7)
-                                                .foregroundStyle(.secondary)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 3)
-                                                .background(
-                                                    Color.primary.opacity(0.05),
-                                                    in: Capsule()
-                                                )
-                                        }
-                                    }
+                        SettingsDivider()
 
-                                    Text(deviceSubtitle(provider))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .multilineTextAlignment(.leading)
-                                }
+                        deviceRow(.garmin)
 
-                                Spacer()
+                        SettingsDivider()
 
-                                Image(
-                                    systemName:
-                                        settings.trainingDeviceProvider == provider
-                                        ? "checkmark.circle.fill"
-                                        : "circle"
-                                )
-                                .foregroundStyle(
-                                    settings.trainingDeviceProvider == provider
-                                        ? ATHLTHTheme.accent
-                                        : Color.secondary.opacity(0.55)
-                                )
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(provider == .garmin)
-                        .opacity(provider == .garmin ? 0.62 : 1)
-
-                        if provider == .appleWatch {
-                            NavigationLink {
-                                AppleWatchConnectionView()
-                            } label: {
-                                Image(systemName: "info.circle")
-                                    .font(.title3)
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .frame(width: 36, height: 36)
-                            }
-                            .accessibilityLabel("Apple Watch details")
-                        } else if provider == .garmin {
-                            NavigationLink {
-                                GarminConnectionSetupView()
-                            } label: {
-                                Image(systemName: "info.circle")
-                                    .font(.title3)
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 36, height: 36)
-                            }
-                            .accessibilityLabel("Garmin setup information")
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-
-            if settings.trainingDeviceProvider == .appleWatch {
-                Section("Apple Watch") {
-                    LabeledContent(
-                        "Status",
-                        value: watchConnection.statusText
-                    )
-
-                    if watchConnection.state == .appNotInstalled {
-                        Label(
-                            "ATHLTH is not installed on the paired Watch.",
-                            systemImage: "exclamationmark.triangle.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                    } else if watchConnection.isReady {
-                        Label(
-                            "ATHLTH Watch app is installed and ready.",
-                            systemImage: "checkmark.circle.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.accent)
-                    }
-
-                    NavigationLink {
-                        AppleWatchConnectionView()
-                    } label: {
-                        Label(
-                            watchConnection.isReady
-                                ? "Apple Watch details"
-                                : "Finish Apple Watch setup",
-                            systemImage: "applewatch"
-                        )
+                        deviceRow(.none)
                     }
                 }
-            }
 
-            if settings.trainingDeviceProvider == .garmin {
-                Section("Garmin") {
-                    NavigationLink {
-                        GarminConnectionSetupView()
-                    } label: {
-                        Label("Set up Garmin", systemImage: "watch.analog")
-                    }
-                }
+                selectedDeviceDetails
             }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 48)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.canvasTop,
+                    Color.white,
+                    ATHLTHTheme.canvasBottom
+                ],
+                startPoint: .top,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        )
         .navigationTitle("Training Device")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -1144,6 +1051,293 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                 settings.preferredWorkoutCapture = .iPhone
             }
         }
+    }
+
+    private func deviceRow(
+        _ provider: TrainingDeviceProvider
+    ) -> some View {
+        Button {
+            select(provider)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: provider.systemImage)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(
+                        settings.trainingDeviceProvider == provider
+                            ? ATHLTHTheme.accentDeep
+                            : ATHLTHTheme.mutedText
+                    )
+                    .frame(width: 44, height: 44)
+                    .background(
+                        providerIconBackground(provider),
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(provider.title)
+                            .font(.system(size: 16.5, weight: .semibold))
+                            .foregroundStyle(
+                                provider == .garmin
+                                    ? ATHLTHTheme.mutedText
+                                    : ATHLTHTheme.primaryText
+                            )
+                            .lineLimit(1)
+                            .layoutPriority(1)
+
+                        if provider == .garmin {
+                            Text("COMING SOON")
+                                .font(.system(size: 8, weight: .bold))
+                                .tracking(0.7)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Color.primary.opacity(0.045),
+                                    in: Capsule()
+                                )
+                                .fixedSize()
+                        }
+                    }
+
+                    Text(deviceSubtitle(provider))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(
+                    systemName:
+                        settings.trainingDeviceProvider == provider
+                        ? "checkmark.circle.fill"
+                        : "circle"
+                )
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(
+                    settings.trainingDeviceProvider == provider
+                        ? ATHLTHTheme.accentDeep
+                        : Color.secondary.opacity(0.42)
+                )
+                .frame(width: 28)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(provider == .garmin)
+        .opacity(provider == .garmin ? 0.72 : 1)
+    }
+
+    @ViewBuilder
+    private var selectedDeviceDetails: some View {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            VStack(alignment: .leading, spacing: 10) {
+                Text("APPLE WATCH SETUP")
+                    .font(.caption.weight(.semibold))
+                    .tracking(2.4)
+                    .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+                    .padding(.leading, 16)
+
+                PremiumSettingsCard {
+                    VStack(alignment: .leading, spacing: 0) {
+                        detailRow(
+                            title: "Connection",
+                            value: watchConnectionTitle,
+                            icon: "applewatch"
+                        )
+
+                        SettingsDivider()
+
+                        detailRow(
+                            title: "Watch app",
+                            value: watchAppTitle,
+                            icon: watchConnection.isReady
+                                ? "checkmark.circle.fill"
+                                : "app.badge"
+                        )
+
+                        SettingsDivider()
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(watchSetupDetail)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            NavigationLink {
+                                AppleWatchConnectionView()
+                            } label: {
+                                HStack {
+                                    Label(
+                                        watchConnection.isReady
+                                            ? "Open Apple Watch details"
+                                            : "Open setup",
+                                        systemImage: "applewatch"
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.bold))
+                                }
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .padding(.horizontal, 14)
+                                .frame(height: 46)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 14,
+                                        style: .continuous
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(16)
+                    }
+                }
+            }
+
+        case .none:
+            VStack(alignment: .leading, spacing: 10) {
+                Text("IPHONE & APPLE HEALTH")
+                    .font(.caption.weight(.semibold))
+                    .tracking(2.4)
+                    .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+                    .padding(.leading, 16)
+
+                PremiumSettingsCard {
+                    HStack(spacing: 14) {
+                        Image(systemName: "iphone")
+                            .font(.title3)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 14,
+                                    style: .continuous
+                                )
+                            )
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("No watch required")
+                                .font(.headline)
+                            Text(
+                                "ATHLTH can still use your iPhone and available Apple Health data. You can connect a watch later."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(16)
+                }
+            }
+
+        case .garmin:
+            EmptyView()
+        }
+    }
+
+    private func detailRow(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 32)
+
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Spacer()
+
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(
+                    value == "Not installed" ||
+                    value == "Not paired" ||
+                    value == "Unavailable"
+                        ? Color.orange
+                        : ATHLTHTheme.mutedText
+                )
+                .multilineTextAlignment(.trailing)
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    private var watchConnectionTitle: String {
+        switch watchConnection.state {
+        case .ready, .appNotInstalled:
+            return "Paired"
+        case .notPaired:
+            return "Not paired"
+        case .checking:
+            return "Checking…"
+        case .unsupported:
+            return "Unavailable"
+        }
+    }
+
+    private var watchAppTitle: String {
+        switch watchConnection.state {
+        case .ready:
+            return "Installed"
+        case .appNotInstalled:
+            return "Not installed"
+        case .notPaired:
+            return "Unavailable"
+        case .checking:
+            return "Checking…"
+        case .unsupported:
+            return "Unavailable"
+        }
+    }
+
+    private var watchSetupDetail: String {
+        switch watchConnection.state {
+        case .ready:
+            return "ATHLTH Watch is ready for live workouts, routes and HealthKit sync."
+        case .appNotInstalled:
+            return "Install the ATHLTH Watch app to start workouts, sync routes and use live tracking."
+        case .notPaired:
+            return "Pair an Apple Watch with this iPhone first, then return here to finish ATHLTH setup."
+        case .checking:
+            return "ATHLTH is checking the paired Apple Watch and app installation."
+        case .unsupported:
+            return "Apple Watch connectivity is unavailable on this device."
+        }
+    }
+
+    private func providerIconBackground(
+        _ provider: TrainingDeviceProvider
+    ) -> Color {
+        if provider == .garmin {
+            return Color.primary.opacity(0.035)
+        }
+
+        return settings.trainingDeviceProvider == provider
+            ? ATHLTHTheme.accentSoft
+            : Color.primary.opacity(0.035)
     }
 
     private func select(_ provider: TrainingDeviceProvider) {
@@ -1171,22 +1365,22 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
         case .appleWatch:
             switch watchConnection.state {
             case .ready:
-                return "Connected · ATHLTH Watch app installed"
+                return "Paired · ATHLTH Watch app installed"
             case .appNotInstalled:
-                return "Paired · ATHLTH Watch app not installed"
+                return "Paired · Watch app needs installation"
             case .notPaired:
                 return "No paired Apple Watch found"
             case .checking:
                 return "Checking Apple Watch…"
             case .unsupported:
-                return "Apple Watch unavailable on this device"
+                return "Apple Watch unavailable"
             }
 
         case .garmin:
-            return "Setup will open here when Garmin access is enabled"
+            return "Garmin Connect integration will be available later"
 
         case .none:
-            return "Use ATHLTH with iPhone and available Apple Health data"
+            return "Use ATHLTH with iPhone and Apple Health"
         }
     }
 }
