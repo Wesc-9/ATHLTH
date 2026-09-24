@@ -199,14 +199,15 @@ final class RouteDiscoveryStore: ObservableObject {
     }
 
     func syncOwnedPublicRoutes(
-        _ routes: [TrainingRoute]
+        _ ownedRoutes: [TrainingRoute]
     ) async {
         do {
-            for route in routes where route.visibility == .publicProfile {
+            for route in ownedRoutes
+            where route.visibility == .publicProfile {
                 try await service.publish(route)
             }
 
-            routes = try await service.loadDiscoverableRoutes()
+            self.routes = try await service.loadDiscoverableRoutes()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
