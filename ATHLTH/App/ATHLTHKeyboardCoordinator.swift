@@ -12,8 +12,8 @@ final class ATHLTHKeyboardCoordinator {
         guard keyboardObserver == nil else { return }
 
         // SwiftUI Form, List and ScrollView are backed by UIScrollView.
-        // Interactive dismissal makes dragging the keyboard down work
-        // consistently across ATHLTH without every screen implementing it.
+        // Keep native interactive dismissal so users can also drag the
+        // keyboard down anywhere ATHLTH uses a scrollable form.
         UIScrollView.appearance().keyboardDismissMode = .interactive
 
         keyboardObserver = NotificationCenter.default.addObserver(
@@ -22,59 +22,98 @@ final class ATHLTHKeyboardCoordinator {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.attachDoneButtonToCurrentResponder()
+                self?.attachDismissControlToCurrentResponder()
             }
         }
     }
 
-    private func attachDoneButtonToCurrentResponder() {
+    private func attachDismissControlToCurrentResponder() {
         guard let responder = UIResponder.athlthCurrentFirstResponder() else {
             return
         }
 
         if let textField = responder as? UITextField {
-            guard textField.inputAccessoryView?.tag != Self.toolbarTag else {
+            guard textField.inputAccessoryView?.tag != Self.accessoryTag else {
                 return
             }
 
-            textField.inputAccessoryView = makeToolbar()
+            textField.inputAccessoryView = makeAccessoryBar()
             textField.reloadInputViews()
             return
         }
 
         if let textView = responder as? UITextView {
-            guard textView.inputAccessoryView?.tag != Self.toolbarTag else {
+            guard textView.inputAccessoryView?.tag != Self.accessoryTag else {
                 return
             }
 
-            textView.inputAccessoryView = makeToolbar()
+            textView.inputAccessoryView = makeAccessoryBar()
             textView.reloadInputViews()
         }
     }
 
-    private func makeToolbar() -> UIToolbar {
-        let toolbar = UIToolbar()
-        toolbar.tag = Self.toolbarTag
-        toolbar.sizeToFit()
-
-        let spacer = UIBarButtonItem(
-            barButtonSystemItem: .flexibleSpace,
-            target: nil,
-            action: nil
+    private func makeAccessoryBar() -> UIView {
+        let height: CGFloat = 36
+        let container = UIView(
+            frame: CGRect(x: 0, y: 0, width: 0, height: height)
         )
-        let done = UIBarButtonItem(
-            title: "Done",
-            style: .done,
-            target: self,
-            action: #selector(doneTapped)
+        container.tag = Self.accessoryTag
+        container.autoresizingMask = [.flexibleWidth]
+        container.backgroundColor = .secondarySystemBackground
+
+        let separator = UIView()
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        separator.backgroundColor = .separator.withAlphaComponent(0.45)
+
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.accessibilityLabel = "Hide keyboard"
+        button.tintColor = .secondaryLabel
+
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(
+            systemName: "keyboard.chevron.compact.down"
+        )
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+            pointSize: 17,
+            weight: .semibold
+        )
+        configuration.contentInsets = NSDirectionalEdgeInsets(
+            top: 4,
+            leading: 8,
+            bottom: 4,
+            trailing: 8
+        )
+        button.configuration = configuration
+        button.addTarget(
+            self,
+            action: #selector(dismissKeyboardTapped),
+            for: .touchUpInside
         )
 
-        toolbar.items = [spacer, done]
-        return toolbar
+        container.addSubview(separator)
+        container.addSubview(button)
+
+        NSLayoutConstraint.activate([
+            separator.topAnchor.constraint(equalTo: container.topAnchor),
+            separator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            separator.heightAnchor.constraint(equalToConstant: 0.5),
+
+            button.trailingAnchor.constraint(
+                equalTo: container.safeAreaLayoutGuide.trailingAnchor,
+                constant: -6
+            ),
+            button.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 40),
+            button.heightAnchor.constraint(equalToConstant: 32)
+        ])
+
+        return container
     }
 
     @objc
-    private func doneTapped() {
+    private func dismissKeyboardTapped() {
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
             to: nil,
@@ -83,7 +122,7 @@ final class ATHLTHKeyboardCoordinator {
         )
     }
 
-    private static let toolbarTag = 0xA7_11_7
+    private static let accessoryTag = 0xA7_11_7
 }
 
 private var athlthCapturedFirstResponder: UIResponder?
