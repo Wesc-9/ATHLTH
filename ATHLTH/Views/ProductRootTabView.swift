@@ -954,7 +954,6 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
-    @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
@@ -1025,11 +1024,7 @@ struct ATHLTHTrainView: View {
                         settings.trainingDeviceProvider == .appleWatch &&
                         watchConnection.isReady,
                     defaultCapture: settings.preferredWorkoutCapture,
-                    defaultTracking: settings.defaultStrengthTracking,
-                    linkedSpotifyPlaylist: session.activePlan?.spotifyPlaylist,
-                    spotifyAutoplayEnabled:
-                        settings.spotifyAutoplayLinkedPlaylists &&
-                        (session.activePlan?.spotifyAutoplayOnWorkoutStart ?? false)
+                    defaultTracking: settings.defaultStrengthTracking
                 ) { captureDevice, trackingMode, selectedFriends in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
