@@ -56,6 +56,55 @@ final class SupabaseSocialService {
             .value
     }
 
+    func loadFollowers(for userID: UUID) async throws -> [SocialFollowRecord] {
+        try await client
+            .from("profile_follows")
+            .select()
+            .eq("following_id", value: userID)
+            .execute()
+            .value
+    }
+
+    func loadFollowing(for userID: UUID) async throws -> [SocialFollowRecord] {
+        try await client
+            .from("profile_follows")
+            .select()
+            .eq("follower_id", value: userID)
+            .execute()
+            .value
+    }
+
+    func follow(_ userID: UUID) async throws {
+        guard let followerID = currentUserID,
+              followerID != userID
+        else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        let payload = SocialFollowInsert(
+            followerID: followerID,
+            followingID: userID
+        )
+
+        try await client
+            .from("profile_follows")
+            .insert(payload)
+            .execute()
+    }
+
+    func unfollow(_ userID: UUID) async throws {
+        guard let followerID = currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        try await client
+            .from("profile_follows")
+            .delete()
+            .eq("follower_id", value: followerID)
+            .eq("following_id", value: userID)
+            .execute()
+    }
+
     func sendFriendRequest(to recipientID: UUID, message: String? = nil) async throws {
         guard let senderID = currentUserID else {
             throw SocialServiceError.notAuthenticated
