@@ -56,6 +56,43 @@ struct ATHLTHSettingsView: View {
                             }
                             }
                             .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            Menu {
+                                ForEach(TimeFormatPreference.allCases) { preference in
+                                    Button {
+                                        settings.timeFormatPreference = preference
+                                    } label: {
+                                        if settings.timeFormatPreference == preference {
+                                            Label(
+                                                "\(preference.title) · \(preference.example)",
+                                                systemImage: "checkmark"
+                                            )
+                                        } else {
+                                            Text(
+                                                "\(preference.title) · \(preference.example)"
+                                            )
+                                        }
+                                    }
+                                }
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "clock",
+                                    title: "Time format",
+                                    subtitle: "Used for times throughout ATHLTH"
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text(settings.timeFormatPreference.title)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(
+                                                ATHLTHTheme.mutedText.opacity(0.72)
+                                            )
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
 
