@@ -1,4 +1,5 @@
 import Charts
+import Foundation
 import SwiftUI
 
 private enum HomeWeeklyMetric: CaseIterable, Identifiable {
@@ -91,10 +92,7 @@ struct HomeWeeklyTrendsCard: View {
             } else if let snapshot,
                       snapshotHasData(snapshot) {
                 VStack(spacing: 0) {
-                    ForEach(
-                        Array(HomeWeeklyMetric.allCases.enumerated()),
-                        id: \.element.id
-                    ) { index, metric in
+                    ForEach(HomeWeeklyMetric.allCases) { metric in
                         HomeWeeklyTrendRow(
                             metric: metric,
                             summary: summary(metric, snapshot: snapshot),
@@ -102,7 +100,7 @@ struct HomeWeeklyTrendsCard: View {
                             points: points(metric, snapshot: snapshot)
                         )
 
-                        if index < HomeWeeklyMetric.allCases.count - 1 {
+                        if metric != .sleep {
                             Divider()
                                 .overlay(ATHLTHTheme.divider.opacity(0.7))
                                 .padding(.leading, 46)
