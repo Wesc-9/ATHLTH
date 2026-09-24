@@ -4127,7 +4127,6 @@ struct ATHLTHProgressView: View {
 
     @State private var period: ProgressPeriod = .week
     @State private var progressSnapshot: HealthProgressSnapshot?
-    @State private var monthlySnapshot: HealthProgressSnapshot?
     @State private var consistencySnapshot: HealthProgressSnapshot?
     @State private var personalRecords: [HealthPersonalRecord] = []
     @State private var workoutHistory: [WorkoutSummary] = []
@@ -4444,147 +4443,6 @@ struct ATHLTHProgressView: View {
         .progressReferenceCard()
     }
 
-    private var workoutsCompletedCard: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            compactHeader("Workouts Completed")
-
-            HStack(alignment: .top, spacing: 10) {
-                if let snapshot = progressSnapshot, !snapshot.buckets.isEmpty {
-                    Chart(snapshot.buckets) { bucket in
-                        BarMark(
-                            x: .value("Period", bucketAxisLabel(bucket.startDate)),
-                            y: .value("Workouts", bucket.workoutCount)
-                        )
-                        .foregroundStyle(green.gradient)
-                        .cornerRadius(4)
-                    }
-                    .chartYAxis {
-                        AxisMarks(position: .leading) {
-                            AxisGridLine().foregroundStyle(Color.black.opacity(0.045))
-                            AxisValueLabel().font(.system(size: 8))
-                        }
-                    }
-                    .chartXAxis {
-                        AxisMarks {
-                            AxisValueLabel().font(.system(size: 8))
-                        }
-                    }
-                    .frame(height: 120)
-                } else {
-                    chartPlaceholder(icon: "figure.run")
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(progressSnapshot.map { String($0.workoutCount) } ?? "—")
-                        .font(.title2.weight(.bold))
-                    Text(periodSummaryLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    changeIndicator(progressSnapshot?.workoutChangePercent)
-                        .padding(.top, 7)
-
-                    Text(comparisonLabel)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(width: 66, alignment: .leading)
-            }
-        }
-        .padding(16)
-        .progressReferenceCard()
-    }
-
-    private var dailyStepsCard: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            compactHeader("Daily Steps")
-
-            HStack(alignment: .top, spacing: 10) {
-                if let snapshot = progressSnapshot, !snapshot.buckets.isEmpty {
-                    Chart(snapshot.buckets) { bucket in
-                        BarMark(
-                            x: .value("Period", bucketAxisLabel(bucket.startDate)),
-                            y: .value("Steps", bucket.averageDailySteps ?? 0)
-                        )
-                        .foregroundStyle(blue.gradient)
-                        .cornerRadius(4)
-                    }
-                    .chartYScale(domain: 0...stepsChartUpperBound)
-                    .chartYAxis {
-                        AxisMarks(position: .leading) {
-                            AxisGridLine().foregroundStyle(Color.black.opacity(0.045))
-                            AxisValueLabel().font(.system(size: 8))
-                        }
-                    }
-                    .chartXAxis {
-                        AxisMarks {
-                            AxisValueLabel().font(.system(size: 8))
-                        }
-                    }
-                    .frame(height: 120)
-                } else {
-                    chartPlaceholder(icon: "shoeprints.fill")
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(formattedSteps(progressSnapshot?.averageDailySteps))
-                        .font(.title2.weight(.bold))
-                        .minimumScaleFactor(0.70)
-                        .lineLimit(1)
-                    Text("avg. steps")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    changeIndicator(progressSnapshot?.stepsChangePercent)
-                        .padding(.top, 7)
-
-                    Text(comparisonLabel)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(width: 70, alignment: .leading)
-            }
-        }
-        .padding(16)
-        .progressReferenceCard()
-    }
-
-    private var consistencyCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            compactHeader("Consistency")
-
-            HStack(spacing: 13) {
-                ZStack {
-                    Circle()
-                        .fill(green.opacity(0.08))
-                        .frame(width: 78, height: 78)
-
-                    Image(systemName: "calendar.badge.checkmark")
-                        .font(.system(size: 32))
-                        .foregroundStyle(green)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("\(activeDaysLast30) active days")
-                        .font(.title2.weight(.bold))
-
-                    Text("Last 30 days")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            ProgressView(value: Double(activeDaysLast30), total: 30)
-                .tint(green)
-
-            Text("\(consistencyPercentLast30)% of the last 30 days included training.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .progressReferenceCard()
-    }
-
     private var personalRecordsCard: some View {
         let healthRecords = Array(personalRecords.prefix(2))
         let strengthRecords = Array(
@@ -4592,125 +4450,117 @@ struct ATHLTHProgressView: View {
                 .filter { $0.kind == .heaviestSet }
                 .prefix(2)
         )
-        let totalRecordCount = personalRecords.count + strengthWorkout.personalRecords.count
+        let totalRecordCount =
+            personalRecords.count +
+            strengthWorkout.personalRecords.count +
+            strengthWorkout.repPersonalRecords.count
 
-        return VStack(alignment: .leading, spacing: 13) {
-            HStack {
-                Text("Personal Records")
-                    .font(.headline)
-                Spacer()
+        return NavigationLink {
+            ProgressPersonalRecordsView(
+                healthRecords: personalRecords,
+                strengthRecords:
+                    strengthWorkout.personalRecords,
+                repRecords:
+                    strengthWorkout.repPersonalRecords
+            )
+        } label: {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Personal Records")
+                            .font(.headline)
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
 
-                if totalRecordCount > healthRecords.count + strengthRecords.count {
-                    Text("+\(totalRecordCount - healthRecords.count - strengthRecords.count)")
+                        Text("Your verified best performances.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if totalRecordCount >
+                        healthRecords.count +
+                        strengthRecords.count {
+                        Text(
+                            "+\(totalRecordCount - healthRecords.count - strengthRecords.count)"
+                        )
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(green)
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
                 }
 
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
+                if healthRecords.isEmpty &&
+                    strengthRecords.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Image(systemName: "trophy")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
 
-            if healthRecords.isEmpty && strengthRecords.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Image(systemName: "trophy")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
+                        Text("No records yet")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
 
-                    Text("No records yet")
-                        .font(.caption.weight(.semibold))
-
-                    Text("ATHLTH will surface verified records from Apple Health and strength workouts you log in ATHLTH.")
+                        Text(
+                            "ATHLTH will surface verified records from Apple Health and strength workouts you log in ATHLTH."
+                        )
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.vertical, 8)
-            } else {
-                ForEach(healthRecords) { record in
-                    recordRow(
-                        record.kind.title,
-                        value: record.formattedValue,
-                        date: record.date.formatted(.dateTime.month(.abbreviated).day().year()),
-                        icon: record.kind.systemImage
-                    )
-                }
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                    }
+                    .padding(.vertical, 8)
+                } else {
+                    ForEach(healthRecords) { record in
+                        recordRow(
+                            record.kind.title,
+                            value: record.formattedValue,
+                            date: record.date.formatted(
+                                .dateTime
+                                    .month(.abbreviated)
+                                    .day()
+                                    .year()
+                            ),
+                            icon: record.kind.systemImage
+                        )
+                    }
 
-                if !healthRecords.isEmpty && !strengthRecords.isEmpty {
-                    Divider()
-                        .overlay(Color.black.opacity(0.05))
-                }
+                    if !healthRecords.isEmpty &&
+                        !strengthRecords.isEmpty {
+                        Divider()
+                            .overlay(
+                                Color.black.opacity(0.05)
+                            )
+                    }
 
-                ForEach(strengthRecords) { record in
-                    recordRow(
-                        record.title,
-                        value: record.value,
-                        date: record.date.formatted(.dateTime.month(.abbreviated).day().year()),
-                        icon: record.kind.systemImage
-                    )
+                    ForEach(strengthRecords) { record in
+                        recordRow(
+                            record.title,
+                            value: record.value,
+                            date: record.date.formatted(
+                                .dateTime
+                                    .month(.abbreviated)
+                                    .day()
+                                    .year()
+                            ),
+                            icon: record.kind.systemImage
+                        )
+                    }
                 }
             }
+            .padding(16)
+            .progressReferenceCard()
         }
-        .padding(16)
-        .progressReferenceCard()
-    }
-
-    private var monthlyStatsCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack {
-                Text("Monthly Stats")
-                    .font(.headline)
-                Spacer()
-                Text(Date().formatted(.dateTime.month(.wide).year()))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
-
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
-                ],
-                spacing: 14
-            ) {
-                statTile(
-                    icon: "dumbbell.fill",
-                    tint: green,
-                    value: monthlySnapshot.map { String($0.workoutCount) } ?? "—",
-                    label: "Workouts",
-                    change: monthlySnapshot?.workoutChangePercent
-                )
-
-                statTile(
-                    icon: "shoeprints.fill",
-                    tint: blue,
-                    value: formattedSteps(monthlySnapshot?.totalSteps),
-                    label: "Steps",
-                    change: monthlySnapshot?.totalStepsChangePercent
-                )
-
-                statTile(
-                    icon: "moon.fill",
-                    tint: purple,
-                    value: monthlySnapshot?.averageSleepDuration.map { $0.shortDuration } ?? "—",
-                    label: "Avg. Sleep",
-                    change: monthlySnapshot?.sleepChangePercent
-                )
-
-                statTile(
-                    icon: "clock.fill",
-                    tint: green,
-                    value: monthlySnapshot.map { $0.trainingDuration.shortDuration } ?? "—",
-                    label: "Training",
-                    change: monthlySnapshot?.trainingDurationChangePercent
-                )
-            }
-        }
-        .padding(16)
-        .progressReferenceCard()
+        .buttonStyle(.plain)
     }
 
     private var achievementsCard: some View {
@@ -4952,34 +4802,6 @@ struct ATHLTHProgressView: View {
 
     private var consistencyPercentLast30: Int {
         Int(((Double(activeDaysLast30) / 30) * 100).rounded())
-    }
-
-    private var monthlyRange: (
-        start: Date,
-        end: Date,
-        previousStart: Date,
-        previousEnd: Date
-    ) {
-        let calendar = Calendar.current
-        let now = Date()
-        let start = calendar.dateInterval(of: .month, for: now)?.start
-            ?? calendar.startOfDay(for: now)
-        let previousStart = calendar.date(byAdding: .month, value: -1, to: start)
-            ?? start.addingTimeInterval(-2_592_000)
-        let elapsed = now.timeIntervalSince(start)
-        let previousBoundary = calendar.date(byAdding: .month, value: 1, to: previousStart)
-            ?? start
-        let previousEnd = min(
-            previousStart.addingTimeInterval(elapsed),
-            previousBoundary
-        )
-
-        return (
-            start: start,
-            end: now,
-            previousStart: previousStart,
-            previousEnd: previousEnd
-        )
     }
 
     private var consistencyRange: (
