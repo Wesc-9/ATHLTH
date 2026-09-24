@@ -1953,10 +1953,18 @@ final class HealthKitManager: ObservableObject {
 
     private func fetchTodayMoveGoal() async throws -> Double? {
         let calendar = Calendar.current
-        let components = calendar.dateComponents(
+        var components = calendar.dateComponents(
             [.era, .year, .month, .day],
             from: Date()
         )
+
+        // HealthKit requires the DateComponents used for an activity-summary
+        // predicate to carry a valid Calendar. iOS 27 raises an Objective-C
+        // exception here (which Swift cannot catch) when calendar is nil.
+        // Calendar.dateComponents(_:from:) does not guarantee that property.
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+
         let predicate = HKQuery.predicateForActivitySummary(
             with: components
         )
