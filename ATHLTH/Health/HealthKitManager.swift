@@ -923,7 +923,7 @@ final class HealthKitManager: ObservableObject {
                 in: route,
                 targetDistance: 1_000
             ),
-               fastestOneK == nil || duration < fastestOneK!.duration {
+               fastestOneK.map { duration < $0.duration } ?? true {
                 fastestOneK = TimedDistancePerformanceRecord(
                     distanceMeters: 1_000,
                     duration: duration,
@@ -937,7 +937,7 @@ final class HealthKitManager: ObservableObject {
                     in: route,
                     targetDistance: 5_000
                ),
-               fastestFiveK == nil || duration < fastestFiveK!.duration {
+               fastestFiveK.map { duration < $0.duration } ?? true {
                 fastestFiveK = TimedDistancePerformanceRecord(
                     distanceMeters: 5_000,
                     duration: duration,
@@ -951,7 +951,7 @@ final class HealthKitManager: ObservableObject {
                     in: route,
                     targetDistance: 42_195
                ),
-               fastestMarathon == nil || duration < fastestMarathon!.duration {
+               fastestMarathon.map { duration < $0.duration } ?? true {
                 fastestMarathon = TimedDistancePerformanceRecord(
                     distanceMeters: 42_195,
                     duration: duration,
