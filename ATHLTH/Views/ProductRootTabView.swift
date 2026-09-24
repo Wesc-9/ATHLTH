@@ -1675,7 +1675,11 @@ struct ATHLTHTrainView: View {
     @ViewBuilder
     private func todaysPlanCard(_ plan: TrainingPlan) -> some View {
         let sessions = todaySessions(in: plan)
-        let completedIDs = completedTodaySessionIDs(sessions)
+        let healthCompletedIDs = healthCompletedTodaySessionIDs(sessions)
+        let manuallyCompletedIDs = manuallyCompletedTodaySessionIDs(
+            planID: plan.id,
+            sessions: sessions
+        )
 
         ATHLTHCard {
             HStack(spacing: 10) {
@@ -1726,7 +1730,11 @@ struct ATHLTHTrainView: View {
                     ForEach(Array(sessions.enumerated()), id: \.element.id) { index, workout in
                         todayPlanRow(
                             workout,
-                            isCompleted: completedIDs.contains(workout.id),
+                            planID: plan.id,
+                            isHealthCompleted:
+                                healthCompletedIDs.contains(workout.id),
+                            isManuallyCompleted:
+                                manuallyCompletedIDs.contains(workout.id),
                             isFirst: index == 0,
                             isLast: index == sessions.count - 1
                         )
@@ -1804,16 +1812,24 @@ struct ATHLTHTrainView: View {
     @ViewBuilder
     private func todayPlanRow(
         _ workout: PlannedSession,
-        isCompleted: Bool,
+        planID: UUID,
+        isHealthCompleted: Bool,
+        isManuallyCompleted: Bool,
         isFirst: Bool,
         isLast: Bool
     ) -> some View {
-        Button {
-            if workout.kind == .strength, !isCompleted {
-                selectedStrengthSession = workout
-            }
-        } label: {
-            HStack(spacing: 12) {
+        let isCompleted = isHealthCompleted || isManuallyCompleted
+
+        HStack(spacing: 12) {
+            Button {
+                guard !isHealthCompleted else { return }
+
+                session.setPlanSessionManuallyCompleted(
+                    planID: planID,
+                    sessionID: workout.id,
+                    completed: !isManuallyCompleted
+                )
+            } label: {
                 ZStack {
                     if !isFirst {
                         Rectangle()
@@ -1853,45 +1869,127 @@ struct ATHLTHTrainView: View {
                     }
                 }
                 .frame(width: 32, height: 58)
+            }
+            .buttonStyle(.plain)
+            .disabled(isHealthCompleted)
+            .accessibilityLabel(
+                isHealthCompleted
+                    ? "Completed from Apple Health"
+                    : isManuallyCompleted
+                        ? "Mark \(workout.title) as not completed"
+                        : "Mark \(workout.title) as completed"
+            )
+            .accessibilityHint(
+                isHealthCompleted
+                    ? "This workout was matched automatically from Apple Health."
+                    : "Double tap to change manual completion."
+            )
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(workout.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
-
-                    Text(todaySessionSummary(workout))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 6)
-
-                Text(todayPlanStatus(workout, isCompleted: isCompleted))
-                    .font(.caption.weight(isCompleted ? .semibold : .regular))
-                    .foregroundStyle(
-                        isCompleted
-                            ? ATHLTHTheme.accent
-                            : ATHLTHTheme.mutedText
-                    )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(workout.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
                     .lineLimit(1)
 
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                Text(todaySessionSummary(workout))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 10)
-            .frame(minHeight: 64)
-            .background(
-                Color.white.opacity(0.42),
-                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-            )
+
+            Spacer(minLength: 6)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(
+                    todayPlanStatus(
+                        workout,
+                        isCompleted: isCompleted
+                    )
+                )
+                .font(.caption.weight(isCompleted ? .semibold : .regular))
+                .foregroundStyle(
+                    isCompleted
+                        ? ATHLTHTheme.accent
+                        : ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
+
+                if isManuallyCompleted && !isHealthCompleted {
+                    Text("Manual")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+
+            if workout.kind == .strength && !isCompleted {
+                Button {
+                    selectedStrengthSession = workout
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Start \(workout.title)")
+            } else if isManuallyCompleted && !isHealthCompleted {
+                Button {
+                    session.setPlanSessionManuallyCompleted(
+                        planID: planID,
+                        sessionID: workout.id,
+                        completed: false
+                    )
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Undo manual completion")
+            } else {
+                Image(systemName: isHealthCompleted ? "heart.fill" : "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        isHealthCompleted
+                            ? ATHLTHTheme.accent.opacity(0.72)
+                            : Color.secondary.opacity(0.55)
+                    )
+                    .frame(width: 30, height: 30)
+                    .accessibilityHidden(true)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(workout.kind != .strength || isCompleted)
-        .opacity(1)
+        .padding(.horizontal, 10)
+        .frame(minHeight: 64)
+        .background(
+            Color.white.opacity(0.42),
+            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+        )
         .padding(.vertical, 3)
+        .contextMenu {
+            if !isHealthCompleted {
+                Button {
+                    session.setPlanSessionManuallyCompleted(
+                        planID: planID,
+                        sessionID: workout.id,
+                        completed: !isManuallyCompleted
+                    )
+                } label: {
+                    Label(
+                        isManuallyCompleted
+                            ? "Mark as Not Completed"
+                            : "Mark as Completed",
+                        systemImage: isManuallyCompleted
+                            ? "arrow.uturn.backward.circle"
+                            : "checkmark.circle"
+                    )
+                }
+            }
+        }
     }
 
     private func todayPlanStatus(
@@ -1912,7 +2010,23 @@ struct ATHLTHTrainView: View {
         return "Today"
     }
 
-    private func completedTodaySessionIDs(
+    private func manuallyCompletedTodaySessionIDs(
+        planID: UUID,
+        sessions: [PlannedSession]
+    ) -> Set<UUID> {
+        Set(
+            sessions
+                .filter {
+                    session.isPlanSessionManuallyCompleted(
+                        planID: planID,
+                        sessionID: $0.id
+                    )
+                }
+                .map(\.id)
+        )
+    }
+
+    private func healthCompletedTodaySessionIDs(
         _ sessions: [PlannedSession]
     ) -> Set<UUID> {
         let calendar = Calendar.current
