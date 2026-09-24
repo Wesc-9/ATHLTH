@@ -213,14 +213,6 @@ final class AdminControlCenterStore: ObservableObject {
     let campaignDrafts: [OfferCampaignDraft]
 
     init() {
-        #if DEBUG
-        users = AdminPreviewData.users
-        auditEvents = AdminPreviewData.auditEvents
-        safetyCases = AdminPreviewData.safetyCases
-        campaignHistory = AdminPreviewData.campaignHistory
-        analytics = AdminPreviewData.analytics
-        campaignDrafts = AdminPreviewData.campaignDrafts
-        #else
         users = []
         auditEvents = []
         safetyCases = []
@@ -244,7 +236,6 @@ final class AdminControlCenterStore: ObservableObject {
             interestBreakdown: []
         )
         campaignDrafts = []
-        #endif
     }
 
     func campaignEvents(for userID: UUID) -> [UserCampaignEvent] {
@@ -361,252 +352,6 @@ final class AdminControlCenterStore: ObservableObject {
         )
     }
 }
-
-#if DEBUG
-enum AdminPreviewData {
-    private static func daysAgo(_ value: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: -value, to: Date()) ?? Date()
-    }
-
-    static let users: [AdminUserRecord] = [
-        AdminUserRecord(
-            id: PreviewData.userID,
-            username: "stian",
-            email: "owner@athlth.app",
-            role: .owner,
-            subscription: .paid,
-            createdAt: daysAgo(120),
-            lastActiveAt: Date(),
-            onboardingCompleted: true,
-            currentGoal: .buildMuscle,
-            interests: [.strength, .nutrition, .trainingPlans],
-            offerConsent: .granted,
-            connections: AdminConnectionSummary(
-                appleHealth: true,
-                appleWatch: true,
-                spotify: true
-            ),
-            status: .active
-        ),
-        AdminUserRecord(
-            id: UUID(uuidString: "91111111-1111-1111-1111-111111111111")!,
-            username: "sara_demo",
-            email: "sara@example.com",
-            role: .admin,
-            subscription: .free,
-            createdAt: daysAgo(64),
-            lastActiveAt: daysAgo(1),
-            onboardingCompleted: true,
-            currentGoal: .runBetter,
-            interests: [.running, .trainingPlans, .social],
-            offerConsent: .declined,
-            connections: AdminConnectionSummary(
-                appleHealth: true,
-                appleWatch: true,
-                spotify: false
-            ),
-            status: .active
-        ),
-        AdminUserRecord(
-            id: UUID(uuidString: "92222222-2222-2222-2222-222222222222")!,
-            username: "erik_demo",
-            email: "erik@example.com",
-            role: .user,
-            subscription: .paid,
-            createdAt: daysAgo(31),
-            lastActiveAt: daysAgo(2),
-            onboardingCompleted: true,
-            currentGoal: .getStronger,
-            interests: [.strength, .trainingPlans],
-            offerConsent: .granted,
-            connections: AdminConnectionSummary(
-                appleHealth: true,
-                appleWatch: false,
-                spotify: true
-            ),
-            status: .active
-        ),
-        AdminUserRecord(
-            id: UUID(uuidString: "93333333-3333-3333-3333-333333333333")!,
-            username: "live_demo",
-            email: "live@example.com",
-            role: .user,
-            subscription: .free,
-            createdAt: daysAgo(8),
-            lastActiveAt: daysAgo(6),
-            onboardingCompleted: true,
-            currentGoal: .loseWeight,
-            interests: [.walking, .nutrition, .healthTracking],
-            offerConsent: .declined,
-            connections: AdminConnectionSummary(
-                appleHealth: false,
-                appleWatch: false,
-                spotify: false
-            ),
-            status: .active
-        )
-    ]
-
-    static let analytics = AdminAnalyticsSnapshot(
-        totalUsers: 1_248,
-        freeUsers: 1_090,
-        trialUsers: 83,
-        paidUsers: 75,
-        privilegedUsers: 2,
-        newUsers7Days: 38,
-        newUsers30Days: 164,
-        activeUsers7Days: 684,
-        activeUsers30Days: 1_012,
-        onboardingCompletionPercent: 91,
-        appleHealthConnectedPercent: 68,
-        appleWatchConnectedPercent: 42,
-        spotifyConnectedPercent: 31,
-        personalizedOfferConsentPercent: 37,
-        goalBreakdown: [
-            AdminMetricBreakdown(id: "muscle", title: "Build muscle", count: 298, percentage: 23.9),
-            AdminMetricBreakdown(id: "weight", title: "Lose weight", count: 246, percentage: 19.7),
-            AdminMetricBreakdown(id: "stronger", title: "Get stronger", count: 214, percentage: 17.1),
-            AdminMetricBreakdown(id: "run", title: "Run faster or farther", count: 172, percentage: 13.8),
-            AdminMetricBreakdown(id: "other", title: "Other goals", count: 318, percentage: 25.5)
-        ],
-        interestBreakdown: [
-            AdminMetricBreakdown(id: "strength", title: "Strength", count: 693, percentage: 55.5),
-            AdminMetricBreakdown(id: "plans", title: "Training plans", count: 612, percentage: 49.0),
-            AdminMetricBreakdown(id: "running", title: "Running", count: 508, percentage: 40.7),
-            AdminMetricBreakdown(id: "nutrition", title: "Nutrition", count: 431, percentage: 34.5),
-            AdminMetricBreakdown(id: "recovery", title: "Recovery", count: 387, percentage: 31.0)
-        ]
-    )
-
-    static let campaignDrafts: [OfferCampaignDraft] = [
-        OfferCampaignDraft(
-            title: "Goal support · Weight",
-            productName: "12-week Training + Nutrition Plan",
-            targetGoal: .loseWeight,
-            requiredInterests: [.nutrition, .trainingPlans],
-            minimumAccountAgeDays: 21
-        ),
-        OfferCampaignDraft(
-            title: "Goal support · Muscle",
-            productName: "8-week Hypertrophy Plan",
-            targetGoal: .buildMuscle,
-            requiredInterests: [.strength, .trainingPlans],
-            minimumAccountAgeDays: 14
-        ),
-        OfferCampaignDraft(
-            title: "Goal support · Event",
-            productName: "Event Preparation Plan",
-            targetGoal: .event,
-            requiredInterests: [.trainingPlans],
-            minimumAccountAgeDays: 14
-        )
-    ]
-
-    static let campaignHistory: [CampaignHistoryRecord] = [
-        CampaignHistoryRecord(
-            id: UUID(uuidString: "A1111111-1111-1111-1111-111111111111")!,
-            title: "Welcome to ATHLTH Plus",
-            message: "A preview offer for upgraded training-plan features.",
-            audience: .freeUsers,
-            channels: [.inApp, .email],
-            status: .sent,
-            createdByUsername: "stian",
-            createdAt: daysAgo(28),
-            sentAt: daysAgo(27),
-            audienceCount: 1_105,
-            deliveredCount: 1_074,
-            openedCount: 536,
-            convertedCount: 42,
-            recipients: [
-                CampaignRecipientSnapshot(
-                    id: UUID(),
-                    userID: UUID(uuidString: "93333333-3333-3333-3333-333333333333")!,
-                    username: "live_demo",
-                    deliveredAt: daysAgo(27),
-                    openedAt: daysAgo(26),
-                    convertedAt: nil
-                )
-            ]
-        ),
-        CampaignHistoryRecord(
-            id: UUID(uuidString: "A2222222-2222-2222-2222-222222222222")!,
-            title: "Strength plan launch",
-            message: "Early access to the 8-week hypertrophy plan.",
-            audience: .personalizedSegment,
-            channels: [.inApp],
-            status: .sent,
-            createdByUsername: "stian",
-            createdAt: daysAgo(18),
-            sentAt: daysAgo(17),
-            audienceCount: 184,
-            deliveredCount: 181,
-            openedCount: 112,
-            convertedCount: 19,
-            recipients: [
-                CampaignRecipientSnapshot(
-                    id: UUID(),
-                    userID: PreviewData.userID,
-                    username: "stian",
-                    deliveredAt: daysAgo(17),
-                    openedAt: daysAgo(17),
-                    convertedAt: daysAgo(15)
-                )
-            ]
-        ),
-        CampaignHistoryRecord(
-            id: UUID(uuidString: "A3333333-3333-3333-3333-333333333333")!,
-            title: "Nutrition launch draft",
-            message: "Future nutrition-plan introduction.",
-            audience: .freeUsers,
-            channels: [.inApp, .push],
-            status: .blocked,
-            createdByUsername: "stian",
-            createdAt: daysAgo(3),
-            sentAt: nil,
-            audienceCount: 1_173,
-            deliveredCount: 0,
-            openedCount: 0,
-            convertedCount: 0,
-            recipients: []
-        )
-    ]
-
-    static let auditEvents: [AdminAuditEvent] = [
-        AdminAuditEvent(
-            id: UUID(),
-            actor: "@stian",
-            action: "Control Center initialized",
-            target: "ATHLTH",
-            createdAt: Date()
-        ),
-        AdminAuditEvent(
-            id: UUID(),
-            actor: "@stian",
-            action: "Campaign delivery kept disabled",
-            target: "Marketing",
-            createdAt: daysAgo(1)
-        )
-    ]
-
-    static let safetyCases: [AdminSafetyCase] = [
-        AdminSafetyCase(
-            id: UUID(),
-            username: "demo_report_1",
-            category: "Profile report",
-            status: .open,
-            createdAt: daysAgo(1)
-        ),
-        AdminSafetyCase(
-            id: UUID(),
-            username: "demo_report_2",
-            category: "Harassment report",
-            status: .reviewing,
-            createdAt: daysAgo(2)
-        )
-    ]
-}
-
-#endif
 
 struct AdminCenterView: View {
     @EnvironmentObject private var session: AppSessionStore
@@ -805,9 +550,9 @@ struct AdminCenterView: View {
                 .foregroundStyle(.orange)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Development preview")
+                Text("Backend connection required")
                     .font(.subheadline.weight(.semibold))
-                Text("Analytics and user directory are demo data until the ATHLTH backend is connected.")
+                Text("Live analytics, user directory, safety cases, audit history and campaigns stay empty until Control Center is connected to the ATHLTH backend.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1298,7 +1043,7 @@ private struct AdminGrowthView: View {
             }
 
             Section {
-                Text("Growth metrics are demo values until analytics events and the backend are connected.")
+                Text("Growth metrics remain unavailable until analytics events and the Control Center backend are connected.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1420,7 +1165,7 @@ private struct AdminOffersView: View {
                     value: session.onboardingProfile?.personalizedOfferConsent.title ?? "Not requested"
                 )
                 LabeledContent(
-                    "Consent rate · demo",
+                    "Consent rate",
                     value: String(format: "%.0f%%", store.analytics.personalizedOfferConsentPercent)
                 )
 
