@@ -114,26 +114,45 @@ struct WatchActiveWorkoutView: View {
 
     private var activeContent: some View {
         Group {
-            HStack {
-                Label(
-                    workoutManager.kind.title,
-                    systemImage: workoutManager.kind.systemImage
-                )
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(WatchTheme.green)
+            VStack(spacing: 8) {
+                HStack {
+                    Label(
+                        workoutManager.kind.title,
+                        systemImage: workoutManager.kind.systemImage
+                    )
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(WatchTheme.green)
 
-                Spacer()
+                    Spacer()
 
-                Text(stateTitle)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(WatchTheme.muted)
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(
+                                workoutManager.state == .paused
+                                    ? Color.orange
+                                    : WatchTheme.green
+                            )
+                            .frame(width: 6, height: 6)
+
+                        Text(stateTitle)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(WatchTheme.muted)
+                    }
+                }
+
+                Text(durationText(workoutManager.elapsedTime))
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .semibold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 4)
-
-            Text(durationText(workoutManager.elapsedTime))
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .frame(maxWidth: .infinity)
+            .padding(11)
+            .watchSurface(radius: 18)
 
             if let structured =
                     workoutManager.structuredRunningWorkout,
@@ -392,7 +411,19 @@ struct WatchActiveWorkoutView: View {
                     .stroke(WatchTheme.green, lineWidth: 4)
             }
             .frame(height: 104)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+                .stroke(WatchTheme.border, lineWidth: 1)
+            }
         }
     }
 
