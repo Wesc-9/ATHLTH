@@ -4130,6 +4130,8 @@ struct ATHLTHProgressView: View {
     @State private var monthlySnapshot: HealthProgressSnapshot?
     @State private var consistencySnapshot: HealthProgressSnapshot?
     @State private var personalRecords: [HealthPersonalRecord] = []
+    @State private var workoutHistory: [WorkoutSummary] = []
+    @State private var trendMetric: ProgressTrendMetric = .training
     @State private var progressLoading = false
     @State private var progressError: String?
 
@@ -4156,27 +4158,47 @@ struct ATHLTHProgressView: View {
 
                         weeklyOverview
 
-                        HStack(alignment: .top, spacing: 12) {
-                            workoutsCompletedCard
-                            dailyStepsCard
+                        if let snapshot = progressSnapshot {
+                            ProgressTrendCard(
+                                snapshot: snapshot,
+                                metric: $trendMetric
+                            )
                         }
 
-                        HStack(alignment: .top, spacing: 12) {
-                            consistencyCard
-                            personalRecordsCard
-                        }
+                        ProgressConsistencyCard(
+                            snapshot: consistencySnapshot
+                        )
 
-                        HStack(alignment: .top, spacing: 12) {
-                            monthlyStatsCard
-                            achievementsCard
-                        }
+                        ProgressPerformanceCard(
+                            runningWorkouts:
+                                selectedPeriodRunningWorkouts,
+                            strengthWorkouts:
+                                selectedPeriodStrengthWorkouts,
+                            healthRecords: personalRecords,
+                            strengthRecords:
+                                strengthWorkout.personalRecords,
+                            repRecords:
+                                strengthWorkout.repPersonalRecords
+                        )
+
+                        personalRecordsCard
+                        achievementsCard
                     } else {
                         progressWithoutHealthCard
 
-                        HStack(alignment: .top, spacing: 12) {
-                            personalRecordsCard
-                            achievementsCard
-                        }
+                        ProgressPerformanceCard(
+                            runningWorkouts: [],
+                            strengthWorkouts:
+                                selectedPeriodStrengthWorkouts,
+                            healthRecords: personalRecords,
+                            strengthRecords:
+                                strengthWorkout.personalRecords,
+                            repRecords:
+                                strengthWorkout.repPersonalRecords
+                        )
+
+                        personalRecordsCard
+                        achievementsCard
                     }
                 }
                 .padding(.horizontal, 16)
@@ -4306,64 +4328,103 @@ struct ATHLTHProgressView: View {
     private var weeklyOverview: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(overviewTitle)
-                    .font(.title3.weight(.bold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(overviewTitle)
+                        .font(.title3.weight(.bold))
+
+                    Text("Tap a metric to explore the selected period.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
                 Text(periodDateLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 0) {
-                overviewMetric(
-                    icon: "dumbbell.fill",
-                    tint: green,
-                    value: progressSnapshot.map { String($0.workoutCount) } ?? "—",
-                    title: "Workouts",
-                    change: progressSnapshot?.workoutChangePercent,
-                    footer: comparisonLabel
-                )
+            if let snapshot = progressSnapshot {
+                HStack(spacing: 0) {
+                    NavigationLink {
+                        WorkoutHistoryView()
+                    } label: {
+                        overviewMetric(
+                            icon: "dumbbell.fill",
+                            tint: green,
+                            value: String(snapshot.workoutCount),
+                            title: "Workouts",
+                            change: snapshot.workoutChangePercent,
+                            footer: comparisonLabel
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                overviewDivider
+                    overviewDivider
 
-                overviewMetric(
-                    icon: "shoeprints.fill",
-                    tint: blue,
-                    value: formattedSteps(progressSnapshot?.averageDailySteps),
-                    title: "Steps/Day",
-                    change: progressSnapshot?.stepsChangePercent,
-                    footer: comparisonLabel
-                )
+                    NavigationLink {
+                        ProgressMetricDetailView(
+                            kind: .training,
+                            snapshot: snapshot,
+                            periodLabel: periodDateLabel
+                        )
+                    } label: {
+                        overviewMetric(
+                            icon: "clock.fill",
+                            tint: purple,
+                            value: snapshot.trainingDuration.shortDuration,
+                            title: "Training",
+                            change:
+                                snapshot.trainingDurationChangePercent,
+                            footer: comparisonLabel
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                overviewDivider
+                    overviewDivider
 
-                overviewMetric(
-                    icon: "moon.fill",
-                    tint: purple,
-                    value: progressSnapshot?.averageSleepDuration.map { $0.shortDuration } ?? "—",
-                    title: "Sleep/Day",
-                    change: progressSnapshot?.sleepChangePercent,
-                    footer: comparisonLabel
-                )
+                    NavigationLink {
+                        ProgressMetricDetailView(
+                            kind: .distance,
+                            snapshot: snapshot,
+                            periodLabel: periodDateLabel
+                        )
+                    } label: {
+                        overviewMetric(
+                            icon:
+                                "point.topleft.down.to.point.bottomright.curvepath",
+                            tint: blue,
+                            value: String(
+                                format: "%.1f km",
+                                snapshot.workoutDistanceMeters / 1_000
+                            ),
+                            title: "Distance",
+                            change:
+                                snapshot.workoutDistanceChangePercent,
+                            footer: comparisonLabel
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                overviewDivider
+                    overviewDivider
 
-                overviewMetric(
-                    icon: health.recovery.state.systemImage,
-                    tint: green,
-                    value: health.recovery.score.map { String($0) } ?? "—",
-                    title: "Recovery",
-                    change: nil,
-                    footer: health.recovery.score == nil
-                        ? health.recovery.state.title
-                        : "ATHLTH score"
-                )
+                    NavigationLink {
+                        ProgressConsistencyDetailView(
+                            snapshot: consistencySnapshot
+                        )
+                    } label: {
+                        overviewMetric(
+                            icon: "calendar.badge.checkmark",
+                            tint: green,
+                            value:
+                                "\(snapshot.activeWorkoutDays.count)d",
+                            title: "Consistency",
+                            change: nil,
+                            footer: periodSummaryLabel
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             if progressLoading {
@@ -4371,9 +4432,12 @@ struct ATHLTHProgressView: View {
                     .controlSize(.small)
                     .frame(maxWidth: .infinity)
             } else if let progressError {
-                Label(progressError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
+                Label(
+                    progressError,
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption2)
+                .foregroundStyle(.orange)
             }
         }
         .padding(18)
