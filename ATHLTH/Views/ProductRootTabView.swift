@@ -3864,7 +3864,7 @@ struct ATHLTHProfileView: View {
 
     private var premiumProfileHero: some View {
         ZStack(alignment: .bottom) {
-            Image("ProgressHero")
+            Image("ProfileHero")
                 .resizable()
                 .scaledToFill()
                 .frame(maxWidth: .infinity)
