@@ -15,11 +15,20 @@ enum ATHLTHTheme {
     static let premiumGoldSoft = premiumGold.opacity(0.14)
     static let champagne = Color(red: 0.93, green: 0.87, blue: 0.76)
     static let champagneSoft = champagne.opacity(0.18)
+    static let vitality = Color(red: 0.24, green: 0.47, blue: 0.38)
+    static let vitalitySoft = vitality.opacity(0.12)
+    static let recoveryBlue = Color(red: 0.31, green: 0.52, blue: 0.72)
+    static let recoveryBlueSoft = recoveryBlue.opacity(0.11)
 
-    static let canvasTop = Color(red: 0.995, green: 0.992, blue: 0.986)
-    static let canvasBottom = Color(red: 0.966, green: 0.962, blue: 0.955)
-    static let card = Color.white.opacity(0.97)
-    static let cardWarm = Color(red: 0.992, green: 0.985, blue: 0.972)
+    // Warm stone canvas + subtly tinted surfaces keep the app light without
+    // reading as flat white. Existing names are retained to avoid breaking
+    // screens that already depend on the theme API.
+    static let canvasTop = Color(red: 0.986, green: 0.978, blue: 0.962)
+    static let canvasBottom = Color(red: 0.938, green: 0.947, blue: 0.944)
+    static let card = Color(red: 0.995, green: 0.992, blue: 0.984).opacity(0.98)
+    static let cardWarm = Color(red: 0.975, green: 0.956, blue: 0.922)
+    static let surfaceStone = Color(red: 0.955, green: 0.958, blue: 0.950)
+    static let surfaceSage = Color(red: 0.925, green: 0.950, blue: 0.934)
     static let primaryText = Color(red: 0.07, green: 0.08, blue: 0.10)
     static let mutedText = Color(red: 0.43, green: 0.46, blue: 0.53)
     static let border = Color.black.opacity(0.055)
@@ -38,21 +47,31 @@ struct ATHLTHCard<Content: View>: View {
                     cornerRadius: ATHLTHTheme.cornerRadius,
                     style: .continuous
                 )
-                .fill(.thinMaterial)
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: ATHLTHTheme.cornerRadius,
-                        style: .continuous
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.card,
+                            ATHLTHTheme.cardWarm.opacity(0.72),
+                            ATHLTHTheme.surfaceSage.opacity(0.48)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.42),
-                                ATHLTHTheme.cardWarm.opacity(0.22),
-                                ATHLTHTheme.champagneSoft.opacity(0.16)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                )
+                .overlay {
+                    RadialGradient(
+                        colors: [
+                            ATHLTHTheme.premiumGold.opacity(0.075),
+                            Color.clear
+                        ],
+                        center: .topTrailing,
+                        startRadius: 0,
+                        endRadius: 220
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: ATHLTHTheme.cornerRadius,
+                            style: .continuous
                         )
                     )
                 }
@@ -76,10 +95,10 @@ struct ATHLTHCard<Content: View>: View {
                 )
             }
             .shadow(
-                color: ATHLTHTheme.accentDeep.opacity(0.055),
-                radius: 18,
+                color: ATHLTHTheme.accentDeep.opacity(0.085),
+                radius: 20,
                 x: 0,
-                y: 9
+                y: 10
             )
             .shadow(
                 color: ATHLTHTheme.premiumGold.opacity(0.025),
@@ -365,6 +384,80 @@ struct ATHLTHTabHero: View {
 }
 
 
+struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
+    let accent: Color
+    private let hero: Hero
+    private let content: Content
+
+    init(
+        accent: Color,
+        @ViewBuilder hero: () -> Hero,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.accent = accent
+        self.hero = hero()
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            ATHLTHPremiumCanvas(accent: accent)
+
+            // The hero is outside the ScrollView so it stays visually anchored.
+            // The rounded content surface overlaps it slightly and is the only
+            // area that scrolls/bounces, which gives the root tabs a sheet-like
+            // modern feel without touching their data or navigation logic.
+            VStack(spacing: -18) {
+                hero
+                    .zIndex(0)
+
+                ScrollView {
+                    content
+                        .frame(maxWidth: .infinity)
+                        .background {
+                            RoundedRectangle(
+                                cornerRadius: 30,
+                                style: .continuous
+                            )
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        ATHLTHTheme.canvasTop.opacity(0.99),
+                                        ATHLTHTheme.surfaceStone.opacity(0.98),
+                                        ATHLTHTheme.canvasBottom.opacity(0.96)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .overlay {
+                                RoundedRectangle(
+                                    cornerRadius: 30,
+                                    style: .continuous
+                                )
+                                .stroke(
+                                    Color.white.opacity(0.70),
+                                    lineWidth: 0.8
+                                )
+                            }
+                            .shadow(
+                                color: ATHLTHTheme.accentDeep.opacity(0.075),
+                                radius: 20,
+                                x: 0,
+                                y: -4
+                            )
+                        }
+                }
+                .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.interactively)
+                .zIndex(1)
+            }
+            .ignoresSafeArea(edges: .top)
+        }
+    }
+}
+
+
 struct ATHLTHPremiumSegmentedControl: View {
     let titles: [String]
     @Binding var selection: Int
@@ -442,7 +535,7 @@ struct ATHLTHPremiumCanvas: View {
             LinearGradient(
                 colors: [
                     ATHLTHTheme.canvasTop,
-                    Color.white,
+                    ATHLTHTheme.surfaceStone,
                     ATHLTHTheme.canvasBottom
                 ],
                 startPoint: .top,
@@ -451,7 +544,7 @@ struct ATHLTHPremiumCanvas: View {
 
             RadialGradient(
                 colors: [
-                    accent.opacity(0.055),
+                    accent.opacity(0.085),
                     Color.clear
                 ],
                 center: .topLeading,
@@ -461,7 +554,7 @@ struct ATHLTHPremiumCanvas: View {
 
             RadialGradient(
                 colors: [
-                    ATHLTHTheme.premiumGold.opacity(0.045),
+                    ATHLTHTheme.premiumGold.opacity(0.070),
                     Color.clear
                 ],
                 center: .bottomTrailing,
