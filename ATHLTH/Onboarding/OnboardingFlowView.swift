@@ -1410,7 +1410,7 @@ struct OnboardingFlowView: View {
     }
 
     private func openAppleWatchApp() {
-        openIPhoneWatchApp()
+        AppleWatchInstallSupport.openWatchApp()
     }
 
     private var appleHealthConnectionStep: some View {
