@@ -230,6 +230,7 @@ struct ATHLTHTabHero: View {
     var height: CGFloat = 190
     var alignment: Alignment = .leading
     var focalOffsetX: CGFloat = 18
+    var focalOffsetY: CGFloat = 16
 
     var body: some View {
         GeometryReader { proxy in
@@ -244,11 +245,21 @@ struct ATHLTHTabHero: View {
                         height: proxy.size.height,
                         alignment: alignment
                     )
-                    .scaleEffect(proxy.size.width >= 700 ? 1.03 : 1.08)
+                    // Keep enough overscan on iPhone to move the focal subject
+                    // below the status/Dynamic Island zone without exposing
+                    // empty image edges. Wide iPad layouts need far less zoom.
+                    .scaleEffect(
+                        proxy.size.width >= 700
+                            ? 1.04
+                            : 1.12
+                    )
                     .offset(
                         x: proxy.size.width >= 700
                             ? focalOffsetX * 0.4
-                            : focalOffsetX
+                            : focalOffsetX,
+                        y: proxy.size.width >= 700
+                            ? focalOffsetY * 0.35
+                            : focalOffsetY
                     )
                     .clipped()
 
@@ -271,6 +282,23 @@ struct ATHLTHTabHero: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
+
+                // The hero is intentionally full-bleed, but the top strip is
+                // treated as visual breathing room for the iPhone status bar
+                // and Dynamic Island. Important subjects are positioned below
+                // this zone with focalOffsetY.
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.22),
+                        Color.black.opacity(0.07),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 62)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
 
                 RadialGradient(
                     colors: [
