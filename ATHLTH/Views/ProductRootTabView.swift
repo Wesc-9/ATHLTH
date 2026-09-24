@@ -107,7 +107,8 @@ struct ATHLTHHomeView: View {
                                 : "Your health and training at a glance.",
                             height: 190,
                             alignment: .leading,
-                            focalOffsetX: 18
+                            focalOffsetX: 18,
+                            focalOffsetY: 14
                         )
 
                         HStack(spacing: 8) {
@@ -1242,7 +1243,8 @@ struct ATHLTHTrainView: View {
                         subtitle: "Build a stronger, healthier you.",
                         height: 190,
                         alignment: .leading,
-                        focalOffsetX: -18
+                        focalOffsetX: -18,
+                        focalOffsetY: 18
                     )
 
                     VStack(spacing: 18) {
@@ -2438,7 +2440,8 @@ struct ATHLTHRecoveryView: View {
                         subtitle: "Use sleep and recovery signals to guide today's load.",
                         height: 190,
                         alignment: .leading,
-                        focalOffsetX: 14
+                        focalOffsetX: 14,
+                        focalOffsetY: 16
                     )
 
                     VStack(spacing: 16) {
@@ -2987,7 +2990,8 @@ private struct ATHLTHProgressHero: View {
                 subtitle: subtitle,
                 height: height,
                 alignment: .leading,
-                focalOffsetX: -12
+                focalOffsetX: -12,
+                focalOffsetY: 12
             )
         } else {
             ATHLTHProgressFallbackHero(
