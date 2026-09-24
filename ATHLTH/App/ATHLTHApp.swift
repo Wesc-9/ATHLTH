@@ -310,6 +310,16 @@ struct AppRootView: View {
             )
 
             Task {
+                if workout.healthMetrics.healthKitWorkoutUUID == nil,
+                   let endedAt = workout.endedAt {
+                    _ = await health.saveManualStrengthWorkout(
+                        startDate: workout.startedAt,
+                        endDate: endedAt,
+                        externalID: workout.id
+                    )
+                    await health.refreshAll()
+                }
+
                 if let endedAt = workout.endedAt {
                     await social.finishActiveWorkout(
                         sourceWorkoutID: workout.healthMetrics.healthKitWorkoutUUID ?? workout.id,
