@@ -17,6 +17,7 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var routeCapabilityTestResult: String?
     @Published private(set) var lastSuccessfulRefreshAt: Date?
     @Published private(set) var backgroundSyncError: String?
+    @Published private(set) var automaticRefreshSuspended = false
 
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
@@ -25,10 +26,32 @@ final class HealthKitManager: ObservableObject {
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
     private let currentAuthorizationVersion = 2
+    private let refreshInProgressKey = "athlth.healthRefreshInProgress"
+    private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
+    private let currentSafeRefreshVersion = 1
 
     init() {
-        // Keep launch lightweight. Observer queries are installed from
-        // AppRootView after the UI has entered its lifecycle task.
+        let defaults = UserDefaults.standard
+        let interruptedRefresh = defaults.bool(forKey: refreshInProgressKey)
+        let hasExistingHealthAuthorization =
+            defaults.integer(forKey: authorizationVersionKey) >=
+            currentAuthorizationVersion
+        let needsSafeLaunchMigration =
+            hasExistingHealthAuthorization &&
+            defaults.integer(forKey: safeRefreshVersionKey) <
+            currentSafeRefreshVersion
+
+        automaticRefreshSuspended =
+            interruptedRefresh || needsSafeLaunchMigration
+
+        // A process termination during a Health refresh must never create an
+        // endless crash loop. The next launch starts with automatic Health
+        // work suspended and lets the product UI become usable first.
+        defaults.set(false, forKey: refreshInProgressKey)
+        defaults.set(
+            currentSafeRefreshVersion,
+            forKey: safeRefreshVersionKey
+        )
     }
 
     var hasRequestedAuthorization: Bool {
@@ -115,16 +138,24 @@ final class HealthKitManager: ObservableObject {
             try await healthStore.requestAuthorization(toShare: [], read: readTypes)
             UserDefaults.standard.set(true, forKey: legacyAuthorizationFlagKey)
             UserDefaults.standard.set(currentAuthorizationVersion, forKey: authorizationVersionKey)
+            UserDefaults.standard.set(
+                currentSafeRefreshVersion,
+                forKey: safeRefreshVersionKey
+            )
+            automaticRefreshSuspended = false
             objectWillChange.send()
+
+            // Keep the permission-sheet callback lightweight. A full Health
+            // import is intentionally not started while iOS is dismissing
+            // the authorization sheet.
             await refreshPersonalDetails()
-            await refreshAll()
         } catch {
             authorizationError = error.localizedDescription
         }
     }
 
     func configureBackgroundSync(allowed: Bool) async {
-        guard healthDataAvailable else { return }
+        guard healthDataAvailable, !automaticRefreshSuspended else { return }
 
         backgroundSyncError = nil
 
@@ -227,11 +258,22 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshAll() async {
-        guard healthDataAvailable, !isRefreshing else { return }
+        guard healthDataAvailable,
+              !isRefreshing,
+              !automaticRefreshSuspended
+        else {
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        defaults.set(true, forKey: refreshInProgressKey)
 
         isRefreshing = true
         authorizationError = nil
-        defer { isRefreshing = false }
+        defer {
+            isRefreshing = false
+            defaults.set(false, forKey: refreshInProgressKey)
+        }
 
         do {
             let end = Date()
@@ -259,6 +301,15 @@ final class HealthKitManager: ObservableObject {
         } catch {
             authorizationError = error.localizedDescription
         }
+    }
+
+    func resumeAutomaticRefresh() {
+        automaticRefreshSuspended = false
+        UserDefaults.standard.set(false, forKey: refreshInProgressKey)
+    }
+
+    var needsHealthRefreshRecovery: Bool {
+        automaticRefreshSuspended
     }
 
     func workoutHistory() async throws -> [WorkoutSummary] {
@@ -332,7 +383,7 @@ final class HealthKitManager: ObservableObject {
         var firstMarathonDate: Date?
 
         for workout in workouts where workout.workoutActivityType == .running {
-            let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0
+            let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()) ?? 0
             guard distance > 0 else { continue }
 
             longestRunMeters = max(longestRunMeters, distance)
@@ -658,24 +709,24 @@ final class HealthKitManager: ObservableObject {
         }
 
         let longestDistanceWorkout = allWorkouts
-            .filter { ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) > 0 }
+            .filter { (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) > 0 }
             .max { lhs, rhs in
-                (lhs.totalDistance?.doubleValue(for: .meter()) ?? 0) <
-                (rhs.totalDistance?.doubleValue(for: .meter()) ?? 0)
+                (Self.safeDoubleValue(lhs.totalDistance, unit: .meter()) ?? 0) <
+                (Self.safeDoubleValue(rhs.totalDistance, unit: .meter()) ?? 0)
             }
 
         let runningWorkouts = workoutsByDate.filter {
             $0.workoutActivityType == .running &&
-            ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) > 0
+            (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) > 0
         }
 
         let longestRun = runningWorkouts.max { lhs, rhs in
-            (lhs.totalDistance?.doubleValue(for: .meter()) ?? 0) <
-            (rhs.totalDistance?.doubleValue(for: .meter()) ?? 0)
+            (Self.safeDoubleValue(lhs.totalDistance, unit: .meter()) ?? 0) <
+            (Self.safeDoubleValue(rhs.totalDistance, unit: .meter()) ?? 0)
         }
 
         let totalRunningDistance = runningWorkouts.reduce(0.0) { partial, workout in
-            partial + (workout.totalDistance?.doubleValue(for: .meter()) ?? 0)
+            partial + (Self.safeDoubleValue(workout.totalDistance, unit: .meter()) ?? 0)
         }
 
         var fastestOneK: TimedDistancePerformanceRecord?
@@ -683,7 +734,7 @@ final class HealthKitManager: ObservableObject {
         var fastestMarathon: TimedDistancePerformanceRecord?
 
         for workout in runningWorkouts {
-            let reportedDistance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0
+            let reportedDistance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()) ?? 0
             guard reportedDistance >= 1_000,
                   let route = try? await fetchRoute(for: workout),
                   route.count >= 2
@@ -748,7 +799,7 @@ final class HealthKitManager: ObservableObject {
             longestWorkoutDistanceActivity: longestDistanceWorkout.map {
                 WorkoutActivity(healthKitType: $0.workoutActivityType)
             },
-            longestRunMeters: longestRun?.totalDistance?.doubleValue(for: .meter()),
+            longestRunMeters: Self.safeDoubleValue(longestRun?.totalDistance, unit: .meter()),
             longestRunDate: longestRun?.startDate,
             totalWorkoutCount: allWorkouts.count,
             totalTrainingDuration: allWorkouts.reduce(0) { $0 + $1.duration },
@@ -766,10 +817,10 @@ final class HealthKitManager: ObservableObject {
         if let workout = workouts
             .filter({ $0.workoutActivityType == .running && $0.totalDistance != nil })
             .max(by: {
-                ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) <
-                ($1.totalDistance?.doubleValue(for: .meter()) ?? 0)
+                (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) <
+                (Self.safeDoubleValue($1.totalDistance, unit: .meter()) ?? 0)
             }),
-           let distance = workout.totalDistance?.doubleValue(for: .meter()),
+           let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()),
            distance > 0 {
             records.append(
                 HealthPersonalRecord(
@@ -794,7 +845,7 @@ final class HealthKitManager: ObservableObject {
 
         for workout in workouts where workout.workoutActivityType == .running {
             guard let reportedDistance =
-                    workout.totalDistance?.doubleValue(for: .meter()),
+                    Self.safeDoubleValue(workout.totalDistance, unit: .meter()),
                   reportedDistance >= 1_000,
                   let route = try? await fetchRoute(for: workout),
                   route.count >= 2
@@ -844,10 +895,10 @@ final class HealthKitManager: ObservableObject {
         if let workout = workouts
             .filter({ $0.workoutActivityType == .cycling && $0.totalDistance != nil })
             .max(by: {
-                ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) <
-                ($1.totalDistance?.doubleValue(for: .meter()) ?? 0)
+                (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) <
+                (Self.safeDoubleValue($1.totalDistance, unit: .meter()) ?? 0)
             }),
-           let distance = workout.totalDistance?.doubleValue(for: .meter()),
+           let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()),
            distance > 0 {
             records.append(
                 HealthPersonalRecord(
@@ -864,10 +915,10 @@ final class HealthKitManager: ObservableObject {
                 $0.totalDistance != nil
             })
             .max(by: {
-                ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) <
-                ($1.totalDistance?.doubleValue(for: .meter()) ?? 0)
+                (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) <
+                (Self.safeDoubleValue($1.totalDistance, unit: .meter()) ?? 0)
             }),
-           let distance = workout.totalDistance?.doubleValue(for: .meter()),
+           let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()),
            distance > 0 {
             records.append(
                 HealthPersonalRecord(
@@ -892,10 +943,10 @@ final class HealthKitManager: ObservableObject {
         if let workout = workouts
             .filter({ $0.totalEnergyBurned != nil })
             .max(by: {
-                ($0.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0) <
-                ($1.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0)
+                (Self.safeDoubleValue($0.totalEnergyBurned, unit: .kilocalorie()) ?? 0) <
+                (Self.safeDoubleValue($1.totalEnergyBurned, unit: .kilocalorie()) ?? 0)
             }),
-           let calories = workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()),
+           let calories = Self.safeDoubleValue(workout.totalEnergyBurned, unit: .kilocalorie()),
            calories > 0 {
             records.append(
                 HealthPersonalRecord(
@@ -941,10 +992,10 @@ final class HealthKitManager: ObservableObject {
             guard let workout = candidates
                 .filter({ $0.totalDistance != nil })
                 .max(by: {
-                    ($0.totalDistance?.doubleValue(for: .meter()) ?? 0) <
-                    ($1.totalDistance?.doubleValue(for: .meter()) ?? 0)
+                    (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) <
+                    (Self.safeDoubleValue($1.totalDistance, unit: .meter()) ?? 0)
                 }),
-                let distance = workout.totalDistance?.doubleValue(for: .meter())
+                let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter())
             else {
                 return nil
             }
@@ -1802,7 +1853,7 @@ final class HealthKitManager: ObservableObject {
                     let day = calendar.startOfDay(
                         for: statistics.startDate
                     )
-                    values[day] = quantity.doubleValue(for: unit)
+                    values[day] = Self.safeDoubleValue(quantity, unit: unit) ?? 0
                 }
 
                 continuation.resume(returning: values)
@@ -1871,7 +1922,7 @@ final class HealthKitManager: ObservableObject {
                 results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
                     guard let quantity = statistics.sumQuantity() else { return }
                     let day = calendar.startOfDay(for: statistics.startDate)
-                    values[day] = quantity.doubleValue(for: unit)
+                    values[day] = Self.safeDoubleValue(quantity, unit: unit) ?? 0
                 }
 
                 continuation.resume(returning: values)
@@ -2025,7 +2076,7 @@ final class HealthKitManager: ObservableObject {
                 }
 
                 continuation.resume(
-                    returning: result?.sumQuantity()?.doubleValue(for: unit)
+                    returning: Self.safeDoubleValue(result?.sumQuantity(), unit: unit)
                 )
             }
 
@@ -2068,7 +2119,7 @@ final class HealthKitManager: ObservableObject {
                 }
 
                 continuation.resume(
-                    returning: quantity?.doubleValue(for: unit)
+                    returning: Self.safeDoubleValue(quantity, unit: unit)
                 )
             }
 
@@ -2112,7 +2163,7 @@ final class HealthKitManager: ObservableObject {
                 }
 
                 continuation.resume(
-                    returning: (sample.quantity.doubleValue(for: unit), sample.endDate)
+                    returning: (sample.Self.safeDoubleValue(quantity, unit: unit) ?? 0, sample.endDate)
                 )
             }
 
@@ -2150,7 +2201,7 @@ final class HealthKitManager: ObservableObject {
                 }
 
                 continuation.resume(
-                    returning: (sample.quantity.doubleValue(for: unit), sample.endDate)
+                    returning: (sample.Self.safeDoubleValue(quantity, unit: unit) ?? 0, sample.endDate)
                 )
             }
 
@@ -2185,7 +2236,7 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
 
-        let values = samples.map { $0.quantity.doubleValue(for: unit) }
+        let values = samples.map { $0.Self.safeDoubleValue(quantity, unit: unit) ?? 0 }
         guard !values.isEmpty else { return (nil, nil) }
 
         return (
@@ -2498,4 +2549,18 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
     }
+    private static func safeDoubleValue(
+        _ quantity: HKQuantity?,
+        unit: HKUnit
+    ) -> Double? {
+        guard let quantity,
+              quantity.is(compatibleWith: unit)
+        else {
+            return nil
+        }
+
+        let value = quantity.doubleValue(for: unit)
+        return value.isFinite ? value : nil
+    }
+
 }
