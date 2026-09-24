@@ -457,36 +457,30 @@ struct ATHLTHCommunityView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    ATHLTHTabHero(
-                        imageName: "CommunityHero",
+            ATHLTHPinnedHeroLayout(
+                accent: Color.purple.opacity(0.42)
+            ) {
+                ATHLTHTabHero(
+                    imageName: "CommunityHero",
                         title: "Community",
                         subtitle: "Train together. Go further.",
                         height: 190,
                         alignment: .leading,
                         focalOffsetX: -18,
-                        focalOffsetY: 18
-                    )
-
-                    VStack(spacing: 18) {
+                    focalOffsetY: 18
+                )
+            } content: {
+                VStack(spacing: 18) {
                         quickActions
                         upcomingEvents
                         friendsSection
                         challengesSection
                         activitySection
                     }
-                    .padding()
-                    .frame(maxWidth: 900)
-                    .frame(maxWidth: .infinity)
-                }
+                .padding()
+                .frame(maxWidth: 900)
+                .frame(maxWidth: .infinity)
             }
-            .ignoresSafeArea(edges: .top)
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: Color.purple.opacity(0.42)
-                )
-            )
             .refreshable {
                 await refreshCommunity()
             }
