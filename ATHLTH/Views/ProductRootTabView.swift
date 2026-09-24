@@ -1250,7 +1250,7 @@ struct ATHLTHTrainView: View {
                         subtitle: "Build a stronger, healthier you.",
                         height: 190,
                         alignment: .leading,
-                        focalOffsetX: 20
+                        focalOffsetX: -18
                     )
 
                     VStack(spacing: 18) {
@@ -2712,255 +2712,6 @@ struct ATHLTHRecoveryView: View {
     }
 }
 
-private struct ATHLTHProgressTrackingHero: View {
-    let title: String
-    let subtitle: String
-    var height: CGFloat = 190
-
-    private let sky = Color(red: 0.84, green: 0.92, blue: 0.98)
-    private let warm = Color(red: 1.00, green: 0.95, blue: 0.86)
-    private let stone = Color(red: 0.93, green: 0.90, blue: 0.84)
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                LinearGradient(
-                    colors: [sky, Color.white, warm],
-                    startPoint: .topTrailing,
-                    endPoint: .bottomLeading
-                )
-
-                scenicBackdrop(proxy: proxy)
-
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.96),
-                        Color.white.opacity(0.72),
-                        Color.white.opacity(0.10),
-                        Color.clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-
-                HStack(spacing: 0) {
-                    heroCopy
-                        .frame(
-                            width: min(proxy.size.width * 0.47, 360),
-                            alignment: .leading
-                        )
-
-                    Spacer(minLength: 4)
-
-                    metricsArtwork
-                        .frame(
-                            width: max(proxy.size.width * 0.51, 190),
-                            alignment: .trailing
-                        )
-                        .offset(y: 13)
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 43)
-                .padding(.bottom, 14)
-            }
-            .clipped()
-        }
-        .frame(height: height)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(subtitle)")
-    }
-
-    @ViewBuilder
-    private func scenicBackdrop(
-        proxy: GeometryProxy
-    ) -> some View {
-        ZStack(alignment: .bottom) {
-            Ellipse()
-                .fill(Color(red: 0.63, green: 0.72, blue: 0.78).opacity(0.24))
-                .frame(
-                    width: proxy.size.width * 0.84,
-                    height: proxy.size.height * 0.58
-                )
-                .offset(
-                    x: proxy.size.width * 0.20,
-                    y: proxy.size.height * 0.26
-                )
-
-            Ellipse()
-                .fill(Color(red: 0.49, green: 0.60, blue: 0.66).opacity(0.16))
-                .frame(
-                    width: proxy.size.width * 0.68,
-                    height: proxy.size.height * 0.45
-                )
-                .offset(
-                    x: proxy.size.width * 0.31,
-                    y: proxy.size.height * 0.31
-                )
-
-            LinearGradient(
-                colors: [
-                    Color(red: 0.58, green: 0.76, blue: 0.86).opacity(0.34),
-                    Color.white.opacity(0.12)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: proxy.size.height * 0.42)
-            .offset(y: proxy.size.height * 0.13)
-
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            stone.opacity(0.90),
-                            Color.white.opacity(0.82)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(
-                    width: proxy.size.width * 0.72,
-                    height: proxy.size.height * 0.31
-                )
-                .offset(
-                    x: proxy.size.width * 0.24,
-                    y: proxy.size.height * 0.18
-                )
-                .shadow(
-                    color: Color.black.opacity(0.06),
-                    radius: 16,
-                    x: 0,
-                    y: 8
-                )
-        }
-        .allowsHitTesting(false)
-    }
-
-    private var heroCopy: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("ATHLTH")
-                .font(.system(size: 17, weight: .black))
-                .tracking(5.5)
-
-            Text("MOVE BETTER · LIVE LONGER")
-                .font(.system(size: 8, weight: .semibold))
-                .tracking(1.7)
-                .padding(.top, 2)
-
-            Spacer(minLength: 10)
-
-            Text(title)
-                .font(.system(size: 30, weight: .bold))
-                .lineLimit(1)
-
-            Text(subtitle)
-                .font(.subheadline)
-                .lineLimit(2)
-                .padding(.top, 2)
-        }
-        .foregroundStyle(ATHLTHTheme.primaryText)
-        .shadow(color: .white.opacity(0.46), radius: 3)
-    }
-
-    private var metricsArtwork: some View {
-        HStack(spacing: 6) {
-            progressMetricPanel(
-                title: "Workouts",
-                value: "12",
-                detail: "THIS WEEK",
-                tint: .blue,
-                icon: "dumbbell.fill"
-            )
-
-            progressMetricPanel(
-                title: "Activity",
-                value: "4.2k",
-                detail: "ACTIVE",
-                tint: .green,
-                icon: "bolt.fill"
-            )
-
-            progressMetricPanel(
-                title: "Steps",
-                value: "8.4k",
-                detail: "DAILY AVG",
-                tint: .cyan,
-                icon: "figure.walk"
-            )
-
-            progressMetricPanel(
-                title: "Recovery",
-                value: "78%",
-                detail: "SCORE",
-                tint: .purple,
-                icon: "leaf.fill"
-            )
-        }
-        .scaleEffect(0.92, anchor: .trailing)
-    }
-
-    private func progressMetricPanel(
-        title: String,
-        value: String,
-        detail: String,
-        tint: Color,
-        icon: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(tint)
-
-            Spacer(minLength: 2)
-
-            Text(value)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .minimumScaleFactor(0.72)
-
-            Text(title)
-                .font(.system(size: 8.5, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-
-            Text(detail)
-                .font(.system(size: 6.5, weight: .bold))
-                .tracking(0.4)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .lineLimit(1)
-
-            HStack(spacing: 2) {
-                ForEach(0..<4, id: \.self) { index in
-                    Capsule()
-                        .fill(tint.opacity(0.25 + Double(index) * 0.15))
-                        .frame(
-                            width: 3,
-                            height: CGFloat(5 + index * 3)
-                        )
-                }
-            }
-            .frame(height: 14, alignment: .bottom)
-        }
-        .padding(8)
-        .frame(width: 62, height: 102, alignment: .leading)
-        .background(
-            Color.white.opacity(0.78),
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.85), lineWidth: 1)
-        }
-        .shadow(
-            color: Color.black.opacity(0.08),
-            radius: 9,
-            x: 0,
-            y: 5
-        )
-    }
-}
-
 private enum ProgressPeriod: String, CaseIterable, Identifiable {
     case week = "Week"
     case month = "Month"
@@ -2993,10 +2744,13 @@ struct ATHLTHProgressView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
-                    ATHLTHProgressTrackingHero(
+                    ATHLTHTabHero(
+                        imageName: "ProgressHero",
                         title: "Progress",
                         subtitle: "See your training, consistency and health trends.",
-                        height: 190
+                        height: 190,
+                        alignment: .leading,
+                        focalOffsetX: -12
                     )
 
                     VStack(spacing: 14) {
@@ -3190,12 +2944,14 @@ struct ATHLTHProgressView: View {
                 overviewDivider
 
                 overviewMetric(
-                    icon: "leaf.fill",
+                    icon: health.recovery.state.systemImage,
                     tint: green,
-                    value: "Soon",
+                    value: health.recovery.score.map { String($0) } ?? "—",
                     title: "Recovery",
                     change: nil,
-                    footer: "ATHLTH score"
+                    footer: health.recovery.score == nil
+                        ? health.recovery.state.title
+                        : "ATHLTH score"
                 )
             }
 
