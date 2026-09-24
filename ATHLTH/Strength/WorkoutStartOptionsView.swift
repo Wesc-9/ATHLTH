@@ -7,8 +7,6 @@ struct WorkoutStartOptionsView: View {
     let session: PlannedSession
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
-    let linkedSpotifyPlaylist: SpotifyPlaylistReference?
-    let spotifyAutoplayEnabled: Bool
     let onStart: (
         WorkoutCaptureDevice,
         StrengthTrackingMode,
@@ -25,8 +23,6 @@ struct WorkoutStartOptionsView: View {
         watchConnected: Bool,
         defaultCapture: WorkoutCapturePreference,
         defaultTracking: StrengthTrackingPreference,
-        linkedSpotifyPlaylist: SpotifyPlaylistReference?,
-        spotifyAutoplayEnabled: Bool,
         onStart: @escaping (
             WorkoutCaptureDevice,
             StrengthTrackingMode,
@@ -36,8 +32,6 @@ struct WorkoutStartOptionsView: View {
         self.session = session
         self.trainingDeviceProvider = trainingDeviceProvider
         self.watchConnected = watchConnected
-        self.linkedSpotifyPlaylist = linkedSpotifyPlaylist
-        self.spotifyAutoplayEnabled = spotifyAutoplayEnabled
         self.onStart = onStart
 
         let initialDevice: WorkoutCaptureDevice
