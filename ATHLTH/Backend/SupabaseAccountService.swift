@@ -448,9 +448,9 @@ final class SupabaseAccountService: ObservableObject {
             throw SupabaseAccountError.notAuthenticated
         }
 
-        guard jpegData.count <= 5_242_880 else {
+        guard jpegData.count <= 10_485_760 else {
             throw SupabaseAccountError.invalidProfile(
-                "Profile photo must be smaller than 5 MB."
+                "Profile photo must be smaller than 10 MB."
             )
         }
 
