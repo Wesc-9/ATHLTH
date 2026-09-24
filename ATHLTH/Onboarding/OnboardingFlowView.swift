@@ -2,6 +2,31 @@ import AuthenticationServices
 import SwiftUI
 import UIKit
 
+@MainActor
+private func openIPhoneWatchApp() {
+    let candidates = [
+        "itms-watchs://",
+        "bridge://"
+    ].compactMap(URL.init(string:))
+
+    func openCandidate(at index: Int) {
+        guard candidates.indices.contains(index) else { return }
+
+        UIApplication.shared.open(
+            candidates[index],
+            options: [:]
+        ) { opened in
+            guard !opened else { return }
+
+            Task { @MainActor in
+                openCandidate(at: index + 1)
+            }
+        }
+    }
+
+    openCandidate(at: 0)
+}
+
 private enum ConnectionStage {
     case device
     case appleHealth
@@ -1310,8 +1335,7 @@ struct OnboardingFlowView: View {
     }
 
     private func openAppleWatchApp() {
-        guard let url = URL(string: "itms-watch://") else { return }
-        openURL(url)
+        openIPhoneWatchApp()
     }
 
     private var appleHealthConnectionStep: some View {
@@ -2295,7 +2319,7 @@ private struct WatchInstallHelpView: View {
                         watchInstallStep(
                             number: "1",
                             title: "Open the Watch app",
-                            detail: "ATHLTH can take you directly to Apple’s Watch app on this iPhone."
+                            detail: "ATHLTH opens Apple’s Watch app on this iPhone. Go to My Watch → Apps and install ATHLTH under Available Apps."
                         )
 
                         watchInstallStep(
@@ -2348,9 +2372,7 @@ private struct WatchInstallHelpView: View {
 
                 if state == .appNotInstalled || state == .notPaired {
                     Button {
-                        if let url = URL(string: "itms-watch://") {
-                            openURL(url)
-                        }
+                        openIPhoneWatchApp()
                     } label: {
                         HStack {
                             Spacer()
