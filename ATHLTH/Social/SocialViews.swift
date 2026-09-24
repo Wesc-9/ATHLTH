@@ -126,6 +126,7 @@ struct SocialHubView: View {
 
     @State private var selectedTab: SocialHubTab
     @State private var searchText = ""
+    @State private var showingNewMessage = false
 
     init(initialTab: SocialHubTab = .feed) {
         self.initialTab = initialTab
@@ -201,7 +202,9 @@ struct SocialHubView: View {
                 case .friends:
                     friendsContent
                 case .messages:
-                    MessageInboxView()
+                    MessageInboxView {
+                        showingNewMessage = true
+                    }
                 case .requests:
                     requestsContent
                 case .discover:
@@ -214,12 +217,26 @@ struct SocialHubView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink {
-                    SocialPrivacySettingsView()
-                } label: {
-                    Image(systemName: "hand.raised.fill")
+                if selectedTab == .messages {
+                    Button {
+                        showingNewMessage = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .bold))
+                            .frame(width: 38, height: 38)
+                    }
+                    .accessibilityLabel("New message")
+                } else {
+                    NavigationLink {
+                        SocialPrivacySettingsView()
+                    } label: {
+                        Image(systemName: "hand.raised.fill")
+                    }
                 }
             }
+        }
+        .sheet(isPresented: $showingNewMessage) {
+            NewMessageView()
         }
         .task {
             await social.refresh()
