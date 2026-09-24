@@ -325,6 +325,16 @@ final class SocialStore: ObservableObject {
         await updatePrivacy(privacy)
     }
 
+    func syncOwnTrainingFocus(_ focus: TrainingFocus) async {
+        errorMessage = nil
+
+        do {
+            try await service.syncTrainingFocus(focus)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func syncOwnPerformance(_ stats: ProfilePerformanceStats?) async {
         guard let stats else { return }
 
