@@ -5434,25 +5434,39 @@ struct ATHLTHProfileView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                ATHLTHCard {
-                    HStack(spacing: 12) {
-                        Image(systemName: "target")
-                            .font(.system(size: 19, weight: .semibold))
-                            .foregroundStyle(.green)
-                            .frame(width: 44, height: 44)
-                            .background(Color.green.opacity(0.10), in: Circle())
+                NavigationLink {
+                    GoalsHubView()
+                } label: {
+                    ATHLTHCard {
+                        HStack(spacing: 12) {
+                            Image(systemName: "target")
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(.green)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    Color.green.opacity(0.10),
+                                    in: Circle()
+                                )
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Goals")
-                                .font(.headline)
-                            Text("No active goal")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Goals")
+                                    .font(.headline)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+                                Text("Set your first goal")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(.green)
                         }
-
-                        Spacer()
                     }
                 }
+                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity)
