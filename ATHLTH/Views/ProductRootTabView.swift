@@ -310,6 +310,8 @@ struct ATHLTHHomeView: View {
                 )
             )
             .refreshable {
+                guard !health.shouldDeferAutomaticHealthWork else { return }
+
                 async let healthRefresh: Void = health.refreshAll()
                 async let streakRefresh: Void = loadHomeStreak()
                 async let goalsRefresh: Void = goalStore.refreshAutomaticMilestones(
@@ -319,6 +321,8 @@ struct ATHLTHHomeView: View {
                 _ = await (healthRefresh, streakRefresh, goalsRefresh)
             }
             .task {
+                guard !health.shouldDeferAutomaticHealthWork else { return }
+
                 if health.lastSuccessfulRefreshAt == nil {
                     await health.refreshAll()
                 }
@@ -336,7 +340,10 @@ struct ATHLTHHomeView: View {
 
     @MainActor
     private func loadHomeStreak() async {
-        guard health.healthDataAvailable, health.hasRequestedAuthorization else {
+        guard health.healthDataAvailable,
+              health.hasRequestedAuthorization,
+              !health.shouldDeferAutomaticHealthWork
+        else {
             homeStreakSnapshot = nil
             return
         }
