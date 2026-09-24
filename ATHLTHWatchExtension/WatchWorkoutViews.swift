@@ -135,6 +135,56 @@ struct WatchActiveWorkoutView: View {
                 .monospacedDigit()
                 .frame(maxWidth: .infinity)
 
+            if let structured =
+                    workoutManager.structuredRunningWorkout,
+               let step =
+                    workoutManager.currentStructuredRunningStep {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(structured.title)
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(WatchTheme.muted)
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        Text(
+                            "\(workoutManager.structuredStepIndex + 1)/\(structured.steps.count)"
+                        )
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(WatchTheme.green)
+                    }
+
+                    Text(step.title)
+                        .font(
+                            .system(
+                                size: 14,
+                                weight: .bold
+                            )
+                        )
+                        .lineLimit(2)
+
+                    if let target =
+                            structuredStepTargetText(step) {
+                        Text(target)
+                            .font(.system(size: 10))
+                            .foregroundStyle(WatchTheme.muted)
+                    }
+                }
+                .padding(10)
+                .watchSurface()
+            }
+
             HStack(spacing: 0) {
                 metric(
                     icon: "heart.fill",
@@ -216,6 +266,43 @@ struct WatchActiveWorkoutView: View {
                 .disabled(workoutManager.state == .ending)
             }
         }
+    }
+
+    private func structuredStepTargetText(
+        _ step: WatchRunningWorkoutStep
+    ) -> String? {
+        var parts: [String] = []
+
+        switch step.measure {
+        case .distance:
+            if let meters = step.distanceMeters {
+                parts.append(
+                    meters >= 1_000
+                        ? String(
+                            format: "%.1f km",
+                            meters / 1_000
+                        )
+                        : "\(Int(meters.rounded())) m"
+                )
+            }
+
+        case .time:
+            if let seconds = step.durationSeconds {
+                parts.append(durationText(seconds))
+            }
+
+        case .open:
+            parts.append("Open")
+        }
+
+        if let intensity = step.intensityText,
+           !intensity.isEmpty {
+            parts.append(intensity)
+        }
+
+        return parts.isEmpty
+            ? nil
+            : parts.joined(separator: " · ")
     }
 
     private var completedContent: some View {
