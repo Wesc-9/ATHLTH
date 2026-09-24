@@ -1202,7 +1202,7 @@ struct ATHLTHTrainView: View {
                 actionTitle: quickStartDeviceTitle
             )
             HStack {
-                ForEach([WorkoutKind.running, .walking, .strength]) { kind in
+                ForEach(quickStartKinds) { kind in
                     Button {
                         handleQuickStart(kind)
                     } label: {
@@ -1394,6 +1394,20 @@ struct ATHLTHTrainView: View {
             return .strength
         case .mobility, .recovery, .custom:
             return nil
+        }
+    }
+
+    private var quickStartKinds: [WorkoutKind] {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
+            return [.running, .walking, .strength]
+        case .garmin:
+            return [.strength]
+        case .none:
+            // Outdoor quick capture currently requires a supported wearable.
+            // Keep the iPhone-native strength flow available and avoid
+            // presenting dead or empty wearable-only choices.
+            return [.strength]
         }
     }
 
