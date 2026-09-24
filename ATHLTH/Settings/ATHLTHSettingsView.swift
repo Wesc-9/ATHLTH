@@ -114,24 +114,6 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
-                    settingsSection("Privacy") {
-                        PremiumSettingsCard {
-                            NavigationLink {
-                                ATHLTHPrivacyCenterView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "hand.raised",
-                                    title: "Privacy Center",
-                                    subtitle: privacySummary
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
                     settingsSection("Health & Sync") {
                         PremiumSettingsCard {
                             PremiumSettingsRow(
