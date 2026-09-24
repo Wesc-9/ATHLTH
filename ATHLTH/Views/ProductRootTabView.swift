@@ -227,27 +227,47 @@ struct ATHLTHHomeView: View {
                                 progress: moveProgress
                             )
 
-                            HomeDayStatus(
-                                title: "Recovery",
-                                value: recoveryValue,
-                                subtitle: health.recovery.state.title,
-                                icon: health.recovery.state.systemImage,
-                                progress: health.recovery.score.map {
-                                    Double($0) / 100
-                                }
-                            )
+                            if shouldShowRecoverySummary {
+                                HomeDayStatus(
+                                    title: "Recovery",
+                                    value: recoveryValue,
+                                    subtitle: health.recovery.state.title,
+                                    icon: health.recovery.state.systemImage,
+                                    progress: health.recovery.score.map {
+                                        Double($0) / 100
+                                    }
+                                )
+                            }
 
-                            HomeDayStatus(
-                                title: "Sleep",
-                                value: sleepValue,
-                                subtitle: sleepSubtitle,
-                                icon: "moon.fill",
-                                progress: health.sleep.totalAsleep > 0
-                                    ? min(health.sleep.totalAsleep / (8 * 3_600), 1)
-                                    : nil
-                            )
+                            if shouldShowSleepSummary {
+                                HomeDayStatus(
+                                    title: "Sleep",
+                                    value: sleepValue,
+                                    subtitle: sleepSubtitle,
+                                    icon: "moon.fill",
+                                    progress: health.sleep.totalAsleep > 0
+                                        ? min(health.sleep.totalAsleep / (8 * 3_600), 1)
+                                        : nil
+                                )
+                            }
                         }
                         .padding(.top, 14)
+
+                        if settings.trainingDeviceProvider == .none &&
+                            !shouldShowRecoverySummary &&
+                            !shouldShowSleepSummary {
+                            HStack(spacing: 10) {
+                                Image(systemName: "iphone")
+                                    .foregroundStyle(ATHLTHTheme.accent)
+
+                                Text(
+                                    "Using iPhone mode. Sleep and recovery appear automatically if compatible data becomes available in Apple Health."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                            .padding(.top, 10)
+                        }
                     }
 
                     HomeCurrentStreakCard(snapshot: homeStreakSnapshot)
@@ -447,6 +467,25 @@ struct ATHLTHHomeView: View {
         }
 
         return "\(greeting), \(session.profile.displayName)"
+    }
+
+    private var shouldShowSleepSummary: Bool {
+        if settings.trainingDeviceProvider != .none {
+            return true
+        }
+
+        return health.sleep.totalAsleep > 0
+    }
+
+    private var shouldShowRecoverySummary: Bool {
+        if settings.trainingDeviceProvider != .none {
+            return true
+        }
+
+        return health.recovery.score != nil ||
+            health.heart.hrvMilliseconds != nil ||
+            health.heart.restingHeartRate != nil ||
+            health.recovery.baselineDays > 0
     }
 
     private var moveValue: String {
@@ -1714,12 +1753,13 @@ struct ATHLTHRecoveryView: View {
                         focalOffsetX: 14
                     )
 
-                    ATHLTHPlusFeatureGate(
-                        feature: .advancedRecovery,
-                        title: "Advanced Recovery",
-                        message: "Recovery scoring, trends and training guidance are included with ATHLTH+."
-                    ) {
-                        VStack(spacing: 18) {
+                    if shouldShowWearableRecoveryContent {
+                        ATHLTHPlusFeatureGate(
+                            feature: .advancedRecovery,
+                            title: "Advanced Recovery",
+                            message: "Recovery scoring, trends and training guidance are included with ATHLTH+."
+                        ) {
+                            VStack(spacing: 18) {
                             ATHLTHCard {
                                 ATHLTHSectionHeader(
                                     title: "Recovery",
@@ -1897,6 +1937,38 @@ struct ATHLTHRecoveryView: View {
                                     .foregroundStyle(.secondary)
                                     .padding(.top, 2)
                             }
+
+                            }
+                        }
+                    } else {
+                        ATHLTHCard {
+                            HStack(alignment: .top, spacing: 14) {
+                                Image(systemName: "iphone")
+                                    .font(.title2)
+                                    .foregroundStyle(ATHLTHTheme.accent)
+                                    .frame(width: 48, height: 48)
+                                    .background(
+                                        ATHLTHTheme.accentSoft,
+                                        in: RoundedRectangle(
+                                            cornerRadius: 14,
+                                            style: .continuous
+                                        )
+                                    )
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Recovery data isn’t available yet")
+                                        .font(.headline)
+
+                                    Text(
+                                        "You selected No watch. ATHLTH will keep this page clean until compatible sleep, HRV or resting heart-rate data is available in Apple Health. You can connect a wearable later in Settings."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                }
+
+                                Spacer()
+                            }
                         }
                     }
                 }
@@ -1908,6 +1980,18 @@ struct ATHLTHRecoveryView: View {
                 await health.refreshAll()
             }
         }
+    }
+
+    private var shouldShowWearableRecoveryContent: Bool {
+        if settings.trainingDeviceProvider != .none {
+            return true
+        }
+
+        return health.recovery.score != nil ||
+            health.sleep.totalAsleep > 0 ||
+            health.heart.hrvMilliseconds != nil ||
+            health.heart.restingHeartRate != nil ||
+            health.recovery.baselineDays > 0
     }
 
     private var recoveryHeadline: String {
