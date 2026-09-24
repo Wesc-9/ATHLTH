@@ -222,16 +222,14 @@ struct AppRootView: View {
             }
         }
         .onChange(of: health.personalDetails) { _, details in
-            guard appSession.onboardingProfile?.personalDetailsSource == .appleHealth,
+            guard let source = appSession.onboardingProfile?.personalDetailsSource,
+                  source == .appleHealth || source == .mixed,
                   details.hasAnyValue
             else {
                 return
             }
 
-            appSession.updatePersonalDetails(
-                details,
-                source: .appleHealth
-            )
+            appSession.mergePersonalDetailsFromAppleHealth(details)
         }
         .onChange(of: settings.backgroundHealthSyncEnabled) { _, enabled in
             guard health.hasRequestedAuthorization else {
@@ -493,15 +491,15 @@ struct AppRootView: View {
     }
 
     private func syncAppleHealthProfileDetailsIfNeeded() {
-        guard appSession.onboardingProfile?.personalDetailsSource == .appleHealth,
+        guard let source = appSession.onboardingProfile?.personalDetailsSource,
+              source == .appleHealth || source == .mixed,
               health.personalDetails.hasAnyValue
         else {
             return
         }
 
-        appSession.updatePersonalDetails(
-            health.personalDetails,
-            source: .appleHealth
+        appSession.mergePersonalDetailsFromAppleHealth(
+            health.personalDetails
         )
     }
 
