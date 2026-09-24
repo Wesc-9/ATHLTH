@@ -3229,13 +3229,14 @@ struct ATHLTHProfileView: View {
                             NavigationLink {
                                 ATHLTHEditProfileView()
                             } label: {
-                                Image(systemName: "pencil")
-                                    .font(.system(size: 16, weight: .semibold))
+                                Label("Edit", systemImage: "pencil")
+                                    .font(.caption.weight(.semibold))
                                     .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .frame(width: 42, height: 42)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 38)
                                     .background(
                                         ATHLTHTheme.accentSoft,
-                                        in: Circle()
+                                        in: Capsule()
                                     )
                             }
                             .buttonStyle(.plain)
