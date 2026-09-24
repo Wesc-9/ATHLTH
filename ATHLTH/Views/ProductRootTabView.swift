@@ -1041,6 +1041,14 @@ private struct HomeCurrentStreakCard: View {
     }
 }
 
+private struct PlannedWorkoutSelection: Identifiable {
+    let planID: UUID
+    let workout: PlannedSession
+    let isHealthCompleted: Bool
+
+    var id: UUID { workout.id }
+}
+
 struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
@@ -1058,6 +1066,7 @@ struct ATHLTHTrainView: View {
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
     @State private var selectedStrengthSession: PlannedSession?
+    @State private var selectedPlanWorkout: PlannedWorkoutSelection?
     @State private var pendingQuickStartKind: WorkoutKind?
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
@@ -1112,6 +1121,14 @@ struct ATHLTHTrainView: View {
                 }
             }
             .ignoresSafeArea(edges: .top)
+            .sheet(item: $selectedPlanWorkout) { selection in
+                PlannedWorkoutDetailView(
+                    planID: selection.planID,
+                    workout: selection.workout,
+                    isHealthCompleted: selection.isHealthCompleted
+                )
+                .environmentObject(session)
+            }
             .sheet(item: $selectedStrengthSession) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
@@ -1820,16 +1837,14 @@ struct ATHLTHTrainView: View {
     ) -> some View {
         let isCompleted = isHealthCompleted || isManuallyCompleted
 
-        HStack(spacing: 12) {
-            Button {
-                guard !isHealthCompleted else { return }
-
-                session.setPlanSessionManuallyCompleted(
-                    planID: planID,
-                    sessionID: workout.id,
-                    completed: !isManuallyCompleted
-                )
-            } label: {
+        Button {
+            selectedPlanWorkout = PlannedWorkoutSelection(
+                planID: planID,
+                workout: workout,
+                isHealthCompleted: isHealthCompleted
+            )
+        } label: {
+            HStack(spacing: 12) {
                 ZStack {
                     if !isFirst {
                         Rectangle()
@@ -1869,127 +1884,68 @@ struct ATHLTHTrainView: View {
                     }
                 }
                 .frame(width: 32, height: 58)
-            }
-            .buttonStyle(.plain)
-            .disabled(isHealthCompleted)
-            .accessibilityLabel(
-                isHealthCompleted
-                    ? "Completed from Apple Health"
-                    : isManuallyCompleted
-                        ? "Mark \(workout.title) as not completed"
-                        : "Mark \(workout.title) as completed"
-            )
-            .accessibilityHint(
-                isHealthCompleted
-                    ? "This workout was matched automatically from Apple Health."
-                    : "Double tap to change manual completion."
-            )
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(workout.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workout.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
 
-                Text(todaySessionSummary(workout))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 6)
-
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(
-                    todayPlanStatus(
-                        workout,
-                        isCompleted: isCompleted
-                    )
-                )
-                .font(.caption.weight(isCompleted ? .semibold : .regular))
-                .foregroundStyle(
-                    isCompleted
-                        ? ATHLTHTheme.accent
-                        : ATHLTHTheme.mutedText
-                )
-                .lineLimit(1)
-
-                if isManuallyCompleted && !isHealthCompleted {
-                    Text("Manual")
-                        .font(.system(size: 9, weight: .medium))
+                    Text(todaySessionSummary(workout))
+                        .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
                 }
-            }
 
-            if workout.kind == .strength && !isCompleted {
-                Button {
-                    selectedStrengthSession = workout
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 30, height: 30)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: Circle()
+                Spacer(minLength: 6)
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(
+                        todayPlanStatus(
+                            workout,
+                            isCompleted: isCompleted
                         )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Start \(workout.title)")
-            } else if isManuallyCompleted && !isHealthCompleted {
-                Button {
-                    session.setPlanSessionManuallyCompleted(
-                        planID: planID,
-                        sessionID: workout.id,
-                        completed: false
                     )
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .frame(width: 30, height: 30)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Undo manual completion")
-            } else {
-                Image(systemName: isHealthCompleted ? "heart.fill" : "chevron.right")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(isCompleted ? .semibold : .regular))
                     .foregroundStyle(
-                        isHealthCompleted
-                            ? ATHLTHTheme.accent.opacity(0.72)
-                            : Color.secondary.opacity(0.55)
+                        isCompleted
+                            ? ATHLTHTheme.accent
+                            : ATHLTHTheme.mutedText
                     )
-                    .frame(width: 30, height: 30)
-                    .accessibilityHidden(true)
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(minHeight: 64)
-        .background(
-            Color.white.opacity(0.42),
-            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-        )
-        .padding(.vertical, 3)
-        .contextMenu {
-            if !isHealthCompleted {
-                Button {
-                    session.setPlanSessionManuallyCompleted(
-                        planID: planID,
-                        sessionID: workout.id,
-                        completed: !isManuallyCompleted
-                    )
-                } label: {
-                    Label(
-                        isManuallyCompleted
-                            ? "Mark as Not Completed"
-                            : "Mark as Completed",
-                        systemImage: isManuallyCompleted
-                            ? "arrow.uturn.backward.circle"
-                            : "checkmark.circle"
-                    )
+                    .lineLimit(1)
+
+                    if isHealthCompleted {
+                        Label("Health", systemImage: "heart.fill")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    } else if isManuallyCompleted {
+                        Text("Manual")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
                 }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 20)
             }
+            .padding(.horizontal, 10)
+            .frame(minHeight: 64)
+            .background(
+                Color.white.opacity(0.42),
+                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+            )
+            .contentShape(
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+            )
         }
+        .buttonStyle(.plain)
+        .padding(.vertical, 3)
+        .accessibilityLabel(
+            "\(workout.title), \(isCompleted ? "completed" : "planned")"
+        )
+        .accessibilityHint("Open workout details")
     }
 
     private func todayPlanStatus(
