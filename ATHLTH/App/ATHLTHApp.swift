@@ -132,7 +132,12 @@ struct AppRootView: View {
                 await messaging.refresh()
             }
 
-            guard health.hasRequestedAuthorization else { return }
+            guard health.hasRequestedAuthorization,
+                  !health.shouldDeferAutomaticHealthWork
+            else {
+                return
+            }
+
             await health.configureBackgroundSync(
                 allowed:
                     appSession.canAccess(.backgroundHealthSync) &&
@@ -167,7 +172,11 @@ struct AppRootView: View {
                     await messaging.refresh()
                 }
 
-                guard health.hasRequestedAuthorization else { return }
+                guard health.hasRequestedAuthorization,
+                      !health.shouldDeferAutomaticHealthWork
+                else {
+                    return
+                }
 
                 await health.refreshAll()
                 await goals.refreshAutomaticMilestones(
