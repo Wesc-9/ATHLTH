@@ -22,7 +22,7 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var automaticRefreshSuspended = false
     @Published private(set) var deferFullRefreshUntilNextLaunch = false
 
-    var hasReadableHealthData: Bool {
+    var hasTrainingHealthData: Bool {
         !workouts.isEmpty ||
         sleep.totalAsleep > 0 ||
         heart.latestHeartRate != nil ||
@@ -31,8 +31,11 @@ final class HealthKitManager: ObservableObject {
         training.stepsToday != nil ||
         training.activeEnergyKilocaloriesToday != nil ||
         training.exerciseMinutesToday != nil ||
-        training.distanceWalkingRunningMetersToday != nil ||
-        personalDetails.hasAnyValue
+        training.distanceWalkingRunningMetersToday != nil
+    }
+
+    var hasReadableHealthData: Bool {
+        hasTrainingHealthData || personalDetails.hasAnyValue
     }
 
     private let healthStore = HKHealthStore()
@@ -1858,9 +1861,9 @@ final class HealthKitManager: ObservableObject {
             endDate: endDate
         )
 
-        let workouts = try await workoutsTask
-        let stepsByDay = try await stepsTask
-        let sleepByDay = try await sleepTask
+        let workouts = (try? await workoutsTask) ?? []
+        let stepsByDay = (try? await stepsTask) ?? [:]
+        let sleepByDay = (try? await sleepTask) ?? [:]
 
         let calendar = Calendar.current
         let totalTrainingDuration = workouts.reduce(0) { $0 + $1.duration }
@@ -1953,9 +1956,9 @@ final class HealthKitManager: ObservableObject {
             endDate: baselineEnd
         )
 
-        let sleepDays = try await sleepDaysTask
-        let hrvDays = try await hrvDaysTask
-        let restingDays = try await restingDaysTask
+        let sleepDays = (try? await sleepDaysTask) ?? [:]
+        let hrvDays = (try? await hrvDaysTask) ?? [:]
+        let restingDays = (try? await restingDaysTask) ?? [:]
 
         let commonDays = Set(sleepDays.keys)
             .intersection(hrvDays.keys)
