@@ -478,6 +478,26 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
+                    if session.currentRole.canAccessControlCenter {
+                        settingsSection("Support") {
+                            PremiumSettingsCard {
+                                NavigationLink {
+                                    ATHLTHSystemDiagnosticsView()
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "stethoscope",
+                                        title: "System Diagnostics",
+                                        subtitle: "Health, Watch, push, account and build status"
+                                    ) {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
                     #if DEBUG
                     if session.currentRole.canAccessControlCenter {
                         settingsSection("Admin") {
@@ -507,22 +527,6 @@ struct ATHLTHSettingsView: View {
                     if session.previewModeEnabled || session.currentRole.canAccessControlCenter {
                         settingsSection("Developer") {
                             PremiumSettingsCard {
-                                NavigationLink {
-                                    ATHLTHSystemDiagnosticsView()
-                                } label: {
-                                    PremiumSettingsRow(
-                                        icon: "stethoscope",
-                                        title: "System Diagnostics",
-                                        subtitle: "Health, Watch, push, account and build status"
-                                    ) {
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                    }
-                                }
-                                .buttonStyle(.plain)
-
-                                SettingsDivider()
-
                                 NavigationLink {
                                     CapabilityLabView()
                                 } label: {
