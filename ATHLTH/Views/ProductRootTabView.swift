@@ -13,7 +13,9 @@ struct ProductRootTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            ATHLTHHomeView()
+            ATHLTHHomeView { tab in
+                selectedTab = tab
+            }
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(0)
 
@@ -82,6 +84,8 @@ struct ProductRootTabView: View {
 }
 
 struct ATHLTHHomeView: View {
+    var onSelectTab: (Int) -> Void = { _ in }
+
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -92,10 +96,15 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var challenges: ChallengeStore
 
     @State private var homeStreakDays: [Date]?
-    @State private var homeWeekSnapshot: HealthProgressSnapshot?
-    @State private var homeWeekLoading = false
+    @State private var selectedHomeStrengthSession: PlannedSession?
+    @State private var pendingHomeQuickStartKind: WorkoutKind?
+    @State private var pendingHomePlanSession: PlannedSession?
+    @State private var showingHomeStrengthWorkout = false
+    @State private var homeWatchTransferMessage: String?
+    @State private var homeWatchTransferError: String?
 
     var body: some View {
         NavigationStack {
@@ -212,161 +221,135 @@ struct ATHLTHHomeView: View {
                 }
             } content: {
                 LazyVStack(spacing: 18) {
-                    ATHLTHCard {
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Daily Pulse")
-                                    .font(.title3.weight(.bold))
-                                Text(homeHealthSourceText)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                    homeTodayCard
 
-                            Spacer()
+                    if shouldShowGettingStarted {
+                        HomeGettingStartedCard(
+                            healthConnected: health.hasRequestedAuthorization,
+                            hasPlan: session.activePlan != nil,
+                            hasGoal: !goalStore.activeGoals.isEmpty
+                        )
+                    }
 
-                            if homeStreakDays == nil {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Label(
-                                    homeStreakCount > 0
-                                        ? "\(homeStreakCount) day streak"
-                                        : "Start your streak",
-                                    systemImage: "flame.fill"
-                                )
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(
-                                    homeStreakCount > 0
-                                        ? Color.orange
-                                        : ATHLTHTheme.mutedText
-                                )
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 6)
-                                .background(
-                                    (homeStreakCount > 0
-                                        ? Color.orange.opacity(0.09)
-                                        : ATHLTHTheme.surfaceStone),
-                                    in: Capsule()
-                                )
-                            }
-                        }
-
-                        if shouldShowAnyDaySummary {
-                            HStack(alignment: .top, spacing: 9) {
-                                if shouldShowMoveSummary {
-                                    HomeDayStatus(
-                                        title: "Move",
-                                        value: moveValue,
-                                        subtitle: moveSubtitle,
-                                        icon: "flame.fill",
-                                        progress: moveProgress,
-                                        tint: .orange
-                                    )
-                                }
-
-                                if shouldShowRecoverySummary {
-                                    HomeDayStatus(
-                                        title: "Recovery",
-                                        value: recoveryValue,
-                                        subtitle: health.recovery.state.title,
-                                        icon: health.recovery.state.systemImage,
-                                        progress: health.recovery.score.map {
-                                            Double($0) / 100
-                                        },
-                                        tint: ATHLTHTheme.recoveryBlue
-                                    )
-                                }
-
-                                if shouldShowSleepSummary {
-                                    HomeDayStatus(
-                                        title: "Sleep",
-                                        value: sleepValue,
-                                        subtitle: sleepSubtitle,
-                                        icon: "moon.fill",
-                                        progress:
-                                            health.sleep.totalAsleep > 0
-                                                ? min(
-                                                    health.sleep.totalAsleep /
-                                                        (8 * 3_600),
-                                                    1
-                                                )
-                                                : nil,
-                                        tint: .purple
-                                    )
-                                }
-                            }
-                            .padding(.top, 14)
-                        } else {
-                            HStack(alignment: .top, spacing: 10) {
-                                Image(
-                                    systemName:
-                                        health.hasRequestedAuthorization
-                                            ? "heart.text.square"
-                                            : "iphone"
-                                )
-                                .foregroundStyle(ATHLTHTheme.vitality)
-                                .frame(width: 28)
-
-                                Text(homeNoHealthDetail)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(
-                                        horizontal: false,
-                                        vertical: true
-                                    )
-                            }
-                            .padding(.top, 14)
-                        }
-
-                        if let insight = homeInsight {
-                            Divider()
-                                .padding(.vertical, 12)
-
-                            HStack(alignment: .top, spacing: 11) {
-                                Image(systemName: insight.icon)
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(ATHLTHTheme.vitality)
-                                    .frame(width: 34, height: 34)
-                                    .background(
-                                        ATHLTHTheme.vitalitySoft,
-                                        in: RoundedRectangle(
-                                            cornerRadius: 11,
-                                            style: .continuous
-                                        )
-                                    )
-
+                    if health.hasRequestedAuthorization {
+                        ATHLTHCard {
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(insight.title)
-                                        .font(.subheadline.weight(.semibold))
-
-                                    Text(insight.detail)
+                                    Text("Daily Readiness")
+                                        .font(.title3.weight(.bold))
+                                    Text(homeHealthSourceText)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
-                                        .lineLimit(3)
                                 }
 
                                 Spacer()
+
+                                if let score = health.recovery.score {
+                                    Text("\(score)")
+                                        .font(.title2.weight(.bold))
+                                        .foregroundStyle(
+                                            readinessTint
+                                        )
+                                }
+                            }
+
+                            HStack(alignment: .top, spacing: 9) {
+                                HomeDayStatus(
+                                    title: "Move",
+                                    value: moveValue,
+                                    subtitle: moveSubtitle,
+                                    icon: "flame.fill",
+                                    progress: moveProgress,
+                                    tint: .orange
+                                )
+
+                                HomeDayStatus(
+                                    title: "Recovery",
+                                    value: recoveryValue,
+                                    subtitle: health.recovery.state.title,
+                                    icon: health.recovery.state.systemImage,
+                                    progress: health.recovery.score.map {
+                                        Double($0) / 100
+                                    },
+                                    tint: ATHLTHTheme.recoveryBlue
+                                )
+
+                                HomeDayStatus(
+                                    title: "Sleep",
+                                    value: sleepValue,
+                                    subtitle: sleepSubtitle,
+                                    icon: "moon.fill",
+                                    progress:
+                                        health.sleep.totalAsleep > 0
+                                            ? min(
+                                                health.sleep.totalAsleep /
+                                                    (8 * 3_600),
+                                                1
+                                            )
+                                            : nil,
+                                    tint: .purple
+                                )
+                            }
+                            .padding(.top, 14)
+
+                            if let insight = homeInsight {
+                                Divider()
+                                    .padding(.vertical, 12)
+
+                                Button {
+                                    onSelectTab(2)
+                                } label: {
+                                    HStack(alignment: .top, spacing: 11) {
+                                        Image(systemName: insight.icon)
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(readinessTint)
+                                            .frame(width: 34, height: 34)
+                                            .background(
+                                                readinessTint.opacity(0.10),
+                                                in: RoundedRectangle(
+                                                    cornerRadius: 11,
+                                                    style: .continuous
+                                                )
+                                            )
+
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(insight.title)
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                            Text(insight.detail)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(3)
+                                        }
+
+                                        Spacer()
+
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption2.bold())
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
 
-                    if let nextUp = homeNextUp {
-                        homeNextUpCard(nextUp)
+                    HomeThisWeekCard(
+                        plan: session.activePlan,
+                        workouts: health.workouts,
+                        streakCount: homeStreakCount
+                    ) {
+                        onSelectTab(3)
                     }
 
                     HomeActivitySection()
 
-                    HomeWeeklyTrendsCard(
-                        snapshot: homeWeekSnapshot,
-                        isLoading: homeWeekLoading,
-                        hasHealthAccess: health.hasRequestedAuthorization
-                    )
-                    .task {
-                        if homeWeekSnapshot == nil &&
-                            !homeWeekLoading &&
-                            !health.shouldDeferAutomaticHealthWork {
-                            await loadHomeWeek()
-                        }
+                    HomeHappeningCard(
+                        challenges: challenges.visibleChallenges,
+                        events: community.upcomingEvents
+                    ) {
+                        onSelectTab(4)
                     }
 
                     HomeAroundYouSection()
@@ -374,6 +357,113 @@ struct ATHLTHHomeView: View {
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
+            }
+            .sheet(item: $selectedHomeStrengthSession) { workout in
+                WorkoutStartOptionsView(
+                    session: workout,
+                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    watchConnected:
+                        settings.trainingDeviceProvider == .appleWatch &&
+                        watchConnection.isReady,
+                    defaultCapture: settings.preferredWorkoutCapture,
+                    defaultTracking: settings.defaultStrengthTracking
+                ) { captureDevice, trackingMode, selectedFriends in
+                    Task { @MainActor in
+                        await social.beginWorkoutWithFriends(
+                            title: workout.title,
+                            kind: .strength,
+                            friends: selectedFriends,
+                            creatorName: session.profile.displayName,
+                            creatorUsername: session.profile.username
+                        )
+
+                        if captureDevice == .appleWatch {
+                            do {
+                                try await watchConnection.startWorkoutOnWatch(.strength)
+                                session.beginTrainingStatus(for: workout)
+                                strengthWorkout.start(
+                                    session: workout,
+                                    watchSessionID: UUID(),
+                                    trackingMode: trackingMode,
+                                    captureDevice: .appleWatch
+                                )
+                                showingHomeStrengthWorkout = true
+                            } catch {
+                                homeWatchTransferError =
+                                    error.localizedDescription
+                            }
+                        } else {
+                            session.beginTrainingStatus(for: workout)
+                            strengthWorkout.start(
+                                session: workout,
+                                watchSessionID: nil,
+                                trackingMode: trackingMode,
+                                captureDevice: .iPhone
+                            )
+                            showingHomeStrengthWorkout = true
+                        }
+                    }
+                }
+            }
+            .sheet(item: $pendingHomeQuickStartKind) { kind in
+                QuickWorkoutStartSheet(
+                    kind: kind,
+                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    watchConnected:
+                        settings.trainingDeviceProvider == .appleWatch &&
+                        watchConnection.isReady
+                ) { selectedFriends in
+                    let planned = pendingHomePlanSession
+
+                    Task { @MainActor in
+                        await social.beginWorkoutWithFriends(
+                            title: planned?.title ?? kind.title,
+                            kind: kind,
+                            friends: selectedFriends,
+                            creatorName: session.profile.displayName,
+                            creatorUsername: session.profile.username
+                        )
+
+                        if let planned {
+                            startHomePlannedWorkoutOnWatch(planned)
+                        } else {
+                            startHomeQuickWorkoutOnWatch(kind)
+                        }
+
+                        pendingHomePlanSession = nil
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $showingHomeStrengthWorkout) {
+                ActiveStrengthWorkoutView()
+                    .environmentObject(strengthWorkout)
+                    .environmentObject(session)
+            }
+            .alert(
+                "ATHLTH",
+                isPresented: Binding(
+                    get: {
+                        homeWatchTransferMessage != nil ||
+                        homeWatchTransferError != nil
+                    },
+                    set: { visible in
+                        if !visible {
+                            homeWatchTransferMessage = nil
+                            homeWatchTransferError = nil
+                        }
+                    }
+                )
+            ) {
+                Button("OK", role: .cancel) {
+                    homeWatchTransferMessage = nil
+                    homeWatchTransferError = nil
+                }
+            } message: {
+                Text(
+                    homeWatchTransferError ??
+                    homeWatchTransferMessage ??
+                    ""
+                )
             }
             .refreshable {
                 async let communityRefresh: Void = community.refresh()
@@ -384,7 +474,6 @@ struct ATHLTHHomeView: View {
                     await health.refreshAll()
 
                     async let streakRefresh: Void = loadHomeStreak()
-                    async let weekRefresh: Void = loadHomeWeek()
                     async let goalsRefresh: Void =
                         goalStore.refreshAutomaticMilestones(
                             health: health,
@@ -393,11 +482,9 @@ struct ATHLTHHomeView: View {
 
                     _ = await (
                         streakRefresh,
-                        weekRefresh,
                         goalsRefresh
                     )
                 } else {
-                    homeWeekSnapshot = nil
                     await loadHomeStreak()
                 }
 
