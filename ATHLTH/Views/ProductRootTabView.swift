@@ -5212,7 +5212,25 @@ struct ATHLTHProfileView: View {
             await refreshProfile()
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                NavigationLink {
+                    ATHLTHPrivacyCenterView()
+                } label: {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            ATHLTHTheme.cardWarm.opacity(0.82),
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(Color.white.opacity(0.80), lineWidth: 1)
+                        }
+                }
+                .accessibilityLabel("Privacy & Visibility")
+
                 NavigationLink {
                     ATHLTHSettingsView()
                 } label: {
