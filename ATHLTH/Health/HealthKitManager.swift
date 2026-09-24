@@ -1539,38 +1539,156 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
 
-        var result = SleepSummary.empty
-        var asleepSamples: [HKCategorySample] = []
+        func sleepValue(_ sample: HKCategorySample) -> HKCategoryValueSleepAnalysis? {
+            HKCategoryValueSleepAnalysis(rawValue: sample.value)
+        }
 
-        for sample in samples {
-            let duration = sample.endDate.timeIntervalSince(sample.startDate)
-            guard let value = HKCategoryValueSleepAnalysis(rawValue: sample.value) else { continue }
+        func isAsleep(_ sample: HKCategorySample) -> Bool {
+            guard let value = sleepValue(sample) else { return false }
 
             switch value {
-            case .asleepCore:
-                result.core += duration
-                result.totalAsleep += duration
-                asleepSamples.append(sample)
-            case .asleepDeep:
-                result.deep += duration
-                result.totalAsleep += duration
-                asleepSamples.append(sample)
-            case .asleepREM:
-                result.rem += duration
-                result.totalAsleep += duration
-                asleepSamples.append(sample)
-            case .asleepUnspecified:
-                result.totalAsleep += duration
-                asleepSamples.append(sample)
-            case .awake:
-                result.awake += duration
+            case .asleepCore, .asleepDeep, .asleepREM, .asleepUnspecified:
+                return true
             default:
-                break
+                return false
             }
         }
 
-        result.sleepStart = asleepSamples.first?.startDate
-        result.sleepEnd = asleepSamples.last?.endDate
+        func mergedDuration(_ input: [HKCategorySample]) -> TimeInterval {
+            let sorted = input
+                .filter { $0.endDate > $0.startDate }
+                .sorted { $0.startDate < $1.startDate }
+
+            guard let first = sorted.first else { return 0 }
+
+            var total: TimeInterval = 0
+            var currentStart = first.startDate
+            var currentEnd = first.endDate
+
+            for sample in sorted.dropFirst() {
+                if sample.startDate <= currentEnd {
+                    currentEnd = max(currentEnd, sample.endDate)
+                } else {
+                    total += currentEnd.timeIntervalSince(currentStart)
+                    currentStart = sample.startDate
+                    currentEnd = sample.endDate
+                }
+            }
+
+            total += currentEnd.timeIntervalSince(currentStart)
+            return max(total, 0)
+        }
+
+        let asleepSamples = samples.filter(isAsleep)
+        guard !asleepSamples.isEmpty else {
+            return .empty
+        }
+
+        // Build sleep sessions while allowing normal awake gaps during the
+        // night. Selecting the longest recent session keeps a later short nap
+        // from replacing the main overnight sleep.
+        let sortedAsleep = asleepSamples.sorted { $0.startDate < $1.startDate }
+        var sessions: [[HKCategorySample]] = []
+
+        for sample in sortedAsleep {
+            guard !sessions.isEmpty else {
+                sessions.append([sample])
+                continue
+            }
+
+            let currentIndex = sessions.index(before: sessions.endIndex)
+            let latestEnd = sessions[currentIndex]
+                .map(\.endDate)
+                .max() ?? sample.startDate
+
+            if sample.startDate.timeIntervalSince(latestEnd) <= 2 * 60 * 60 {
+                sessions[currentIndex].append(sample)
+            } else {
+                sessions.append([sample])
+            }
+        }
+
+        guard let primarySession = sessions.max(by: { lhs, rhs in
+            let leftDuration = mergedDuration(lhs)
+            let rightDuration = mergedDuration(rhs)
+
+            if abs(leftDuration - rightDuration) > 60 {
+                return leftDuration < rightDuration
+            }
+
+            let leftEnd = lhs.map(\.endDate).max() ?? .distantPast
+            let rightEnd = rhs.map(\.endDate).max() ?? .distantPast
+            return leftEnd < rightEnd
+        }) else {
+            return .empty
+        }
+
+        guard let sessionStart = primarySession.map(\.startDate).min(),
+              let sessionEnd = primarySession.map(\.endDate).max()
+        else {
+            return .empty
+        }
+
+        let sourceGroups = Dictionary(
+            grouping: primarySession,
+            by: { $0.sourceRevision.source.bundleIdentifier }
+        )
+
+        func detailedStageDuration(_ group: [HKCategorySample]) -> TimeInterval {
+            mergedDuration(group.filter { sample in
+                guard let value = sleepValue(sample) else { return false }
+                switch value {
+                case .asleepCore, .asleepDeep, .asleepREM:
+                    return true
+                default:
+                    return false
+                }
+            })
+        }
+
+        let preferredSourceGroup = sourceGroups.values.max(by: { lhs, rhs in
+            let leftDetailed = detailedStageDuration(lhs)
+            let rightDetailed = detailedStageDuration(rhs)
+
+            if abs(leftDetailed - rightDetailed) > 60 {
+                return leftDetailed < rightDetailed
+            }
+
+            return mergedDuration(lhs) < mergedDuration(rhs)
+        }) ?? primarySession
+
+        let preferredBundleID =
+            preferredSourceGroup.first?.sourceRevision.source.bundleIdentifier
+
+        func stageDuration(_ stage: HKCategoryValueSleepAnalysis) -> TimeInterval {
+            mergedDuration(preferredSourceGroup.filter {
+                sleepValue($0) == stage
+            })
+        }
+
+        let awakeSamples = samples.filter { sample in
+            guard sleepValue(sample) == .awake,
+                  sample.endDate > sessionStart,
+                  sample.startDate < sessionEnd
+            else {
+                return false
+            }
+
+            if let preferredBundleID {
+                return sample.sourceRevision.source.bundleIdentifier == preferredBundleID
+            }
+
+            return true
+        }
+
+        var result = SleepSummary.empty
+        result.totalAsleep = mergedDuration(primarySession)
+        result.core = stageDuration(.asleepCore)
+        result.deep = stageDuration(.asleepDeep)
+        result.rem = stageDuration(.asleepREM)
+        result.awake = mergedDuration(awakeSamples)
+        result.sleepStart = sessionStart
+        result.sleepEnd = sessionEnd
         return result
     }
 
