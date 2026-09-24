@@ -1797,7 +1797,18 @@ struct OnboardingFlowView: View {
                         if settings.trainingDeviceProvider == .appleWatch {
                             watchConnection.refreshStatus()
                         }
-                        connectionStage = .appleHealth
+
+                        if health.hasRequestedAuthorization {
+                            // Health has already been through the iOS permission
+                            // flow. Show the resulting status on the final
+                            // summary instead of another Health confirmation page.
+                            appleHealthSkipped = false
+                            saveProfileData()
+                            connectionStage = .device
+                            step = .ready
+                        } else {
+                            connectionStage = .appleHealth
+                        }
                     }
 
                 case .appleHealth:
@@ -2316,6 +2327,7 @@ struct OnboardingFlowView: View {
 
             saveProfileData()
             healthRequestInProgress = false
+            connectionStage = .device
 
             // The Health permission sheet is the interaction. Once iOS
             // returns to ATHLTH, go straight to the final setup summary rather
