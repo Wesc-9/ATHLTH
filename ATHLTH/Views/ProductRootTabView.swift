@@ -3229,7 +3229,7 @@ struct ATHLTHProfileView: View {
                             NavigationLink {
                                 ATHLTHEditProfileView()
                             } label: {
-                                Label("Edit", systemImage: "pencil")
+                                Label("Edit profile", systemImage: "pencil")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(ATHLTHTheme.accentDeep)
                                     .padding(.horizontal, 12)
