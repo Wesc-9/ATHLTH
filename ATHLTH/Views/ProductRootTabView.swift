@@ -1,4 +1,5 @@
 import Charts
+import Combine
 import MapKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -7,24 +8,50 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var settings: AppSettingsStore
 
+    @State private var selectedTab = 0
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             ATHLTHHomeView()
                 .tabItem { Label("Home", systemImage: "house.fill") }
+                .tag(0)
 
             ATHLTHTrainView()
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
+                .tag(1)
 
             ATHLTHRecoveryView()
                 .tabItem { Label("Recovery", systemImage: "leaf.fill") }
+                .tag(2)
 
             ATHLTHProgressView()
                 .tabItem { Label("Progress", systemImage: "chart.bar.fill") }
+                .tag(3)
 
             ATHLTHCommunityView()
                 .tabItem { Label("Community", systemImage: "person.3.fill") }
+                .tag(4)
         }
         .tint(ATHLTHTheme.accent)
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .athlthRemoteNotificationTapped
+            )
+        ) { notification in
+            let kind = (
+                notification.userInfo?["athlth_kind"] as? String
+            )?.lowercased() ?? ""
+
+            if kind.contains("message") ||
+                kind.contains("friend") ||
+                kind.contains("challenge") ||
+                kind.contains("reaction") ||
+                kind.contains("workout") {
+                selectedTab = 4
+            } else {
+                selectedTab = 0
+            }
+        }
         .sheet(
             isPresented: Binding(
                 get: {
