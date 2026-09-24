@@ -34,6 +34,7 @@ struct OnboardingFlowView: View {
     @State private var appleSignInInProgress = false
     @State private var onboardingCompletionError: String?
     @State private var showingWatchInstallHelp = false
+    @State private var showingGarminSetup = false
     @State private var connectionStage: ConnectionStage = .device
     @FocusState private var usernameFieldFocused: Bool
 
@@ -111,9 +112,9 @@ struct OnboardingFlowView: View {
                 await loadUsernameSuggestions()
             case .connections:
                 usernameFieldFocused = false
-                if settings.trainingDeviceProvider == .appleWatch {
-                    watchConnection.refreshStatus()
-                }
+                // The connection screen is also a device check. Refresh Watch
+                // status even when the user has not selected Apple Watch yet.
+                watchConnection.refreshStatus()
             case .goals, .ready:
                 usernameFieldFocused = false
             default:
@@ -126,8 +127,7 @@ struct OnboardingFlowView: View {
         }
         .onChange(of: scenePhase) {
             guard scenePhase == .active,
-                  step == .connections,
-                  settings.trainingDeviceProvider == .appleWatch
+                  step == .connections
             else {
                 return
             }
@@ -146,10 +146,13 @@ struct OnboardingFlowView: View {
             }
         }
         .sheet(isPresented: $showingWatchInstallHelp) {
-            WatchInstallHelpView {
+            WatchInstallHelpView(state: watchConnection.state) {
                 showingWatchInstallHelp = false
                 watchConnection.refreshStatus()
             }
+        }
+        .sheet(isPresented: $showingGarminSetup) {
+            GarminOnboardingSetupView()
         }
     }
 
@@ -1017,12 +1020,12 @@ struct OnboardingFlowView: View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 8) {
                 onboardingTitle(
-                    "Connect your device",
-                    subtitle: "Choose how you want to train with ATHLTH."
+                    "Check your connections",
+                    subtitle: "Make sure the devices you want to use with ATHLTH are ready."
                 )
 
                 HStack(spacing: 7) {
-                    Text("DEVICE")
+                    Text("DEVICES")
                     Text("1 OF 2")
                 }
                 .font(.caption2.weight(.bold))
@@ -1035,8 +1038,31 @@ struct OnboardingFlowView: View {
                     provider: .appleWatch,
                     title: "Apple Watch",
                     subtitle: "Track workouts, heart rate, recovery and more.",
-                    icon: "applewatch"
+                    icon: "applewatch",
+                    status: appleWatchConnectionLabel,
+                    statusTint: appleWatchConnectionTint,
+                    infoAction: {
+                        showingWatchInstallHelp = true
+                    }
                 )
+
+                if settings.trainingDeviceProvider == .appleWatch,
+                   watchConnection.state == .appNotInstalled {
+                    Button {
+                        openAppleWatchApp()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "applewatch")
+                            Text("Open Watch app to install ATHLTH")
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption.weight(.bold))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                }
 
                 deviceChoiceCard(
                     provider: .garmin,
@@ -1044,14 +1070,44 @@ struct OnboardingFlowView: View {
                     subtitle: "Garmin Connect integration is coming soon.",
                     icon: "watch.analog",
                     isAvailable: false,
-                    badge: "COMING SOON"
+                    badge: "COMING SOON",
+                    status: "Setup will be required",
+                    statusTint: OnboardingTheme.faintText,
+                    infoAction: {
+                        showingGarminSetup = true
+                    }
                 )
 
                 deviceChoiceCard(
                     provider: .none,
                     title: "No watch",
-                    subtitle: "Continue with just your iPhone. Connect a watch later.",
-                    icon: "iphone"
+                    subtitle: "Use ATHLTH with your iPhone and Apple Health when available.",
+                    icon: "iphone",
+                    status: settings.trainingDeviceProvider == .none
+                        ? "iPhone / manual mode"
+                        : nil,
+                    statusTint: OnboardingTheme.accent
+                )
+            }
+
+            if settings.trainingDeviceProvider == .none {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "rectangle.3.group.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(OnboardingTheme.accent)
+                        .padding(.top, 1)
+
+                    Text(
+                        "ATHLTH adapts to your setup. Apple Health can still power workouts, activity and compatible health insights. Watch-only sections stay hidden when they have no data, and if you skip Apple Health too, ATHLTH keeps the experience focused on features you can use without a wearable."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(OnboardingTheme.mutedText)
+                    .lineSpacing(2)
+                }
+                .padding(14)
+                .background(
+                    OnboardingTheme.accent.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
             }
 
@@ -1069,134 +1125,192 @@ struct OnboardingFlowView: View {
         subtitle: String,
         icon: String,
         isAvailable: Bool = true,
-        badge: String? = nil
+        badge: String? = nil,
+        status: String? = nil,
+        statusTint: Color = OnboardingTheme.accent,
+        infoAction: (() -> Void)? = nil
     ) -> some View {
         let selected = isAvailable && settings.trainingDeviceProvider == provider
 
-        return Button {
-            guard isAvailable else { return }
+        return HStack(spacing: 12) {
+            Button {
+                guard isAvailable else { return }
 
-            withAnimation(.easeInOut(duration: 0.18)) {
-                settings.trainingDeviceProvider = provider
-            }
-
-            if provider != .appleWatch,
-               settings.preferredWorkoutCapture == .appleWatch {
-                settings.preferredWorkoutCapture = .iPhone
-            }
-
-            if provider == .appleWatch {
-                watchConnection.refreshStatus()
-            }
-        } label: {
-            HStack(spacing: 17) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(
-                            !isAvailable
-                                ? Color.black.opacity(0.025)
-                                : selected
-                                    ? OnboardingTheme.accent.opacity(0.11)
-                                    : Color.black.opacity(0.035)
-                        )
-                        .frame(width: 72, height: 72)
-
-                    Image(systemName: icon)
-                        .font(.system(size: provider == .appleWatch ? 31 : 28, weight: .medium))
-                        .foregroundStyle(
-                            !isAvailable
-                                ? OnboardingTheme.faintText.opacity(0.55)
-                                : selected
-                                    ? OnboardingTheme.accent
-                                    : OnboardingTheme.primaryText.opacity(0.78)
-                        )
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    settings.trainingDeviceProvider = provider
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(title)
-                            .font(.system(size: 19, weight: .bold))
+                if provider != .appleWatch,
+                   settings.preferredWorkoutCapture == .appleWatch {
+                    settings.preferredWorkoutCapture = .iPhone
+                }
+
+                if provider == .appleWatch {
+                    watchConnection.refreshStatus()
+                }
+            } label: {
+                HStack(spacing: 17) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(
+                                !isAvailable
+                                    ? Color.black.opacity(0.025)
+                                    : selected
+                                        ? OnboardingTheme.accent.opacity(0.11)
+                                        : Color.black.opacity(0.035)
+                            )
+                            .frame(width: 72, height: 72)
+
+                        Image(systemName: icon)
+                            .font(.system(size: provider == .appleWatch ? 31 : 28, weight: .medium))
+                            .foregroundStyle(
+                                !isAvailable
+                                    ? OnboardingTheme.faintText.opacity(0.55)
+                                    : selected
+                                        ? OnboardingTheme.accent
+                                        : OnboardingTheme.primaryText.opacity(0.78)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Text(title)
+                                .font(.system(size: 19, weight: .bold))
+                                .foregroundStyle(
+                                    isAvailable
+                                        ? OnboardingTheme.primaryText
+                                        : OnboardingTheme.mutedText
+                                )
+
+                            if let badge {
+                                Text(badge)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .tracking(0.7)
+                                    .foregroundStyle(OnboardingTheme.faintText)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        Color.black.opacity(0.045),
+                                        in: Capsule()
+                                    )
+                            }
+                        }
+
+                        Text(subtitle)
+                            .font(.subheadline)
                             .foregroundStyle(
                                 isAvailable
-                                    ? OnboardingTheme.primaryText
-                                    : OnboardingTheme.mutedText
+                                    ? OnboardingTheme.mutedText
+                                    : OnboardingTheme.faintText
                             )
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(2)
 
-                        if let badge {
-                            Text(badge)
-                                .font(.system(size: 9, weight: .bold))
-                                .tracking(0.7)
-                                .foregroundStyle(OnboardingTheme.faintText)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 4)
-                                .background(
-                                    Color.black.opacity(0.045),
-                                    in: Capsule()
-                                )
+                        if let status {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(statusTint)
+                                    .frame(width: 7, height: 7)
+
+                                Text(status)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(statusTint)
+                                    .lineLimit(2)
+                            }
+                            .padding(.top, 1)
                         }
                     }
 
-                    Text(subtitle)
-                        .font(.subheadline)
+                    Spacer(minLength: 2)
+
+                    Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                        .font(.system(size: 22, weight: .medium))
                         .foregroundStyle(
-                            isAvailable
-                                ? OnboardingTheme.mutedText
-                                : OnboardingTheme.faintText
+                            selected
+                                ? OnboardingTheme.accent
+                                : OnboardingTheme.faintText.opacity(0.72)
                         )
-                        .multilineTextAlignment(.leading)
-                        .lineSpacing(2)
                 }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 23, weight: .medium))
-                    .foregroundStyle(
-                        selected
-                            ? OnboardingTheme.accent
-                            : OnboardingTheme.faintText.opacity(0.72)
-                    )
+                .contentShape(Rectangle())
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
-            .background(
-                !isAvailable
-                    ? Color.black.opacity(0.025)
-                    : selected
-                        ? OnboardingTheme.accent.opacity(0.045)
-                        : OnboardingTheme.card,
-                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(
-                        !isAvailable
-                            ? OnboardingTheme.border.opacity(0.55)
-                            : selected
-                                ? OnboardingTheme.accent.opacity(0.52)
-                                : OnboardingTheme.border,
-                        lineWidth: selected ? 1.4 : 1
-                    )
+            .buttonStyle(.plain)
+            .disabled(!isAvailable)
+
+            if let infoAction {
+                Button(action: infoAction) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(OnboardingTheme.mutedText)
+                        .frame(width: 38, height: 48)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(title) setup details")
             }
-            .shadow(
-                color: !isAvailable
-                    ? Color.clear
-                    : selected
-                        ? OnboardingTheme.accent.opacity(0.09)
-                        : Color.black.opacity(0.035),
-                radius: selected ? 18 : 12,
-                x: 0,
-                y: 8
-            )
         }
-        .buttonStyle(.plain)
-        .disabled(!isAvailable)
-        .accessibilityLabel("\(title). \(subtitle)")
-        .accessibilityValue(
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+        .background(
             !isAvailable
-                ? "Coming soon"
-                : selected ? "Selected" : "Not selected"
+                ? Color.black.opacity(0.025)
+                : selected
+                    ? OnboardingTheme.accent.opacity(0.045)
+                    : OnboardingTheme.card,
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(
+                    !isAvailable
+                        ? OnboardingTheme.border.opacity(0.55)
+                        : selected
+                            ? OnboardingTheme.accent.opacity(0.52)
+                            : OnboardingTheme.border,
+                    lineWidth: selected ? 1.4 : 1
+                )
+        }
+        .shadow(
+            color: !isAvailable
+                ? Color.clear
+                : selected
+                    ? OnboardingTheme.accent.opacity(0.09)
+                    : Color.black.opacity(0.035),
+            radius: selected ? 18 : 12,
+            x: 0,
+            y: 8
+        )
+        .accessibilityElement(children: .contain)
+    }
+
+    private var appleWatchConnectionLabel: String {
+        switch watchConnection.state {
+        case .checking:
+            return "Checking connection…"
+        case .unsupported:
+            return "Apple Watch unavailable"
+        case .notPaired:
+            return "Watch not connected"
+        case .appNotInstalled:
+            return "Paired · ATHLTH app not installed"
+        case .ready:
+            return "Connected"
+        }
+    }
+
+    private var appleWatchConnectionTint: Color {
+        switch watchConnection.state {
+        case .ready:
+            return OnboardingTheme.success
+        case .appNotInstalled, .notPaired:
+            return .orange
+        case .checking, .unsupported:
+            return OnboardingTheme.faintText
+        }
+    }
+
+    private func openAppleWatchApp() {
+        guard let url = URL(string: "itms-watch://") else { return }
+        openURL(url)
     }
 
     private var appleHealthConnectionStep: some View {
@@ -2100,86 +2214,117 @@ private struct WatchInstallHelpView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
+    let state: AppleWatchConnectionState
     let onCheckAgain: () -> Void
 
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Image(systemName: "applewatch")
+                    Image(systemName: watchHeaderIcon)
                         .font(.system(size: 42, weight: .medium))
-                        .foregroundStyle(OnboardingTheme.accent)
+                        .foregroundStyle(watchHeaderTint)
 
-                    Text("Install ATHLTH on Apple Watch")
+                    Text(watchHeaderTitle)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(OnboardingTheme.primaryText)
 
-                    Text("ATHLTH includes a companion Watch app. Install it from the Watch app on this iPhone.")
+                    Text(watchHeaderDetail)
                         .font(.subheadline)
                         .foregroundStyle(OnboardingTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                VStack(alignment: .leading, spacing: 16) {
-                    watchInstallStep(
-                        number: "1",
-                        title: "Open the Watch app",
-                        detail: "On this iPhone, open Apple’s Watch app and choose My Watch."
-                    )
+                if state == .appNotInstalled {
+                    VStack(alignment: .leading, spacing: 16) {
+                        watchInstallStep(
+                            number: "1",
+                            title: "Open the Watch app",
+                            detail: "ATHLTH can take you directly to Apple’s Watch app on this iPhone."
+                        )
 
-                    watchInstallStep(
-                        number: "2",
-                        title: "Find ATHLTH",
-                        detail: "Scroll to Available Apps and tap Install next to ATHLTH."
-                    )
+                        watchInstallStep(
+                            number: "2",
+                            title: "Find ATHLTH",
+                            detail: "Scroll to Available Apps and tap Install next to ATHLTH."
+                        )
 
-                    watchInstallStep(
-                        number: "3",
-                        title: "Return to ATHLTH",
-                        detail: "When installation finishes, come back here and verify the connection."
+                        watchInstallStep(
+                            number: "3",
+                            title: "Return to ATHLTH",
+                            detail: "When installation finishes, come back and check the connection again."
+                        )
+                    }
+                    .padding(18)
+                    .background(
+                        OnboardingTheme.card,
+                        in: RoundedRectangle(cornerRadius: 22, style: .continuous)
                     )
-                }
-                .padding(18)
-                .background(
-                    OnboardingTheme.card,
-                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(OnboardingTheme.border, lineWidth: 1)
+                    }
+                } else if state == .notPaired {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label(
+                            "Pair an Apple Watch in Apple’s Watch app first.",
+                            systemImage: "link.badge.plus"
+                        )
+                        Label(
+                            "Then return to ATHLTH and check again.",
+                            systemImage: "arrow.clockwise"
+                        )
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(OnboardingTheme.mutedText)
+                    .padding(18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        OnboardingTheme.card,
+                        in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(OnboardingTheme.border, lineWidth: 1)
+                    }
                 }
 
                 Spacer()
 
-                Button {
-                    if let url = URL(string: "itms-watch://") {
-                        openURL(url)
+                if state == .appNotInstalled || state == .notPaired {
+                    Button {
+                        if let url = URL(string: "itms-watch://") {
+                            openURL(url)
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Open Watch app")
+                                .font(.headline)
+                            Image(systemName: "arrow.up.right")
+                            Spacer()
+                        }
                     }
-                } label: {
-                    HStack {
-                        Spacer()
-                        Text("Open Watch app")
-                            .font(.headline)
-                        Image(systemName: "arrow.up.right")
-                        Spacer()
-                    }
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
                 }
-                .buttonStyle(OnboardingPrimaryButtonStyle())
 
-                Button {
-                    onCheckAgain()
-                } label: {
-                    HStack {
-                        Spacer()
-                        Text("I installed it — Check again")
-                            .font(.headline)
-                        Image(systemName: "arrow.clockwise")
-                        Spacer()
+                if state != .unsupported {
+                    Button {
+                        onCheckAgain()
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text(state == .ready ? "Refresh connection" : "Check again")
+                                .font(.headline)
+                            Image(systemName: "arrow.clockwise")
+                            Spacer()
+                        }
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
 
-                Button("Not now") {
+                Button("Done") {
                     dismiss()
                 }
                 .font(.subheadline.weight(.semibold))
@@ -2192,6 +2337,62 @@ private struct WatchInstallHelpView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .preferredColorScheme(.light)
+    }
+
+    private var watchHeaderIcon: String {
+        switch state {
+        case .ready:
+            return "checkmark.circle.fill"
+        case .appNotInstalled:
+            return "applewatch"
+        case .notPaired:
+            return "applewatch.slash"
+        case .checking:
+            return "arrow.clockwise"
+        case .unsupported:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var watchHeaderTint: Color {
+        switch state {
+        case .ready:
+            return OnboardingTheme.success
+        case .appNotInstalled, .notPaired:
+            return .orange
+        case .checking, .unsupported:
+            return OnboardingTheme.accent
+        }
+    }
+
+    private var watchHeaderTitle: String {
+        switch state {
+        case .ready:
+            return "Apple Watch connected"
+        case .appNotInstalled:
+            return "Install ATHLTH on Apple Watch"
+        case .notPaired:
+            return "Apple Watch isn’t connected"
+        case .checking:
+            return "Checking Apple Watch"
+        case .unsupported:
+            return "Apple Watch unavailable"
+        }
+    }
+
+    private var watchHeaderDetail: String {
+        switch state {
+        case .ready:
+            return "Your paired Apple Watch has the ATHLTH companion app installed and is ready to use."
+        case .appNotInstalled:
+            return "Your Apple Watch is paired, but the ATHLTH Watch app still needs to be installed."
+        case .notPaired:
+            return "ATHLTH can’t find a paired Apple Watch on this iPhone."
+        case .checking:
+            return "ATHLTH is checking the paired Watch and companion-app installation."
+        case .unsupported:
+            return "Apple Watch connectivity is not available on this device."
+        }
     }
 
     private func watchInstallStep(
@@ -2220,3 +2421,57 @@ private struct WatchInstallHelpView: View {
     }
 }
 
+private struct GarminOnboardingSetupView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 22) {
+                Image(systemName: "watch.analog")
+                    .font(.system(size: 42, weight: .medium))
+                    .foregroundStyle(OnboardingTheme.accent)
+
+                Text("Garmin setup")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(OnboardingTheme.primaryText)
+
+                Text(
+                    "Garmin Connect support is not enabled yet. When it is released, this is where you’ll sign in, authorize ATHLTH and confirm the Garmin data you want to sync."
+                )
+                .font(.subheadline)
+                .foregroundStyle(OnboardingTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 13) {
+                    Label("Connect Garmin account", systemImage: "person.crop.circle.badge.checkmark")
+                    Label("Choose permitted health and workout data", systemImage: "checklist")
+                    Label("Confirm sync status before continuing", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .font(.subheadline)
+                .foregroundStyle(OnboardingTheme.mutedText)
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    OnboardingTheme.card,
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(OnboardingTheme.border, lineWidth: 1)
+                }
+
+                Spacer()
+
+                Button("Done") {
+                    dismiss()
+                }
+                .buttonStyle(OnboardingPrimaryButtonStyle())
+            }
+            .padding(24)
+            .background(OnboardingBackground().ignoresSafeArea())
+            .navigationTitle("Garmin")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .preferredColorScheme(.light)
+    }
+}
