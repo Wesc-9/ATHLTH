@@ -218,61 +218,75 @@ struct OnboardingFlowView: View {
     }
 
     private var accountStep: some View {
-        ZStack {
-            OnboardingHeroPhoto()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .scaleEffect(1.025)
-                .offset(y: 8)
-                .clipped()
+        GeometryReader { proxy in
+            let usesTabletWidth = proxy.size.width >= 700
+            let foregroundWidth: CGFloat = usesTabletWidth ? 500 : 560
+            let spacerMinimum: CGFloat = usesTabletWidth ? 56 : 170
+
+            ZStack {
+                OnboardingHeroPhoto()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                    .scaleEffect(1.025)
+                    .offset(y: 8)
+                    .clipped()
+                    .ignoresSafeArea()
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.44),
+                        Color.black.opacity(0.10),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: UnitPoint(x: 0.5, y: 0.38)
+                )
                 .ignoresSafeArea()
 
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.44),
-                    Color.black.opacity(0.10),
-                    Color.clear
-                ],
-                startPoint: .top,
-                endPoint: UnitPoint(x: 0.5, y: 0.38)
-            )
-            .ignoresSafeArea()
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.06),
+                        Color.black.opacity(0.76)
+                    ],
+                    startPoint: UnitPoint(x: 0.5, y: 0.50),
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    Color.black.opacity(0.06),
-                    Color.black.opacity(0.76)
-                ],
-                startPoint: UnitPoint(x: 0.5, y: 0.50),
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+                VStack(spacing: 0) {
+                    accountBrand
+                        .padding(.top, usesTabletWidth ? 24 : 18)
 
-            VStack(spacing: 0) {
-                accountBrand
-                    .padding(.top, 18)
+                    Spacer(minLength: spacerMinimum)
 
-                Spacer(minLength: 170)
+                    accountSignInPanel
 
-                accountSignInPanel
+                    if let authenticationError {
+                        Label(
+                            authenticationError,
+                            systemImage: "exclamationmark.circle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 6)
+                        .padding(.top, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
-                if let authenticationError {
-                    Label(
-                        authenticationError,
-                        systemImage: "exclamationmark.circle.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 6)
-                    .padding(.top, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    accountLegal
+                        .padding(.top, 18)
+                        .padding(.bottom, 12)
                 }
-
-                accountLegal
-                    .padding(.top, 18)
-                    .padding(.bottom, 12)
+                .frame(maxWidth: foregroundWidth)
+                .padding(.horizontal, 24)
+                .frame(
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                )
             }
-            .padding(.horizontal, 24)
         }
         .background(Color.black.ignoresSafeArea())
     }
