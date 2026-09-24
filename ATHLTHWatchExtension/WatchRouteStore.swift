@@ -8,6 +8,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var companionLinked = false
 
     private let fileManager = FileManager.default
+    private var pendingWorkoutRouteID: UUID?
 
     override init() {
         super.init()
@@ -108,6 +109,41 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
     }
 
+    private func handleWorkoutRouteSelection(
+        _ payload: [String: Any]
+    ) -> Bool {
+        guard
+            payload[WatchTransferMetadataKey.kind] as? String
+                == WatchTransferKind.workoutRouteSelection.rawValue,
+            let rawRouteID =
+                payload[WatchTransferMetadataKey.routeID] as? String
+        else {
+            return false
+        }
+
+        guard !rawRouteID.isEmpty,
+              let routeID = UUID(uuidString: rawRouteID)
+        else {
+            pendingWorkoutRouteID = nil
+            DispatchQueue.main.async {
+                WatchWorkoutManager.shared
+                    .configurePlannedRoute(nil)
+            }
+            return true
+        }
+
+        pendingWorkoutRouteID = routeID
+
+        if let route = route(with: routeID) {
+            DispatchQueue.main.async {
+                WatchWorkoutManager.shared
+                    .configurePlannedRoute(route)
+            }
+        }
+
+        return true
+    }
+
     private func handleWorkoutConfiguration(
         _ payload: [String: Any]
     ) -> Bool {
@@ -153,6 +189,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         case .route,
              .workoutResult,
              .workoutCommand,
+             .workoutRouteSelection,
              .connectivityProbe,
              .connectivityAck:
             return false
@@ -198,6 +235,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 self.routes.sort { $0.updatedAt > $1.updatedAt }
                 self.connectionText = "Route received"
                 self.persistRoutes()
+
+                if self.pendingWorkoutRouteID == route.id {
+                    WatchWorkoutManager.shared
+                        .configurePlannedRoute(route)
+                }
             }
         } catch {
             DispatchQueue.main.async { [weak self] in
@@ -239,6 +281,10 @@ extension WatchRouteStore: WCSessionDelegate {
             return
         }
 
+        if handleWorkoutRouteSelection(message) {
+            return
+        }
+
         if handleWorkoutConfiguration(message) {
             return
         }
@@ -252,6 +298,11 @@ extension WatchRouteStore: WCSessionDelegate {
         replyHandler: @escaping ([String: Any]) -> Void
     ) {
         if handleConnectivityProbe(message, replyHandler: replyHandler) {
+            return
+        }
+
+        if handleWorkoutRouteSelection(message) {
+            replyHandler([:])
             return
         }
 
@@ -269,6 +320,10 @@ extension WatchRouteStore: WCSessionDelegate {
         didReceiveUserInfo userInfo: [String: Any] = [:]
     ) {
         if handleConnectivityProbe(userInfo) {
+            return
+        }
+
+        if handleWorkoutRouteSelection(userInfo) {
             return
         }
 
