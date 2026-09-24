@@ -6,7 +6,7 @@ on:
       - release/v1.3
       - release/v1.3.3
       - release/v1.3.4
-      - release/v1.3.6
+      - release/v1.3.7
     paths:
       - .github/icon-trigger
 
