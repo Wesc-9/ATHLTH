@@ -1177,11 +1177,15 @@ struct SessionEditorView: View {
     private var strengthBuilder: some View {
         Section("Strength Exercises") {
             if plannedExercises.isEmpty {
-                Text(
-                    "Add exercises from RepDB or your own custom library."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Freestyle strength workout")
+                        .font(.subheadline.weight(.semibold))
+                    Text(
+                        "You can add this workout now and choose exercises later, or add exercises below for a structured session."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             } else {
                 ForEach(Array(plannedExercises.enumerated()), id: \.element.id) { index, planned in
                     Button {
