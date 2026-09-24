@@ -1,6 +1,7 @@
 import CoreLocation
 import MapKit
 import SwiftUI
+import UIKit
 
 final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private(set) var location: CLLocation?
@@ -34,7 +35,7 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
 
         case .authorizedAlways, .authorizedWhenInUse:
             isUpdating = true
-            manager.startUpdatingLocation()
+            manager.requestLocation()
 
         case .denied, .restricted:
             isUpdating = false
@@ -72,7 +73,7 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
             if self.canShowUserLocation {
                 self.errorMessage = nil
                 self.isUpdating = true
-                manager.startUpdatingLocation()
+                manager.requestLocation()
             } else if manager.authorizationStatus == .denied ||
                         manager.authorizationStatus == .restricted {
                 self.isUpdating = false
@@ -151,8 +152,8 @@ struct HomeAroundYouSection: View {
     @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
 
     @StateObject private var locationStore = HomeLocationStore()
-    @State private var mapPosition: MapCameraPosition = .automatic
-    @State private var hasCenteredOnUser = false
+    @State private var mapSnapshot: UIImage?
+    @State private var snapshotLoading = false
 
     var body: some View {
         ATHLTHCard {
@@ -169,9 +170,7 @@ struct HomeAroundYouSection: View {
                 Spacer()
 
                 NavigationLink {
-                    AroundYouExploreView(
-                        locationStore: locationStore
-                    )
+                    AroundYouExploreView(locationStore: locationStore)
                 } label: {
                     HStack(spacing: 5) {
                         Text("Explore")
@@ -182,78 +181,65 @@ struct HomeAroundYouSection: View {
                 }
             }
 
-            Map(position: $mapPosition) {
-                if locationStore.canShowUserLocation {
-                    UserAnnotation()
-                }
-
-                ForEach(nearbyRoutes.prefix(8)) { route in
-                    MapPolyline(
-                        coordinates: route.coordinates.map(\.coordinate)
-                    )
-                    .stroke(
-                        route.isMine
-                            ? ATHLTHTheme.premiumGold
-                            : ATHLTHTheme.accent,
-                        style: StrokeStyle(
-                            lineWidth: route.isMine ? 5 : 4,
-                            lineCap: .round,
-                            lineJoin: .round
-                        )
+            ZStack {
+                if let mapSnapshot {
+                    Image(uiImage: mapSnapshot)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.surfaceSage,
+                            ATHLTHTheme.cardWarm,
+                            ATHLTHTheme.canvasBottom
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
 
-                    if let center = route.centerCoordinate {
-                        Annotation(route.title, coordinate: center) {
-                            Image(
-                                systemName: route.isMine
-                                    ? "figure.run.circle.fill"
-                                    : "point.topleft.down.to.point.bottomright.curvepath"
-                            )
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 34, height: 34)
-                            .background(
-                                route.isMine
-                                    ? ATHLTHTheme.premiumGold
-                                    : ATHLTHTheme.accentDeep,
-                                in: Circle()
-                            )
-                            .shadow(
-                                color: .black.opacity(0.12),
-                                radius: 7,
-                                y: 4
-                            )
+                    VStack(spacing: 9) {
+                        if snapshotLoading || locationStore.isUpdating {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "map.fill")
+                                .font(.title2)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
                         }
-                    }
-                }
 
-                ForEach(nearbyEvents.prefix(12)) { item in
-                    if let coordinate = eventCoordinate(item) {
-                        Marker(
-                            item.event.title,
-                            systemImage: item.event.activityType.systemImage,
-                            coordinate: coordinate
+                        Text(
+                            locationStore.canShowUserLocation
+                                ? "Preparing nearby preview"
+                                : "Location is needed for nearby discovery"
                         )
-                        .tint(.purple)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                     }
                 }
             }
-            .mapStyle(.standard(elevation: .realistic))
-            .mapControls {
-                MapCompass()
-                MapUserLocationButton()
-            }
-            .frame(height: 235)
+            .frame(height: 188)
+            .frame(maxWidth: .infinity)
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: 20,
                     style: .continuous
                 )
             )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+                .stroke(Color.white.opacity(0.70), lineWidth: 1)
+            }
             .overlay(alignment: .topLeading) {
                 HStack(spacing: 7) {
                     Image(systemName: "location.fill")
-                    Text(locationStore.location == nil ? "Finding you…" : "You are here")
+                    Text(
+                        locationStore.location == nil
+                            ? "Finding you…"
+                            : "You are here"
+                    )
                 }
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(ATHLTHTheme.primaryText)
@@ -280,9 +266,7 @@ struct HomeAroundYouSection: View {
                 Spacer()
 
                 Button {
-                    hasCenteredOnUser = false
                     locationStore.refresh()
-                    centerOnUser()
                 } label: {
                     Image(systemName: "location.circle.fill")
                         .font(.title3)
@@ -293,6 +277,26 @@ struct HomeAroundYouSection: View {
             }
             .padding(.top, 11)
 
+            if let nearest = nearbyRoutes.first {
+                Label(
+                    "\(nearest.title) · \(nearest.distanceKilometers.formatted(.number.precision(.fractionLength(1)))) km",
+                    systemImage: "figure.run"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.78))
+                .lineLimit(1)
+                .padding(.top, 8)
+            } else if let event = nearbyEvents.first {
+                Label(
+                    event.event.title,
+                    systemImage: event.event.activityType.systemImage
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.78))
+                .lineLimit(1)
+                .padding(.top, 8)
+            }
+
             if let error = locationStore.errorMessage {
                 Text(error)
                     .font(.caption2)
@@ -300,31 +304,27 @@ struct HomeAroundYouSection: View {
                     .padding(.top, 8)
             }
         }
+        // LazyVStack creates this section only when Home scrolls near it.
+        // Discovery is read-only here; route publishing belongs to route edits.
         .task {
-            async let routesRefresh: Void =
-                routeDiscovery.syncOwnedPublicRoutes(
-                    session.savedRoutes
-                )
-            async let eventsRefresh: Void = community.refresh()
-            _ = await (routesRefresh, eventsRefresh)
-        }
-        .onAppear {
             locationStore.start()
-            centerOnUser()
-        }
-        .onDisappear {
-            locationStore.stop()
+            await routeDiscovery.refresh()
+            await refreshSnapshot()
         }
         .onChange(of: locationStore.location?.timestamp) { _, _ in
-            if !hasCenteredOnUser {
-                centerOnUser()
-            }
+            Task { await refreshSnapshot() }
+        }
+        .onChange(of: routeDiscovery.routes.count) { _, _ in
+            Task { await refreshSnapshot() }
+        }
+        .onChange(of: community.events.count) { _, _ in
+            Task { await refreshSnapshot() }
         }
     }
 
     private var locationSubtitle: String {
         if locationStore.location != nil {
-            return "Live routes and events near your current location."
+            return "Routes and events near your current location."
         }
 
         if locationStore.canShowUserLocation {
@@ -373,9 +373,7 @@ struct HomeAroundYouSection: View {
 
         return allRoutes
             .compactMap { route -> (AroundYouRouteItem, CLLocationDistance)? in
-                guard let center = route.centerCoordinate else {
-                    return nil
-                }
+                guard let center = route.centerCoordinate else { return nil }
 
                 let distance = CLLocation(
                     latitude: center.latitude,
@@ -436,23 +434,113 @@ struct HomeAroundYouSection: View {
         )
     }
 
-    private func centerOnUser() {
-        guard let coordinate = locationStore.location?.coordinate else {
-            return
-        }
+    @MainActor
+    private func refreshSnapshot() async {
+        guard let location = locationStore.location else { return }
+        guard !snapshotLoading else { return }
 
-        hasCenteredOnUser = true
+        snapshotLoading = true
+        defer { snapshotLoading = false }
 
-        withAnimation(.easeInOut(duration: 0.35)) {
-            mapPosition = .region(
-                MKCoordinateRegion(
-                    center: coordinate,
-                    span: MKCoordinateSpan(
-                        latitudeDelta: 0.10,
-                        longitudeDelta: 0.10
+        let options = MKMapSnapshotter.Options()
+        options.region = MKCoordinateRegion(
+            center: location.coordinate,
+            span: MKCoordinateSpan(
+                latitudeDelta: 0.10,
+                longitudeDelta: 0.10
+            )
+        )
+        options.size = CGSize(width: 900, height: 420)
+        options.scale = 1
+        options.mapType = .standard
+        options.showsBuildings = true
+
+        do {
+            let snapshot = try await MKMapSnapshotter(options: options).start()
+            let bounds = CGRect(origin: .zero, size: options.size)
+            let renderer = UIGraphicsImageRenderer(size: options.size)
+
+            mapSnapshot = renderer.image { context in
+                snapshot.image.draw(at: .zero)
+
+                let cg = context.cgContext
+                cg.setLineCap(.round)
+                cg.setLineJoin(.round)
+
+                for route in nearbyRoutes.prefix(4) {
+                    let points = route.coordinates
+                        .enumerated()
+                        .compactMap { index, coordinate -> CGPoint? in
+                            let stride = max(route.coordinates.count / 90, 1)
+                            guard index % stride == 0 ||
+                                  index == route.coordinates.count - 1
+                            else { return nil }
+
+                            let point = snapshot.point(
+                                for: coordinate.coordinate
+                            )
+                            return bounds.insetBy(dx: -20, dy: -20)
+                                .contains(point) ? point : nil
+                        }
+
+                    guard points.count > 1 else { continue }
+
+                    cg.beginPath()
+                    cg.move(to: points[0])
+                    for point in points.dropFirst() {
+                        cg.addLine(to: point)
+                    }
+                    cg.setStrokeColor(
+                        route.isMine
+                            ? UIColor.systemOrange.cgColor
+                            : UIColor.systemGreen.cgColor
+                    )
+                    cg.setLineWidth(route.isMine ? 7 : 6)
+                    cg.strokePath()
+                }
+
+                for item in nearbyEvents.prefix(8) {
+                    guard let coordinate = eventCoordinate(item) else {
+                        continue
+                    }
+
+                    let point = snapshot.point(for: coordinate)
+                    guard bounds.contains(point) else { continue }
+
+                    cg.setFillColor(UIColor.systemPurple.cgColor)
+                    cg.fillEllipse(
+                        in: CGRect(
+                            x: point.x - 7,
+                            y: point.y - 7,
+                            width: 14,
+                            height: 14
+                        )
+                    )
+                }
+
+                let userPoint = snapshot.point(for: location.coordinate)
+                cg.setFillColor(UIColor.white.cgColor)
+                cg.fillEllipse(
+                    in: CGRect(
+                        x: userPoint.x - 11,
+                        y: userPoint.y - 11,
+                        width: 22,
+                        height: 22
                     )
                 )
-            )
+                cg.setFillColor(UIColor.systemBlue.cgColor)
+                cg.fillEllipse(
+                    in: CGRect(
+                        x: userPoint.x - 7,
+                        y: userPoint.y - 7,
+                        width: 14,
+                        height: 14
+                    )
+                )
+            }
+        } catch {
+            // Keep the lightweight fallback instead of turning map rendering
+            // into a Home-level error.
         }
     }
 
@@ -567,9 +655,7 @@ struct AroundYouExploreView: View {
         }
         .task {
             async let routesRefresh: Void =
-                routeDiscovery.syncOwnedPublicRoutes(
-                    session.savedRoutes
-                )
+                routeDiscovery.refresh()
             async let eventsRefresh: Void = community.refresh()
             _ = await (routesRefresh, eventsRefresh)
         }
