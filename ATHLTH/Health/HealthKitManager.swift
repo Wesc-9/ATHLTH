@@ -20,6 +20,19 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var automaticRefreshSuspended = false
     @Published private(set) var deferFullRefreshUntilNextLaunch = false
 
+    var hasReadableHealthData: Bool {
+        !workouts.isEmpty ||
+        sleep.totalAsleep > 0 ||
+        heart.latestHeartRate != nil ||
+        heart.restingHeartRate != nil ||
+        heart.hrvMilliseconds != nil ||
+        training.stepsToday != nil ||
+        training.activeEnergyKilocaloriesToday != nil ||
+        training.exerciseMinutesToday != nil ||
+        training.distanceWalkingRunningMetersToday != nil ||
+        personalDetails.hasAnyValue
+    }
+
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
@@ -284,11 +297,14 @@ final class HealthKitManager: ObservableObject {
             defaults.set(false, forKey: refreshInProgressKey)
         }
 
-        do {
-            let end = Date()
-            let start = Calendar.current.date(byAdding: .month, value: -3, to: end)
-                ?? end.addingTimeInterval(-7_776_000)
+        let end = Date()
+        let start = Calendar.current.date(byAdding: .month, value: -3, to: end)
+            ?? end.addingTimeInterval(-7_776_000)
 
+        var completedRead = false
+        var failures: [String] = []
+
+        do {
             let fetched = try await fetchWorkouts(
                 startDate: start,
                 endDate: end,
@@ -298,23 +314,75 @@ final class HealthKitManager: ObservableObject {
             workoutObjects = fetched.reduce(into: [:]) { result, workout in
                 result[workout.uuid] = workout
             }
+            completedRead = true
+        } catch {
+            failures.append("Workouts: \(error.localizedDescription)")
+        }
+
+        do {
             sleep = try await fetchLatestSleep()
+            completedRead = true
+        } catch {
+            failures.append("Sleep: \(error.localizedDescription)")
+        }
+
+        do {
             heart = try await fetchHeartSummary()
+            completedRead = true
+        } catch {
+            failures.append("Heart: \(error.localizedDescription)")
+        }
+
+        do {
             training = try await fetchTrainingSummary()
+            completedRead = true
+        } catch {
+            failures.append("Activity: \(error.localizedDescription)")
+        }
+
+        do {
             recovery = try await fetchRecoveryReadiness(
                 currentSleep: sleep,
                 currentHeart: heart
             )
-            await refreshPersonalDetails()
-            lastSuccessfulRefreshAt = Date()
+            completedRead = true
         } catch {
-            authorizationError = error.localizedDescription
+            failures.append("Recovery: \(error.localizedDescription)")
+        }
+
+        await refreshPersonalDetails()
+
+        if completedRead || personalDetails.hasAnyValue {
+            lastSuccessfulRefreshAt = Date()
+        }
+
+        if let firstFailure = failures.first {
+            authorizationError = failures.count == 1
+                ? firstFailure
+                : "\(firstFailure) (+\(failures.count - 1) more)"
         }
     }
 
     func resumeAutomaticRefresh() {
         automaticRefreshSuspended = false
         UserDefaults.standard.set(false, forKey: refreshInProgressKey)
+    }
+
+    func resumeUserInitiatedHealthSync() {
+        automaticRefreshSuspended = false
+        deferFullRefreshUntilNextLaunch = false
+        UserDefaults.standard.set(false, forKey: refreshInProgressKey)
+        UserDefaults.standard.set(
+            currentSafeRefreshVersion,
+            forKey: safeRefreshVersionKey
+        )
+    }
+
+    func completeAuthorizationSetup() async {
+        // Give iOS a short moment to finish dismissing the Health permission
+        // sheet before ATHLTH starts the first full read.
+        try? await Task.sleep(nanoseconds: 650_000_000)
+        resumeUserInitiatedHealthSync()
     }
 
     var needsHealthRefreshRecovery: Bool {
