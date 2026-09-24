@@ -4,6 +4,8 @@ import Foundation
 final class SocialStore: ObservableObject {
     @Published private(set) var friends: [SocialProfileCard] = []
     @Published private(set) var friendships: [SocialFriendshipRecord] = []
+    @Published private(set) var followerIDs: Set<UUID> = []
+    @Published private(set) var followingIDs: Set<UUID> = []
     @Published private(set) var incomingRequests: [SocialFriendRequestDisplay] = []
     @Published private(set) var outgoingRequests: [SocialFriendRequestDisplay] = []
     @Published private(set) var discoverResults: [SocialProfileCard] = []
@@ -47,6 +49,29 @@ final class SocialStore: ObservableObject {
         incomingRequests.count + workoutInvites.count
     }
 
+    var followerCount: Int { followerIDs.count }
+    var followingCount: Int { followingIDs.count }
+
+    var followers: [SocialProfileCard] {
+        visibleProfiles
+            .filter { followerIDs.contains($0.userID) }
+            .sorted {
+                $0.resolvedName.localizedCaseInsensitiveCompare($1.resolvedName) == .orderedAscending
+            }
+    }
+
+    var following: [SocialProfileCard] {
+        visibleProfiles
+            .filter { followingIDs.contains($0.userID) }
+            .sorted {
+                $0.resolvedName.localizedCaseInsensitiveCompare($1.resolvedName) == .orderedAscending
+            }
+    }
+
+    func isFollowing(_ userID: UUID) -> Bool {
+        followingIDs.contains(userID)
+    }
+
     func acceptedTrainingPartnerNames(for workoutID: UUID) -> [String] {
         guard let session = workoutSessions.first(where: {
             $0.creatorID == currentUserID &&
@@ -82,6 +107,8 @@ final class SocialStore: ObservableObject {
         do {
             async let cardsTask = service.loadVisibleProfileCards()
             async let friendshipsTask = service.loadFriendships()
+            async let followersTask = service.loadFollowers(for: service.currentUserID!)
+            async let followingTask = service.loadFollowing(for: service.currentUserID!)
             async let requestsTask = service.loadFriendRequests()
             async let privacyTask = service.loadPrivacySettings()
             async let feedTask = service.loadFeed()
@@ -93,6 +120,8 @@ final class SocialStore: ObservableObject {
 
             let cards = try await cardsTask
             let friendships = try await friendshipsTask
+            let followerRows = try await followersTask
+            let followingRows = try await followingTask
             let requests = try await requestsTask
             let privacy = try await privacyTask
             let feed = try await feedTask
@@ -103,6 +132,8 @@ final class SocialStore: ObservableObject {
             let workoutParticipants = try await workoutParticipantsTask
 
             visibleProfiles = cards
+            followerIDs = Set(followerRows.map(\.followerID))
+            followingIDs = Set(followingRows.map(\.followingID))
 
             applyRelationships(
                 cards: cards,
@@ -145,6 +176,28 @@ final class SocialStore: ObservableObject {
 
     func clearSearch() {
         discoverResults = []
+    }
+
+    func follow(_ profile: SocialProfileCard) async {
+        errorMessage = nil
+
+        do {
+            try await service.follow(profile.userID)
+            followingIDs.insert(profile.userID)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func unfollow(_ userID: UUID) async {
+        errorMessage = nil
+
+        do {
+            try await service.unfollow(userID)
+            followingIDs.remove(userID)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func sendFriendRequest(to profile: SocialProfileCard) async {
@@ -1097,6 +1150,8 @@ final class SocialStore: ObservableObject {
     private func reset() {
         friends = []
         friendships = []
+        followerIDs = []
+        followingIDs = []
         incomingRequests = []
         outgoingRequests = []
         discoverResults = []
