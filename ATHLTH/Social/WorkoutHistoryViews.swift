@@ -129,12 +129,39 @@ struct WorkoutHistoryView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
+    let startDate: Date?
+    let endDate: Date?
+
     @State private var workouts: [SocialPublishableWorkout] = []
     @State private var filter: WorkoutHistoryFilter = .all
     @State private var loading = false
 
+    init(
+        startDate: Date? = nil,
+        endDate: Date? = nil
+    ) {
+        self.startDate = startDate
+        self.endDate = endDate
+    }
+
     private var filtered: [SocialPublishableWorkout] {
-        workouts.filter { filter.includes($0.activity) }
+        workouts.filter { workout in
+            guard filter.includes(workout.activity) else {
+                return false
+            }
+
+            if let startDate,
+               workout.startDate < startDate {
+                return false
+            }
+
+            if let endDate,
+               workout.startDate > endDate {
+                return false
+            }
+
+            return true
+        }
     }
 
     var body: some View {
