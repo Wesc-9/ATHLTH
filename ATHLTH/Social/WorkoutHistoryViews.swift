@@ -43,9 +43,9 @@ struct WorkoutHistoryPreviewSection: View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Workout History")
+                    Text("Recent Activity")
                         .font(.title3.bold())
-                    Text("Every completed workout in one place.")
+                    Text("Your latest completed workouts.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -55,7 +55,7 @@ struct WorkoutHistoryPreviewSection: View {
                 NavigationLink {
                     WorkoutHistoryView()
                 } label: {
-                    Text("View All")
+                    Text("See All")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accent)
                 }
