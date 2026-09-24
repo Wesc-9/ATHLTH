@@ -2879,19 +2879,28 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        if let routeID = workout.routeID,
-           let route = session.savedRoutes.first(where: { $0.id == routeID }) {
-            do {
+        do {
+            if let routeID = workout.routeID,
+               let route = session.savedRoutes.first(
+                    where: { $0.id == routeID }
+               ) {
                 try watchConnection.sendRoute(route)
-            } catch {
-                watchTransferError = error.localizedDescription
-                return
+                watchConnection.sendWorkoutRouteSelection(route.id)
+            } else {
+                watchConnection.sendWorkoutRouteSelection(nil)
             }
+        } catch {
+            watchTransferError = error.localizedDescription
+            return
         }
 
         Task {
             do {
                 try await watchConnection.startWorkoutOnWatch(.running)
+                watchConnection.sendAudioCoachConfiguration(.disabled)
+                watchConnection.sendRunningWorkout(
+                    watchRunningWorkoutTransfer(from: workout)
+                )
                 watchTransferMessage =
                     "\(workout.title) started on Apple Watch."
             } catch {
