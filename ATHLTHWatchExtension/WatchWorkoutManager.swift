@@ -69,7 +69,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) async {
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = activityType(for: kind)
-        configuration.locationType = kind == .strength ? .indoor : .outdoor
+        configuration.locationType = kind.usesOutdoorLocation ? .outdoor : .indoor
 
         await start(
             configuration: configuration,
@@ -252,7 +252,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         for identifier in [
             HKQuantityTypeIdentifier.heartRate,
             .activeEnergyBurned,
-            .distanceWalkingRunning
+            .distanceWalkingRunning,
+            .distanceCycling
         ] {
             if let type = HKObjectType.quantityType(forIdentifier: identifier) {
                 shareTypes.insert(type)
@@ -478,7 +479,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         let heartType = HKObjectType.quantityType(forIdentifier: .heartRate)
         let energyType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)
-        let distanceType = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)
+        let distanceIdentifier: HKQuantityTypeIdentifier? = {
+            switch kind {
+            case .running, .walking:
+                return .distanceWalkingRunning
+            case .cycling:
+                return .distanceCycling
+            case .strength, .hiit, .functional, .rowing, .stairClimbing, .yoga, .other:
+                return nil
+            }
+        }()
+        let distanceType = distanceIdentifier.flatMap {
+            HKObjectType.quantityType(forIdentifier: $0)
+        }
 
         if let heartType, types.contains(heartType),
            let statistics = builder.statistics(for: heartType) {
@@ -517,7 +530,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         for identifier in [
             HKQuantityTypeIdentifier.heartRate,
             .activeEnergyBurned,
-            .distanceWalkingRunning
+            .distanceWalkingRunning,
+            .distanceCycling
         ] {
             if let type = HKObjectType.quantityType(forIdentifier: identifier) {
                 types.insert(type)
@@ -534,6 +548,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         case .running: return .running
         case .walking: return .walking
         case .strength: return .traditionalStrengthTraining
+        case .hiit: return .highIntensityIntervalTraining
+        case .functional: return .functionalStrengthTraining
+        case .cycling: return .cycling
+        case .rowing: return .rowing
+        case .stairClimbing: return .stairClimbing
+        case .yoga: return .yoga
+        case .other: return .other
         }
     }
 
@@ -541,13 +562,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         for activityType: HKWorkoutActivityType
     ) -> WatchWorkoutKind {
         switch activityType {
+        case .running:
+            return .running
         case .walking:
             return .walking
-        case .traditionalStrengthTraining,
-             .functionalStrengthTraining:
+        case .traditionalStrengthTraining:
             return .strength
+        case .functionalStrengthTraining:
+            return .functional
+        case .highIntensityIntervalTraining:
+            return .hiit
+        case .cycling:
+            return .cycling
+        case .rowing:
+            return .rowing
+        case .stairClimbing:
+            return .stairClimbing
+        case .yoga:
+            return .yoga
         default:
-            return .running
+            return .other
         }
     }
 
