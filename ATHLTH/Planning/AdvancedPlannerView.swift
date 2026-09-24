@@ -446,60 +446,32 @@ struct TrainingPlanManagerView: View {
                 ATHLTHCard {
                     ATHLTHSectionHeader(
                         title: "Spotify",
-                        actionTitle: "Program only"
+                        actionTitle: "Coming later"
                     )
 
-                    if settings.spotifyConnected {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label(
-                                plan.spotifyPlaylist?.name ?? "No playlist linked",
-                                systemImage: "music.note"
-                            )
-                            .font(.headline)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(
+                            "Spotify integration is not active yet",
+                            systemImage: "music.note"
+                        )
+                        .font(.headline)
 
-                            Text(
-                                plan.spotifyPlaylist == nil
-                                    ? "ATHLTH only shows real playlists linked to this program."
-                                    : "This playlist can start automatically with workouts from this program."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "ATHLTH will only enable playlist linking and autoplay after the real Spotify authorization and playback flow is connected."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                            if plan.spotifyPlaylist != nil {
-                                Toggle(
-                                    "Autoplay when workout starts",
-                                    isOn: Binding(
-                                        get: {
-                                            plan.spotifyAutoplayOnWorkoutStart
-                                        },
-                                        set: {
-                                            session.setActivePlanSpotifyAutoplay($0)
-                                        }
-                                    )
-                                )
-                            }
-
-                            NavigationLink {
-                                SpotifySettingsView()
-                            } label: {
-                                Label(
-                                    "Spotify Settings",
-                                    systemImage: "gearshape"
-                                )
-                            }
-                        }
-                        .padding(.top, 10)
-                    } else {
                         NavigationLink {
                             SpotifySettingsView()
                         } label: {
                             Label(
-                                "Connect Spotify",
-                                systemImage: "music.note"
+                                "About Spotify integration",
+                                systemImage: "info.circle"
                             )
                         }
-                        .padding(.top, 8)
                     }
+                    .padding(.top, 10)
                 }
 
                 ATHLTHCard {
