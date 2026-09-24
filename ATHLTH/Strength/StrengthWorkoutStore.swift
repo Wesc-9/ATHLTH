@@ -59,8 +59,9 @@ final class StrengthWorkoutStore: ObservableObject {
 
         for workout in workoutHistory where workout.isFinished {
             if workout.totalVolumeKilograms > 0,
-               highestVolumeWorkout == nil ||
-                workout.totalVolumeKilograms > highestVolumeWorkout!.totalVolumeKilograms {
+               highestVolumeWorkout.map({
+                   workout.totalVolumeKilograms > $0.totalVolumeKilograms
+               }) ?? true {
                 highestVolumeWorkout = workout
             }
 
@@ -102,8 +103,9 @@ final class StrengthWorkoutStore: ObservableObject {
 
                     if reps <= 12 {
                         let estimatedOneRepMax = weight * (1 + Double(reps) / 30.0)
-                        if bestEstimatedOneRepMax == nil ||
-                            estimatedOneRepMax > bestEstimatedOneRepMax!.value {
+                        if bestEstimatedOneRepMax.map({
+                            estimatedOneRepMax > $0.value
+                        }) ?? true {
                             bestEstimatedOneRepMax = (
                                 exerciseName,
                                 estimatedOneRepMax,
@@ -539,7 +541,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
                     let date = set.completedAt ?? workout.endedAt ?? workout.startedAt
 
-                    if best == nil || weight > best!.weight {
+                    if best.map({ weight > $0.weight }) ?? true {
                         best = (weight, date)
                     }
                 }
