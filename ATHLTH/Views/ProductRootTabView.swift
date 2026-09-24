@@ -4786,22 +4786,24 @@ struct ATHLTHProgressView: View {
         )
     }
 
-    private var activeDaysLast30: Int {
-        guard let days = consistencySnapshot?.activeWorkoutDays else {
-            return 0
+    private var selectedPeriodRunningWorkouts: [WorkoutSummary] {
+        let range = progressRange
+
+        return workoutHistory.filter {
+            $0.activity == .running &&
+            $0.startDate >= range.start &&
+            $0.startDate <= range.end
         }
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let start = calendar.date(byAdding: .day, value: -29, to: today) ?? today
-
-        return Set(days.map { calendar.startOfDay(for: $0) })
-            .filter { $0 >= start && $0 <= today }
-            .count
     }
 
-    private var consistencyPercentLast30: Int {
-        Int(((Double(activeDaysLast30) / 30) * 100).rounded())
+    private var selectedPeriodStrengthWorkouts: [StrengthWorkoutLog] {
+        let range = progressRange
+
+        return strengthWorkout.workoutHistory.filter {
+            $0.isFinished &&
+            $0.startedAt >= range.start &&
+            $0.startedAt <= range.end
+        }
     }
 
     private var consistencyRange: (
@@ -4826,23 +4828,16 @@ struct ATHLTHProgressView: View {
     }
 
     private func loadSupportingProgressData() async {
-        guard health.healthDataAvailable, health.hasRequestedAuthorization else {
-            monthlySnapshot = nil
+        guard health.healthDataAvailable,
+              health.hasRequestedAuthorization
+        else {
             consistencySnapshot = nil
             personalRecords = []
+            workoutHistory = []
             return
         }
 
-        let month = monthlyRange
         let consistency = consistencyRange
-
-        async let monthly = health.progressSnapshot(
-            startDate: month.start,
-            endDate: month.end,
-            previousStartDate: month.previousStart,
-            previousEndDate: month.previousEnd,
-            grouping: .week
-        )
 
         async let consistencyData = health.progressSnapshot(
             startDate: consistency.start,
@@ -4853,10 +4848,11 @@ struct ATHLTHProgressView: View {
         )
 
         async let records = health.personalRecords()
+        async let history = health.workoutHistory()
 
-        monthlySnapshot = try? await monthly
         consistencySnapshot = try? await consistencyData
         personalRecords = (try? await records) ?? []
+        workoutHistory = (try? await history) ?? []
     }
 
     private func loadProgressData() async {
