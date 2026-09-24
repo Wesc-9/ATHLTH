@@ -90,6 +90,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var goalStore: GoalStore
@@ -950,7 +951,55 @@ struct ATHLTHHomeView: View {
                 }
             }
 
-            if let active = strengthWorkout.activeWorkout {
+            if workoutMirroring.hasActiveMirroredWorkout,
+               let snapshot = workoutMirroring.snapshot {
+                HStack(spacing: 13) {
+                    Image(systemName: snapshot.kind.systemImage)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            ATHLTHTheme.vitalitySoft,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("LIVE ON APPLE WATCH")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Text(snapshot.kind.title)
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+
+                        Text(workoutMirroring.connectionText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Circle()
+                        .fill(ATHLTHTheme.vitality)
+                        .frame(width: 9, height: 9)
+                }
+                .padding(.top, 14)
+
+                Button {
+                    workoutMirroring.isPresentationRequested = true
+                } label: {
+                    Label("Continue Workout", systemImage: "applewatch")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+                .padding(.top, 12)
+            } else if let active = strengthWorkout.activeWorkout {
                 HStack(spacing: 13) {
                     Image(systemName: "dumbbell.fill")
                         .font(.system(size: 20, weight: .semibold))
@@ -1093,8 +1142,16 @@ struct ATHLTHHomeView: View {
                         icon: "figure.run",
                         tint: .green
                     ) {
-                        pendingHomePlanSession = nil
-                        pendingHomeQuickStartKind = .running
+                        if settings.trainingDeviceProvider == .appleWatch &&
+                            watchConnection.isReady {
+                            pendingHomePlanSession = nil
+                            pendingHomeQuickStartKind = .running
+                        } else {
+                            // Direct outdoor quick start is currently a Watch
+                            // capability. Route no-watch users to Train instead
+                            // of presenting a disabled start sheet.
+                            onSelectTab(1)
+                        }
                     }
 
                     homeQuickStartButton(
