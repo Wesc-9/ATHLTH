@@ -344,6 +344,36 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+
+    func mergePersonalDetailsFromAppleHealth(
+        _ healthBasics: HealthProfileBasics
+    ) {
+        guard healthBasics.hasAnyValue else { return }
+
+        let existing = onboardingProfile
+        let merged = HealthProfileBasics(
+            dateOfBirth: healthBasics.dateOfBirth ?? existing?.dateOfBirth,
+            healthSex: healthBasics.healthSex ?? existing?.healthSex,
+            weightKilograms:
+                healthBasics.weightKilograms ?? existing?.weightKilograms,
+            heightCentimeters:
+                healthBasics.heightCentimeters ?? existing?.heightCentimeters
+        )
+
+        let usesManualFallback =
+            (healthBasics.dateOfBirth == nil && existing?.dateOfBirth != nil) ||
+            (healthBasics.healthSex == nil && existing?.healthSex != nil) ||
+            (healthBasics.weightKilograms == nil &&
+                existing?.weightKilograms != nil) ||
+            (healthBasics.heightCentimeters == nil &&
+                existing?.heightCentimeters != nil)
+
+        updatePersonalDetails(
+            merged,
+            source: usesManualFallback ? .mixed : .appleHealth
+        )
+    }
+
     func completeOnboarding() {
         onboardingCompleted = true
         defaults.set(true, forKey: "session.onboardingCompleted")
