@@ -508,12 +508,28 @@ struct ATHLTHSettingsView: View {
                         settingsSection("Developer") {
                             PremiumSettingsCard {
                                 NavigationLink {
+                                    ATHLTHSystemDiagnosticsView()
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "stethoscope",
+                                        title: "System Diagnostics",
+                                        subtitle: "Health, Watch, push, account and build status"
+                                    ) {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                                .buttonStyle(.plain)
+
+                                SettingsDivider()
+
+                                NavigationLink {
                                     CapabilityLabView()
                                 } label: {
                                     PremiumSettingsRow(
                                         icon: "testtube.2",
                                         title: "Capability Lab",
-                                        subtitle: "Developer diagnostics and capability tests"
+                                        subtitle: "Run low-level Health and capability tests"
                                     ) {
                                         Image(systemName: "chevron.right")
                                             .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
