@@ -293,7 +293,7 @@ struct OnboardingFlowView: View {
             Text("ATHLTH")
                 .font(.system(size: 31, weight: .medium, design: .default))
                 .tracking(9.5)
-                .foregroundStyle(OnboardingTheme.primaryText)
+                .foregroundStyle(.white)
                 .lineLimit(1)
                 .fixedSize()
 
