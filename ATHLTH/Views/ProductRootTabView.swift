@@ -1043,7 +1043,6 @@ struct ATHLTHTrainView: View {
                         if captureDevice == .appleWatch {
                             do {
                                 try await watchConnection.startWorkoutOnWatch(.strength)
-                                startPlanSpotifyIfNeeded()
                                 session.beginTrainingStatus(for: workout)
                                 strengthWorkout.start(
                                     session: workout,
@@ -1056,7 +1055,6 @@ struct ATHLTHTrainView: View {
                                 watchTransferError = error.localizedDescription
                             }
                         } else {
-                            startPlanSpotifyIfNeeded()
                             session.beginTrainingStatus(for: workout)
                             strengthWorkout.start(
                                 session: workout,
@@ -1301,13 +1299,25 @@ struct ATHLTHTrainView: View {
             }
 
             if let route = session.savedRoutes.first {
-                Map(initialPosition: .region(routeRegion(route))) {
-                    MapPolyline(coordinates: route.coordinates.map(\.coordinate))
-                        .stroke(ATHLTHTheme.accent, lineWidth: 5)
+                if let region = routeRegion(route) {
+                    Map(initialPosition: .region(region)) {
+                        MapPolyline(coordinates: route.coordinates.map(\.coordinate))
+                            .stroke(ATHLTHTheme.accent, lineWidth: 5)
+                    }
+                    .frame(height: 190)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .padding(.top, 10)
+                } else {
+                    ContentUnavailableView(
+                        "Route map unavailable",
+                        systemImage: "map.fill",
+                        description: Text(
+                            "This route does not contain coordinates. ATHLTH will not substitute a placeholder location."
+                        )
+                    )
+                    .frame(height: 190)
+                    .padding(.top, 10)
                 }
-                .frame(height: 190)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .padding(.top, 10)
 
                 HStack {
                     VStack(alignment: .leading) {
@@ -1511,23 +1521,6 @@ struct ATHLTHTrainView: View {
         }
     }
 
-    private func startPlanSpotifyIfNeeded() {
-        guard
-            let plan = session.activePlan,
-            plan.spotifyAutoplayOnWorkoutStart,
-            let playlist = plan.spotifyPlaylist
-        else {
-            return
-        }
-
-        Task {
-            await spotifyPlayback.startLinkedPlaylist(
-                playlist,
-                settings: settings
-            )
-        }
-    }
-
     private func todaySessions(
         in plan: TrainingPlan
     ) -> [PlannedSession] {
@@ -1621,17 +1614,49 @@ struct ATHLTHTrainView: View {
         )
     }
 
-    private func routeRegion(_ route: TrainingRoute) -> MKCoordinateRegion {
-        guard let first = route.coordinates.first else {
+    private func routeRegion(
+        _ route: TrainingRoute
+    ) -> MKCoordinateRegion? {
+        let coordinates = route.coordinates.map(\.coordinate)
+        guard let first = coordinates.first else {
+            return nil
+        }
+
+        let latitudes = coordinates.map(\.latitude)
+        let longitudes = coordinates.map(\.longitude)
+
+        guard let minLatitude = latitudes.min(),
+              let maxLatitude = latitudes.max(),
+              let minLongitude = longitudes.min(),
+              let maxLongitude = longitudes.max()
+        else {
             return MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: 66.3126, longitude: 14.1428),
-                span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
+                center: first,
+                span: MKCoordinateSpan(
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01
+                )
             )
         }
 
+        let latitudeDelta = max(
+            (maxLatitude - minLatitude) * 1.30,
+            0.01
+        )
+        let longitudeDelta = max(
+            (maxLongitude - minLongitude) * 1.30,
+            0.01
+        )
+
         return MKCoordinateRegion(
-            center: first.coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
+            center: CLLocationCoordinate2D(
+                latitude: (minLatitude + maxLatitude) / 2,
+                longitude: (minLongitude + maxLongitude) / 2
+            ),
+            span: MKCoordinateSpan(
+                latitudeDelta: latitudeDelta,
+                longitudeDelta: longitudeDelta
+            )
         )
     }
 
