@@ -225,7 +225,10 @@ final class HealthKitManager: ObservableObject {
         }
 
         let quantityTypes: [(HKQuantityTypeIdentifier, HKUpdateFrequency)] = [
-            (.heartRate, .immediate),
+            // ATHLTH does not show continuous background heart rate outside
+            // an active Watch workout, so hourly delivery avoids waking the
+            // iPhone for every sensor sample.
+            (.heartRate, .hourly),
             (.restingHeartRate, .hourly),
             (.walkingHeartRateAverage, .hourly),
             (.heartRateVariabilitySDNN, .hourly),
@@ -238,11 +241,6 @@ final class HealthKitManager: ObservableObject {
             (.flightsClimbed, .hourly),
             (.appleExerciseTime, .hourly),
             (.vo2Max, .daily),
-            (.runningSpeed, .immediate),
-            (.runningPower, .immediate),
-            (.cyclingSpeed, .immediate),
-            (.cyclingPower, .immediate),
-            (.swimmingStrokeCount, .immediate),
             (.bodyMass, .hourly),
             (.height, .daily)
         ]
