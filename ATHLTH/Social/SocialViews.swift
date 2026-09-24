@@ -785,6 +785,18 @@ struct FriendProfileView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if let focus = profile.trainingFocus {
+                Label(focus.title, systemImage: focus.systemImage)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: Capsule()
+                    )
+            }
+
             if let presence = profile.presence {
                 Label(
                     presence.state == "training"
