@@ -3266,7 +3266,7 @@ struct ATHLTHRecoveryView: View {
                     focalOffsetY: 16
                 )
             } content: {
-                VStack(spacing: 16) {
+                LazyVStack(spacing: 16) {
                         if shouldShowWearableRecoveryContent {
                             recoveryScoreCard
 
@@ -4207,7 +4207,7 @@ struct ATHLTHProgressView: View {
                     height: 190
                 )
             } content: {
-                VStack(spacing: 14) {
+                LazyVStack(spacing: 14) {
                     if health.hasRequestedAuthorization &&
                         (health.hasTrainingHealthData || progressHasHealthData) {
                         periodPicker
@@ -5119,7 +5119,7 @@ struct ATHLTHProfileView: View {
         ) {
             profileHero
         } content: {
-            VStack(spacing: 16) {
+            LazyVStack(spacing: 16) {
                 profileSocialStatsCard
                 trainingIdentityCard
                 ProfileGearSummaryView()
