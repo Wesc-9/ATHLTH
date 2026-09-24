@@ -818,6 +818,30 @@ struct FriendProfileView: View {
         let relationship = social.relationshipState(with: userID)
 
         return VStack(spacing: 10) {
+            Button {
+                Task {
+                    if social.isFollowing(userID) {
+                        await social.unfollow(userID)
+                    } else {
+                        await social.follow(profile.card)
+                    }
+                }
+            } label: {
+                Label(
+                    social.isFollowing(userID) ? "Following" : "Follow",
+                    systemImage: social.isFollowing(userID)
+                        ? "person.fill.checkmark"
+                        : "person.badge.plus"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(
+                social.isFollowing(userID)
+                    ? .bordered
+                    : .borderedProminent
+            )
+            .tint(ATHLTHTheme.accent)
+
             HStack(spacing: 10) {
                 relationshipButton(profile.card)
 
