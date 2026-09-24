@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 enum CommunityLeaderboardScope: String, CaseIterable, Identifiable {
