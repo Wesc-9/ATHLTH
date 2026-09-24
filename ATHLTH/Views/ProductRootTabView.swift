@@ -1226,20 +1226,14 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var social: SocialStore
 
     @State private var selectedSection = 0
-    @State private var showingFileImporter = false
-    @State private var importMessage: String?
-    @State private var importError: String?
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
     @State private var pendingQuickStartKind: WorkoutKind?
+    @State private var pendingRunningTemplate: RunningWorkoutTemplate?
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
-
-    private var gpxImporter: GPXRouteImporter {
-        GPXRouteImporter(ownerID: session.profile.userID)
-    }
 
     var body: some View {
         NavigationStack {
@@ -1257,26 +1251,18 @@ struct ATHLTHTrainView: View {
                     VStack(spacing: 18) {
                     Picker("Training section", selection: $selectedSection) {
                         Text("Today").tag(0)
-                        Text("Calendar").tag(1)
-                        Text("Programs").tag(2)
+                        Text("Plan").tag(1)
+                        Text("Library").tag(2)
                     }
                     .pickerStyle(.segmented)
 
                     switch selectedSection {
                     case 1:
-                        ATHLTHPlusFeatureGate(
-                            feature: .advancedTrainingPlans,
-                            title: "Training Calendar",
-                            message: "Schedule and adjust the active program across days and weeks with ATHLTH+."
-                        ) {
-                            AdvancedPlannerView {
-                                selectedSection = 2
-                            }
+                        AdvancedPlannerView {
+                            selectedSection = 2
                         }
                     case 2:
-                        TrainingPlanManagerView {
-                            selectedSection = 1
-                        }
+                        libraryContent
                     default:
                         todayContent
                     }
@@ -1361,6 +1347,26 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
+            .sheet(item: $pendingRunningTemplate) { workout in
+                QuickWorkoutStartSheet(
+                    kind: .running,
+                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    watchConnected:
+                        settings.trainingDeviceProvider == .appleWatch &&
+                        watchConnection.isReady
+                ) { selectedFriends in
+                    Task { @MainActor in
+                        await social.beginWorkoutWithFriends(
+                            title: workout.title,
+                            kind: .running,
+                            friends: selectedFriends,
+                            creatorName: session.profile.displayName,
+                            creatorUsername: session.profile.username
+                        )
+                        startRunningTemplate(workout)
+                    }
+                }
+            }
             .sheet(isPresented: $showingCustomQuickStart) {
                 CustomQuickStartSheet(
                     trainingDeviceProvider: settings.trainingDeviceProvider,
@@ -1376,46 +1382,29 @@ struct ATHLTHTrainView: View {
                     .environmentObject(strengthWorkout)
                     .environmentObject(session)
             }
-            .fileImporter(
-                isPresented: $showingFileImporter,
-                allowedContentTypes: [.xml, .data],
-                allowsMultipleSelection: false
-            ) { result in
-                Task {
-                    await importGPX(result)
-                }
-            }
             .task {
                 await exerciseLibrary.refresh()
             }
             .alert("ATHLTH", isPresented: Binding(
                 get: {
-                    importMessage != nil ||
-                    importError != nil ||
                     watchTransferMessage != nil ||
                     watchTransferError != nil
                 },
                 set: { newValue in
                     if !newValue {
-                        importMessage = nil
-                        importError = nil
                         watchTransferMessage = nil
                         watchTransferError = nil
                     }
                 }
             )) {
                 Button("OK", role: .cancel) {
-                    importMessage = nil
-                    importError = nil
                     watchTransferMessage = nil
                     watchTransferError = nil
                 }
             } message: {
                 Text(
                     watchTransferError ??
-                    importError ??
                     watchTransferMessage ??
-                    importMessage ??
                     ""
                 )
             }
@@ -1522,10 +1511,24 @@ struct ATHLTHTrainView: View {
             }
         }
 
+
+    }
+
+    @ViewBuilder
+    private var libraryContent: some View {
+        TrainingPlanManagerView {
+            selectedSection = 1
+        }
+
         ATHLTHCard {
-            HStack(spacing: 10) {
-                Text("Routes")
-                    .font(.title3.weight(.semibold))
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Routes")
+                        .font(.title3.weight(.bold))
+                    Text("Create and save routes inside ATHLTH.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
@@ -1542,96 +1545,147 @@ struct ATHLTHTrainView: View {
                     Label("Create", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.small)
                 .tint(ATHLTHTheme.accent)
-
-                Button {
-                    showingFileImporter = true
-                } label: {
-                    Label("GPX", systemImage: "square.and.arrow.down")
-                }
-                .buttonStyle(.bordered)
             }
 
-            if let route = session.savedRoutes.first {
-                if let region = routeRegion(route) {
-                    Map(initialPosition: .region(region)) {
-                        MapPolyline(coordinates: route.coordinates.map(\.coordinate))
+            if let route = session.savedRoutes.first,
+               let region = routeRegion(route) {
+                NavigationLink {
+                    SavedRoutesView()
+                } label: {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Map(initialPosition: .region(region)) {
+                            MapPolyline(
+                                coordinates: route.coordinates.map(\.coordinate)
+                            )
                             .stroke(ATHLTHTheme.accent, lineWidth: 5)
-                    }
-                    .frame(height: 190)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                    .padding(.top, 10)
-                } else {
-                    ContentUnavailableView(
-                        "Route map unavailable",
-                        systemImage: "map.fill",
-                        description: Text(
-                            "This route does not contain coordinates. ATHLTH will not substitute a placeholder location."
+                        }
+                        .allowsHitTesting(false)
+                        .frame(height: 130)
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
                         )
-                    )
-                    .frame(height: 190)
-                    .padding(.top, 10)
-                }
 
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(route.title)
-                            .font(.headline)
-                        Text("\(route.distanceKilometers, specifier: "%.1f") km · \(Int(route.elevationGainMeters ?? 0)) m ascent")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(route.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(
+                                    "\(route.distanceKilometers, specifier: "%.1f") km · \(Int(route.elevationGainMeters ?? 0)) m ascent"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
+                    .padding(.top, 12)
+                }
+                .buttonStyle(.plain)
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "map.fill")
+                        .foregroundStyle(ATHLTHTheme.accent)
+                    Text("No saved routes yet. Create your first route in ATHLTH.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Spacer()
                 }
-                .padding(.top, 8)
-
-                routeDeviceActions(route)
-                    .padding(.top, 8)
-            } else {
-                ContentUnavailableView(
-                    "No routes yet",
-                    systemImage: "map",
-                    description: Text("Create an A-to-B running route or import GPX.")
-                )
-                .frame(height: 190)
+                .padding(.top, 12)
             }
         }
 
         ATHLTHCard {
-            ATHLTHSectionHeader(
-                title: "Workout Builder",
-                actionTitle: "Library"
-            )
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Workout Library")
+                    .font(.title3.weight(.bold))
+                Text("Choose a complete workout or use exercises to build your own.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
-            HStack(spacing: 10) {
+            VStack(spacing: 10) {
                 NavigationLink {
-                    ExerciseLibraryView()
+                    RunningWorkoutLibraryView(
+                        onStart: { workout in
+                            pendingRunningTemplate = workout
+                        }
+                    )
                 } label: {
-                    builderTile(
-                        title: "Exercises",
-                        subtitle: exerciseLibrary.repDBExercises.isEmpty
-                            ? "RepDB + Custom"
-                            : "\(exerciseLibrary.repDBExercises.count) + custom",
-                        icon: "dumbbell.fill"
+                    libraryRow(
+                        title: "Running Workouts",
+                        subtitle: "\(runningWorkoutLibrary.allTemplates.count) structured workouts · start, schedule or customize",
+                        icon: "figure.run",
+                        tint: .green
                     )
                 }
                 .buttonStyle(.plain)
 
                 NavigationLink {
-                    RunningWorkoutLibraryView()
+                    ExerciseLibraryView()
                 } label: {
-                    builderTile(
-                        title: "Running",
-                        subtitle: "\(runningWorkoutLibrary.allTemplates.count) workouts",
-                        icon: "figure.run"
+                    libraryRow(
+                        title: "Exercise Library",
+                        subtitle: exerciseLibrary.repDBExercises.isEmpty
+                            ? "Strength exercises and your own custom movements"
+                            : "\(exerciseLibrary.repDBExercises.count) exercises · use them to build strength workouts",
+                        icon: "dumbbell.fill",
+                        tint: .purple
                     )
                 }
                 .buttonStyle(.plain)
             }
             .padding(.top, 10)
         }
+    }
 
+    private func libraryRow(
+        title: String,
+        subtitle: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 44, height: 44)
+                .background(
+                    tint.opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
 
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(12)
+        .background(
+            Color.primary.opacity(0.025),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
     }
 
     @ViewBuilder
@@ -1834,6 +1888,38 @@ struct ATHLTHTrainView: View {
             do {
                 try await watchConnection.startWorkoutOnWatch(watchKind)
                 watchTransferMessage = "\(watchKind.title) started on Apple Watch."
+            } catch {
+                watchTransferError = error.localizedDescription
+            }
+        }
+    }
+
+    private func startRunningTemplate(
+        _ workout: RunningWorkoutTemplate
+    ) {
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady
+        else {
+            watchTransferError =
+                "Connect Apple Watch to start a live running workout from the library."
+            return
+        }
+
+        if let routeID = workout.routeID,
+           let route = session.savedRoutes.first(where: { $0.id == routeID }) {
+            do {
+                try watchConnection.sendRoute(route)
+            } catch {
+                watchTransferError = error.localizedDescription
+                return
+            }
+        }
+
+        Task {
+            do {
+                try await watchConnection.startWorkoutOnWatch(.running)
+                watchTransferMessage =
+                    "\(workout.title) started on Apple Watch."
             } catch {
                 watchTransferError = error.localizedDescription
             }
@@ -2335,30 +2421,7 @@ struct ATHLTHTrainView: View {
         )
     }
 
-    private func importGPX(_ result: Result<[URL], Error>) async {
-        do {
-            guard let url = try result.get().first else { return }
 
-            let didAccess = url.startAccessingSecurityScopedResource()
-            defer {
-                if didAccess {
-                    url.stopAccessingSecurityScopedResource()
-                }
-            }
-
-            let data = try Data(contentsOf: url)
-            let route = try await gpxImporter.importGPX(data: data, filename: url.lastPathComponent)
-
-            await MainActor.run {
-                session.addImportedRoute(route)
-                importMessage = "Imported \(route.title) · \(String(format: "%.1f", route.distanceKilometers)) km"
-            }
-        } catch {
-            await MainActor.run {
-                importError = error.localizedDescription
-            }
-        }
-    }
 }
 
 struct ATHLTHRecoveryView: View {
