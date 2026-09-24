@@ -374,12 +374,17 @@ struct PersonalHealthProfileView: View {
 
                 Button {
                     Task {
-                        await health.requestAuthorization()
+                        if !health.hasRequestedAuthorization {
+                            await health.requestAuthorization()
+                            await health.completeAuthorizationSetup()
+                        } else {
+                            health.resumeUserInitiatedHealthSync()
+                        }
+
                         await health.configureBackgroundSync(
-                            allowed:
-                                session.canAccess(.backgroundHealthSync) &&
-                                settings.backgroundHealthSyncEnabled
+                            allowed: settings.backgroundHealthSyncEnabled
                         )
+                        await health.refreshAll()
                         await health.refreshPersonalDetails()
                         session.updatePersonalDetails(
                             health.personalDetails,
@@ -390,7 +395,12 @@ struct PersonalHealthProfileView: View {
                         loadFromSession()
                     }
                 } label: {
-                    Label("Use Apple Health", systemImage: "heart.fill")
+                    Label(
+                        health.hasRequestedAuthorization
+                            ? "Refresh from Apple Health"
+                            : "Use Apple Health",
+                        systemImage: "heart.fill"
+                    )
                 }
 
                 Text("ATHLTH uses only profile values Apple Health makes available. Missing values can be entered manually below.")
@@ -402,56 +412,70 @@ struct PersonalHealthProfileView: View {
                 Toggle("Date of birth", isOn: $includeDateOfBirth)
 
                 if includeDateOfBirth {
-                    DatePicker(
-                        "Date",
-                        selection: $dateOfBirth,
-                        in: ...Date(),
-                        displayedComponents: .date
-                    )
+                    HStack {
+                        Spacer()
+                        DatePicker(
+                            "Date of birth",
+                            selection: $dateOfBirth,
+                            in: ...Date(),
+                            displayedComponents: .date
+                        )
+                        .labelsHidden()
+                    }
                 }
 
                 Toggle("Sex for health calculations", isOn: $includeSex)
 
                 if includeSex {
-                    Picker("Sex", selection: $healthSex) {
-                        ForEach(HealthSex.allCases) { value in
-                            Text(value.title).tag(value)
+                    HStack {
+                        Spacer()
+                        Picker("Sex for health calculations", selection: $healthSex) {
+                            ForEach(HealthSex.allCases) { value in
+                                Text(value.title).tag(value)
+                            }
                         }
+                        .labelsHidden()
                     }
                 }
 
                 Toggle("Weight", isOn: $includeWeight)
 
                 if includeWeight {
-                    HStack {
-                        Text("Weight")
-                        Spacer()
-                        Text(weightDisplay)
-                            .monospacedDigit()
-                    }
+                    VStack(spacing: 12) {
+                        HStack {
+                            Spacer()
+                            Text(weightDisplay)
+                                .font(.subheadline.weight(.medium))
+                                .monospacedDigit()
+                        }
 
-                    Slider(
-                        value: weightBinding,
-                        in: weightRange,
-                        step: settings.measurementPreference == .metric ? 0.5 : 1
-                    )
+                        Slider(
+                            value: weightBinding,
+                            in: weightRange,
+                            step: settings.measurementPreference == .metric ? 0.5 : 1
+                        )
+                    }
+                    .padding(.vertical, 2)
                 }
 
                 Toggle("Height", isOn: $includeHeight)
 
                 if includeHeight {
-                    HStack {
-                        Text("Height")
-                        Spacer()
-                        Text(heightDisplay)
-                            .monospacedDigit()
-                    }
+                    VStack(spacing: 12) {
+                        HStack {
+                            Spacer()
+                            Text(heightDisplay)
+                                .font(.subheadline.weight(.medium))
+                                .monospacedDigit()
+                        }
 
-                    Slider(
-                        value: heightBinding,
-                        in: heightRange,
-                        step: 1
-                    )
+                        Slider(
+                            value: heightBinding,
+                            in: heightRange,
+                            step: 1
+                        )
+                    }
+                    .padding(.vertical, 2)
                 }
 
                 Button("Save Health Profile") {
