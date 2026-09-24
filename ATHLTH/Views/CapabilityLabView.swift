@@ -15,7 +15,7 @@ struct CapabilityLabView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text("Capability Lab")
                             .font(.largeTitle.weight(.bold))
-                        Text("A temporary V0.1 test bench for the free Apple Personal Team.")
+                        Text("Low-level capability tests for ATHLTH development and TestFlight diagnostics.")
                             .foregroundStyle(.secondary)
                     }
 
@@ -115,7 +115,7 @@ struct CapabilityLabView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Privacy note", systemImage: "lock.shield.fill")
                             .font(.headline)
-                        Text("These tests run on-device. V0.1 has no ATHLTH account, analytics SDK, cloud backend, or Home Assistant connection.")
+                        Text("Capability tests run on-device. ATHLTH account and social features use the configured backend, but this screen does not display passwords, Health values, access tokens or other secrets.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
