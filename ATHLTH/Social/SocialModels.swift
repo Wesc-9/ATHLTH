@@ -682,8 +682,20 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
             activity = .running
         case .walking:
             activity = .walking
-        case .strength:
+        case .strength, .functional:
             activity = .strength
+        case .hiit:
+            activity = .hiit
+        case .cycling:
+            activity = .cycling
+        case .rowing:
+            activity = .rowing
+        case .stairClimbing:
+            activity = .stairClimbing
+        case .yoga:
+            activity = .yoga
+        case .other:
+            activity = .other
         }
 
         startDate = watchResult.startedAt
