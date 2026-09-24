@@ -48,9 +48,14 @@ final class HealthKitManager: ObservableObject {
     private let refreshInProgressKey = "athlth.healthRefreshInProgress"
     private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
     private let currentSafeRefreshVersion = 1
+    private let lastSuccessfulRefreshKey = "athlth.healthLastSuccessfulRefreshAt"
 
     init() {
         let defaults = UserDefaults.standard
+        lastSuccessfulRefreshAt = defaults.object(
+            forKey: lastSuccessfulRefreshKey
+        ) as? Date
+
         let interruptedRefresh = defaults.bool(forKey: refreshInProgressKey)
         let hasExistingHealthAuthorization =
             defaults.integer(forKey: authorizationVersionKey) >=
@@ -394,7 +399,9 @@ final class HealthKitManager: ObservableObject {
         await refreshPersonalDetails()
 
         if completedRead || personalDetails.hasAnyValue {
-            lastSuccessfulRefreshAt = Date()
+            let refreshedAt = Date()
+            lastSuccessfulRefreshAt = refreshedAt
+            defaults.set(refreshedAt, forKey: lastSuccessfulRefreshKey)
         }
 
         if let firstFailure = failures.first {
