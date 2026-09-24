@@ -461,25 +461,26 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
+                    #if DEBUG
                     if session.currentRole.canAccessControlCenter {
                         settingsSection("Admin") {
                             PremiumSettingsCard {
                                 NavigationLink {
-                                AdminCenterView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "lock.rectangle.stack",
-                                    title: "Control Center",
-                                    subtitle: "ATHLTH administration"
-                                ) {
-                                    HStack(spacing: 8) {
-                                        Text(session.currentRole.title)
-                                            .font(.subheadline)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    AdminCenterView()
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "lock.rectangle.stack",
+                                        title: "Control Center",
+                                        subtitle: "Development preview · not production data"
+                                    ) {
+                                        HStack(spacing: 8) {
+                                            Text(session.currentRole.title)
+                                                .font(.subheadline)
+                                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                            Image(systemName: "chevron.right")
+                                                .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                        }
                                     }
-                                }
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -505,6 +506,7 @@ struct ATHLTHSettingsView: View {
                             }
                         }
                     }
+                    #endif
 
                     Text("ATHLTH \(appVersion) · Progress lives here.")
                         .font(.caption2.weight(.medium))
