@@ -684,8 +684,8 @@ struct ATHLTHSettingsView: View {
         if healthSyncHasIssue {
             return "Issue"
         }
-        if health.lastSuccessfulRefreshAt != nil && !health.hasReadableHealthData {
-            return "No data"
+        if health.lastSuccessfulRefreshAt != nil && !health.hasTrainingHealthData {
+            return health.personalDetails.hasAnyValue ? "Profile only" : "No data"
         }
         return health.lastSuccessfulRefreshAt != nil ? "Synced" : "Ready"
     }
@@ -712,11 +712,15 @@ struct ATHLTHSettingsView: View {
             formatter.unitsStyle = .full
             let relative = formatter.localizedString(for: lastRefresh, relativeTo: Date())
 
-            if health.hasReadableHealthData {
-                return "Apple Health data imported successfully. Last synced \(relative)."
+            if health.hasTrainingHealthData {
+                return "Apple Health training data imported successfully. Last synced \(relative)."
             }
 
-            return "Apple Health responded, but ATHLTH found no readable compatible data. Check that ATHLTH has read access in Apple Health, then tap Sync now."
+            if health.personalDetails.hasAnyValue {
+                return "Apple Health profile values were imported, but ATHLTH found no readable workouts, activity, sleep or heart data. Review Health read access, then tap Sync now."
+            }
+
+            return "Apple Health responded, but ATHLTH found no readable compatible data. Review Health read access, then tap Sync now."
         }
 
         return settings.backgroundHealthSyncEnabled
@@ -748,8 +752,12 @@ struct ATHLTHSettingsView: View {
             return "Reading Apple Health data now"
         }
 
-        if health.hasReadableHealthData {
-            return "Connected · compatible health data is available"
+        if health.hasTrainingHealthData {
+            return "Connected · training and health data is available"
+        }
+
+        if health.personalDetails.hasAnyValue {
+            return "Configured · profile values available, no training data yet"
         }
 
         if health.lastSuccessfulRefreshAt != nil {
