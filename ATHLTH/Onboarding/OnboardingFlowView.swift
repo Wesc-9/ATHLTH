@@ -7,7 +7,7 @@ private enum ConnectionStage {
     case appleHealth
 }
 
-private enum GoalsStage {
+private enum GoalsStage: Equatable {
     case trainingStyle
     case goalSelection
 }
@@ -729,9 +729,7 @@ struct OnboardingFlowView: View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 8) {
                 onboardingTitle(
-                    selectedGoalFocus == nil
-                        ? "What matters most right now?"
-                        : goalDetailPrompt(for: selectedGoalFocus!),
+                    goalSelectionTitle,
                     subtitle: selectedGoalFocus == nil
                         ? "Choose one area first. Your options will update without leaving this step."
                         : "Choose one primary goal. This personalizes ATHLTH, but does not make it public."
@@ -973,6 +971,14 @@ struct OnboardingFlowView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var goalSelectionTitle: String {
+        guard let selectedGoalFocus else {
+            return "What matters most right now?"
+        }
+
+        return goalDetailPrompt(for: selectedGoalFocus)
     }
 
     private func goalDetailPrompt(for focus: GoalFocusArea) -> String {
