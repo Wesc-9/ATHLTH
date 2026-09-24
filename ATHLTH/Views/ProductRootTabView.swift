@@ -98,11 +98,12 @@ struct ATHLTHHomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    ZStack(alignment: .topTrailing) {
-                        ATHLTHTabHero(
-                            imageName: "HomeHero",
+            ATHLTHPinnedHeroLayout(
+                accent: ATHLTHTheme.premiumGold.opacity(0.70)
+            ) {
+                ZStack(alignment: .topTrailing) {
+                    ATHLTHTabHero(
+                        imageName: "HomeHero",
                             title: greetingTitle,
                             subtitle: session.profile.presence.state == .training
                                 ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
@@ -202,9 +203,9 @@ struct ATHLTHHomeView: View {
                         }
                         .padding(.top, 52)
                         .padding(.trailing, 12)
-                    }
-
-                    VStack(spacing: 18) {
+                }
+            } content: {
+                VStack(spacing: 18) {
                     ATHLTHCard {
                         HStack(alignment: .firstTextBaseline) {
                             VStack(alignment: .leading, spacing: 3) {
@@ -336,14 +337,7 @@ struct ATHLTHHomeView: View {
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
-                }
             }
-            .ignoresSafeArea(edges: .top)
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: ATHLTHTheme.premiumGold.opacity(0.70)
-                )
-            )
             .refreshable {
                 async let streakRefresh: Void = loadHomeStreak()
                 async let communityRefresh: Void = community.refresh()
@@ -1304,19 +1298,20 @@ struct ATHLTHTrainView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    ATHLTHTabHero(
-                        imageName: "TrainHero",
+            ATHLTHPinnedHeroLayout(
+                accent: Color.green.opacity(0.55)
+            ) {
+                ATHLTHTabHero(
+                    imageName: "TrainHero",
                         title: "Train",
                         subtitle: "Build a stronger, healthier you.",
                         height: 190,
                         alignment: .leading,
                         focalOffsetX: -18,
-                        focalOffsetY: 18
-                    )
-
-                    VStack(spacing: 18) {
+                    focalOffsetY: 18
+                )
+            } content: {
+                VStack(spacing: 18) {
                     ATHLTHPremiumSegmentedControl(
                         titles: ["Today", "Plan", "Library"],
                         selection: $selectedSection
@@ -1336,14 +1331,7 @@ struct ATHLTHTrainView: View {
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
-                }
             }
-            .ignoresSafeArea(edges: .top)
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: Color.green.opacity(0.55)
-                )
-            )
             .sheet(item: $selectedPlanWorkout) { selection in
                 PlannedWorkoutDetailView(
                     planID: selection.planID,
@@ -2501,19 +2489,20 @@ struct ATHLTHRecoveryView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    ATHLTHTabHero(
-                        imageName: "RecoveryHero",
+            ATHLTHPinnedHeroLayout(
+                accent: Color.blue.opacity(0.70)
+            ) {
+                ATHLTHTabHero(
+                    imageName: "RecoveryHero",
                         title: "Recovery",
                         subtitle: "Use sleep and recovery signals to guide today's load.",
                         height: 190,
                         alignment: .leading,
                         focalOffsetX: 14,
-                        focalOffsetY: 16
-                    )
-
-                    VStack(spacing: 16) {
+                    focalOffsetY: 16
+                )
+            } content: {
+                VStack(spacing: 16) {
                         if shouldShowWearableRecoveryContent {
                             recoveryScoreCard
                             todaysSignalsCard
@@ -2526,17 +2515,10 @@ struct ATHLTHRecoveryView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
-                    .padding(.bottom, 30)
-                    .frame(maxWidth: 760)
-                    .frame(maxWidth: .infinity)
-                }
+                .padding(.bottom, 30)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
             }
-            .ignoresSafeArea(edges: .top)
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: Color.blue.opacity(0.70)
-                )
-            )
             .refreshable {
                 await health.refreshAll()
             }
@@ -3351,15 +3333,16 @@ struct ATHLTHProgressView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    ATHLTHProgressHero(
-                        title: "Progress",
+            ATHLTHPinnedHeroLayout(
+                accent: green.opacity(0.60)
+            ) {
+                ATHLTHProgressHero(
+                    title: "Progress",
                         subtitle: "See your training, consistency and health trends.",
-                        height: 190
-                    )
-
-                    VStack(spacing: 14) {
+                    height: 190
+                )
+            } content: {
+                VStack(spacing: 14) {
                     if health.hasRequestedAuthorization &&
                         (health.hasTrainingHealthData || progressHasHealthData) {
                         periodPicker
@@ -3394,14 +3377,7 @@ struct ATHLTHProgressView: View {
                 .padding(.bottom, 30)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
-                }
             }
-            .ignoresSafeArea(edges: .top)
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: green.opacity(0.60)
-                )
-            )
             .refreshable {
                 async let selected: Void = loadProgressData()
                 async let support: Void = loadSupportingProgressData()
@@ -4392,9 +4368,13 @@ struct ATHLTHProfileView: View {
     @State private var performanceStatsLoading = false
 
     var body: some View {
-        ScrollView {
+        ATHLTHPinnedHeroLayout(
+            accent: ATHLTHTheme.premiumGold.opacity(0.62)
+        ) {
+            profileHero
+        } content: {
             VStack(spacing: 16) {
-                profileHeaderCard
+                profileSocialStatsCard
                 trainingIdentityCard
                 ProfileGearSummaryView()
 
@@ -4410,22 +4390,11 @@ struct ATHLTHProfileView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 10)
+            .padding(.top, 14)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
         }
-        .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.canvasTop,
-                    ATHLTHTheme.canvasBottom
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -4444,10 +4413,13 @@ struct ATHLTHProfileView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                         .frame(width: 40, height: 40)
-                        .background(.ultraThinMaterial, in: Circle())
+                        .background(
+                            ATHLTHTheme.cardWarm.opacity(0.82),
+                            in: Circle()
+                        )
                         .overlay {
                             Circle()
-                                .stroke(Color.white.opacity(0.72), lineWidth: 1)
+                                .stroke(Color.white.opacity(0.80), lineWidth: 1)
                         }
                 }
                 .accessibilityLabel("Settings")
@@ -4455,54 +4427,105 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    private var profileHeaderCard: some View {
-        ATHLTHCard {
-            HStack(alignment: .top, spacing: 14) {
-                profileAvatar
+    private var profileHero: some View {
+        GeometryReader { proxy in
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.cardWarm,
+                        ATHLTHTheme.surfaceSage,
+                        ATHLTHTheme.canvasBottom
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(session.profile.displayName)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
+                RadialGradient(
+                    colors: [
+                        ATHLTHTheme.premiumGold.opacity(0.24),
+                        Color.clear
+                    ],
+                    center: .topTrailing,
+                    startRadius: 0,
+                    endRadius: max(proxy.size.width * 0.70, 260)
+                )
 
-                    Text("@\(session.profile.username)")
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                RadialGradient(
+                    colors: [
+                        ATHLTHTheme.vitality.opacity(0.16),
+                        Color.clear
+                    ],
+                    center: .bottomLeading,
+                    startRadius: 10,
+                    endRadius: max(proxy.size.width * 0.56, 220)
+                )
 
-                    if !session.profile.bio
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .isEmpty {
-                        Text(session.profile.bio)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 3)
+                HStack(alignment: .center, spacing: 16) {
+                    profileAvatar
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("PROFILE")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.6)
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep.opacity(0.62)
+                            )
+
+                        Text(session.profile.displayName)
+                            .font(.system(size: 27, weight: .bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.76)
+
+                        Text("@\(session.profile.username)")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        if !session.profile.bio
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .isEmpty {
+                            Text(session.profile.bio)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText.opacity(0.72)
+                                )
+                                .lineLimit(2)
+                                .padding(.top, 2)
+                        }
                     }
-                }
 
-                Spacer(minLength: 8)
+                    Spacer(minLength: 6)
 
-                NavigationLink {
-                    ATHLTHEditProfileView()
-                } label: {
-                    Label("Edit", systemImage: "pencil")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .padding(.horizontal, 11)
-                        .frame(height: 38)
-                        .background(
-                            Color.primary.opacity(0.045),
-                            in: Capsule()
-                        )
+                    NavigationLink {
+                        ATHLTHEditProfileView()
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 42, height: 42)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white.opacity(0.74),
+                                        lineWidth: 1
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Edit Profile")
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.top, 62)
+                .padding(.bottom, 24)
             }
+        }
+        .frame(height: 230)
+        .clipped()
+    }
 
-            Divider()
-                .padding(.vertical, 10)
-
+    private var profileSocialStatsCard: some View {
+        ATHLTHCard {
             HStack(spacing: 0) {
                 NavigationLink {
                     ProfileFollowListView(mode: .followers)
@@ -4775,7 +4798,7 @@ struct ATHLTHProfileView: View {
                     avatarFallback
                 }
             }
-            .frame(width: 86, height: 86)
+            .frame(width: 104, height: 104)
             .clipShape(Circle())
             .overlay {
                 Circle()
@@ -4784,7 +4807,7 @@ struct ATHLTHProfileView: View {
             .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
         } else {
             avatarFallback
-                .frame(width: 86, height: 86)
+                .frame(width: 104, height: 104)
         }
     }
 
@@ -4793,7 +4816,7 @@ struct ATHLTHProfileView: View {
             .fill(ATHLTHTheme.accentSoft)
             .overlay {
                 Image(systemName: "person.fill")
-                    .font(.system(size: 34))
+                    .font(.system(size: 40, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
             }
     }
