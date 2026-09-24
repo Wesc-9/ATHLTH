@@ -5,7 +5,7 @@ struct ProfilePerformanceSection: View {
     let isLoading: Bool
 
     var body: some View {
-        ATHLTHCard {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Performance Stats")
@@ -48,99 +48,127 @@ struct ProfilePerformanceSection: View {
                     spacing: 10
                 ) {
                     performanceTile(
-                        icon: "1.circle.fill",
+                        icon: "figure.run",
                         title: "Fastest 1K",
                         value: stats.fastestOneKilometer?.formattedTime ?? "—",
-                        detail: stats.fastestOneKilometer?.formattedPace ?? "GPS verified"
+                        detail: stats.fastestOneKilometer?.formattedPace ?? "GPS verified",
+                        tint: .green
                     )
 
                     performanceTile(
-                        icon: "5.circle.fill",
+                        icon: "figure.run.circle.fill",
                         title: "Fastest 5K",
                         value: stats.fastestFiveKilometers?.formattedTime ?? "—",
-                        detail: stats.fastestFiveKilometers?.formattedPace ?? "GPS verified"
+                        detail: stats.fastestFiveKilometers?.formattedPace ?? "GPS verified",
+                        tint: .blue
                     )
 
                     performanceTile(
                         icon: "flag.checkered",
                         title: "Marathon",
                         value: stats.fastestMarathon?.formattedTime ?? "—",
-                        detail: stats.fastestMarathon?.formattedPace ?? "No verified 42.2K yet"
+                        detail: stats.fastestMarathon?.formattedPace ?? "No verified 42.2K yet",
+                        tint: .purple
                     )
 
                     performanceTile(
                         icon: "point.topleft.down.to.point.bottomright.curvepath",
                         title: "Longest Run",
                         value: formatDistance(stats.longestRunMeters),
-                        detail: formatMil(stats.longestRunMeters)
+                        detail: formatMil(stats.longestRunMeters),
+                        tint: .orange
                     )
 
                     performanceTile(
                         icon: "clock.fill",
                         title: "Longest Session",
                         value: formatDuration(stats.longestWorkoutDuration),
-                        detail: stats.longestWorkoutActivity?.rawValue ?? "Workout"
+                        detail: stats.longestWorkoutActivity?.rawValue ?? "Workout",
+                        tint: .cyan
                     )
 
                     performanceTile(
                         icon: "figure.run",
                         title: "Running Distance",
                         value: formatDistance(stats.totalRunningDistanceMeters),
-                        detail: formatMil(stats.totalRunningDistanceMeters)
+                        detail: formatMil(stats.totalRunningDistanceMeters),
+                        tint: ATHLTHTheme.accent
                     )
                 }
                 .padding(.top, 12)
             } else {
                 Text("Connect Apple Health to build verified performance stats.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                     .padding(.vertical, 12)
             }
         }
+        .padding(18)
+        .background(
+            Color.white.opacity(0.82),
+            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(ATHLTHTheme.border.opacity(0.72), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.035), radius: 16, x: 0, y: 8)
     }
 
     private func performanceTile(
         icon: String,
         title: String,
         value: String,
-        detail: String
+        detail: String,
+        tint: Color
     ) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
+                    .foregroundStyle(tint)
+                    .frame(width: 32, height: 32)
+                    .background(tint.opacity(0.10), in: Circle())
 
                 Spacer()
 
                 Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(ATHLTHTheme.accent.opacity(0.72))
+                    .font(.system(size: 10))
+                    .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.55))
             }
 
             Text(value)
                 .font(.title3.monospacedDigit().weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
                 .minimumScaleFactor(0.68)
                 .lineLimit(1)
 
             Text(title)
                 .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
                 .lineLimit(1)
 
             Text(detail)
                 .font(.system(size: 9))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ATHLTHTheme.mutedText)
                 .lineLimit(1)
         }
         .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 118, alignment: .leading)
         .background(
-            ATHLTHTheme.accent.opacity(0.045),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            LinearGradient(
+                colors: [
+                    tint.opacity(0.08),
+                    Color.white.opacity(0.72)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(ATHLTHTheme.accent.opacity(0.09), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(tint.opacity(0.10), lineWidth: 1)
         }
     }
 }
