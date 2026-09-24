@@ -7,6 +7,11 @@ private enum ConnectionStage {
     case appleHealth
 }
 
+private enum GoalsStage {
+    case trainingStyle
+    case goalSelection
+}
+
 struct OnboardingFlowView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
@@ -37,6 +42,7 @@ struct OnboardingFlowView: View {
     @State private var showingWatchInstallHelp = false
     @State private var showingGarminSetup = false
     @State private var connectionStage: ConnectionStage = .device
+    @State private var goalsStage: GoalsStage = .trainingStyle
     @FocusState private var usernameFieldFocused: Bool
 
     private let usernameService = SupabaseUsernameAvailabilityService()
@@ -186,7 +192,7 @@ struct OnboardingFlowView: View {
 
                 Spacer()
 
-                if step != .account {
+                if step == .goals || step == .connections || step == .ready {
                     Button {
                         skipCurrentStep()
                     } label: {
@@ -669,12 +675,32 @@ struct OnboardingFlowView: View {
         }
     }
 
+    @ViewBuilder
     private var goalsStep: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            onboardingTitle(
-                "How do you train?",
-                subtitle: "Choose the training identity that fits you best. You can change it later."
-            )
+        switch goalsStage {
+        case .trainingStyle:
+            trainingStyleStep
+        case .goalSelection:
+            goalSelectionStep
+        }
+    }
+
+    private var trainingStyleStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 8) {
+                onboardingTitle(
+                    "How do you train?",
+                    subtitle: "Choose the training identity that fits you best. You can change it later."
+                )
+
+                HStack(spacing: 7) {
+                    Text("TRAINING PROFILE")
+                    Text("1 OF 2")
+                }
+                .font(.caption2.weight(.bold))
+                .tracking(1.15)
+                .foregroundStyle(OnboardingTheme.faintText)
+            }
 
             LazyVGrid(
                 columns: [
@@ -684,81 +710,61 @@ struct OnboardingFlowView: View {
                 spacing: 12
             ) {
                 ForEach(TrainingFocus.allCases) { focus in
-                    let selected = selectedTrainingFocus == focus
-
-                    Button {
+                    onboardingSelectionCard(
+                        title: focus.title,
+                        subtitle: focus.subtitle,
+                        icon: focus.systemImage,
+                        selected: selectedTrainingFocus == focus
+                    ) {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             selectedTrainingFocus = focus
-                            applyTrainingFocusToInterests(focus)
-                        }
-                    } label: {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Image(systemName: focus.systemImage)
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(
-                                        selected
-                                            ? OnboardingTheme.accent
-                                            : OnboardingTheme.primaryText
-                                    )
-
-                                Spacer()
-
-                                Image(
-                                    systemName: selected
-                                        ? "checkmark.circle.fill"
-                                        : "circle"
-                                )
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(
-                                    selected
-                                        ? OnboardingTheme.accent
-                                        : OnboardingTheme.faintText
-                                )
-                            }
-
-                            Text(focus.title)
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(OnboardingTheme.primaryText)
-
-                            Text(focus.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(OnboardingTheme.mutedText)
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(3)
-                        }
-                        .padding(14)
-                        .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
-                        .background(
-                            selected
-                                ? OnboardingTheme.selectedFill
-                                : OnboardingTheme.card,
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(
-                                    selected
-                                        ? OnboardingTheme.accent.opacity(0.40)
-                                        : OnboardingTheme.border,
-                                    lineWidth: 1
-                                )
                         }
                     }
-                    .buttonStyle(.plain)
                 }
             }
+        }
+    }
 
-            onboardingTitle(
-                "What matters most right now?",
-                subtitle: "Choose one primary goal. This personalizes ATHLTH, but does not make it public."
-            )
+    private var goalSelectionStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 8) {
+                onboardingTitle(
+                    selectedGoalFocus == nil
+                        ? "What matters most right now?"
+                        : goalDetailPrompt(for: selectedGoalFocus!),
+                    subtitle: selectedGoalFocus == nil
+                        ? "Choose one area first. Your options will update without leaving this step."
+                        : "Choose one primary goal. This personalizes ATHLTH, but does not make it public."
+                )
 
-            VStack(alignment: .leading, spacing: 12) {
-                Text("CHOOSE A FOCUS")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.25)
-                    .foregroundStyle(OnboardingTheme.faintText)
+                HStack(spacing: 7) {
+                    Text("YOUR GOALS")
+                    Text("2 OF 2")
+                }
+                .font(.caption2.weight(.bold))
+                .tracking(1.15)
+                .foregroundStyle(OnboardingTheme.faintText)
+            }
+
+            if let selectedGoalFocus {
+                HStack {
+                    Text(selectedGoalFocus.title.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.1)
+                        .foregroundStyle(OnboardingTheme.accent)
+
+                    Spacer()
+
+                    Button("Change focus") {
+                        withAnimation(.easeInOut(duration: 0.20)) {
+                            self.selectedGoalFocus = nil
+                            selectedGoal = nil
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(OnboardingTheme.mutedText)
+                    .buttonStyle(.plain)
+                }
 
                 LazyVGrid(
                     columns: [
@@ -767,255 +773,206 @@ struct OnboardingFlowView: View {
                     ],
                     spacing: 12
                 ) {
-                    ForEach(GoalFocusArea.allCases) { focus in
-                        let selected = selectedGoalFocus == focus
-
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.20)) {
-                                if selectedGoalFocus != focus {
-                                    selectedGoal = nil
-                                }
-                                selectedGoalFocus = focus
+                    ForEach(selectedGoalFocus.goals) { goal in
+                        onboardingSelectionCard(
+                            title: goal.title,
+                            subtitle: goal.subtitle,
+                            icon: goal.systemImage,
+                            selected: selectedGoal == goal
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.16)) {
+                                selectedGoal = goal
                             }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: focus.systemImage)
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundStyle(
-                                            selected
-                                                ? OnboardingTheme.accent
-                                                : OnboardingTheme.primaryText
-                                        )
-                                        .frame(width: 38, height: 38)
-                                        .background(
-                                            selected
-                                                ? OnboardingTheme.accent.opacity(0.12)
-                                                : OnboardingTheme.subtleFill,
-                                            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                        )
-
-                                    Spacer()
-
-                                    if selected {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 17, weight: .semibold))
-                                            .foregroundStyle(OnboardingTheme.accent)
-                                    }
-                                }
-
-                                Text(focus.title)
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(OnboardingTheme.primaryText)
-                                    .multilineTextAlignment(.leading)
-
-                                Text(focus.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(OnboardingTheme.mutedText)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(2)
-                            }
-                            .padding(15)
-                            .frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
-                            .background(
-                                selected
-                                    ? OnboardingTheme.selectedFill
-                                    : OnboardingTheme.card,
-                                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .stroke(
-                                        selected
-                                            ? OnboardingTheme.accent.opacity(0.42)
-                                            : OnboardingTheme.border,
-                                        lineWidth: selected ? 1.2 : 1
-                                    )
-                            }
-                            .shadow(
-                                color: selected
-                                    ? OnboardingTheme.accent.opacity(0.06)
-                                    : Color.black.opacity(0.035),
-                                radius: 12,
-                                x: 0,
-                                y: 6
-                            )
                         }
-                        .buttonStyle(.plain)
                     }
                 }
-            }
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-            if let selectedGoalFocus {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(goalDetailPrompt(for: selectedGoalFocus))
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(OnboardingTheme.primaryText)
+                if selectedGoal != nil {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Also interested in")
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(OnboardingTheme.primaryText)
 
-                        Spacer()
+                            Text("Choose at least one")
+                                .font(.caption)
+                                .foregroundStyle(OnboardingTheme.faintText)
 
-                        Text("ONE GOAL")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.0)
-                            .foregroundStyle(OnboardingTheme.faintText)
-                    }
+                            Spacer()
+                        }
 
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 150), spacing: 10)],
-                        spacing: 10
-                    ) {
-                        ForEach(selectedGoalFocus.goals) { goal in
-                            let selected = selectedGoal == goal
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 120), spacing: 9)],
+                            spacing: 9
+                        ) {
+                            ForEach(ATHLTHInterest.allCases) { interest in
+                                let selected = interests.contains(interest)
 
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.16)) {
-                                    selectedGoal = goal
-                                }
-                            } label: {
-                                HStack(spacing: 9) {
-                                    Image(systemName: goal.systemImage)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(
-                                            selected
-                                                ? OnboardingTheme.accent
-                                                : OnboardingTheme.mutedText
-                                        )
+                                Button {
+                                    toggleInterest(interest)
+                                } label: {
+                                    HStack(spacing: 7) {
+                                        Image(systemName: interest.systemImage)
+                                            .font(.system(size: 13, weight: .semibold))
 
-                                    Text(goal.title)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(OnboardingTheme.primaryText)
-                                        .multilineTextAlignment(.leading)
-                                        .lineLimit(2)
+                                        Text(interest.title)
+                                            .font(.caption.weight(.semibold))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.82)
 
-                                    Spacer(minLength: 4)
-
-                                    Image(
-                                        systemName: selected
-                                            ? "checkmark.circle.fill"
-                                            : "circle"
-                                    )
-                                    .font(.system(size: 14, weight: .semibold))
+                                        if selected {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 10, weight: .bold))
+                                        }
+                                    }
                                     .foregroundStyle(
                                         selected
                                             ? OnboardingTheme.accent
-                                            : OnboardingTheme.faintText
+                                            : OnboardingTheme.primaryText
                                     )
-                                }
-                                .padding(.horizontal, 13)
-                                .frame(minHeight: 50)
-                                .background(
-                                    selected
-                                        ? OnboardingTheme.selectedFill
-                                        : OnboardingTheme.card,
-                                    in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                )
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                        .stroke(
-                                            selected
-                                                ? OnboardingTheme.accent.opacity(0.36)
-                                                : OnboardingTheme.border,
-                                            lineWidth: 1
-                                        )
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .transition(
-                    .opacity.combined(
-                        with: .move(edge: .top)
-                    )
-                )
-            }
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Also interested in")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(OnboardingTheme.primaryText)
-
-                    Text("Optional")
-                        .font(.caption)
-                        .foregroundStyle(OnboardingTheme.faintText)
-
-                    Spacer()
-                }
-
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 120), spacing: 9)],
-                    spacing: 9
-                ) {
-                    ForEach(ATHLTHInterest.allCases) { interest in
-                        let selected = interests.contains(interest)
-
-                        Button {
-                            toggleInterest(interest)
-                        } label: {
-                            HStack(spacing: 7) {
-                                Image(systemName: interest.systemImage)
-                                    .font(.system(size: 13, weight: .semibold))
-
-                                Text(interest.title)
-                                    .font(.caption.weight(.semibold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.82)
-
-                                if selected {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                }
-                            }
-                            .foregroundStyle(
-                                selected
-                                    ? OnboardingTheme.accent
-                                    : OnboardingTheme.primaryText
-                            )
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 40)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                selected
-                                    ? OnboardingTheme.selectedFill
-                                    : OnboardingTheme.card,
-                                in: Capsule()
-                            )
-                            .overlay {
-                                Capsule()
-                                    .stroke(
+                                    .padding(.horizontal, 12)
+                                    .frame(minHeight: 40)
+                                    .frame(maxWidth: .infinity)
+                                    .background(
                                         selected
-                                            ? OnboardingTheme.accent.opacity(0.34)
-                                            : OnboardingTheme.border,
-                                        lineWidth: 1
+                                            ? OnboardingTheme.selectedFill
+                                            : OnboardingTheme.card,
+                                        in: Capsule()
                                     )
+                                    .overlay {
+                                        Capsule()
+                                            .stroke(
+                                                selected
+                                                    ? OnboardingTheme.accent.opacity(0.34)
+                                                    : OnboardingTheme.border,
+                                                lineWidth: 1
+                                            )
+                                    }
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
-                        .buttonStyle(.plain)
+
+                        if interests.isEmpty {
+                            Label(
+                                "Choose at least one interest to continue, or use Skip.",
+                                systemImage: "info.circle"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(OnboardingTheme.mutedText)
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            } else {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)
+                    ],
+                    spacing: 12
+                ) {
+                    ForEach(GoalFocusArea.allCases) { focus in
+                        onboardingSelectionCard(
+                            title: focus.title,
+                            subtitle: focus.subtitle,
+                            icon: focus.systemImage,
+                            selected: false
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.20)) {
+                                selectedGoal = nil
+                                selectedGoalFocus = focus
+                            }
+                        }
                     }
                 }
+                .transition(.opacity.combined(with: .move(edge: .leading)))
             }
         }
+        .animation(.easeInOut(duration: 0.20), value: selectedGoalFocus)
+        .animation(.easeInOut(duration: 0.16), value: selectedGoal)
     }
 
-    private func applyTrainingFocusToInterests(_ focus: TrainingFocus) {
-        switch focus {
-        case .running:
-            interests.insert(.running)
-        case .strength:
-            interests.insert(.strength)
-        case .hybrid:
-            interests.insert(.running)
-            interests.insert(.strength)
-        case .walking:
-            interests.insert(.walking)
-        case .generalFitness:
-            interests.insert(.healthTracking)
-            interests.insert(.trainingPlans)
-        case .recovery:
-            interests.insert(.recovery)
+    @ViewBuilder
+    private func onboardingSelectionCard(
+        title: String,
+        subtitle: String,
+        icon: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(
+                            selected
+                                ? OnboardingTheme.accent
+                                : OnboardingTheme.primaryText
+                        )
+                        .frame(width: 38, height: 38)
+                        .background(
+                            selected
+                                ? OnboardingTheme.accent.opacity(0.12)
+                                : OnboardingTheme.subtleFill,
+                            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        )
+
+                    Spacer()
+
+                    Image(
+                        systemName: selected
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                    )
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(
+                        selected
+                            ? OnboardingTheme.accent
+                            : OnboardingTheme.faintText
+                    )
+                }
+
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(OnboardingTheme.primaryText)
+                    .multilineTextAlignment(.leading)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(OnboardingTheme.mutedText)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
+            .background(
+                selected
+                    ? OnboardingTheme.selectedFill
+                    : OnboardingTheme.card,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(
+                        selected
+                            ? OnboardingTheme.accent.opacity(0.42)
+                            : OnboardingTheme.border,
+                        lineWidth: selected ? 1.2 : 1
+                    )
+            }
+            .shadow(
+                color: selected
+                    ? OnboardingTheme.accent.opacity(0.06)
+                    : Color.black.opacity(0.035),
+                radius: 12,
+                x: 0,
+                y: 6
+            )
         }
+        .buttonStyle(.plain)
     }
 
     private func goalDetailPrompt(for focus: GoalFocusArea) -> String {
@@ -1731,15 +1688,30 @@ struct OnboardingFlowView: View {
                 }
 
             case .goals:
-                footerButton(
-                    title: "Continue",
-                    disabled: selectedGoal == nil || selectedTrainingFocus == nil
-                ) {
-                    saveProfileData()
-                    step = .connections
-                }
+                switch goalsStage {
+                case .trainingStyle:
+                    footerButton(
+                        title: "Continue",
+                        disabled: selectedTrainingFocus == nil
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.20)) {
+                            goalsStage = .goalSelection
+                        }
+                    }
 
-                personalizedOffersFooter
+                case .goalSelection:
+                    footerButton(
+                        title: "Continue",
+                        disabled:
+                            selectedGoal == nil ||
+                            interests.isEmpty
+                    ) {
+                        saveProfileData()
+                        step = .connections
+                    }
+
+                    personalizedOffersFooter
+                }
 
             case .connections:
                 switch connectionStage {
@@ -2196,7 +2168,7 @@ struct OnboardingFlowView: View {
             return
 
         case .username:
-            skipUsernameStep()
+            return
 
         case .goals:
             saveProfileData()
@@ -2216,47 +2188,28 @@ struct OnboardingFlowView: View {
         }
     }
 
-    private func skipUsernameStep() {
-        skipInProgress = true
-        usernameClaimError = nil
-
-        Task {
-            defer { skipInProgress = false }
-
-            if !session.profile.username.isEmpty {
-                step = .goals
-                return
-            }
-
-            var candidates = usernameSuggestions
-            if candidates.isEmpty {
-                candidates = await usernameService.suggestions(
-                    for: session.usernameSeed
-                )
-            }
-
-            for candidate in candidates {
-                do {
-                    try await usernameService.claim(candidate)
-                    username = candidate
-                    session.setPendingUsername(candidate)
-                    step = .goals
-                    return
-                } catch {
-                    continue
-                }
-            }
-
-            usernameClaimError =
-                "ATHLTH couldn't create a username automatically. Choose one to continue."
-            await loadUsernameSuggestions()
-        }
-    }
-
     private func goBack() {
         if step == .connections, connectionStage == .appleHealth {
             connectionStage = .device
             return
+        }
+
+        if step == .goals {
+            if goalsStage == .goalSelection,
+               selectedGoalFocus != nil {
+                withAnimation(.easeInOut(duration: 0.20)) {
+                    selectedGoalFocus = nil
+                    selectedGoal = nil
+                }
+                return
+            }
+
+            if goalsStage == .goalSelection {
+                withAnimation(.easeInOut(duration: 0.20)) {
+                    goalsStage = .trainingStyle
+                }
+                return
+            }
         }
 
         guard let previous = OnboardingStep(rawValue: step.rawValue - 1) else { return }
