@@ -74,6 +74,36 @@ enum MeasurementPreference: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum TimeFormatPreference: String, CaseIterable, Identifiable, Codable {
+    case twentyFourHour
+    case twelveHour
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .twentyFourHour: return "24-hour"
+        case .twelveHour: return "12-hour"
+        }
+    }
+
+    var example: String {
+        switch self {
+        case .twentyFourHour: return "21:45"
+        case .twelveHour: return "9:45 PM"
+        }
+    }
+
+    var locale: Locale {
+        switch self {
+        case .twentyFourHour:
+            return Locale(identifier: "en_GB")
+        case .twelveHour:
+            return Locale(identifier: "en_US")
+        }
+    }
+}
+
 enum AppAppearance: String, CaseIterable, Identifiable, Codable {
     case system
     case light
@@ -203,6 +233,7 @@ enum IntegrationKind: String, CaseIterable, Identifiable {
 final class AppSettingsStore: ObservableObject {
     @Published var language: AppLanguage { didSet { persist() } }
     @Published var measurementPreference: MeasurementPreference { didSet { persist() } }
+    @Published var timeFormatPreference: TimeFormatPreference { didSet { persist() } }
     @Published var appearance: AppAppearance { didSet { persist() } }
 
     @Published var profileVisibility: ProfileVisibility { didSet { persist() } }
@@ -250,6 +281,15 @@ final class AppSettingsStore: ObservableObject {
         // Keep the underlying types in place so localization/themes can expand later.
         language = .english
         measurementPreference = MeasurementPreference(rawValue: defaults.string(forKey: "settings.measurement") ?? "") ?? .metric
+        timeFormatPreference =
+            TimeFormatPreference(
+                rawValue: defaults.string(
+                    forKey: "settings.timeFormat"
+                ) ?? ""
+            )
+            ?? (measurementPreference == .metric
+                ? .twentyFourHour
+                : .twelveHour)
         appearance = .light
 
         profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .privateOnly
@@ -345,6 +385,7 @@ final class AppSettingsStore: ObservableObject {
 
         defaults.set(language.rawValue, forKey: "settings.language")
         defaults.set(measurementPreference.rawValue, forKey: "settings.measurement")
+        defaults.set(timeFormatPreference.rawValue, forKey: "settings.timeFormat")
         defaults.set(appearance.rawValue, forKey: "settings.appearance")
 
         defaults.set(profileVisibility.rawValue, forKey: "settings.profileVisibility")
