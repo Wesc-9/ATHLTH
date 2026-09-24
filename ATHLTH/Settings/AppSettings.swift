@@ -252,8 +252,8 @@ final class AppSettingsStore: ObservableObject {
         measurementPreference = MeasurementPreference(rawValue: defaults.string(forKey: "settings.measurement") ?? "") ?? .metric
         appearance = .light
 
-        profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .friends
-        defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .friends
+        profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .privateOnly
+        defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .privateOnly
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? false
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
 
@@ -312,10 +312,13 @@ final class AppSettingsStore: ObservableObject {
         challengeNotificationsEnabled = defaults.object(forKey: "settings.challengeNotifications") as? Bool ?? true
         messageNotificationsEnabled = defaults.object(forKey: "settings.messageNotifications") as? Bool ?? true
 
-        spotifyAutoplayLinkedPlaylists = defaults.object(forKey: "settings.spotifyAutoplayLinkedPlaylists") as? Bool ?? true
+        spotifyAutoplayLinkedPlaylists = false
         watchConnected = defaults.object(forKey: "settings.watchConnected") as? Bool ?? false
-        spotifyConnected = defaults.object(forKey: "settings.spotifyConnected") as? Bool ?? false
+        spotifyConnected = false
         homeAssistantConnected = defaults.object(forKey: "settings.homeAssistantConnected") as? Bool ?? false
+
+        defaults.set(false, forKey: "settings.spotifyAutoplayLinkedPlaylists")
+        defaults.set(false, forKey: "settings.spotifyConnected")
 
         isInitializing = false
     }
