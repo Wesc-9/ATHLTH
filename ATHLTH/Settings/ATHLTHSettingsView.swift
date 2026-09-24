@@ -189,22 +189,6 @@ struct ATHLTHSettingsView: View {
                     settingsSection("Profile") {
                         PremiumSettingsCard {
                             NavigationLink {
-                                ATHLTHEditProfileView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "person.crop.circle",
-                                    title: "Edit Profile",
-                                    subtitle: "Photo, display name, username and bio"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
                                 PersonalHealthProfileView()
                             } label: {
                                 PremiumSettingsRow(
@@ -254,24 +238,34 @@ struct ATHLTHSettingsView: View {
 
                             SettingsDivider()
 
-                            PremiumSettingsRow(
-                                icon: healthSyncHasIssue
-                                    ? "exclamationmark.triangle"
-                                    : "arrow.triangle.2.circlepath",
-                                iconTint: healthSyncHasIssue
-                                    ? .orange
-                                    : ATHLTHTheme.accentDeep,
-                                title: "Sync status",
-                                subtitle: healthSyncStatusText
-                            ) {
-                                Text(healthSyncStateTitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(
-                                        healthSyncHasIssue
-                                            ? Color.orange
-                                            : ATHLTHTheme.mutedText
+                            Button {
+                                runHealthSync()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: healthSyncHasIssue
+                                        ? "exclamationmark.triangle"
+                                        : health.hasReadableHealthData
+                                            ? "checkmark.circle"
+                                            : "arrow.triangle.2.circlepath",
+                                    iconTint: healthSyncHasIssue
+                                        ? .orange
+                                        : ATHLTHTheme.accentDeep,
+                                    title: "Sync status",
+                                    subtitle: healthSyncStatusText
+                                ) {
+                                    connectionTrailing(
+                                        health.isRefreshing
+                                            ? "Syncing"
+                                            : health.hasRequestedAuthorization
+                                                ? "Sync now"
+                                                : "Connect",
+                                        showChevron: false,
+                                        loading: health.isRefreshing || healthRequestInProgress
                                     )
+                                }
                             }
+                            .buttonStyle(.plain)
+                            .disabled(health.isRefreshing || healthRequestInProgress)
                         }
                     }
 
@@ -528,6 +522,16 @@ struct ATHLTHSettingsView: View {
         }
         .task {
             await notifications.refreshAuthorizationStatus()
+
+            if health.hasRequestedAuthorization,
+               health.lastSuccessfulRefreshAt == nil,
+               !health.isRefreshing {
+                health.resumeUserInitiatedHealthSync()
+                await health.configureBackgroundSync(
+                    allowed: settings.backgroundHealthSyncEnabled
+                )
+                await health.refreshAll()
+            }
         }
     }
 
@@ -658,41 +662,63 @@ struct ATHLTHSettingsView: View {
     }
 
     private var healthSyncHasIssue: Bool {
-        guard session.canAccess(.backgroundHealthSync),
-              settings.backgroundHealthSyncEnabled
-        else {
+        guard settings.backgroundHealthSyncEnabled else {
             return false
         }
         return !(health.backgroundSyncError?.isEmpty ?? true)
     }
 
     private var healthSyncStateTitle: String {
-        guard session.canAccess(.backgroundHealthSync),
-              settings.backgroundHealthSyncEnabled
-        else {
+        guard settings.backgroundHealthSyncEnabled else {
             return "Off"
         }
-        return healthSyncHasIssue ? "Issue" : "Active"
+        if health.isRefreshing {
+            return "Syncing"
+        }
+        if !health.hasRequestedAuthorization {
+            return "Not connected"
+        }
+        if healthSyncHasIssue {
+            return "Issue"
+        }
+        if health.lastSuccessfulRefreshAt != nil && !health.hasReadableHealthData {
+            return "No data"
+        }
+        return health.lastSuccessfulRefreshAt != nil ? "Synced" : "Ready"
     }
 
     private var healthSyncStatusText: String {
-        guard settings.backgroundHealthSyncEnabled else {
-            return "Background sync is turned off."
+        if health.isRefreshing {
+            return "Reading workouts, activity, sleep, heart data and profile values from Apple Health."
         }
 
         if let error = health.backgroundSyncError, !error.isEmpty {
             return "Background sync needs attention: \(error)"
         }
 
+        if let error = health.authorizationError, !error.isEmpty {
+            return "Apple Health read needs attention: \(error)"
+        }
+
+        guard health.hasRequestedAuthorization else {
+            return "Apple Health is not connected yet. Tap here to connect."
+        }
+
         if let lastRefresh = health.lastSuccessfulRefreshAt {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .full
-            return "Last synced " + formatter.localizedString(for: lastRefresh, relativeTo: Date())
+            let relative = formatter.localizedString(for: lastRefresh, relativeTo: Date())
+
+            if health.hasReadableHealthData {
+                return "Apple Health data imported successfully. Last synced \(relative)."
+            }
+
+            return "Apple Health responded, but ATHLTH found no readable compatible data. Check that ATHLTH has read access in Apple Health, then tap Sync now."
         }
 
-        return health.hasRequestedAuthorization
-            ? "Waiting for the first Apple Health refresh."
-            : "Apple Health is not configured."
+        return settings.backgroundHealthSyncEnabled
+            ? "Apple Health is configured. Tap Sync now to perform the first full import."
+            : "Apple Health is configured. Background sync is off, but you can still tap Sync now."
     }
 
     private var backgroundHealthSyncBinding: Binding<Bool> {
@@ -739,20 +765,35 @@ struct ATHLTHSettingsView: View {
 
     private func handleAppleHealthTap() {
         if health.hasRequestedAuthorization {
-            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                openURL(settingsURL)
-            }
+            runHealthSync()
             return
         }
 
         Task {
             healthRequestInProgress = true
             await health.requestAuthorization()
+            await health.completeAuthorizationSetup()
             await health.configureBackgroundSync(
-                allowed:
-                    session.canAccess(.backgroundHealthSync) &&
-                    settings.backgroundHealthSyncEnabled
+                allowed: settings.backgroundHealthSyncEnabled
             )
+            await health.refreshAll()
+            healthRequestInProgress = false
+        }
+    }
+
+    private func runHealthSync() {
+        guard health.hasRequestedAuthorization else {
+            handleAppleHealthTap()
+            return
+        }
+
+        Task {
+            healthRequestInProgress = true
+            health.resumeUserInitiatedHealthSync()
+            await health.configureBackgroundSync(
+                allowed: settings.backgroundHealthSyncEnabled
+            )
+            await health.refreshAll()
             healthRequestInProgress = false
         }
     }
