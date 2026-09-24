@@ -140,33 +140,6 @@ struct WorkoutStartOptionsView: View {
                         )
                     }
 
-                    if let playlist = linkedSpotifyPlaylist {
-                        ATHLTHCard {
-                            HStack(spacing: 12) {
-                                Image(systemName: "music.note")
-                                    .font(.title2)
-                                    .foregroundStyle(ATHLTHTheme.accent)
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Spotify")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                    Text(playlist.name)
-                                        .font(.headline)
-                                    Text(
-                                        spotifyAutoplayEnabled
-                                            ? "Starts automatically with this workout."
-                                            : "Linked to the plan, but autoplay is off."
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-                            }
-                        }
-                    }
-
                     ATHLTHCard {
                         Label(deviceInfoTitle, systemImage: "checkmark.shield.fill")
                             .font(.headline)
