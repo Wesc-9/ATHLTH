@@ -20,12 +20,26 @@ enum WatchWorkoutKind: String, Codable, CaseIterable, Hashable {
     case running
     case walking
     case strength
+    case hiit
+    case functional
+    case cycling
+    case rowing
+    case stairClimbing
+    case yoga
+    case other
 
     var title: String {
         switch self {
         case .running: return "Run"
         case .walking: return "Walk"
         case .strength: return "Strength"
+        case .hiit: return "HIIT"
+        case .functional: return "Functional"
+        case .cycling: return "Cycling"
+        case .rowing: return "Rowing"
+        case .stairClimbing: return "Stairs"
+        case .yoga: return "Yoga"
+        case .other: return "Workout"
         }
     }
 
@@ -34,6 +48,31 @@ enum WatchWorkoutKind: String, Codable, CaseIterable, Hashable {
         case .running: return "figure.run"
         case .walking: return "figure.walk"
         case .strength: return "dumbbell.fill"
+        case .hiit: return "figure.highintensity.intervaltraining"
+        case .functional: return "figure.cross.training"
+        case .cycling: return "figure.outdoor.cycle"
+        case .rowing: return "figure.rower"
+        case .stairClimbing: return "figure.stair.stepper"
+        case .yoga: return "figure.yoga"
+        case .other: return "figure.mixed.cardio"
+        }
+    }
+
+    var usesOutdoorLocation: Bool {
+        switch self {
+        case .running, .walking, .cycling:
+            return true
+        case .strength, .hiit, .functional, .rowing, .stairClimbing, .yoga, .other:
+            return false
+        }
+    }
+
+    var supportsDistanceMetric: Bool {
+        switch self {
+        case .running, .walking, .cycling:
+            return true
+        case .strength, .hiit, .functional, .rowing, .stairClimbing, .yoga, .other:
+            return false
         }
     }
 }
