@@ -7,6 +7,7 @@ struct ATHLTHProfileSetupView: View {
     @EnvironmentObject private var social: SocialStore
 
     @State private var selectedFocus: TrainingFocus?
+    @State private var trainingFocusVisibility: ProfileVisibility = .privateOnly
     @State private var trainingStatusVisibility: ProfileVisibility = .privateOnly
     @State private var performanceVisibility: ProfileVisibility = .privateOnly
     @State private var trophyVisibility: ProfileVisibility = .privateOnly
@@ -93,6 +94,12 @@ struct ATHLTHProfileSetupView: View {
             }
 
             Section {
+                visibilityRow(
+                    "Training focus",
+                    icon: "bolt.heart.fill",
+                    selection: $trainingFocusVisibility
+                )
+
                 visibilityRow(
                     "Training status",
                     icon: "figure.run",
@@ -266,6 +273,7 @@ struct ATHLTHProfileSetupView: View {
 
     private func loadSharingSettings() {
         guard let privacy = social.privacy else {
+            trainingFocusVisibility = .privateOnly
             trainingStatusVisibility = .privateOnly
             performanceVisibility = .privateOnly
             trophyVisibility = .privateOnly
@@ -276,6 +284,9 @@ struct ATHLTHProfileSetupView: View {
             return
         }
 
+        trainingFocusVisibility =
+            ProfileVisibility(rawValue: privacy.trainingFocusVisibility)
+            ?? .privateOnly
         trainingStatusVisibility =
             ProfileVisibility(rawValue: privacy.trainingPresenceVisibility)
             ?? .privateOnly
@@ -301,6 +312,7 @@ struct ATHLTHProfileSetupView: View {
 
     private var broadestProfileVisibility: ProfileVisibility {
         let values = [
+            trainingFocusVisibility,
             trainingStatusVisibility,
             performanceVisibility,
             trophyVisibility,
@@ -328,10 +340,17 @@ struct ATHLTHProfileSetupView: View {
         defer { saving = false }
 
         session.setTrainingFocus(selectedFocus)
+        await social.syncOwnTrainingFocus(selectedFocus)
+
+        if let message = social.errorMessage, !message.isEmpty {
+            errorMessage = message
+            return
+        }
 
         var privacy = social.privacy
             ?? SocialPrivacySettings.fallback(userID: session.profile.userID)
 
+        privacy.trainingFocusVisibility = trainingFocusVisibility.rawValue
         privacy.trainingPresenceVisibility = trainingStatusVisibility.rawValue
         privacy.performanceStatsVisibility = performanceVisibility.rawValue
         privacy.trophyCabinetVisibility = trophyVisibility.rawValue
@@ -360,6 +379,8 @@ struct ATHLTHProfileSetupView: View {
             performanceVisibility != .privateOnly
 
         privacy.profileVisibility = broadestProfileVisibility.rawValue
+        privacy.discoverable =
+            broadestProfileVisibility == .publicProfile
 
         await social.updatePrivacy(privacy)
 
@@ -369,6 +390,7 @@ struct ATHLTHProfileSetupView: View {
         }
 
         settings.profileVisibility = broadestProfileVisibility
+        settings.defaultActivityVisibility = .privateOnly
         settings.shareTrainingPresence =
             trainingStatusVisibility != .privateOnly
         settings.markProfileSetupCompleted()
