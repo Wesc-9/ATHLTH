@@ -195,6 +195,7 @@ final class ATHLTHAppDelegate: NSObject,
             [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        HealthKitManager.shared.prepareBackgroundObserversAtLaunch()
 
         // APNs registration is independent from alert permission. The user
         // still controls alert/sound/badge permission in ATHLTH Settings/iOS.
