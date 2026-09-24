@@ -154,8 +154,12 @@ struct ATHLTHTabHero: View {
                         height: proxy.size.height,
                         alignment: alignment
                     )
-                    .scaleEffect(1.08)
-                    .offset(x: focalOffsetX)
+                    .scaleEffect(proxy.size.width >= 700 ? 1.03 : 1.08)
+                    .offset(
+                        x: proxy.size.width >= 700
+                            ? focalOffsetX * 0.4
+                            : focalOffsetX
+                    )
                     .clipped()
 
                 LinearGradient(
@@ -208,7 +212,7 @@ struct ATHLTHTabHero: View {
                 .padding(.top, 48)
                 .padding(.bottom, 16)
                 .frame(
-                    maxWidth: proxy.size.width * 0.74,
+                    maxWidth: min(proxy.size.width * 0.74, 560),
                     maxHeight: .infinity,
                     alignment: .leading
                 )
