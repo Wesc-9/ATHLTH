@@ -800,6 +800,7 @@ struct ATHLTHSettingsView: View {
                 allowed: settings.backgroundHealthSyncEnabled
             )
             await health.refreshAll()
+            syncHealthProfileFromAppleHealthIfAppropriate()
             healthRequestInProgress = false
         }
     }
@@ -817,8 +818,22 @@ struct ATHLTHSettingsView: View {
                 allowed: settings.backgroundHealthSyncEnabled
             )
             await health.refreshAll()
+            syncHealthProfileFromAppleHealthIfAppropriate()
             healthRequestInProgress = false
         }
+    }
+
+    private func syncHealthProfileFromAppleHealthIfAppropriate() {
+        guard session.onboardingProfile?.personalDetailsSource != .manual,
+              health.personalDetails.hasAnyValue
+        else {
+            return
+        }
+
+        session.updatePersonalDetails(
+            health.personalDetails,
+            source: .appleHealth
+        )
     }
 
     private var appVersion: String {
