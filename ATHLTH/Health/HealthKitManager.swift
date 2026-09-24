@@ -561,13 +561,16 @@ final class HealthKitManager: ObservableObject {
             averageDailySteps: current.averageDailySteps,
             averageSleepDuration: current.averageSleepDuration,
             trainingDuration: current.trainingDuration,
+            workoutDistanceMeters: current.workoutDistanceMeters,
             activeWorkoutDays: current.activeWorkoutDays,
             buckets: current.buckets,
             previousWorkoutCount: previous.workoutCount,
             previousTotalSteps: previous.totalSteps,
             previousAverageDailySteps: previous.averageDailySteps,
             previousAverageSleepDuration: previous.averageSleepDuration,
-            previousTrainingDuration: previous.trainingDuration
+            previousTrainingDuration: previous.trainingDuration,
+            previousWorkoutDistanceMeters:
+                previous.workoutDistanceMeters
         )
     }
 
@@ -2045,6 +2048,7 @@ final class HealthKitManager: ObservableObject {
         let averageDailySteps: Double?
         let averageSleepDuration: TimeInterval?
         let trainingDuration: TimeInterval
+        let workoutDistanceMeters: Double
         let activeWorkoutDays: [Date]
         let buckets: [HealthProgressBucket]
     }
@@ -2075,6 +2079,13 @@ final class HealthKitManager: ObservableObject {
 
         let calendar = Calendar.current
         let totalTrainingDuration = workouts.reduce(0) { $0 + $1.duration }
+        let totalWorkoutDistance = workouts.reduce(0) { partial, workout in
+            partial +
+                (Self.safeDoubleValue(
+                    workout.totalDistance,
+                    unit: .meter()
+                ) ?? 0)
+        }
         let totalSteps = stepsByDay.isEmpty ? nil : stepsByDay.values.reduce(0, +)
         let averageSteps = average(Array(stepsByDay.values))
         let averageSleep = average(Array(sleepByDay.values))
@@ -2089,6 +2100,7 @@ final class HealthKitManager: ObservableObject {
             averageDailySteps: averageSteps,
             averageSleepDuration: averageSleep,
             trainingDuration: totalTrainingDuration,
+            workoutDistanceMeters: totalWorkoutDistance,
             activeWorkoutDays: activeWorkoutDays,
             buckets: makeProgressBuckets(
                 startDate: startDate,
@@ -2574,7 +2586,16 @@ final class HealthKitManager: ObservableObject {
                     workoutCount: bucketWorkouts.count,
                     averageDailySteps: average(stepValues),
                     averageSleepDuration: average(sleepValues),
-                    trainingDuration: bucketWorkouts.reduce(0) { $0 + $1.duration }
+                    trainingDuration:
+                        bucketWorkouts.reduce(0) { $0 + $1.duration },
+                    workoutDistanceMeters:
+                        bucketWorkouts.reduce(0) { partial, workout in
+                            partial +
+                                (Self.safeDoubleValue(
+                                    workout.totalDistance,
+                                    unit: .meter()
+                                ) ?? 0)
+                        }
                 )
             )
 
