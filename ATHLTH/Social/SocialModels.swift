@@ -376,6 +376,7 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
     let entityID: UUID?
     let createdAt: Date
     let readAt: Date?
+    let pushNotifiedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -387,6 +388,7 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
         case entityID = "entity_id"
         case createdAt = "created_at"
         case readAt = "read_at"
+        case pushNotifiedAt = "push_notified_at"
     }
 }
 
