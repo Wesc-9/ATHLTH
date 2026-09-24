@@ -571,6 +571,122 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    func recoveryTrendSnapshot(
+        days: Int = 14
+    ) async -> RecoveryTrendSnapshot {
+        let calendar = Calendar.current
+        let resolvedDays = min(max(days, 7), 14)
+        let today = calendar.startOfDay(for: Date())
+        let trendStart = calendar.date(
+            byAdding: .day,
+            value: -(resolvedDays - 1),
+            to: today
+        ) ?? today.addingTimeInterval(
+            -Double(resolvedDays - 1) * 86_400
+        )
+        let now = Date()
+
+        let chronicStart = calendar.date(
+            byAdding: .day,
+            value: -27,
+            to: today
+        ) ?? today.addingTimeInterval(-27 * 86_400)
+
+        async let sleepTask = sleepDurationsByWakeDay(
+            startDate: trendStart,
+            endDate: now
+        )
+        async let hrvTask = dailyAverageQuantities(
+            identifier: .heartRateVariabilitySDNN,
+            unit: .secondUnit(with: .milli),
+            startDate: trendStart,
+            endDate: now
+        )
+        async let restingTask = dailyAverageQuantities(
+            identifier: .restingHeartRate,
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            startDate: trendStart,
+            endDate: now
+        )
+        async let trendWorkoutsTask = fetchWorkouts(
+            startDate: trendStart,
+            endDate: now
+        )
+        async let chronicWorkoutsTask = fetchWorkouts(
+            startDate: chronicStart,
+            endDate: now
+        )
+
+        let sleepByDay = (try? await sleepTask) ?? [:]
+        let hrvByDay = (try? await hrvTask) ?? [:]
+        let restingByDay = (try? await restingTask) ?? [:]
+        let trendWorkouts = (try? await trendWorkoutsTask) ?? []
+        let chronicWorkouts = (try? await chronicWorkoutsTask) ?? []
+
+        var trainingMinutesByDay: [Date: Double] = [:]
+
+        for workout in trendWorkouts {
+            let day = calendar.startOfDay(
+                for: workout.startDate
+            )
+            trainingMinutesByDay[day, default: 0] +=
+                workout.duration / 60
+        }
+
+        let trendDays: [RecoveryTrendDay] =
+            (0..<resolvedDays).compactMap { offset in
+                guard let day = calendar.date(
+                    byAdding: .day,
+                    value: offset,
+                    to: trendStart
+                ) else {
+                    return nil
+                }
+
+                let normalizedDay = calendar.startOfDay(for: day)
+
+                return RecoveryTrendDay(
+                    date: normalizedDay,
+                    sleepDuration: sleepByDay[normalizedDay],
+                    hrvMilliseconds: hrvByDay[normalizedDay],
+                    restingHeartRate:
+                        restingByDay[normalizedDay],
+                    trainingMinutes:
+                        trainingMinutesByDay[normalizedDay] ?? 0
+                )
+            }
+
+        let acuteStart = calendar.date(
+            byAdding: .day,
+            value: -6,
+            to: today
+        ) ?? today.addingTimeInterval(-6 * 86_400)
+
+        let acuteMinutes = chronicWorkouts
+            .filter { $0.startDate >= acuteStart }
+            .reduce(0) {
+                $0 + ($1.duration / 60)
+            }
+
+        let chronicMinutes = chronicWorkouts.reduce(0) {
+            $0 + ($1.duration / 60)
+        }
+
+        let chronicWeeklyAverage =
+            chronicMinutes > 0
+                ? chronicMinutes / 4
+                : nil
+
+        return RecoveryTrendSnapshot(
+            days: trendDays,
+            trainingLoad: RecoveryTrainingLoadSummary(
+                acuteMinutes: acuteMinutes,
+                chronicWeeklyAverageMinutes:
+                    chronicWeeklyAverage
+            )
+        )
+    }
+
     func trophySnapshot() async throws -> TrophyHealthSnapshot {
         let workouts = try await fetchAllWorkouts()
             .sorted { $0.startDate < $1.startDate }
