@@ -29,7 +29,7 @@ struct MirroredWorkoutLiveView: View {
                                 icon: "flame.fill"
                             )
 
-                            if snapshot.kind != .strength {
+                            if snapshot.kind.supportsDistanceMetric {
                                 metricCard(
                                     title: "Distance",
                                     value: String(
