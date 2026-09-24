@@ -3187,6 +3187,12 @@ struct ATHLTHTrainView: View {
 struct ATHLTHRecoveryView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+
+    @StateObject private var sorenessStore = RecoverySorenessStore()
+    @State private var recoverySnapshot = RecoveryTrendSnapshot.empty
+    @State private var showingSorenessLog = false
+    @State private var selectedRecoveryTool: RecoveryTool?
 
     var body: some View {
         NavigationStack {
@@ -3206,12 +3212,44 @@ struct ATHLTHRecoveryView: View {
                 VStack(spacing: 16) {
                         if shouldShowWearableRecoveryContent {
                             recoveryScoreCard
-                            todaysSignalsCard
+
+                            RecoveryReadinessBreakdownCard(
+                                recovery: health.recovery,
+                                sleep: health.sleep,
+                                heart: health.heart
+                            )
+
+                            RecoveryTrendsCard(
+                                snapshot: recoverySnapshot,
+                                sleep: health.sleep
+                            )
+
                             todaysGuidanceCard
+
+                            MuscleRecoveryCard(
+                                statuses: muscleRecoveryStatuses
+                            ) {
+                                showingSorenessLog = true
+                            }
+
+                            RecoveryToolsCard { tool in
+                                selectedRecoveryTool = tool
+                            }
+
                             baselineCard
                             recoveryMethodCard
                         } else {
                             recoveryUnavailableCard
+
+                            MuscleRecoveryCard(
+                                statuses: muscleRecoveryStatuses
+                            ) {
+                                showingSorenessLog = true
+                            }
+
+                            RecoveryToolsCard { tool in
+                                selectedRecoveryTool = tool
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -3222,6 +3260,20 @@ struct ATHLTHRecoveryView: View {
             }
             .refreshable {
                 await health.refreshAll()
+                recoverySnapshot =
+                    await health.recoveryTrendSnapshot()
+            }
+            .task {
+                recoverySnapshot =
+                    await health.recoveryTrendSnapshot()
+            }
+            .sheet(isPresented: $showingSorenessLog) {
+                RecoverySorenessLogView(
+                    store: sorenessStore
+                )
+            }
+            .sheet(item: $selectedRecoveryTool) { tool in
+                RecoveryGuidedToolView(tool: tool)
             }
             .toolbar(.hidden, for: .navigationBar)
         }
