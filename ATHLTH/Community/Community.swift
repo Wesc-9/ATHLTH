@@ -488,6 +488,14 @@ struct ATHLTHCommunityView: View {
         }
     }
 
+
+    private var friendsActivity: [SocialFeedItem] {
+        let friendIDs = Set(social.friends.map(\.userID))
+        return social.feed.filter {
+            friendIDs.contains($0.actor.userID)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
@@ -848,14 +856,14 @@ struct ATHLTHCommunityView: View {
                 }
             }
 
-            if social.feed.isEmpty {
+            if friendsActivity.isEmpty {
                 Text("Friend activity will appear here when people choose to share it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 12)
             } else {
                 VStack(spacing: 10) {
-                    ForEach(Array(social.feed.prefix(3))) { item in
+                    ForEach(Array(friendsActivity.prefix(3))) { item in
                         CommunityFeedPreviewRow(item: item)
                     }
                 }
