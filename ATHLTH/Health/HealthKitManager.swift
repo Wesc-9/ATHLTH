@@ -481,6 +481,16 @@ final class HealthKitManager: ObservableObject {
             ])
             try await builder.endCollection(at: endDate)
             let workout = try await builder.finishWorkout()
+
+            if let workout {
+                workoutObjects[workout.uuid] = workout
+
+                let summary = WorkoutSummary(workout: workout)
+                workouts.removeAll { $0.id == summary.id }
+                workouts.append(summary)
+                workouts.sort { $0.startDate > $1.startDate }
+            }
+
             return workout?.uuid
         } catch {
             authorizationError =
