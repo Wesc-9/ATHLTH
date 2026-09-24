@@ -981,16 +981,23 @@ struct ATHLTHPrivacyCenterView: View {
                 NavigationLink {
                     SocialPrivacySettingsView()
                 } label: {
-                    LabeledContent("Social profile", value: profileVisibilityTitle)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label(
+                            "Social & Messages",
+                            systemImage: "person.2.badge.gearshape"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Text(
+                            "\(profileVisibilityTitle) profile · \(messagePrivacyTitle)"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 3)
                 }
 
-                NavigationLink {
-                    SocialPrivacySettingsView()
-                } label: {
-                    LabeledContent("Message requests", value: messagePrivacyTitle)
-                }
-
-                Text("Profile visibility, discoverability, friend requests, message requests and “Training now” presence are synced to your ATHLTH account.")
+                Text("Profile visibility, discoverability, friend requests, message requests and “Training now” presence are managed together and synced to your ATHLTH account.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
