@@ -10,6 +10,7 @@ final class AppSessionStore: ObservableObject {
     }
     @Published private(set) var planTemplates: [TrainingPlan]
     @Published private(set) var savedWorkoutTemplates: [PlannedSession]
+    @Published private(set) var manuallyCompletedPlanSessions: Set<String>
     @Published var savedRoutes: [TrainingRoute] {
         didSet {
             persistSavedRoutes()
@@ -42,6 +43,8 @@ final class AppSessionStore: ObservableObject {
         self.activePlan = activePlan ?? Self.loadActivePlan(from: defaults)
         self.planTemplates = Self.loadPlanTemplates(from: defaults)
         self.savedWorkoutTemplates = Self.loadSavedWorkoutTemplates(from: defaults)
+        self.manuallyCompletedPlanSessions =
+            Self.loadManuallyCompletedPlanSessions(from: defaults)
         self.savedRoutes = savedRoutes.isEmpty
             ? Self.loadSavedRoutes(from: defaults)
             : savedRoutes
@@ -390,12 +393,14 @@ final class AppSessionStore: ObservableObject {
         savedRoutes = []
         planTemplates = []
         savedWorkoutTemplates = []
+        manuallyCompletedPlanSessions = []
         previewModeEnabled = false
         usernameSeed = profile.displayName
         defaults.removeObject(forKey: "session.activeTrainingPlan")
         defaults.removeObject(forKey: "session.savedRoutes")
         defaults.removeObject(forKey: "session.trainingPlanTemplates")
         defaults.removeObject(forKey: "session.savedWorkoutTemplates")
+        defaults.removeObject(forKey: "session.manuallyCompletedPlanSessions")
     }
 
     func resetAuthenticationState() {
@@ -417,6 +422,53 @@ final class AppSessionStore: ObservableObject {
         backendSubscriptionAccess = .free
         storeEntitlement = nil
         subscriptionAccess = .free
+    }
+
+    func isPlanSessionManuallyCompleted(
+        planID: UUID,
+        sessionID: UUID
+    ) -> Bool {
+        manuallyCompletedPlanSessions.contains(
+            Self.manualCompletionKey(
+                planID: planID,
+                sessionID: sessionID
+            )
+        )
+    }
+
+    func setPlanSessionManuallyCompleted(
+        planID: UUID,
+        sessionID: UUID,
+        completed: Bool
+    ) {
+        let key = Self.manualCompletionKey(
+            planID: planID,
+            sessionID: sessionID
+        )
+
+        if completed {
+            manuallyCompletedPlanSessions.insert(key)
+        } else {
+            manuallyCompletedPlanSessions.remove(key)
+        }
+
+        persistManuallyCompletedPlanSessions()
+    }
+
+    func togglePlanSessionManualCompletion(
+        planID: UUID,
+        sessionID: UUID
+    ) {
+        let completed = isPlanSessionManuallyCompleted(
+            planID: planID,
+            sessionID: sessionID
+        )
+
+        setPlanSessionManuallyCompleted(
+            planID: planID,
+            sessionID: sessionID,
+            completed: !completed
+        )
     }
 
     func beginTrainingStatus(for session: PlannedSession) {
@@ -1002,6 +1054,40 @@ final class AppSessionStore: ObservableObject {
         }
 
         defaults.set(data, forKey: "session.trainingPlanTemplates")
+    }
+
+    private func persistManuallyCompletedPlanSessions() {
+        let values = Array(manuallyCompletedPlanSessions).sorted()
+
+        guard let data = try? JSONEncoder().encode(values) else {
+            return
+        }
+
+        defaults.set(
+            data,
+            forKey: "session.manuallyCompletedPlanSessions"
+        )
+    }
+
+    private static func loadManuallyCompletedPlanSessions(
+        from defaults: UserDefaults
+    ) -> Set<String> {
+        guard let data = defaults.data(
+            forKey: "session.manuallyCompletedPlanSessions"
+        ),
+        let values = try? JSONDecoder().decode([String].self, from: data)
+        else {
+            return []
+        }
+
+        return Set(values)
+    }
+
+    private static func manualCompletionKey(
+        planID: UUID,
+        sessionID: UUID
+    ) -> String {
+        "\(planID.uuidString.lowercased())|\(sessionID.uuidString.lowercased())"
     }
 
     private func persistSavedWorkoutTemplates() {
