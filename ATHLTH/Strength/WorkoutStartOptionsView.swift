@@ -65,42 +65,44 @@ struct WorkoutStartOptionsView: View {
                             .padding(.top, 4)
                     }
 
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Workout device")
+                    if trainingDeviceProvider != .none {
+                        ATHLTHCard {
+                            ATHLTHSectionHeader(title: "Workout device")
 
-                        VStack(spacing: 10) {
-                            optionRow(
-                                title: "iPhone",
-                                subtitle: "Works without Apple Watch. Start and finish the workout in ATHLTH.",
-                                icon: "iphone",
-                                selected: captureDevice == .iPhone
-                            ) {
-                                captureDevice = .iPhone
-                            }
-
-                            if trainingDeviceProvider == .appleWatch {
+                            VStack(spacing: 10) {
                                 optionRow(
-                                    title: "Apple Watch",
-                                    subtitle: watchConnected
-                                        ? "Record the continuous workout on Apple Watch."
-                                        : "Finish Apple Watch setup in Settings to use this option.",
-                                    icon: "applewatch",
-                                    selected: captureDevice == .appleWatch,
-                                    disabled: !watchConnected
+                                    title: "iPhone",
+                                    subtitle: "Record and finish the workout directly in ATHLTH.",
+                                    icon: "iphone",
+                                    selected: captureDevice == .iPhone
                                 ) {
-                                    captureDevice = .appleWatch
+                                    captureDevice = .iPhone
                                 }
-                            } else if trainingDeviceProvider == .garmin {
-                                optionRow(
-                                    title: "Garmin",
-                                    subtitle: "Garmin sync is prepared, but workout authorization is pending Garmin approval. Use iPhone/manual capture for now.",
-                                    icon: "watch.analog",
-                                    selected: false,
-                                    disabled: true
-                                ) {}
+
+                                if trainingDeviceProvider == .appleWatch {
+                                    optionRow(
+                                        title: "Apple Watch",
+                                        subtitle: watchConnected
+                                            ? "Record the continuous workout on Apple Watch."
+                                            : "Finish Apple Watch setup in Settings to use this option.",
+                                        icon: "applewatch",
+                                        selected: captureDevice == .appleWatch,
+                                        disabled: !watchConnected
+                                    ) {
+                                        captureDevice = .appleWatch
+                                    }
+                                } else if trainingDeviceProvider == .garmin {
+                                    optionRow(
+                                        title: "Garmin",
+                                        subtitle: "Garmin setup will appear here when the integration is enabled.",
+                                        icon: "watch.analog",
+                                        selected: false,
+                                        disabled: true
+                                    ) {}
+                                }
                             }
+                            .padding(.top, 12)
                         }
-                        .padding(.top, 12)
                     }
 
                     ATHLTHCard {
@@ -134,15 +136,17 @@ struct WorkoutStartOptionsView: View {
                         )
                     }
 
-                    ATHLTHCard {
-                        Label(deviceInfoTitle, systemImage: "checkmark.shield.fill")
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.accent)
+                    if trainingDeviceProvider != .none {
+                        ATHLTHCard {
+                            Label(deviceInfoTitle, systemImage: "checkmark.shield.fill")
+                                .font(.headline)
+                                .foregroundStyle(ATHLTHTheme.accent)
 
-                        Text(deviceInfoDetail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 6)
+                            Text(deviceInfoDetail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 6)
+                        }
                     }
 
                     Button {
