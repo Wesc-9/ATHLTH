@@ -1238,7 +1238,9 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                                     Label(
                                         watchConnection.isReady
                                             ? "Open Apple Watch details"
-                                            : "Open setup",
+                                            : watchConnection.state == .appNotInstalled
+                                                ? "Install Watch app"
+                                                : "Open setup",
                                         systemImage: "applewatch"
                                     )
                                     .font(.subheadline.weight(.semibold))
