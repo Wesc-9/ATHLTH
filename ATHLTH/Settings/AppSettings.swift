@@ -259,6 +259,20 @@ final class AppSettingsStore: ObservableObject {
 
         profileSetupPromptDismissed = defaults.object(forKey: "settings.profileSetupPromptDismissed") as? Bool ?? false
         profileSetupCompleted = defaults.object(forKey: "settings.profileSetupCompleted") as? Bool ?? false
+
+        if !profileSetupCompleted {
+            profileVisibility = .privateOnly
+            defaultActivityVisibility = .privateOnly
+            defaults.set(
+                ProfileVisibility.privateOnly.rawValue,
+                forKey: "settings.profileVisibility"
+            )
+            defaults.set(
+                ProfileVisibility.privateOnly.rawValue,
+                forKey: "settings.defaultActivityVisibility"
+            )
+        }
+
         showTrainingFocusOnProfile = defaults.object(forKey: "settings.showTrainingFocusOnProfile") as? Bool ?? false
         showTrainingStatusOnProfile = defaults.object(forKey: "settings.showTrainingStatusOnProfile") as? Bool ?? false
         showCurrentGoalOnProfile = defaults.object(forKey: "settings.showCurrentGoalOnProfile") as? Bool ?? false
