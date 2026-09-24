@@ -374,12 +374,8 @@ struct PersonalHealthProfileView: View {
 
                 Button {
                     Task {
-                        if !health.hasRequestedAuthorization {
-                            await health.requestAuthorization()
-                            await health.completeAuthorizationSetup()
-                        } else {
-                            health.resumeUserInitiatedHealthSync()
-                        }
+                        await health.requestAuthorization()
+                        await health.completeAuthorizationSetup()
 
                         await health.configureBackgroundSync(
                             allowed: settings.backgroundHealthSyncEnabled
