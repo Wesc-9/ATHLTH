@@ -281,65 +281,164 @@ struct OnboardingFlowView: View {
 
     private var accountStep: some View {
         GeometryReader { proxy in
-            let usesTabletWidth = proxy.size.width >= 700
-            let foregroundWidth: CGFloat = usesTabletWidth ? 500 : 560
-            let spacerMinimum: CGFloat = usesTabletWidth ? 56 : 170
+            if proxy.size.width >= 700 {
+                iPadAccountStep(proxy: proxy)
+            } else {
+                iPhoneAccountStep(proxy: proxy)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
 
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.44),
-                        Color.black.opacity(0.10),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: UnitPoint(x: 0.5, y: 0.38)
-                )
-                .ignoresSafeArea()
+    @ViewBuilder
+    private func iPhoneAccountStep(
+        proxy: GeometryProxy
+    ) -> some View {
+        let foregroundWidth: CGFloat = 560
+        let spacerMinimum: CGFloat = 170
 
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        Color.black.opacity(0.06),
-                        Color.black.opacity(0.76)
-                    ],
-                    startPoint: UnitPoint(x: 0.5, y: 0.50),
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+        ZStack {
+            accountForegroundGradients
 
+            VStack(spacing: 0) {
+                accountBrand
+                    .padding(.top, 18)
+
+                Spacer(minLength: spacerMinimum)
+
+                accountSignInPanel
+
+                if let authenticationError {
+                    accountAuthenticationError(authenticationError)
+                }
+
+                accountLegal
+                    .padding(.top, 18)
+                    .padding(.bottom, 12)
+            }
+            .frame(maxWidth: foregroundWidth)
+            .padding(.horizontal, 24)
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func iPadAccountStep(
+        proxy: GeometryProxy
+    ) -> some View {
+        let compactHeight = proxy.size.height < 720
+        let contentWidth: CGFloat = min(
+            max(proxy.size.width * 0.48, 480),
+            560
+        )
+
+        ZStack {
+            accountForegroundGradients
+
+            // iPad gets its own foreground layout. The iPhone path above is
+            // intentionally left independent so future tablet fixes cannot
+            // alter the iPhone login screen.
+            ViewThatFits(in: .vertical) {
                 VStack(spacing: 0) {
                     accountBrand
-                        .padding(.top, usesTabletWidth ? 24 : 18)
+                        .padding(.top, compactHeight ? 10 : 24)
 
-                    Spacer(minLength: spacerMinimum)
+                    Spacer(minLength: compactHeight ? 24 : 52)
 
                     accountSignInPanel
 
                     if let authenticationError {
-                        Label(
-                            authenticationError,
-                            systemImage: "exclamationmark.circle.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 6)
-                        .padding(.top, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        accountAuthenticationError(authenticationError)
                     }
 
                     accountLegal
-                        .padding(.top, 18)
-                        .padding(.bottom, 12)
+                        .padding(.top, compactHeight ? 12 : 18)
                 }
-                .frame(maxWidth: foregroundWidth)
-                .padding(.horizontal, 24)
+                .frame(maxWidth: contentWidth)
+                .padding(.horizontal, 36)
+                .padding(
+                    .bottom,
+                    max(proxy.safeAreaInsets.bottom + 18, 24)
+                )
                 .frame(
                     width: proxy.size.width,
-                    height: proxy.size.height
+                    height: proxy.size.height,
+                    alignment: .center
                 )
+
+                ScrollView {
+                    VStack(spacing: 24) {
+                        accountBrand
+
+                        accountSignInPanel
+
+                        if let authenticationError {
+                            accountAuthenticationError(authenticationError)
+                        }
+
+                        accountLegal
+                    }
+                    .frame(maxWidth: contentWidth)
+                    .padding(.horizontal, 36)
+                    .padding(.top, max(proxy.safeAreaInsets.top + 18, 24))
+                    .padding(
+                        .bottom,
+                        max(proxy.safeAreaInsets.bottom + 24, 32)
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .scrollIndicators(.hidden)
             }
         }
+        .frame(
+            width: proxy.size.width,
+            height: proxy.size.height
+        )
+    }
+
+    @ViewBuilder
+    private var accountForegroundGradients: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.44),
+                    Color.black.opacity(0.10),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: UnitPoint(x: 0.5, y: 0.38)
+            )
+            .ignoresSafeArea()
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.06),
+                    Color.black.opacity(0.76)
+                ],
+                startPoint: UnitPoint(x: 0.5, y: 0.50),
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        }
+    }
+
+    @ViewBuilder
+    private func accountAuthenticationError(
+        _ authenticationError: String
+    ) -> some View {
+        Label(
+            authenticationError,
+            systemImage: "exclamationmark.circle.fill"
+        )
+        .font(.caption)
+        .foregroundStyle(.red)
+        .padding(.horizontal, 6)
+        .padding(.top, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var accountBrand: some View {
