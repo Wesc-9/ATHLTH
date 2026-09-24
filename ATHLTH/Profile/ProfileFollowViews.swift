@@ -44,33 +44,33 @@ struct ProfileFollowListView: View {
                 .listRowBackground(Color.clear)
             } else {
                 ForEach(profiles) { profile in
-                    NavigationLink {
-                        FriendProfileView(userID: profile.userID)
-                    } label: {
-                        HStack(spacing: 12) {
-                            SocialAvatar(profile: profile, size: 46)
+                    HStack(spacing: 10) {
+                        NavigationLink {
+                            FriendProfileView(userID: profile.userID)
+                        } label: {
+                            HStack(spacing: 12) {
+                                SocialAvatar(profile: profile, size: 46)
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(profile.resolvedName)
-                                    .font(.subheadline.weight(.semibold))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(profile.resolvedName)
+                                        .font(.subheadline.weight(.semibold))
 
-                                Text(profile.usernameLabel)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            if mode == .following {
-                                Button("Following") {
-                                    Task { await social.unfollow(profile.userID) }
+                                    Text(profile.usernameLabel)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
                             }
                         }
-                        .padding(.vertical, 3)
+
+                        if mode == .following {
+                            Button("Following") {
+                                Task { await social.unfollow(profile.userID) }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
                     }
+                    .padding(.vertical, 3)
                 }
             }
 
