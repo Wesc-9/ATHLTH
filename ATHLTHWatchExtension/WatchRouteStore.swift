@@ -108,6 +108,57 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
     }
 
+    private func handleWorkoutConfiguration(
+        _ payload: [String: Any]
+    ) -> Bool {
+        guard
+            let rawKind =
+                payload[WatchTransferMetadataKey.kind] as? String,
+            let kind = WatchTransferKind(rawValue: rawKind),
+            let data =
+                payload[WatchTransferMetadataKey.payload] as? Data
+        else {
+            return false
+        }
+
+        switch kind {
+        case .audioCoachConfiguration:
+            guard let configuration = try? JSONDecoder().decode(
+                WatchAudioCoachConfiguration.self,
+                from: data
+            ) else {
+                return false
+            }
+
+            DispatchQueue.main.async {
+                WatchWorkoutManager.shared
+                    .configureAudioCoach(configuration)
+            }
+            return true
+
+        case .runningWorkout:
+            guard let workout = try? JSONDecoder().decode(
+                WatchRunningWorkoutTransfer.self,
+                from: data
+            ) else {
+                return false
+            }
+
+            DispatchQueue.main.async {
+                WatchWorkoutManager.shared
+                    .configureRunningWorkout(workout)
+            }
+            return true
+
+        case .route,
+             .workoutResult,
+             .workoutCommand,
+             .connectivityProbe,
+             .connectivityAck:
+            return false
+        }
+    }
+
     private func handleWorkoutCommand(_ payload: [String: Any]) {
         guard
             payload[WatchTransferMetadataKey.kind] as? String
@@ -188,6 +239,10 @@ extension WatchRouteStore: WCSessionDelegate {
             return
         }
 
+        if handleWorkoutConfiguration(message) {
+            return
+        }
+
         handleWorkoutCommand(message)
     }
 
@@ -200,6 +255,11 @@ extension WatchRouteStore: WCSessionDelegate {
             return
         }
 
+        if handleWorkoutConfiguration(message) {
+            replyHandler([:])
+            return
+        }
+
         handleWorkoutCommand(message)
         replyHandler([:])
     }
@@ -209,6 +269,10 @@ extension WatchRouteStore: WCSessionDelegate {
         didReceiveUserInfo userInfo: [String: Any] = [:]
     ) {
         if handleConnectivityProbe(userInfo) {
+            return
+        }
+
+        if handleWorkoutConfiguration(userInfo) {
             return
         }
 
