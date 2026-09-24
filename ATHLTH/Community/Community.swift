@@ -467,7 +467,7 @@ struct ATHLTHCommunityView: View {
         ) ?? .distantPast
         let friendIDs = Set(social.friends.map(\.userID))
 
-        return Set(
+        return Set<UUID>(
             social.feed.compactMap { item in
                 guard item.activity.kind == "workout",
                       item.activity.createdAt >= threshold,
