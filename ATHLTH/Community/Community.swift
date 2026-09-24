@@ -468,7 +468,7 @@ struct ATHLTHCommunityView: View {
         let friendIDs = Set(social.friends.map(\.userID))
 
         return Set<UUID>(
-            social.feed.compactMap { item in
+            social.feed.compactMap { item -> UUID? in
                 guard item.activity.kind == "workout",
                       item.activity.createdAt >= threshold,
                       friendIDs.contains(item.actor.userID)
