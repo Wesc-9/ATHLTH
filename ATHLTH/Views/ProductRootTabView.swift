@@ -1884,6 +1884,76 @@ private struct PlannedWorkoutSelection: Identifiable {
     var id: UUID { workout.id }
 }
 
+private struct ATHLTHTrainSectionSwitcher: View {
+    let titles: [String]
+    @Binding var selection: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(Array(titles.enumerated()), id: \.offset) { index, title in
+                Button {
+                    guard selection != index else { return }
+
+                    var transaction = Transaction()
+                    transaction.animation = nil
+
+                    withTransaction(transaction) {
+                        selection = index
+                    }
+                } label: {
+                    VStack(spacing: 7) {
+                        Text(title)
+                            .font(
+                                .subheadline.weight(
+                                    selection == index ? .bold : .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                selection == index
+                                    ? ATHLTHTheme.primaryText
+                                    : ATHLTHTheme.mutedText
+                            )
+                            .frame(maxWidth: .infinity)
+
+                        Capsule()
+                            .fill(
+                                selection == index
+                                    ? ATHLTHTheme.accent
+                                    : Color.clear
+                            )
+                            .frame(height: 2.5)
+                    }
+                    .padding(.top, 11)
+                    .padding(.horizontal, 8)
+                    .contentShape(Rectangle())
+                    .background(
+                        selection == index
+                            ? Color.white.opacity(0.72)
+                            : Color.clear,
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(
+                    selection == index ? .isSelected : []
+                )
+            }
+        }
+        .padding(5)
+        .background(
+            ATHLTHTheme.accentDeep.opacity(0.045),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
+        }
+    }
+}
+
 struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
@@ -1920,7 +1990,7 @@ struct ATHLTHTrainView: View {
                 )
             } content: {
                 VStack(spacing: 18) {
-                    ATHLTHPremiumSegmentedControl(
+                    ATHLTHTrainSectionSwitcher(
                         titles: ["Today", "Plan", "Library"],
                         selection: $selectedSection
                     )
