@@ -4403,7 +4403,10 @@ struct ATHLTHProgressView: View {
             if let snapshot = progressSnapshot {
                 HStack(spacing: 0) {
                     NavigationLink {
-                        WorkoutHistoryView()
+                        WorkoutHistoryView(
+                            startDate: snapshot.startDate,
+                            endDate: snapshot.endDate
+                        )
                     } label: {
                         overviewMetric(
                             icon: "dumbbell.fill",
