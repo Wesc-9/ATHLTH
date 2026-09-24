@@ -2,31 +2,6 @@ import AuthenticationServices
 import SwiftUI
 import UIKit
 
-@MainActor
-private func openIPhoneWatchApp() {
-    let candidates = [
-        "itms-watchs://",
-        "bridge://"
-    ].compactMap(URL.init(string:))
-
-    func openCandidate(at index: Int) {
-        guard candidates.indices.contains(index) else { return }
-
-        UIApplication.shared.open(
-            candidates[index],
-            options: [:]
-        ) { opened in
-            guard !opened else { return }
-
-            Task { @MainActor in
-                openCandidate(at: index + 1)
-            }
-        }
-    }
-
-    openCandidate(at: 0)
-}
-
 private enum ConnectionStage {
     case device
     case appleHealth
@@ -179,7 +154,7 @@ struct OnboardingFlowView: View {
             }
         }
         .sheet(isPresented: $showingWatchInstallHelp) {
-            WatchInstallHelpView(state: watchConnection.state) {
+            WatchInstallHelpView {
                 showingWatchInstallHelp = false
                 watchConnection.refreshStatus()
             }
@@ -2469,10 +2444,14 @@ struct OnboardingFlowView: View {
 
 private struct WatchInstallHelpView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
-    let state: AppleWatchConnectionState
     let onCheckAgain: () -> Void
+
+    private var state: AppleWatchConnectionState {
+        watchConnection.state
+    }
 
     var body: some View {
         NavigationStack {
@@ -2497,19 +2476,19 @@ private struct WatchInstallHelpView: View {
                         watchInstallStep(
                             number: "1",
                             title: "Open the Watch app",
-                            detail: "ATHLTH opens Apple’s Watch app on this iPhone. Go to My Watch → Apps and install ATHLTH under Available Apps."
+                            detail: "ATHLTH opens Apple’s Watch app on this iPhone."
                         )
 
                         watchInstallStep(
                             number: "2",
                             title: "Find ATHLTH",
-                            detail: "Scroll to Available Apps and tap Install next to ATHLTH."
+                            detail: "Scroll to Available Apps, then find ATHLTH."
                         )
 
                         watchInstallStep(
                             number: "3",
-                            title: "Return to ATHLTH",
-                            detail: "When installation finishes, come back and check the connection again."
+                            title: "Tap Install",
+                            detail: "Install ATHLTH, then return here. We’ll check the Watch automatically."
                         )
                     }
                     .padding(18)
@@ -2550,13 +2529,22 @@ private struct WatchInstallHelpView: View {
 
                 if state == .appNotInstalled || state == .notPaired {
                     Button {
-                        openIPhoneWatchApp()
+                        AppleWatchInstallSupport.openWatchApp()
                     } label: {
                         HStack {
                             Spacer()
-                            Text("Open Watch app")
-                                .font(.headline)
-                            Image(systemName: "arrow.up.right")
+                            Text(
+                                state == .appNotInstalled
+                                    ? "Install ATHLTH on Apple Watch"
+                                    : "Open Watch app"
+                            )
+                            .font(.headline)
+                            Image(
+                                systemName:
+                                    state == .appNotInstalled
+                                        ? "arrow.down.app.fill"
+                                        : "arrow.up.right"
+                            )
                             Spacer()
                         }
                     }
@@ -2592,6 +2580,30 @@ private struct WatchInstallHelpView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .preferredColorScheme(.light)
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            refreshAfterWatchAppReturn()
+        }
+    }
+
+    private func refreshAfterWatchAppReturn() {
+        watchConnection.connect()
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            guard watchConnection.state == .appNotInstalled else {
+                return
+            }
+
+            watchConnection.connect()
+
+            try? await Task.sleep(for: .seconds(2))
+            guard watchConnection.state == .appNotInstalled else {
+                return
+            }
+
+            watchConnection.connect()
+        }
     }
 
     private var watchHeaderIcon: String {
