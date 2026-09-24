@@ -152,6 +152,7 @@ struct HomeAroundYouSection: View {
 
     @StateObject private var locationStore = HomeLocationStore()
     @State private var mapPosition: MapCameraPosition = .automatic
+    @State private var hasCenteredOnUser = false
 
     var body: some View {
         ATHLTHCard {
@@ -279,6 +280,7 @@ struct HomeAroundYouSection: View {
                 Spacer()
 
                 Button {
+                    hasCenteredOnUser = false
                     locationStore.refresh()
                     centerOnUser()
                 } label: {
@@ -314,7 +316,9 @@ struct HomeAroundYouSection: View {
             locationStore.stop()
         }
         .onChange(of: locationStore.location?.timestamp) { _, _ in
-            centerOnUser()
+            if !hasCenteredOnUser {
+                centerOnUser()
+            }
         }
     }
 
@@ -437,6 +441,8 @@ struct HomeAroundYouSection: View {
             return
         }
 
+        hasCenteredOnUser = true
+
         withAnimation(.easeInOut(duration: 0.35)) {
             mapPosition = .region(
                 MKCoordinateRegion(
@@ -479,6 +485,7 @@ struct AroundYouExploreView: View {
 
     @State private var filter: AroundYouFilter = .all
     @State private var mapPosition: MapCameraPosition = .automatic
+    @State private var hasCenteredOnUser = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -549,6 +556,7 @@ struct AroundYouExploreView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    hasCenteredOnUser = false
                     locationStore.refresh()
                     centerOnUser()
                 } label: {
@@ -573,7 +581,9 @@ struct AroundYouExploreView: View {
             locationStore.stop()
         }
         .onChange(of: locationStore.location?.timestamp) { _, _ in
-            centerOnUser()
+            if !hasCenteredOnUser {
+                centerOnUser()
+            }
         }
     }
 
@@ -671,6 +681,8 @@ struct AroundYouExploreView: View {
         guard let coordinate = locationStore.location?.coordinate else {
             return
         }
+
+        hasCenteredOnUser = true
 
         withAnimation(.easeInOut(duration: 0.35)) {
             mapPosition = .region(
