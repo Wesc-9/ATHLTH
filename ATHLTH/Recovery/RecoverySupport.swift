@@ -260,13 +260,6 @@ enum MuscleRecoveryEngine {
                         normalizedMuscleGroup
                     )
                 )
-                let secondary = Set(
-                    exercise.exercise.secondaryMuscles.compactMap(
-                        normalizedMuscleGroup
-                    )
-                )
-                .subtracting(primary)
-
                 for group in primary {
                     var item = values[group] ?? Accumulator()
                     item.completedSets += completedSets
@@ -278,16 +271,6 @@ enum MuscleRecoveryEngine {
                     values[group] = item
                 }
 
-                for group in secondary {
-                    var item = values[group] ?? Accumulator()
-                    item.completedSets += max(completedSets / 2, 1)
-
-                    if item.lastTrainedAt.map({ workoutDate > $0 }) ?? true {
-                        item.lastTrainedAt = workoutDate
-                    }
-
-                    values[group] = item
-                }
             }
         }
 
@@ -607,7 +590,7 @@ struct RecoveryReadinessBreakdownCard: View {
         guard sleep.totalAsleep > 0 else { return "No data" }
 
         if let baseline = recovery.averageSleepDuration {
-            return "(sleep.totalAsleep.shortDuration) · (comparison(current: sleep.totalAsleep, baseline: baseline, higherIsBetter: true))"
+            return "\(sleep.totalAsleep.shortDuration) · \(comparison(current: sleep.totalAsleep, baseline: baseline, higherIsBetter: true))"
         }
 
         return sleep.totalAsleep.shortDuration
@@ -619,10 +602,10 @@ struct RecoveryReadinessBreakdownCard: View {
         }
 
         if let baseline = recovery.baselineHRVMilliseconds {
-            return "(Int(current.rounded())) ms · (comparison(current: current, baseline: baseline, higherIsBetter: true))"
+            return "\(Int(current.rounded())) ms · \(comparison(current: current, baseline: baseline, higherIsBetter: true))"
         }
 
-        return "(Int(current.rounded())) ms"
+        return "\(Int(current.rounded())) ms"
     }
 
     private var restingHRValue: String {
@@ -631,10 +614,10 @@ struct RecoveryReadinessBreakdownCard: View {
         }
 
         if let baseline = recovery.baselineRestingHeartRate {
-            return "(Int(current.rounded())) bpm · (comparison(current: current, baseline: baseline, higherIsBetter: false))"
+            return "\(Int(current.rounded())) bpm · \(comparison(current: current, baseline: baseline, higherIsBetter: false))"
         }
 
-        return "(Int(current.rounded())) bpm"
+        return "\(Int(current.rounded())) bpm"
     }
 
     private func comparison(
@@ -655,8 +638,8 @@ struct RecoveryReadinessBreakdownCard: View {
             higherIsBetter ? percent > 0 : percent < 0
 
         return favorable
-            ? "(rounded)% favorable"
-            : "(rounded)% below target"
+            ? "\(rounded)% favorable"
+            : "\(rounded)% below target"
     }
 
     private func factorLabel(
@@ -862,7 +845,7 @@ struct RecoveryTrendsCard: View {
             quality = "Low quality"
         }
 
-        return "(quality) · duration + available stages"
+        return "\(quality) · duration + available stages"
     }
 
     private var latestHRVText: String {
@@ -873,7 +856,7 @@ struct RecoveryTrendsCard: View {
             return "—"
         }
 
-        return "(Int(value.rounded())) ms"
+        return "\(Int(value.rounded())) ms"
     }
 
     private var latestRestingHRText: String {
@@ -884,14 +867,14 @@ struct RecoveryTrendsCard: View {
             return "—"
         }
 
-        return "(Int(value.rounded())) bpm"
+        return "\(Int(value.rounded())) bpm"
     }
 
     private var acuteLoadText: String {
         let minutes = Int(
             snapshot.trainingLoad.acuteMinutes.rounded()
         )
-        return "(minutes) min / 7d"
+        return "\(minutes) min / 7d"
     }
 
     private var loadSubtitle: String {
@@ -901,7 +884,7 @@ struct RecoveryTrendsCard: View {
             return load.title
         }
 
-        return "(load.title) · 28d avg (Int(chronic.rounded())) min/week"
+        return "\(load.title) · 28d avg \(Int(chronic.rounded())) min/week"
     }
 }
 
@@ -966,19 +949,19 @@ struct MuscleRecoveryCard: View {
                                 HStack {
                                     if status.completedSets > 0 {
                                         Text(
-                                            "(status.completedSets) recent sets"
+                                            "\(status.completedSets) recent sets"
                                         )
                                     }
 
                                     if let last = status.lastTrainedAt {
                                         Text(
-                                            last.relativeDescription
+                                            relativeDescription(last)
                                         )
                                     }
 
                                     if status.soreness != .none {
                                         Text(
-                                            "Logged: (status.soreness.title)"
+                                            "Logged: \(status.soreness.title)"
                                         )
                                     }
                                 }
@@ -998,6 +981,16 @@ struct MuscleRecoveryCard: View {
             .foregroundStyle(.secondary)
             .padding(.top, 10)
         }
+    }
+
+    private func relativeDescription(
+        _ date: Date
+    ) -> String {
+        RelativeDateTimeFormatter()
+            .localizedString(
+                for: date,
+                relativeTo: Date()
+            )
     }
 
     private func statusTint(
@@ -1172,7 +1165,7 @@ struct RecoveryGuidedToolView: View {
                         .font(.title2.weight(.bold))
 
                     Text(
-                        "Step (stepIndex + 1) of (tool.steps.count)"
+                        "Step \(stepIndex + 1) of \(tool.steps.count)"
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
