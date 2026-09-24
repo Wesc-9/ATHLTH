@@ -117,10 +117,10 @@ final class ExerciseLibraryStore: ObservableObject {
                 bodyPart == "All" ||
                 entry.bodyPart == bodyPart
 
-            let matchesEquipment =
-                equipment == nil ||
-                equipment == "All" ||
-                entry.exercise.equipment.contains(equipment!)
+            let matchesEquipment = equipment.map {
+                $0 == "All" ||
+                entry.exercise.equipment.contains($0)
+            } ?? true
 
             return matchesText && matchesBodyPart && matchesEquipment
         }
