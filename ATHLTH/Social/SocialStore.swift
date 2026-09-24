@@ -20,9 +20,11 @@ final class SocialStore: ObservableObject {
     @Published private(set) var activeWorkoutParticipants: [SocialWorkoutParticipantRecord] = []
     @Published private(set) var privacy: SocialPrivacySettings?
     @Published private(set) var isRefreshing = false
+    @Published private(set) var isHomeFeedRefreshing = false
     @Published var errorMessage: String?
 
     private let service: SupabaseSocialService
+    private var lastHomeFeedRefreshAt: Date?
     private var profileCache: [UUID: SocialFriendProfile] = [:]
     private let activationDate: Date
 
@@ -160,6 +162,36 @@ final class SocialStore: ObservableObject {
             }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Lightweight Home refresh. The full social refresh fans out across
+    /// relationships, privacy, inbox, challenges and workout sessions; Home
+    /// only needs the activity feed for its Activity Center.
+    func refreshHomeFeed(force: Bool = false) async {
+        guard service.currentUserID != nil else {
+            feed = []
+            return
+        }
+
+        if !force,
+           let lastHomeFeedRefreshAt,
+           Date().timeIntervalSince(lastHomeFeedRefreshAt) < 120,
+           !feed.isEmpty {
+            return
+        }
+
+        guard !isHomeFeedRefreshing else { return }
+
+        isHomeFeedRefreshing = true
+        defer { isHomeFeedRefreshing = false }
+
+        do {
+            feed = try await service.loadFeed()
+            lastHomeFeedRefreshAt = Date()
+        } catch {
+            // A lightweight Home refresh must not overwrite a more important
+            // social error state or clear already cached activity.
         }
     }
 
