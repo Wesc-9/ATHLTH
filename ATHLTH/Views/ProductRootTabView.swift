@@ -368,6 +368,16 @@ struct ATHLTHHomeView: View {
                     strength: strengthWorkout
                 )
             }
+            .onChange(of: strengthWorkout.workoutHistory.count) {
+                Task {
+                    await loadHomeStreak()
+                }
+            }
+            .onChange(of: health.workouts.count) {
+                Task {
+                    await loadHomeStreak()
+                }
+            }
         }
         .sheet(isPresented: $showingGoalCreation) {
             GoalCreationView()
@@ -376,13 +386,6 @@ struct ATHLTHHomeView: View {
 
     @MainActor
     private func loadHomeStreak() async {
-        guard health.healthDataAvailable,
-              health.hasRequestedAuthorization
-        else {
-            homeStreakDays = []
-            return
-        }
-
         let calendar = Calendar.current
         let now = Date()
         let today = calendar.startOfDay(for: now)
@@ -392,16 +395,41 @@ struct ATHLTHHomeView: View {
             to: today
         ) ?? now.addingTimeInterval(-7_776_000)
 
-        do {
-            homeStreakDays = try await health.activeWorkoutDays(
-                startDate: start,
-                endDate: now
-            )
-        } catch {
-            // nil means "not loaded", which keeps the card truthful instead
-            // of incorrectly showing a zero-day streak after a query failure.
-            homeStreakDays = nil
+        // Native ATHLTH sessions count even when the user has chosen not to
+        // grant Health write/read access. This keeps streak an ATHLTH training
+        // concept rather than making it dependent on a wearable.
+        var activeDays = Set(
+            strengthWorkout.workoutHistory
+                .filter {
+                    $0.isFinished &&
+                    $0.startedAt >= start &&
+                    $0.startedAt <= now
+                }
+                .map {
+                    calendar.startOfDay(for: $0.startedAt)
+                }
+        )
+
+        if health.healthDataAvailable,
+           health.hasRequestedAuthorization {
+            do {
+                let healthDays = try await health.activeWorkoutDays(
+                    startDate: start,
+                    endDate: now
+                )
+
+                activeDays.formUnion(
+                    healthDays.map {
+                        calendar.startOfDay(for: $0)
+                    }
+                )
+            } catch {
+                // Keep the ATHLTH-native days instead of turning a temporary
+                // Health query failure into a lost streak.
+            }
         }
+
+        homeStreakDays = Array(activeDays).sorted()
     }
 
     private var homeInboxUnreadCount: Int {
