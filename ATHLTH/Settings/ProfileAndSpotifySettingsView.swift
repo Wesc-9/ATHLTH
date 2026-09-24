@@ -387,9 +387,8 @@ struct PersonalHealthProfileView: View {
                         await health.refreshAll()
                         await health.refreshPersonalDetails()
                         if health.personalDetails.hasAnyValue {
-                            session.updatePersonalDetails(
-                                health.personalDetails,
-                                source: .appleHealth
+                            session.mergePersonalDetailsFromAppleHealth(
+                                health.personalDetails
                             )
                         }
                         loadFromSession()
@@ -479,14 +478,22 @@ struct PersonalHealthProfileView: View {
                 }
 
                 Button("Save Health Profile") {
+                    let manualDetails = HealthProfileBasics(
+                        dateOfBirth: includeDateOfBirth ? dateOfBirth : nil,
+                        healthSex: includeSex ? healthSex : nil,
+                        weightKilograms: includeWeight ? weightKilograms : nil,
+                        heightCentimeters: includeHeight ? heightCentimeters : nil
+                    )
+
+                    let existingSource =
+                        session.onboardingProfile?.personalDetailsSource ?? .none
+                    let keepsAppleHealthLinked =
+                        existingSource == .appleHealth ||
+                        existingSource == .mixed
+
                     session.updatePersonalDetails(
-                        HealthProfileBasics(
-                            dateOfBirth: includeDateOfBirth ? dateOfBirth : nil,
-                            healthSex: includeSex ? healthSex : nil,
-                            weightKilograms: includeWeight ? weightKilograms : nil,
-                            heightCentimeters: includeHeight ? heightCentimeters : nil
-                        ),
-                        source: .manual
+                        manualDetails,
+                        source: keepsAppleHealthLinked ? .mixed : .manual
                     )
                 }
                 .disabled(
@@ -514,6 +521,7 @@ struct PersonalHealthProfileView: View {
     private var sourceTitle: String {
         switch session.onboardingProfile?.personalDetailsSource ?? .none {
         case .appleHealth: return "Apple Health"
+        case .mixed: return "Apple Health + manual"
         case .manual: return "Manual"
         case .none: return "Not set"
         }
