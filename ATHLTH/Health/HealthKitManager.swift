@@ -5,6 +5,8 @@ import HealthKit
 
 @MainActor
 final class HealthKitManager: ObservableObject {
+    static let shared = HealthKitManager()
+
     @Published private(set) var workouts: [WorkoutSummary] = []
     @Published private(set) var sleep: SleepSummary = .empty
     @Published private(set) var heart: HeartSummary = .empty
@@ -73,6 +75,24 @@ final class HealthKitManager: ObservableObject {
 
     var hasRequestedAuthorization: Bool {
         UserDefaults.standard.integer(forKey: authorizationVersionKey) >= currentAuthorizationVersion
+    }
+
+    func prepareBackgroundObserversAtLaunch() {
+        let defaults = UserDefaults.standard
+        let backgroundSyncEnabled =
+            defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
+
+        guard healthDataAvailable,
+              hasRequestedAuthorization,
+              backgroundSyncEnabled
+        else {
+            return
+        }
+
+        // HealthKit may relaunch the app in the background. Observer queries
+        // need to exist as early as possible in the launch lifecycle so the
+        // pending delivery has a listener ready.
+        startBackgroundObservers()
     }
 
     var healthDataAvailable: Bool {
@@ -214,7 +234,9 @@ final class HealthKitManager: ObservableObject {
             (.runningPower, .immediate),
             (.cyclingSpeed, .immediate),
             (.cyclingPower, .immediate),
-            (.swimmingStrokeCount, .immediate)
+            (.swimmingStrokeCount, .immediate),
+            (.bodyMass, .hourly),
+            (.height, .daily)
         ]
 
         for (identifier, frequency) in quantityTypes {
@@ -265,12 +287,22 @@ final class HealthKitManager: ObservableObject {
         let sampleTypes = readTypes.compactMap { $0 as? HKSampleType }
 
         for type in sampleTypes {
-            let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completionHandler, error in
-                defer { completionHandler() }
-                guard error == nil else { return }
+            let query = HKObserverQuery(sampleType: type, predicate: nil) {
+                [weak self] _, completionHandler, error in
+
+                guard error == nil else {
+                    completionHandler()
+                    return
+                }
 
                 Task { @MainActor [weak self] in
-                    await self?.refreshAll()
+                    guard let self else {
+                        completionHandler()
+                        return
+                    }
+
+                    await self.refreshAll()
+                    completionHandler()
                 }
             }
 
@@ -1556,9 +1588,9 @@ final class HealthKitManager: ObservableObject {
             unit: .secondUnit(with: .milli)
         )
 
-        let latestValue = try await latest
-        let restingValue = try await resting
-        let hrvValue = try await hrv
+        let latestValue = try? await latest
+        let restingValue = try? await resting
+        let hrvValue = try? await hrv
 
         return HeartSummary(
             latestHeartRate: latestValue?.0,
@@ -1641,20 +1673,34 @@ final class HealthKitManager: ObservableObject {
             unit: HKUnit.count().unitDivided(by: .minute())
         )
 
+        let stepsValue = try? await steps
+        let activeEnergyValue = try? await activeEnergy
+        let moveGoalValue = try? await moveGoal
+        let basalEnergyValue = try? await basalEnergy
+        let exerciseMinutesValue = try? await exerciseMinutes
+        let walkingRunningDistanceValue = try? await walkingRunningDistance
+        let cyclingDistanceValue = try? await cyclingDistance
+        let swimmingDistanceValue = try? await swimmingDistance
+        let flightsValue = try? await flights
+        let vo2Value = try? await vo2
+        let walkingHeartRateValue = try? await walkingHeartRate
+        let oxygenValue = try? await oxygen
+        let respiratoryValue = try? await respiratory
+
         return TrainingHealthSummary(
-            stepsToday: try await steps,
-            activeEnergyKilocaloriesToday: try await activeEnergy,
-            moveGoalKilocaloriesToday: try await moveGoal,
-            basalEnergyKilocaloriesToday: try await basalEnergy,
-            exerciseMinutesToday: try await exerciseMinutes,
-            distanceWalkingRunningMetersToday: try await walkingRunningDistance,
-            distanceCyclingMetersToday: try await cyclingDistance,
-            distanceSwimmingMetersToday: try await swimmingDistance,
-            flightsClimbedToday: try await flights,
-            vo2Max: try await vo2?.0,
-            walkingHeartRateAverage: try await walkingHeartRate?.0,
-            oxygenSaturationPercent: try await oxygen?.0,
-            respiratoryRate: try await respiratory?.0
+            stepsToday: stepsValue,
+            activeEnergyKilocaloriesToday: activeEnergyValue,
+            moveGoalKilocaloriesToday: moveGoalValue,
+            basalEnergyKilocaloriesToday: basalEnergyValue,
+            exerciseMinutesToday: exerciseMinutesValue,
+            distanceWalkingRunningMetersToday: walkingRunningDistanceValue,
+            distanceCyclingMetersToday: cyclingDistanceValue,
+            distanceSwimmingMetersToday: swimmingDistanceValue,
+            flightsClimbedToday: flightsValue,
+            vo2Max: vo2Value?.0,
+            walkingHeartRateAverage: walkingHeartRateValue?.0,
+            oxygenSaturationPercent: oxygenValue?.0,
+            respiratoryRate: respiratoryValue?.0
         )
     }
 
