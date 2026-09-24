@@ -42,6 +42,7 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var accountService: SupabaseAccountService
     @Environment(\.scenePhase) private var scenePhase
 
@@ -2335,6 +2336,18 @@ struct OnboardingFlowView: View {
             if accountService.currentUserID != nil {
                 try await accountService.markOnboardingComplete()
             }
+
+            // Ask for the native iOS notification permission once the user has
+            // finished onboarding. The final ATHLTH setup screen remains
+            // visible behind the system prompt, and declining never blocks
+            // entry into the app.
+            let notificationsAllowed =
+                await notifications.requestSystemNotificationPermissionIfNeeded()
+
+            if notificationsAllowed {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+
             session.completeOnboarding()
         } catch {
             onboardingCompletionError = error.localizedDescription
