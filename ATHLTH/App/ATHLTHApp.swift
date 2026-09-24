@@ -5,7 +5,7 @@ import SwiftUI
 struct ATHLTHApp: App {
     @UIApplicationDelegateAdaptor(ATHLTHAppDelegate.self)
     private var appDelegate
-    @StateObject private var health = HealthKitManager()
+    @StateObject private var health = HealthKitManager.shared
     @StateObject private var trainingPlan = TrainingPlanStore()
     @StateObject private var exerciseLibrary = ExerciseLibraryStore()
     @StateObject private var runningWorkoutLibrary = RunningWorkoutLibraryStore()
@@ -218,6 +218,16 @@ struct AppRootView: View {
             } else if settings.preferredWorkoutCapture == .appleWatch {
                 settings.preferredWorkoutCapture = .iPhone
             }
+        }
+        .onChange(of: health.personalDetails) { _, details in
+            guard appSession.onboardingProfile?.personalDetailsSource == .appleHealth else {
+                return
+            }
+
+            appSession.updatePersonalDetails(
+                details,
+                source: details.hasAnyValue ? .appleHealth : .none
+            )
         }
         .onChange(of: settings.backgroundHealthSyncEnabled) { _, enabled in
             guard health.hasRequestedAuthorization else {
