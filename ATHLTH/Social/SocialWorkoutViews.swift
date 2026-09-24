@@ -226,63 +226,151 @@ struct HomeActivitySection: View {
     @EnvironmentObject private var social: SocialStore
 
     @State private var showingPublish = false
+    @State private var selectedScope = 0
+
+    private var scopedFeed: [SocialFeedItem] {
+        guard let currentUserID = social.currentUserID else {
+            return social.feed
+        }
+
+        if selectedScope == 0 {
+            return social.feed.filter { $0.actor.userID == currentUserID }
+        }
+
+        return social.feed.filter { $0.actor.userID != currentUserID }
+    }
 
     var body: some View {
         ATHLTHCard {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Activity")
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Activity Center")
                         .font(.title3.weight(.bold))
-                    Text("Your training circle")
+                    Text("Your training and your circle, in one place.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Button {
-                    showingPublish = true
-                } label: {
-                    Label("Post Workout", systemImage: "plus")
-                        .font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .tint(ATHLTHTheme.accent)
-
                 NavigationLink {
                     SocialHubView(initialTab: .feed)
                 } label: {
-                    Text("See All")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: Circle()
+                        )
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open full activity feed")
             }
 
-            if social.feed.isEmpty {
+            if social.pendingRequestCount > 0 {
+                NavigationLink {
+                    SocialHubView(initialTab: .requests)
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "bolt.badge.clock.fill")
+                            .foregroundStyle(.orange)
+
+                        Text(
+                            "\(social.pendingRequestCount) need\(social.pendingRequestCount == 1 ? "s" : "") your attention"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(height: 40)
+                    .background(
+                        Color.orange.opacity(0.08),
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 12)
+            }
+
+            HStack(spacing: 6) {
+                activityScopeButton("You", index: 0)
+                activityScopeButton("Circle", index: 1)
+
+                Spacer()
+
+                Button {
+                    showingPublish = true
+                } label: {
+                    Label("Post", systemImage: "plus")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 11)
+                        .frame(height: 34)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .tint(ATHLTHTheme.accentDeep)
+            }
+            .padding(.top, 12)
+
+            if social.isHomeFeedRefreshing && social.feed.isEmpty {
+                HStack(spacing: 9) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Updating activity…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else if scopedFeed.isEmpty {
                 HStack(spacing: 12) {
-                    Image(systemName: "bolt.heart.fill")
-                        .font(.title2)
-                        .foregroundStyle(ATHLTHTheme.accent)
+                    Image(
+                        systemName:
+                            selectedScope == 0
+                                ? "figure.run.circle"
+                                : "person.2.circle"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHTheme.vitality)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Activity starts here")
-                            .font(.subheadline.weight(.semibold))
-                        Text("Publish a workout or add friends to see their shared training.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            selectedScope == 0
+                                ? "Your activity starts here"
+                                : "Your circle is quiet"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Text(
+                            selectedScope == 0
+                                ? "Completed and shared training will appear here."
+                                : "Add friends or check back after they share training."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
 
                     Spacer()
                 }
-                .padding(.vertical, 14)
+                .padding(.vertical, 18)
             } else {
                 VStack(spacing: 11) {
-                    ForEach(Array(social.feed.prefix(3))) { item in
+                    ForEach(Array(scopedFeed.prefix(3))) { item in
                         HomeActivityRow(item: item)
 
-                        if item.id != social.feed.prefix(3).last?.id {
-                            Divider().opacity(0.4)
+                        if item.id != scopedFeed.prefix(3).last?.id {
+                            Divider().opacity(0.35)
                         }
                     }
                 }
@@ -293,8 +381,41 @@ struct HomeActivitySection: View {
             WorkoutPublishView()
         }
         .task {
-            await social.refresh()
+            await social.refreshHomeFeed()
         }
+    }
+
+    private func activityScopeButton(
+        _ title: String,
+        index: Int
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedScope = index
+            }
+        } label: {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    selectedScope == index
+                        ? ATHLTHTheme.primaryText
+                        : ATHLTHTheme.mutedText
+                )
+                .padding(.horizontal, 14)
+                .frame(height: 34)
+                .background {
+                    if selectedScope == index {
+                        Capsule()
+                            .fill(ATHLTHTheme.cardWarm)
+                            .shadow(
+                                color: ATHLTHTheme.accentDeep.opacity(0.08),
+                                radius: 7,
+                                y: 3
+                            )
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 }
 
