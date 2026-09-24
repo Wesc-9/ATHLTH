@@ -198,6 +198,21 @@ final class RouteDiscoveryStore: ObservableObject {
         }
     }
 
+    func syncOwnedPublicRoutes(
+        _ routes: [TrainingRoute]
+    ) async {
+        do {
+            for route in routes where route.visibility == .publicProfile {
+                try await service.publish(route)
+            }
+
+            routes = try await service.loadDiscoverableRoutes()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func nearbyRoutes(
         from location: CLLocation,
         radiusKilometers: Double = 35
