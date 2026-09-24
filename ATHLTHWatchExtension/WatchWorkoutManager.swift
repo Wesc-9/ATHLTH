@@ -62,6 +62,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         locationManager.distanceFilter = 3
     }
 
+    func configurePlannedRoute(
+        _ route: WatchRouteTransfer?
+    ) {
+        publish {
+            self.plannedRoute = route
+        }
+    }
+
     func configureAudioCoach(
         _ configuration: WatchAudioCoachConfiguration
     ) {
@@ -69,6 +77,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.audioCoachConfiguration = configuration
         }
         resetAudioCoachThresholds()
+
+        if isActive,
+           configuration.enabled,
+           currentStructuredRunningStep != nil {
+            announceCurrentStructuredStep(prefix: "Current")
+        }
     }
 
     func configureRunningWorkout(
@@ -82,6 +96,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartElapsedTime = elapsedTime
         structuredStepStartDistanceMeters = distanceMeters
         structuredWorkoutComplete = false
+
+        if isActive,
+           !workout.steps.isEmpty {
+            announceCurrentStructuredStep(prefix: "Starting")
+        }
     }
 
     var currentStructuredRunningStep: WatchRunningWorkoutStep? {
@@ -191,10 +210,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) async {
         guard !isActive, state != .preparing, state != .ending else { return }
 
+        let resolvedRoute = route ?? plannedRoute
+
         publish {
             self.state = .preparing
             self.kind = kind
-            self.plannedRoute = route
+            self.plannedRoute = resolvedRoute
             self.completedResult = nil
             self.errorMessage = nil
             self.elapsedTime = 0
