@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreLocation
 import Foundation
 import HealthKit
@@ -26,6 +27,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var maxHeartRate: Double?
     @Published private(set) var routePoints: [WatchRoutePoint] = []
     @Published private(set) var plannedRoute: WatchRouteTransfer?
+    @Published private(set) var audioCoachConfiguration:
+        WatchAudioCoachConfiguration = .disabled
+    @Published private(set) var structuredRunningWorkout:
+        WatchRunningWorkoutTransfer?
+    @Published private(set) var structuredStepIndex = 0
     @Published private(set) var completedResult: WatchWorkoutResult?
     @Published private(set) var errorMessage: String?
 
@@ -42,12 +48,52 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var finishing = false
     private var mirroringActive = false
     private var lastMirrorSnapshotSentAt: Date?
+    private let speechSynthesizer = AVSpeechSynthesizer()
+    private var nextDistanceAnnouncementMeters: Double?
+    private var nextTimeAnnouncementSeconds: TimeInterval?
+    private var structuredStepStartElapsedTime: TimeInterval = 0
+    private var structuredStepStartDistanceMeters: Double = 0
+    private var structuredWorkoutComplete = false
 
     private override init() {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 3
+    }
+
+    func configureAudioCoach(
+        _ configuration: WatchAudioCoachConfiguration
+    ) {
+        publish {
+            self.audioCoachConfiguration = configuration
+        }
+        resetAudioCoachThresholds()
+    }
+
+    func configureRunningWorkout(
+        _ workout: WatchRunningWorkoutTransfer
+    ) {
+        publish {
+            self.structuredRunningWorkout =
+                workout.steps.isEmpty ? nil : workout
+            self.structuredStepIndex = 0
+        }
+        structuredStepStartElapsedTime = elapsedTime
+        structuredStepStartDistanceMeters = distanceMeters
+        structuredWorkoutComplete = false
+    }
+
+    var currentStructuredRunningStep: WatchRunningWorkoutStep? {
+        guard let structuredRunningWorkout,
+              structuredRunningWorkout.steps.indices.contains(
+                structuredStepIndex
+              )
+        else {
+            return nil
+        }
+
+        return structuredRunningWorkout.steps[structuredStepIndex]
     }
 
     var isWorkoutPresented: Bool {
@@ -114,6 +160,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         finishing = false
         mirroringActive = false
         lastMirrorSnapshotSentAt = nil
+        nextDistanceAnnouncementMeters = nil
+        nextTimeAnnouncementSeconds = nil
+        structuredStepStartElapsedTime = 0
+        structuredStepStartDistanceMeters = 0
+        structuredWorkoutComplete = false
+        speechSynthesizer.stopSpeaking(at: .immediate)
         publish {
             self.state = .idle
             self.elapsedTime = 0
@@ -124,6 +176,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.maxHeartRate = nil
             self.routePoints = []
             self.plannedRoute = nil
+            self.audioCoachConfiguration = .disabled
+            self.structuredRunningWorkout = nil
+            self.structuredStepIndex = 0
             self.completedResult = nil
             self.errorMessage = nil
         }
@@ -152,6 +207,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
         workoutLocation = nil
         workoutLocationMetadataAttached = false
+        structuredStepStartElapsedTime = 0
+        structuredStepStartDistanceMeters = 0
+        structuredWorkoutComplete = false
+        resetAudioCoachThresholds()
 
         do {
             try await requestAuthorization()
@@ -229,6 +288,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             publishState(.running)
             startTimer()
+            announceCurrentStructuredStep(prefix: "Starting")
         } catch {
             fail(error)
         }
@@ -277,12 +337,310 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 self.publish {
                     self.elapsedTime = builder.elapsedTime
                 }
+                self.evaluateStructuredRunningWorkout()
+                self.evaluateAudioCoach()
 
                 Task { [weak self] in
                     await self?.sendLiveSnapshot()
                 }
             }
         }
+    }
+
+    private func resetAudioCoachThresholds() {
+        let configuration = audioCoachConfiguration
+
+        if configuration.enabled,
+           let interval = configuration.distanceIntervalMeters,
+           interval > 0 {
+            let completedIntervals =
+                floor(distanceMeters / interval)
+            nextDistanceAnnouncementMeters =
+                (completedIntervals + 1) * interval
+        } else {
+            nextDistanceAnnouncementMeters = nil
+        }
+
+        if configuration.enabled,
+           let interval = configuration.timeIntervalSeconds,
+           interval > 0 {
+            let completedIntervals =
+                floor(elapsedTime / interval)
+            nextTimeAnnouncementSeconds =
+                (completedIntervals + 1) * interval
+        } else {
+            nextTimeAnnouncementSeconds = nil
+        }
+    }
+
+    private func evaluateAudioCoach() {
+        guard state == .running,
+              audioCoachConfiguration.enabled
+        else {
+            return
+        }
+
+        var shouldAnnounce = false
+
+        if let interval =
+                audioCoachConfiguration.distanceIntervalMeters,
+           interval > 0,
+           let nextDistance = nextDistanceAnnouncementMeters,
+           distanceMeters >= nextDistance {
+            repeat {
+                nextDistanceAnnouncementMeters =
+                    (nextDistanceAnnouncementMeters ?? nextDistance) +
+                    interval
+            } while distanceMeters >=
+                (nextDistanceAnnouncementMeters ?? .greatestFiniteMagnitude)
+
+            shouldAnnounce = true
+        }
+
+        if let interval =
+                audioCoachConfiguration.timeIntervalSeconds,
+           interval > 0,
+           let nextTime = nextTimeAnnouncementSeconds,
+           elapsedTime >= nextTime {
+            repeat {
+                nextTimeAnnouncementSeconds =
+                    (nextTimeAnnouncementSeconds ?? nextTime) +
+                    interval
+            } while elapsedTime >=
+                (nextTimeAnnouncementSeconds ?? .greatestFiniteMagnitude)
+
+            shouldAnnounce = true
+        }
+
+        if shouldAnnounce {
+            speak(metricsAnnouncement)
+        }
+    }
+
+    private func evaluateStructuredRunningWorkout() {
+        guard state == .running,
+              kind == .running,
+              !structuredWorkoutComplete,
+              let step = currentStructuredRunningStep
+        else {
+            return
+        }
+
+        let completed: Bool
+
+        switch step.measure {
+        case .time:
+            guard let duration = step.durationSeconds else {
+                return
+            }
+            completed =
+                elapsedTime - structuredStepStartElapsedTime >=
+                duration
+
+        case .distance:
+            guard let distance = step.distanceMeters else {
+                return
+            }
+            completed =
+                distanceMeters - structuredStepStartDistanceMeters >=
+                distance
+
+        case .open:
+            completed = false
+        }
+
+        guard completed else { return }
+        advanceStructuredRunningWorkout()
+    }
+
+    private func advanceStructuredRunningWorkout() {
+        guard let workout = structuredRunningWorkout else {
+            return
+        }
+
+        let nextIndex = structuredStepIndex + 1
+
+        guard workout.steps.indices.contains(nextIndex) else {
+            structuredWorkoutComplete = true
+            if audioCoachConfiguration.enabled {
+                speak(
+                    "Structured workout complete. Continue easy or finish your workout when ready."
+                )
+            }
+            return
+        }
+
+        structuredStepStartElapsedTime = elapsedTime
+        structuredStepStartDistanceMeters = distanceMeters
+
+        publish {
+            self.structuredStepIndex = nextIndex
+        }
+
+        announceCurrentStructuredStep(prefix: "Next")
+    }
+
+    private func announceCurrentStructuredStep(
+        prefix: String
+    ) {
+        guard audioCoachConfiguration.enabled,
+              let step = currentStructuredRunningStep
+        else {
+            return
+        }
+
+        var parts = [
+            prefix,
+            step.title
+        ]
+
+        if let target = spokenTarget(for: step) {
+            parts.append(target)
+        }
+
+        if let intensity = step.intensityText,
+           !intensity.isEmpty {
+            parts.append(intensity)
+        }
+
+        speak(parts.joined(separator: ". "))
+    }
+
+    private func spokenTarget(
+        for step: WatchRunningWorkoutStep
+    ) -> String? {
+        switch step.measure {
+        case .distance:
+            guard let meters = step.distanceMeters else {
+                return nil
+            }
+
+            if meters >= 1_000 {
+                return String(
+                    format: "%.1f kilometers",
+                    meters / 1_000
+                )
+            }
+
+            return "\(Int(meters.rounded())) meters"
+
+        case .time:
+            guard let seconds = step.durationSeconds else {
+                return nil
+            }
+            return spokenDuration(seconds)
+
+        case .open:
+            return "Open duration"
+        }
+    }
+
+    private var metricsAnnouncement: String {
+        var parts: [String] = []
+
+        if distanceMeters > 0 {
+            parts.append(
+                String(
+                    format: "%.1f kilometers",
+                    distanceMeters / 1_000
+                )
+            )
+        }
+
+        parts.append(spokenDuration(elapsedTime))
+
+        if distanceMeters >= 100,
+           elapsedTime > 0 {
+            let secondsPerKilometer =
+                elapsedTime / (distanceMeters / 1_000)
+            parts.append(
+                "Average pace " +
+                spokenPace(secondsPerKilometer)
+            )
+        }
+
+        if audioCoachConfiguration.announceClockTime {
+            let formatter = DateFormatter()
+            formatter.timeStyle = .short
+            formatter.dateStyle = .none
+            parts.append(
+                "Time " + formatter.string(from: Date())
+            )
+        }
+
+        return parts.joined(separator: ". ")
+    }
+
+    private func spokenDuration(
+        _ duration: TimeInterval
+    ) -> String {
+        let totalSeconds = max(
+            Int(duration.rounded()),
+            0
+        )
+        let hours = totalSeconds / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
+        let seconds = totalSeconds % 60
+
+        var parts: [String] = []
+
+        if hours > 0 {
+            parts.append(
+                "\(hours) hour\(hours == 1 ? "" : "s")"
+            )
+        }
+
+        if minutes > 0 {
+            parts.append(
+                "\(minutes) minute\(minutes == 1 ? "" : "s")"
+            )
+        }
+
+        if hours == 0,
+           seconds > 0 {
+            parts.append(
+                "\(seconds) second\(seconds == 1 ? "" : "s")"
+            )
+        }
+
+        return parts.isEmpty ? "0 seconds" :
+            parts.joined(separator: " ")
+    }
+
+    private func spokenPace(
+        _ secondsPerKilometer: TimeInterval
+    ) -> String {
+        let totalSeconds = max(
+            Int(secondsPerKilometer.rounded()),
+            0
+        )
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+
+        if seconds == 0 {
+            return "\(minutes) minutes per kilometer"
+        }
+
+        return "\(minutes) minutes \(seconds) seconds per kilometer"
+    }
+
+    private func speak(
+        _ text: String
+    ) {
+        guard !text.isEmpty else { return }
+
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(
+                at: .word
+            )
+        }
+
+        let utterance = AVSpeechUtterance(
+            string: text
+        )
+        utterance.rate = 0.48
+        utterance.volume = 1.0
+        speechSynthesizer.speak(utterance)
     }
 
     private func stopTimer() {
