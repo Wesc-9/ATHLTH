@@ -47,7 +47,7 @@ final class HealthKitManager: ObservableObject {
     private let currentAuthorizationVersion = 2
     private let refreshInProgressKey = "athlth.healthRefreshInProgress"
     private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
-    private let currentSafeRefreshVersion = 1
+    private let currentSafeRefreshVersion = 2
     private let lastSuccessfulRefreshKey = "athlth.healthLastSuccessfulRefreshAt"
 
     init() {
@@ -1987,9 +1987,13 @@ final class HealthKitManager: ObservableObject {
 
         guard let summary = summaries.first else { return nil }
 
-        let goal = summary.activeEnergyBurnedGoal.doubleValue(
-            for: .kilocalorie()
-        )
+        guard let goal = Self.safeDoubleValue(
+            summary.activeEnergyBurnedGoal,
+            unit: .kilocalorie()
+        ) else {
+            return nil
+        }
+
         return goal > 0 ? goal : nil
     }
 
@@ -2128,7 +2132,9 @@ final class HealthKitManager: ObservableObject {
         startDate: Date,
         endDate: Date
     ) async throws -> [Date: Double] {
-        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+        guard startDate <= endDate,
+              let type = HKObjectType.quantityType(forIdentifier: identifier)
+        else {
             return [:]
         }
 
@@ -2206,7 +2212,9 @@ final class HealthKitManager: ObservableObject {
         startDate: Date,
         endDate: Date
     ) async throws -> [Date: Double] {
-        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+        guard startDate <= endDate,
+              let type = HKObjectType.quantityType(forIdentifier: identifier)
+        else {
             return [:]
         }
 
@@ -2437,7 +2445,9 @@ final class HealthKitManager: ObservableObject {
         start: Date,
         end: Date
     ) async throws -> Double? {
-        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+        guard start <= end,
+              let type = HKObjectType.quantityType(forIdentifier: identifier)
+        else {
             return nil
         }
 
@@ -2517,13 +2527,16 @@ final class HealthKitManager: ObservableObject {
         unit: HKUnit,
         startDate: Date
     ) async throws -> (Double, Date)? {
-        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+        let endDate = Date()
+        guard startDate <= endDate,
+              let type = HKObjectType.quantityType(forIdentifier: identifier)
+        else {
             return nil
         }
 
         let predicate = HKQuery.predicateForSamples(
             withStart: startDate,
-            end: Date(),
+            end: endDate,
             options: .strictStartDate
         )
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
