@@ -752,3 +752,26 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         return time
     }
 }
+
+
+struct SocialFollowRecord: Codable, Hashable {
+    let followerID: UUID
+    let followingID: UUID
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case followerID = "follower_id"
+        case followingID = "following_id"
+        case createdAt = "created_at"
+    }
+}
+
+private struct SocialFollowInsert: Encodable {
+    let followerID: UUID
+    let followingID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case followerID = "follower_id"
+        case followingID = "following_id"
+    }
+}
