@@ -1077,7 +1077,9 @@ final class SocialStore: ObservableObject {
                     socialEntityType: event.entityType,
                     socialEntityID: event.entityID
                 ),
-                deliverSystemAlert: event.createdAt >= activationDate
+                deliverSystemAlert:
+                    event.pushNotifiedAt == nil &&
+                    event.createdAt >= activationDate
             )
         }
     }
