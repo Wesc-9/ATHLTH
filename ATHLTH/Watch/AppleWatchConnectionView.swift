@@ -6,6 +6,52 @@ struct AppleWatchConnectionView: View {
 
     var body: some View {
         Form {
+            if watchConnection.state == .appNotInstalled {
+                Section("Install ATHLTH on Apple Watch") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Label(
+                            "Your Watch is paired — only the ATHLTH app is missing.",
+                            systemImage: "applewatch"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        VStack(alignment: .leading, spacing: 9) {
+                            installStep(
+                                "1",
+                                "Open Apple’s Watch app"
+                            )
+                            installStep(
+                                "2",
+                                "Scroll to Available Apps"
+                            )
+                            installStep(
+                                "3",
+                                "Tap Install next to ATHLTH"
+                            )
+                        }
+
+                        Button {
+                            AppleWatchInstallSupport.openWatchApp()
+                        } label: {
+                            Label(
+                                "Install ATHLTH on Apple Watch",
+                                systemImage: "arrow.down.app.fill"
+                            )
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+
+                        Text(
+                            "When you return to ATHLTH, installation status is checked automatically."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
             Section("Status") {
                 LabeledContent("Pairing", value: pairedText)
                 LabeledContent("ATHLTH Watch app", value: installedText)
@@ -75,52 +121,6 @@ struct AppleWatchConnectionView: View {
                 .foregroundStyle(.secondary)
             }
 
-            if watchConnection.state == .appNotInstalled {
-                Section("Install ATHLTH on Apple Watch") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Label(
-                            "Your Watch is paired — only the ATHLTH app is missing.",
-                            systemImage: "applewatch"
-                        )
-                        .font(.subheadline.weight(.semibold))
-
-                        VStack(alignment: .leading, spacing: 9) {
-                            installStep(
-                                "1",
-                                "Open Apple’s Watch app"
-                            )
-                            installStep(
-                                "2",
-                                "Scroll to Available Apps"
-                            )
-                            installStep(
-                                "3",
-                                "Tap Install next to ATHLTH"
-                            )
-                        }
-
-                        Button {
-                            AppleWatchInstallSupport.openWatchApp()
-                        } label: {
-                            Label(
-                                "Install ATHLTH on Apple Watch",
-                                systemImage: "arrow.down.app.fill"
-                            )
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-
-                        Text(
-                            "When you return to ATHLTH, installation status is checked automatically."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
         }
         .navigationTitle("Apple Watch")
         .navigationBarTitleDisplayMode(.inline)
