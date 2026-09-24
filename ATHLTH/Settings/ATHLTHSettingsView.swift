@@ -1019,6 +1019,62 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                 }
 
                 selectedDeviceDetails
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("WORKOUT CAPTURE")
+                        .font(.caption.weight(.semibold))
+                        .tracking(2.4)
+                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+                        .padding(.leading, 16)
+
+                    PremiumSettingsCard {
+                        HStack(spacing: 14) {
+                            Image(systemName: "record.circle")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 14,
+                                        style: .continuous
+                                    )
+                                )
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Preferred workout device")
+                                    .font(.system(size: 16.5, weight: .semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                Text(workoutCaptureSubtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Picker(
+                                "Preferred workout device",
+                                selection: $settings.preferredWorkoutCapture
+                            ) {
+                                Text("Automatic")
+                                    .tag(WorkoutCapturePreference.automatic)
+                                Text("iPhone")
+                                    .tag(WorkoutCapturePreference.iPhone)
+
+                                if settings.trainingDeviceProvider == .appleWatch {
+                                    Text("Apple Watch")
+                                        .tag(WorkoutCapturePreference.appleWatch)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                    }
+                }
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
@@ -1340,6 +1396,19 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
             : Color.primary.opacity(0.035)
     }
 
+    private var workoutCaptureSubtitle: String {
+        switch settings.preferredWorkoutCapture {
+        case .automatic:
+            return settings.trainingDeviceProvider == .appleWatch
+                ? "ATHLTH chooses between iPhone and Apple Watch based on workout and availability."
+                : "ATHLTH uses iPhone capture when no supported watch is active."
+        case .iPhone:
+            return "New workouts default to iPhone capture."
+        case .appleWatch:
+            return "New workouts default to Apple Watch when it is available."
+        }
+    }
+
     private func select(_ provider: TrainingDeviceProvider) {
         guard provider != .garmin else { return }
 
@@ -1416,61 +1485,62 @@ private struct ATHLTHTrainingSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Workout") {
-                if settings.trainingDeviceProvider != .none {
-                    Picker(
-                        "Preferred workout device",
-                        selection: $settings.preferredWorkoutCapture
-                    ) {
-                        Text("Automatic").tag(WorkoutCapturePreference.automatic)
-                        Text("iPhone").tag(WorkoutCapturePreference.iPhone)
-
-                        if settings.trainingDeviceProvider == .appleWatch {
-                            Text("Apple Watch")
-                                .tag(WorkoutCapturePreference.appleWatch)
-                        }
-                    }
-
-                    if settings.trainingDeviceProvider == .garmin {
-                        Text(
-                            "Garmin is your selected wearable. Until Garmin authorization is available, workouts started in ATHLTH use iPhone/manual capture and Garmin sync remains pending."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                Picker("Strength tracking", selection: $settings.defaultStrengthTracking) {
+            Section("Strength") {
+                Picker(
+                    "Strength tracking",
+                    selection: $settings.defaultStrengthTracking
+                ) {
                     ForEach(StrengthTrackingPreference.allCases) { preference in
                         Text(preference.title).tag(preference)
                     }
                 }
 
-                Text("Only settings that are connected to the active workout flow are shown here. Auto-pause, audio cues and Watch haptic controls will return when those workout-engine features are implemented.")
+                Text(strengthTrackingDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Completed workouts") {
+            Section("Activity sharing") {
                 Toggle(
                     "Publish completed workouts automatically",
                     isOn: $settings.autoPublishCompletedWorkouts
                 )
 
                 if settings.autoPublishCompletedWorkouts {
-                    LabeledContent(
+                    Picker(
                         "Automatic visibility",
-                        value: settings.defaultActivityVisibility.title
-                    )
+                        selection: $settings.defaultActivityVisibility
+                    ) {
+                        ForEach(ProfileVisibility.allCases) { visibility in
+                            Text(visibility.title).tag(visibility)
+                        }
+                    }
 
-                    Text("The workout is saved first. Post-workout review still opens so you can add context or change visibility.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "ATHLTH publishes the workout after it is saved. Post-workout review still opens so you can add context or change visibility."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text(
+                        "Completed workouts stay private until you choose to share them."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
         }
         .navigationTitle("Training")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var strengthTrackingDescription: String {
+        switch settings.defaultStrengthTracking {
+        case .simple:
+            return "Simple keeps strength logging fast with a lighter set and rep workflow."
+        case .advanced:
+            return "Advanced enables the full strength workflow with more detailed workout tracking."
+        }
     }
 }
 
