@@ -43,7 +43,6 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var accountService: SupabaseAccountService
-    @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var step: OnboardingStep = .account
