@@ -2171,13 +2171,13 @@ struct OnboardingFlowView: View {
             healthRequestInProgress = true
 
             await health.requestAuthorization()
+            await health.completeAuthorizationSetup()
 
             await health.configureBackgroundSync(
-                allowed:
-                    session.canAccess(.backgroundHealthSync) &&
-                    settings.backgroundHealthSyncEnabled
+                allowed: settings.backgroundHealthSyncEnabled
             )
 
+            await health.refreshAll()
             await health.refreshPersonalDetails()
             importedHealthDetails = health.personalDetails
             healthRequestInProgress = false
