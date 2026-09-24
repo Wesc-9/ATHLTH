@@ -220,13 +220,15 @@ struct AppRootView: View {
             }
         }
         .onChange(of: health.personalDetails) { _, details in
-            guard appSession.onboardingProfile?.personalDetailsSource == .appleHealth else {
+            guard appSession.onboardingProfile?.personalDetailsSource == .appleHealth,
+                  details.hasAnyValue
+            else {
                 return
             }
 
             appSession.updatePersonalDetails(
                 details,
-                source: details.hasAnyValue ? .appleHealth : .none
+                source: .appleHealth
             )
         }
         .onChange(of: settings.backgroundHealthSyncEnabled) { _, enabled in
