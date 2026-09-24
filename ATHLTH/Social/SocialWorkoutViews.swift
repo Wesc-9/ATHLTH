@@ -224,20 +224,35 @@ struct QuickWorkoutStartSheet: View {
 
 struct HomeActivitySection: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
 
     @State private var showingPublish = false
     @State private var selectedScope = 0
 
-    private var scopedFeed: [SocialFeedItem] {
+    private var circleFeed: [SocialFeedItem] {
         guard let currentUserID = social.currentUserID else {
             return social.feed
         }
 
-        if selectedScope == 0 {
-            return social.feed.filter { $0.actor.userID == currentUserID }
-        }
-
         return social.feed.filter { $0.actor.userID != currentUserID }
+    }
+
+    private var ownWorkouts: [SocialPublishableWorkout] {
+        let healthItems = health.workouts.map(SocialPublishableWorkout.init)
+
+        let localStrengthItems = strength.workoutHistory
+            .filter {
+                $0.isFinished &&
+                $0.healthMetrics.healthKitWorkoutUUID == nil
+            }
+            .map(SocialPublishableWorkout.init)
+
+        return Array(
+            (healthItems + localStrengthItems)
+                .sorted { $0.startDate > $1.startDate }
+                .prefix(3)
+        )
     }
 
     var body: some View {
@@ -254,7 +269,11 @@ struct HomeActivitySection: View {
                 Spacer()
 
                 NavigationLink {
-                    SocialHubView(initialTab: .feed)
+                    if selectedScope == 0 {
+                        WorkoutHistoryView()
+                    } else {
+                        SocialHubView(initialTab: .feed)
+                    }
                 } label: {
                     Image(systemName: "arrow.up.right")
                         .font(.caption.weight(.bold))
@@ -323,39 +342,60 @@ struct HomeActivitySection: View {
             }
             .padding(.top, 12)
 
-            if social.isHomeFeedRefreshing && social.feed.isEmpty {
+            if selectedScope == 0 {
+                if ownWorkouts.isEmpty {
+                    HStack(spacing: 12) {
+                        Image(systemName: "figure.run.circle")
+                            .font(.title2)
+                            .foregroundStyle(ATHLTHTheme.vitality)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Your activity starts here")
+                                .font(.subheadline.weight(.semibold))
+                            Text(
+                                "Your latest completed workouts will appear here automatically."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(.vertical, 18)
+                } else {
+                    VStack(spacing: 11) {
+                        ForEach(ownWorkouts) { workout in
+                            HomeOwnWorkoutRow(workout: workout)
+
+                            if workout.id != ownWorkouts.last?.id {
+                                Divider().opacity(0.35)
+                            }
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+            } else if social.isHomeFeedRefreshing &&
+                        social.feed.isEmpty {
                 HStack(spacing: 9) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Updating activity…")
+                    Text("Updating your circle…")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 24)
-            } else if scopedFeed.isEmpty {
+            } else if circleFeed.isEmpty {
                 HStack(spacing: 12) {
-                    Image(
-                        systemName:
-                            selectedScope == 0
-                                ? "figure.run.circle"
-                                : "person.2.circle"
-                    )
-                    .font(.title2)
-                    .foregroundStyle(ATHLTHTheme.vitality)
+                    Image(systemName: "person.2.circle")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.vitality)
 
                     VStack(alignment: .leading, spacing: 3) {
+                        Text("Your circle is quiet")
+                            .font(.subheadline.weight(.semibold))
                         Text(
-                            selectedScope == 0
-                                ? "Your activity starts here"
-                                : "Your circle is quiet"
-                        )
-                        .font(.subheadline.weight(.semibold))
-
-                        Text(
-                            selectedScope == 0
-                                ? "Completed and shared training will appear here."
-                                : "Add friends or check back after they share training."
+                            "Add friends or check back after they share training."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -366,10 +406,10 @@ struct HomeActivitySection: View {
                 .padding(.vertical, 18)
             } else {
                 VStack(spacing: 11) {
-                    ForEach(Array(scopedFeed.prefix(3))) { item in
+                    ForEach(Array(circleFeed.prefix(3))) { item in
                         HomeActivityRow(item: item)
 
-                        if item.id != scopedFeed.prefix(3).last?.id {
+                        if item.id != circleFeed.prefix(3).last?.id {
                             Divider().opacity(0.35)
                         }
                     }
@@ -416,6 +456,53 @@ struct HomeActivitySection: View {
                 }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct HomeOwnWorkoutRow: View {
+    let workout: SocialPublishableWorkout
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: workout.activity.icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.vitality)
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.vitalitySoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(workout.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+
+                Text(workout.summaryText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(
+                    workout.startDate.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            Spacer()
+
+            Text(workout.source)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+        }
     }
 }
 
