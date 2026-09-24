@@ -30,6 +30,7 @@ jobs:
             "ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg"
             "ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg"
             "ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg"
+            "ATHLTH/Assets.xcassets/CommunityHero.imageset/CommunityHero.jpg"
           )
 
           for image in "${images[@]}"; do
@@ -37,9 +38,9 @@ jobs:
             height="$(sips -g pixelHeight "$image" | awk '/pixelHeight/ {print $2}')"
             echo "$image: ${width}x${height}"
 
-            if [ "$width" -lt 1800 ]; then
+            if [ "$width" -lt 6000 ]; then
               tmp="${image%.jpg}.upscaled.jpg"
-              sips -s format jpeg -s formatOptions 94 --resampleWidth 1800 "$image" --out "$tmp"
+              sips -s format jpeg -s formatOptions 94 --resampleWidth 6532 "$image" --out "$tmp"
               mv "$tmp" "$image"
 
               new_width="$(sips -g pixelWidth "$image" | awk '/pixelWidth/ {print $2}')"
@@ -54,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet --             ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg             ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg             ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg             ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg
+          if git diff --quiet --             ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg             ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg             ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg             ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg             ATHLTH/Assets.xcassets/CommunityHero.imageset/CommunityHero.jpg
           then
             echo "No hero image changes required."
             exit 0
@@ -62,6 +63,6 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add             ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg             ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg             ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg             ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg
+          git add             ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg             ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg             ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg             ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg             ATHLTH/Assets.xcassets/CommunityHero.imageset/CommunityHero.jpg
           git commit -m "Upscale tab hero images for high-resolution displays"
           git push origin HEAD:release/v1.3.7
