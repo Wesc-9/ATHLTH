@@ -18,6 +18,7 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var lastSuccessfulRefreshAt: Date?
     @Published private(set) var backgroundSyncError: String?
     @Published private(set) var automaticRefreshSuspended = false
+    @Published private(set) var deferFullRefreshUntilNextLaunch = false
 
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
@@ -143,6 +144,7 @@ final class HealthKitManager: ObservableObject {
                 forKey: safeRefreshVersionKey
             )
             automaticRefreshSuspended = false
+            deferFullRefreshUntilNextLaunch = true
             objectWillChange.send()
 
             // Keep the permission-sheet callback lightweight. A full Health
@@ -155,7 +157,11 @@ final class HealthKitManager: ObservableObject {
     }
 
     func configureBackgroundSync(allowed: Bool) async {
-        guard healthDataAvailable, !automaticRefreshSuspended else { return }
+        guard healthDataAvailable,
+              !shouldDeferAutomaticHealthWork
+        else {
+            return
+        }
 
         backgroundSyncError = nil
 
@@ -260,7 +266,7 @@ final class HealthKitManager: ObservableObject {
     func refreshAll() async {
         guard healthDataAvailable,
               !isRefreshing,
-              !automaticRefreshSuspended
+              !shouldDeferAutomaticHealthWork
         else {
             return
         }
@@ -310,6 +316,10 @@ final class HealthKitManager: ObservableObject {
 
     var needsHealthRefreshRecovery: Bool {
         automaticRefreshSuspended
+    }
+
+    var shouldDeferAutomaticHealthWork: Bool {
+        automaticRefreshSuspended || deferFullRefreshUntilNextLaunch
     }
 
     func workoutHistory() async throws -> [WorkoutSummary] {
