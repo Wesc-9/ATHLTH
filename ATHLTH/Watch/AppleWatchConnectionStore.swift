@@ -208,6 +208,38 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    func sendWorkoutRouteSelection(
+        _ routeID: UUID?
+    ) {
+        guard
+            let session,
+            session.activationState == .activated
+        else {
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.workoutRouteSelection.rawValue,
+            WatchTransferMetadataKey.routeID:
+                routeID?.uuidString ?? ""
+        ]
+
+        if session.isReachable {
+            session.sendMessage(
+                payload,
+                replyHandler: nil
+            ) { [weak self] error in
+                DispatchQueue.main.async {
+                    self?.workoutLaunchError =
+                        error.localizedDescription
+                }
+            }
+        } else {
+            session.transferUserInfo(payload)
+        }
+    }
+
     func sendAudioCoachConfiguration(
         _ configuration: WatchAudioCoachConfiguration
     ) {
