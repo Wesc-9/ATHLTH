@@ -69,15 +69,6 @@ struct OnboardingFlowView: View {
         }
         .foregroundStyle(step == .account ? Color.white : OnboardingTheme.primaryText)
         .preferredColorScheme(step == .account ? .dark : .light)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    usernameFieldFocused = false
-                }
-                .fontWeight(.semibold)
-            }
-        }
         .task {
             if session.signedIn, !session.onboardingCompleted {
                 if let bootstrap = try? await accountService.loadCurrentUser() {
