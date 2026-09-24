@@ -127,6 +127,7 @@ struct AppRootView: View {
 
             if appSession.signedIn {
                 await APNsPushManager.shared.syncCurrentToken()
+                await syncPushPreferences()
                 await refreshSocialCore()
                 await messaging.refresh()
             }
@@ -360,6 +361,18 @@ struct AppRootView: View {
                 )
             }
         }
+        .onChange(of: settings.workoutRemindersEnabled) { _, _ in
+            Task { await syncPushPreferences() }
+        }
+        .onChange(of: settings.friendActivityNotificationsEnabled) { _, _ in
+            Task { await syncPushPreferences() }
+        }
+        .onChange(of: settings.challengeNotificationsEnabled) { _, _ in
+            Task { await syncPushPreferences() }
+        }
+        .onChange(of: settings.messageNotificationsEnabled) { _, _ in
+            Task { await syncPushPreferences() }
+        }
         .onChange(of: social.privacy) { _, privacy in
             guard appSession.signedIn, privacy != nil else { return }
 
@@ -373,6 +386,7 @@ struct AppRootView: View {
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
             Task {
                 await APNsPushManager.shared.syncCurrentToken()
+                await syncPushPreferences()
                 await submitLatestStoreProofIfPossible()
                 await refreshSocialCore()
                 if health.hasRequestedAuthorization {
@@ -584,6 +598,17 @@ struct AppRootView: View {
             currentUserID: appSession.profile.userID
         )
         notifications.syncTrophyEvents(from: trophies.unlocks)
+    }
+
+    private func syncPushPreferences() async {
+        guard appSession.signedIn else { return }
+
+        await APNsPushManager.shared.syncNotificationPreferences(
+            workoutUpdates: settings.workoutRemindersEnabled,
+            friendActivity: settings.friendActivityNotificationsEnabled,
+            challenges: settings.challengeNotificationsEnabled,
+            messages: settings.messageNotificationsEnabled
+        )
     }
 
     private func submitLatestStoreProofIfPossible() async {
