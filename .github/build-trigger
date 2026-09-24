@@ -200,3 +200,4 @@ v1.3.4-audit-remove-mocks-and-private-focus
 v1.3.4-final-mockup-privacy-cleanup
 v1.3.4-healthkit-crash-loop-hardening
 v1.3.4-healthkit-post-auth-safe-launch
+v1.3.4-healthkit-safe-unit-conversion
