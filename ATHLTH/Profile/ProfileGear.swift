@@ -413,12 +413,12 @@ struct ProfileGearSummaryView: View {
                         .foregroundStyle(.tertiary)
                 }
 
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: 6) {
                     ForEach(ProfileGearCategory.allCases) { category in
                         gearSlot(category)
                     }
                 }
-                .padding(.top, 12)
+                .padding(.top, 8)
             }
         }
         .buttonStyle(.plain)
@@ -428,10 +428,14 @@ struct ProfileGearSummaryView: View {
     private func gearSlot(_ category: ProfileGearCategory) -> some View {
         let item = gear.featuredItem(in: category)
 
-        VStack(spacing: 7) {
+        VStack(spacing: 5) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.primary.opacity(0.035))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        item == nil
+                            ? Color.primary.opacity(0.028)
+                            : ATHLTHTheme.surfaceSage.opacity(0.58)
+                    )
 
                 if let item,
                    let value = item.imageURL,
@@ -442,7 +446,7 @@ struct ProfileGearSummaryView: View {
                             image
                                 .resizable()
                                 .scaledToFit()
-                                .padding(7)
+                                .padding(5)
                         default:
                             gearIcon(category)
                         }
@@ -450,28 +454,34 @@ struct ProfileGearSummaryView: View {
                 } else {
                     gearIcon(category)
                 }
+
+                if item == nil {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .background(Color.white, in: Circle())
+                        .offset(x: 19, y: -19)
+                }
             }
-            .frame(height: 74)
+            .frame(height: 48)
 
             Text(item?.name ?? category.shortTitle)
-                .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(2)
-                .minimumScaleFactor(0.75)
-                .multilineTextAlignment(.center)
-
-            if item == nil {
-                Text("Add")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-            }
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(
+                    item == nil
+                        ? ATHLTHTheme.mutedText
+                        : ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+                .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
     }
 
     private func gearIcon(_ category: ProfileGearCategory) -> some View {
         Image(systemName: category.systemImage)
-            .font(.system(size: 27, weight: .medium))
+            .font(.system(size: 20, weight: .medium))
             .foregroundStyle(ATHLTHTheme.accentDeep)
     }
 }
