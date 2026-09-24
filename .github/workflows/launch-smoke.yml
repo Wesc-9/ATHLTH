@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.3.6
+      - release/v1.3.7
     paths:
       - .github/launch-trigger
 
