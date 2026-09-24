@@ -691,6 +691,119 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    func createSimpleTrainingPlan(
+        title: String,
+        summary: String,
+        weekCount: Int,
+        startDate: Date?,
+        visibility: ProfileVisibility = .privateOnly,
+        sessionsPerWeek: Int,
+        workoutPattern: [WorkoutKind]
+    ) {
+        let resolvedWeekCount = min(max(weekCount, 1), 52)
+        let resolvedSessionsPerWeek = min(max(sessionsPerWeek, 2), 6)
+        let pattern = workoutPattern.isEmpty
+            ? [WorkoutKind.strength, .running]
+            : workoutPattern
+
+        let targetDayIndexes: [Int]
+        switch resolvedSessionsPerWeek {
+        case 2:
+            targetDayIndexes = [1, 4]
+        case 3:
+            targetDayIndexes = [1, 3, 5]
+        case 4:
+            targetDayIndexes = [1, 2, 4, 6]
+        case 5:
+            targetDayIndexes = [1, 2, 3, 5, 6]
+        default:
+            targetDayIndexes = [1, 2, 3, 4, 5, 6]
+        }
+
+        func makeSession(for kind: WorkoutKind) -> PlannedSession {
+            let title: String
+            let duration: Int
+            let distance: Double?
+
+            switch kind {
+            case .running:
+                title = "Run"
+                duration = 40
+                distance = 5
+            case .walking:
+                title = "Walk"
+                duration = 45
+                distance = 4
+            case .strength:
+                title = "Strength"
+                duration = 50
+                distance = nil
+            case .mobility:
+                title = "Mobility"
+                duration = 25
+                distance = nil
+            case .recovery:
+                title = "Recovery"
+                duration = 30
+                distance = nil
+            case .custom:
+                title = "Workout"
+                duration = 45
+                distance = nil
+            }
+
+            return PlannedSession(
+                id: UUID(),
+                title: title,
+                kind: kind,
+                scheduledStart: nil,
+                durationMinutes: duration,
+                targetDistanceKilometers: distance,
+                targetPaceSecondsPerKilometer: nil,
+                routeID: nil,
+                exercises: [],
+                notes: nil,
+                runningWorkout: nil
+            )
+        }
+
+        var weeks = (1...resolvedWeekCount).map(makeEmptyWeek)
+
+        for weekIndex in weeks.indices {
+            for (slot, dayIndex) in targetDayIndexes.enumerated() {
+                guard let actualDayIndex = weeks[weekIndex].days.firstIndex(
+                    where: { $0.dayIndex == dayIndex }
+                ) else {
+                    continue
+                }
+
+                let patternIndex =
+                    (weekIndex * resolvedSessionsPerWeek + slot) %
+                    pattern.count
+
+                weeks[weekIndex].days[actualDayIndex].sessions = [
+                    makeSession(for: pattern[patternIndex])
+                ]
+            }
+        }
+
+        activePlan = TrainingPlan(
+            id: UUID(),
+            ownerID: profile.userID,
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "My Training Plan"
+                : title.trimmingCharacters(in: .whitespacesAndNewlines),
+            summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
+            visibility: visibility,
+            version: 1,
+            weeks: weeks,
+            tags: [],
+            createdAt: Date(),
+            updatedAt: Date(),
+            startDate: startDate
+        )
+    }
+
     func replaceActivePlan(with plan: TrainingPlan) {
         activePlan = plan
     }
