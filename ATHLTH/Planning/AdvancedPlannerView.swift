@@ -71,7 +71,8 @@ struct AdvancedPlannerView: View {
                                             selectedDayID = day.id
                                             showingSessionEditor = true
                                         } label: {
-                                            Image(systemName: "plus.circle.fill")
+                                            Label("Add workout", systemImage: "plus.circle.fill")
+                                                .font(.caption.weight(.semibold))
                                         }
                                         .buttonStyle(.plain)
                                         .foregroundStyle(ATHLTHTheme.accent)
@@ -79,8 +80,8 @@ struct AdvancedPlannerView: View {
 
                                     if day.sessions.isEmpty {
                                         Label(
-                                            "Rest / recovery day",
-                                            systemImage: "leaf"
+                                            "No workout planned",
+                                            systemImage: "calendar.badge.plus"
                                         )
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -1130,16 +1131,14 @@ struct SessionEditorView: View {
                         )
                     }
 
-                    if kind != .running {
-                        Stepper(
-                            "Duration: \(durationMinutes) min",
-                            value: $durationMinutes,
-                            in: 5...300,
-                            step: 5
-                        )
-                    }
+                    Stepper(
+                        "Duration: \(durationMinutes) min",
+                        value: $durationMinutes,
+                        in: 5...300,
+                        step: 5
+                    )
 
-                    if kind == .walking {
+                    if kind == .walking || kind == .running {
                         Stepper(
                             "Distance: \(distanceKilometers, specifier: "%.1f") km",
                             value: $distanceKilometers,
@@ -1372,20 +1371,28 @@ struct SessionEditorView: View {
                         )
                     }
                 } else {
-                    Button {
-                        showingRunningLibrary = true
-                    } label: {
-                        Label(
-                            "Choose or Build Running Workout",
-                            systemImage: "figure.run.circle.fill"
-                        )
-                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "figure.run")
+                                .foregroundStyle(ATHLTHTheme.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Open run")
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Use the duration and distance above, or choose a structured workout.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
 
-                    Text(
-                        "Choose Easy, Long Run, Tempo, Threshold, Intervals, Fartlek, Hills, Race Pace, Progression or a custom workout."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                        Button {
+                            showingRunningLibrary = true
+                        } label: {
+                            Label(
+                                "Choose Structured Running Workout",
+                                systemImage: "list.bullet.rectangle"
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1408,8 +1415,14 @@ struct SessionEditorView: View {
             }
 
             if session.savedRoutes.isEmpty {
+                NavigationLink {
+                    RunRouteBuilderView()
+                } label: {
+                    Label("Create a Route", systemImage: "map.fill")
+                }
+
                 Text(
-                    "Import a GPX route from Train if you want this session tied to a specific route."
+                    "Routes are optional. Create one in ATHLTH and it will appear here."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1422,14 +1435,6 @@ struct SessionEditorView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !cleanTitle.isEmpty else { return false }
-
-        if kind == .strength {
-            return !plannedExercises.isEmpty
-        }
-
-        if kind == .running {
-            return selectedRunningWorkout != nil
-        }
 
         return true
     }
@@ -1489,14 +1494,14 @@ struct SessionEditorView: View {
             scheduledStart: scheduledTimeEnabled
                 ? scheduledTime
                 : nil,
-            durationMinutes: kind == .running
-                ? nil
-                : durationMinutes,
-            targetDistanceKilometers: kind == .walking
-                ? distanceKilometers
-                : selectedRunningWorkout?
+            durationMinutes: durationMinutes,
+            targetDistanceKilometers:
+                selectedRunningWorkout?
                     .estimatedDistanceMeters
-                    .map { $0 / 1_000 },
+                    .map { $0 / 1_000 }
+                ?? ((kind == .walking || kind == .running)
+                    ? distanceKilometers
+                    : nil),
             targetPaceSecondsPerKilometer: nil,
             routeID: selectedRouteID,
             exercises: kind == .strength
