@@ -213,6 +213,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let resolvedRoute = route ?? plannedRoute
 
         publish {
+            self.audioCoachConfiguration = .disabled
+            self.structuredRunningWorkout = nil
+            self.structuredStepIndex = 0
             self.state = .preparing
             self.kind = kind
             self.plannedRoute = resolvedRoute
