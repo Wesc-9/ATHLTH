@@ -1043,6 +1043,7 @@ private struct HomeCurrentStreakCard: View {
 
 struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
@@ -1241,57 +1242,9 @@ struct ATHLTHTrainView: View {
     @ViewBuilder
     private var todayContent: some View {
         if let plan = session.activePlan {
-            ATHLTHCard {
-                ATHLTHSectionHeader(
-                    title: "Today's Program",
-                    actionTitle: plan.title
-                )
-
-                let sessions = todaySessions(in: plan)
-
-                if sessions.isEmpty {
-                    Label(
-                        "No session planned today",
-                        systemImage: "leaf"
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 10)
-                } else {
-                    VStack(spacing: 14) {
-                        ForEach(sessions) { workout in
-                            HStack {
-                                Image(systemName: workout.kind.systemImage)
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .frame(width: 34)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(workout.title)
-                                        .font(.headline)
-
-                                    Text(todaySessionSummary(workout))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-
-                                if workout.kind == .strength {
-                                    Button("Start") {
-                                        selectedStrengthSession = workout
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                } else {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.top, 10)
-                }
-            }
+            todaysPlanCard(plan)
+        } else {
+            noActivePlanCard
         }
 
         ATHLTHCard {
@@ -1716,6 +1669,294 @@ struct ATHLTHTrainView: View {
             watchTransferMessage = "Sent \(route.title) to Apple Watch."
         } catch {
             watchTransferError = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func todaysPlanCard(_ plan: TrainingPlan) -> some View {
+        let sessions = todaySessions(in: plan)
+        let completedIDs = completedTodaySessionIDs(sessions)
+
+        ATHLTHCard {
+            HStack(spacing: 10) {
+                Text("Today's Plan")
+                    .font(.title3.weight(.semibold))
+
+                Spacer()
+
+                Button {
+                    selectedSection = 1
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("View Plan")
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if sessions.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "moon.stars")
+                        .font(.title3)
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Recovery day")
+                            .font(.subheadline.weight(.semibold))
+
+                        Text("Nothing is scheduled in \(plan.title) today.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 12)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(sessions.enumerated()), id: \.element.id) { index, workout in
+                        todayPlanRow(
+                            workout,
+                            isCompleted: completedIDs.contains(workout.id),
+                            isFirst: index == 0,
+                            isLast: index == sessions.count - 1
+                        )
+                    }
+                }
+                .padding(.top, 8)
+            }
+        }
+    }
+
+    private var noActivePlanCard: some View {
+        ATHLTHCard {
+            HStack(spacing: 10) {
+                Text("Today's Plan")
+                    .font(.title3.weight(.semibold))
+
+                Spacer()
+
+                Button {
+                    selectedSection = 2
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("Choose Plan")
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 13) {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHTheme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("No active training plan")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("Start or create a program to see today's sessions, times and completed workouts here.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+            .padding(.top, 12)
+
+            Button {
+                selectedSection = 2
+            } label: {
+                Text("Explore Programs")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: RoundedRectangle(cornerRadius: 15)
+            )
+            .padding(.top, 12)
+        }
+    }
+
+    @ViewBuilder
+    private func todayPlanRow(
+        _ workout: PlannedSession,
+        isCompleted: Bool,
+        isFirst: Bool,
+        isLast: Bool
+    ) -> some View {
+        Button {
+            if workout.kind == .strength, !isCompleted {
+                selectedStrengthSession = workout
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    if !isFirst {
+                        Rectangle()
+                            .fill(ATHLTHTheme.accent.opacity(0.16))
+                            .frame(width: 2, height: 22)
+                            .offset(y: -21)
+                    }
+
+                    if !isLast {
+                        Rectangle()
+                            .fill(ATHLTHTheme.accent.opacity(0.16))
+                            .frame(width: 2, height: 22)
+                            .offset(y: 21)
+                    }
+
+                    Circle()
+                        .fill(
+                            isCompleted
+                                ? ATHLTHTheme.accent
+                                : Color.white.opacity(0.94)
+                        )
+                        .frame(width: 26, height: 26)
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    isCompleted
+                                        ? ATHLTHTheme.accent
+                                        : ATHLTHTheme.accent.opacity(0.42),
+                                    lineWidth: 1.5
+                                )
+                        }
+
+                    if isCompleted {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 32, height: 58)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workout.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+
+                    Text(todaySessionSummary(workout))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 6)
+
+                Text(todayPlanStatus(workout, isCompleted: isCompleted))
+                    .font(.caption.weight(isCompleted ? .semibold : .regular))
+                    .foregroundStyle(
+                        isCompleted
+                            ? ATHLTHTheme.accent
+                            : ATHLTHTheme.mutedText
+                    )
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 10)
+            .frame(minHeight: 64)
+            .background(
+                Color.white.opacity(0.42),
+                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(workout.kind != .strength || isCompleted)
+        .opacity(1)
+        .padding(.vertical, 3)
+    }
+
+    private func todayPlanStatus(
+        _ workout: PlannedSession,
+        isCompleted: Bool
+    ) -> String {
+        if isCompleted {
+            return "Completed"
+        }
+
+        if let scheduledStart = workout.scheduledStart {
+            return scheduledStart.formatted(
+                date: .omitted,
+                time: .shortened
+            )
+        }
+
+        return "Today"
+    }
+
+    private func completedTodaySessionIDs(
+        _ sessions: [PlannedSession]
+    ) -> Set<UUID> {
+        let calendar = Calendar.current
+        var unusedWorkouts = health.workouts
+            .filter { calendar.isDateInToday($0.startDate) }
+            .sorted { $0.startDate < $1.startDate }
+
+        var result = Set<UUID>()
+
+        for session in sessions {
+            guard let matchIndex = unusedWorkouts.firstIndex(where: {
+                healthWorkout($0, matches: session)
+            }) else {
+                continue
+            }
+
+            result.insert(session.id)
+            unusedWorkouts.remove(at: matchIndex)
+        }
+
+        return result
+    }
+
+    private func healthWorkout(
+        _ workout: WorkoutSummary,
+        matches session: PlannedSession
+    ) -> Bool {
+        switch session.kind {
+        case .running:
+            return workout.activity == .running
+        case .walking:
+            return workout.activity == .walking || workout.activity == .hiking
+        case .strength:
+            return workout.activity == .strength
+        case .mobility:
+            return workout.activity == .yoga || workout.activity == .coreTraining
+        case .recovery:
+            return false
+        case .custom:
+            return workout.activity == .hiit ||
+                workout.activity == .rowing ||
+                workout.activity == .cycling ||
+                workout.activity == .stairClimbing ||
+                workout.activity == .other
         }
     }
 
