@@ -2049,8 +2049,11 @@ struct ATHLTHTrainView: View {
     @State private var watchTransferError: String?
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
-    @State private var pendingQuickStartKind: WorkoutKind?
     @State private var pendingRunningTemplate: RunningWorkoutTemplate?
+    @State private var showingRunQuickStart = false
+    @State private var showingWalkQuickStart = false
+    @State private var showingStrengthQuickStart = false
+    @State private var pendingStrengthStartSession: PlannedSession?
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
 
@@ -2144,24 +2147,58 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
-            .sheet(item: $pendingQuickStartKind) { kind in
-                QuickWorkoutStartSheet(
-                    kind: kind,
-                    trainingDeviceProvider: settings.trainingDeviceProvider,
+            .sheet(isPresented: $showingRunQuickStart) {
+                RunQuickStartSheet(
+                    trainingDeviceProvider:
+                        settings.trainingDeviceProvider,
                     watchConnected:
                         settings.trainingDeviceProvider == .appleWatch &&
                         watchConnection.isReady
-                ) { selectedFriends in
+                ) { configuration in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
-                            title: kind.title,
-                            kind: kind,
-                            friends: selectedFriends,
+                            title: configuration.title,
+                            kind: .running,
+                            friends: configuration.friends,
                             creatorName: session.profile.displayName,
                             creatorUsername: session.profile.username
                         )
-                        startQuickWorkoutOnWatch(kind)
+                        startRunQuickWorkout(configuration)
                     }
+                }
+            }
+            .sheet(isPresented: $showingWalkQuickStart) {
+                WalkQuickStartSheet(
+                    trainingDeviceProvider:
+                        settings.trainingDeviceProvider,
+                    watchConnected:
+                        settings.trainingDeviceProvider == .appleWatch &&
+                        watchConnection.isReady
+                ) { configuration in
+                    Task { @MainActor in
+                        await social.beginWorkoutWithFriends(
+                            title: "Walk",
+                            kind: .walking,
+                            friends: configuration.friends,
+                            creatorName: session.profile.displayName,
+                            creatorUsername: session.profile.username
+                        )
+                        startWalkQuickWorkout(configuration)
+                    }
+                }
+            }
+            .sheet(
+                isPresented: $showingStrengthQuickStart,
+                onDismiss: {
+                    if let pending = pendingStrengthStartSession {
+                        pendingStrengthStartSession = nil
+                        selectedStrengthSession = pending
+                    }
+                }
+            ) {
+                StrengthQuickStartSheet { workout in
+                    pendingStrengthStartSession = workout
+                    showingStrengthQuickStart = false
                 }
             }
             .sheet(item: $pendingRunningTemplate) { workout in
@@ -2596,18 +2633,22 @@ struct ATHLTHTrainView: View {
     private func quickStartSubtitle(
         _ kind: WorkoutKind
     ) -> String {
-        guard kind == .running || kind == .walking else {
-            return kind == .strength ? "Gym / Home" : kind.title
-        }
-
         if settings.trainingDeviceProvider == .appleWatch &&
-            watchConnection.isReady {
-            return "Outdoor"
+            !watchConnection.isReady &&
+            kind != .strength {
+            return "Connect Watch"
         }
 
-        return settings.trainingDeviceProvider == .appleWatch
-            ? "Connect Watch"
-            : "Watch required"
+        switch kind {
+        case .running:
+            return "Free / Route / Workout"
+        case .walking:
+            return "Free Walk"
+        case .strength:
+            return "Empty / Build"
+        case .mobility, .recovery, .custom:
+            return kind.title
+        }
     }
 
     private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
@@ -2628,24 +2669,16 @@ struct ATHLTHTrainView: View {
     }
 
     private func handleQuickStart(_ kind: WorkoutKind) {
-        if kind == .strength {
-            selectedStrengthSession = PlannedSession(
-                id: UUID(),
-                title: "Freestyle Strength",
-                kind: .strength,
-                scheduledStart: nil,
-                durationMinutes: nil,
-                targetDistanceKilometers: nil,
-                targetPaceSecondsPerKilometer: nil,
-                routeID: nil,
-                exercises: [],
-                notes: "Freestyle gym session",
-                runningWorkout: nil
-            )
-            return
+        switch kind {
+        case .running:
+            showingRunQuickStart = true
+        case .walking:
+            showingWalkQuickStart = true
+        case .strength:
+            showingStrengthQuickStart = true
+        case .mobility, .recovery, .custom:
+            break
         }
-
-        pendingQuickStartKind = kind
     }
 
     private var quickStartDeviceTitle: String {
@@ -2715,6 +2748,102 @@ struct ATHLTHTrainView: View {
                 )
                 watchTransferMessage =
                     "\(configuration.title) started on Apple Watch · \(configuration.detail)."
+            } catch {
+                watchTransferError = error.localizedDescription
+            }
+        }
+    }
+
+    private func startRunQuickWorkout(
+        _ configuration: RunQuickStartConfiguration
+    ) {
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady
+        else {
+            watchTransferError =
+                "Apple Watch is not ready to start this run."
+            return
+        }
+
+        do {
+            if let route = configuration.route {
+                try watchConnection.sendRoute(route)
+                watchConnection.sendWorkoutRouteSelection(route.id)
+            } else if let workout = configuration.workout,
+                      let routeID = workout.routeID,
+                      let route = session.savedRoutes.first(
+                        where: { $0.id == routeID }
+                      ) {
+                try watchConnection.sendRoute(route)
+                watchConnection.sendWorkoutRouteSelection(route.id)
+            } else {
+                watchConnection.sendWorkoutRouteSelection(nil)
+            }
+        } catch {
+            watchTransferError = error.localizedDescription
+            return
+        }
+
+        Task {
+            do {
+                try await watchConnection
+                    .startWorkoutOnWatch(.running)
+
+                watchConnection.sendAudioCoachConfiguration(
+                    configuration.audioCoach
+                )
+
+                if let workout = configuration.workout {
+                    watchConnection.sendRunningWorkout(
+                        watchRunningWorkoutTransfer(
+                            from: workout
+                        )
+                    )
+                } else {
+                    watchConnection.sendRunningWorkout(
+                        WatchRunningWorkoutTransfer(
+                            title: "",
+                            steps: []
+                        )
+                    )
+                }
+
+                watchTransferMessage =
+                    "\(configuration.title) started on Apple Watch."
+            } catch {
+                watchTransferError = error.localizedDescription
+            }
+        }
+    }
+
+    private func startWalkQuickWorkout(
+        _ configuration: WalkQuickStartConfiguration
+    ) {
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady
+        else {
+            watchTransferError =
+                "Apple Watch is not ready to start this walk."
+            return
+        }
+
+        watchConnection.sendWorkoutRouteSelection(nil)
+        watchConnection.sendRunningWorkout(
+            WatchRunningWorkoutTransfer(
+                title: "",
+                steps: []
+            )
+        )
+
+        Task {
+            do {
+                try await watchConnection
+                    .startWorkoutOnWatch(.walking)
+                watchConnection.sendAudioCoachConfiguration(
+                    configuration.audioCoach
+                )
+                watchTransferMessage =
+                    "Walk started on Apple Watch."
             } catch {
                 watchTransferError = error.localizedDescription
             }
