@@ -5,6 +5,8 @@ struct MessageInboxView: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var social: SocialStore
 
+    var onNewMessage: () -> Void = {}
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -174,16 +176,35 @@ struct MessageInboxView: View {
                     incomingRequestItems.isEmpty &&
                     outgoingRequestItems.isEmpty &&
                     friendsWithoutConversation.isEmpty {
-                    ContentUnavailableView(
-                        "No messages yet",
-                        systemImage: "message",
-                        description: Text(
-                            social.friends.isEmpty
-                                ? "Find people in Social. If they allow message requests, you can send one request before becoming friends."
-                                : "Start a conversation with one of your friends."
+                    VStack(spacing: 18) {
+                        ContentUnavailableView(
+                            "No messages yet",
+                            systemImage: "message",
+                            description: Text(
+                                "Start with a friend or find another athlete. Non-friends can receive one message request when their privacy settings allow it."
+                            )
                         )
-                    )
-                    .padding(.vertical, 50)
+
+                        Button(action: onNewMessage) {
+                            Label(
+                                "Start a Conversation",
+                                systemImage: "plus.message.fill"
+                            )
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+
+                        NavigationLink {
+                            SocialHubView(initialTab: .discover)
+                        } label: {
+                            Text("Explore Community")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    }
+                    .padding(.vertical, 42)
                 }
             }
             .padding()
