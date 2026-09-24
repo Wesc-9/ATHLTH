@@ -5,10 +5,13 @@ import UIKit
 struct ATHLTHEditProfileView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var accountService: SupabaseAccountService
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var gear: ProfileGearStore
 
     @State private var displayName = ""
     @State private var username = ""
     @State private var bio = ""
+    @State private var selectedTrainingFocus: TrainingFocus?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedAvatarData: Data?
     @State private var usernameAvailable: Bool?
@@ -85,17 +88,36 @@ struct ATHLTHEditProfileView: View {
                 }
             }
 
-            Section("Profile setup") {
-                NavigationLink {
-                    ATHLTHProfileSetupView()
-                } label: {
-                    Label(
-                        "Training focus & visibility",
-                        systemImage: "person.crop.circle.badge.checkmark"
-                    )
+            Section("Training Identity") {
+                Picker("Training focus", selection: $selectedTrainingFocus) {
+                    Text("Not set").tag(TrainingFocus?.none)
+                    ForEach(TrainingFocus.allCases) { focus in
+                        Label(focus.title, systemImage: focus.systemImage)
+                            .tag(Optional(focus))
+                    }
                 }
 
-                Text("Choose what appears on your profile and what other ATHLTH users are allowed to see.")
+                Text(
+                    selectedTrainingFocus?.subtitle
+                        ?? "Choose the training identity that best describes how you train."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Section("My Gear") {
+                NavigationLink {
+                    ProfileGearManagerView()
+                } label: {
+                    LabeledContent {
+                        Text("\(gear.items.count) saved")
+                            .foregroundStyle(.secondary)
+                    } label: {
+                        Label("Manage gear", systemImage: "backpack.fill")
+                    }
+                }
+
+                Text("Save multiple watches, shoes, headphones and other gear. Pick one item in each category to show on your profile.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -120,6 +142,9 @@ struct ATHLTHEditProfileView: View {
         .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: loadCurrentProfile)
+        .task {
+            await gear.refresh()
+        }
         .onChange(of: selectedPhoto) { _, newItem in
             guard let newItem else { return }
             Task {
@@ -259,6 +284,7 @@ struct ATHLTHEditProfileView: View {
         displayName = session.profile.displayName
         username = session.profile.username
         bio = session.profile.bio
+        selectedTrainingFocus = session.onboardingProfile?.trainingFocus
         usernameAvailable = nil
     }
 
@@ -336,6 +362,12 @@ struct ATHLTHEditProfileView: View {
             )
 
             session.applyBackendBootstrap(bootstrap)
+
+            if let selectedTrainingFocus {
+                session.setTrainingFocus(selectedTrainingFocus)
+                await social.syncOwnTrainingFocus(selectedTrainingFocus)
+            }
+
             selectedAvatarData = nil
             saved = true
         } catch {
