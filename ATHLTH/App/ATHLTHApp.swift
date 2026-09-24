@@ -132,6 +132,14 @@ struct AppRootView: View {
                 await messaging.refresh()
             }
 
+            if health.needsHealthRefreshRecovery {
+                // Give the UI a stable launch first. Clearing the recovery
+                // latch here only affects future launches because this
+                // process remains deferred until it exits.
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                health.resumeAutomaticRefresh()
+            }
+
             guard health.hasRequestedAuthorization,
                   !health.shouldDeferAutomaticHealthWork
             else {
