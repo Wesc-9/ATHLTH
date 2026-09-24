@@ -386,12 +386,12 @@ struct PersonalHealthProfileView: View {
                         )
                         await health.refreshAll()
                         await health.refreshPersonalDetails()
-                        session.updatePersonalDetails(
-                            health.personalDetails,
-                            source: health.personalDetails.hasAnyValue
-                                ? .appleHealth
-                                : .none
-                        )
+                        if health.personalDetails.hasAnyValue {
+                            session.updatePersonalDetails(
+                                health.personalDetails,
+                                source: .appleHealth
+                            )
+                        }
                         loadFromSession()
                     }
                 } label: {
