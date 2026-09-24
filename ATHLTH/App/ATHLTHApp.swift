@@ -55,7 +55,10 @@ struct ATHLTHApp: App {
                 .environmentObject(subscriptionStore)
                 .environmentObject(subscriptionBackend)
                 .environmentObject(accountService)
-                .environment(\.locale, Locale(identifier: "en"))
+                .environment(
+                    \.locale,
+                    settings.timeFormatPreference.locale
+                )
                 .preferredColorScheme(.light)
                 .tint(ATHLTHTheme.accent)
         }
