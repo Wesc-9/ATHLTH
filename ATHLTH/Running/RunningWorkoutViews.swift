@@ -19,17 +19,21 @@ struct RunningWorkoutLibraryView: View {
 
     let selectionTitle: String?
     let onSelect: ((RunningWorkoutTemplate) -> Void)?
+    let onStart: ((RunningWorkoutTemplate) -> Void)?
 
+    @State private var query = ""
     @State private var selectedType: RunningWorkoutType?
     @State private var showingBuilder = false
     @State private var selectedSection: RunningWorkoutLibrarySection = .library
 
     init(
         selectionTitle: String? = nil,
-        onSelect: ((RunningWorkoutTemplate) -> Void)? = nil
+        onSelect: ((RunningWorkoutTemplate) -> Void)? = nil,
+        onStart: ((RunningWorkoutTemplate) -> Void)? = nil
     ) {
         self.selectionTitle = selectionTitle
         self.onSelect = onSelect
+        self.onStart = onStart
     }
 
     private var templates: [RunningWorkoutTemplate] {
@@ -42,11 +46,23 @@ struct RunningWorkoutLibraryView: View {
             }
         }
 
-        guard let selectedType else {
-            return sourceTemplates
+        let typeFiltered: [RunningWorkoutTemplate]
+        if let selectedType {
+            typeFiltered = sourceTemplates.filter { $0.type == selectedType }
+        } else {
+            typeFiltered = sourceTemplates
         }
 
-        return sourceTemplates.filter { $0.type == selectedType }
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanQuery.isEmpty else {
+            return typeFiltered
+        }
+
+        return typeFiltered.filter {
+            $0.title.localizedCaseInsensitiveContains(cleanQuery) ||
+            $0.summary.localizedCaseInsensitiveContains(cleanQuery) ||
+            $0.type.title.localizedCaseInsensitiveContains(cleanQuery)
+        }
     }
 
     var body: some View {
@@ -114,7 +130,8 @@ struct RunningWorkoutLibraryView: View {
                                 RunningWorkoutDetailView(
                                     workout: workout,
                                     selectionTitle: selectionTitle,
-                                    onSelect: onSelect
+                                    onSelect: onSelect,
+                                    onStart: onStart
                                 )
                             } label: {
                                 workoutCard(workout)
@@ -129,6 +146,11 @@ struct RunningWorkoutLibraryView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(selectionTitle ?? "Running Workouts")
         .navigationBarTitleDisplayMode(.inline)
+        .searchable(
+            text: $query,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search running workouts"
+        )
         .toolbar {
             if selectedSection == .mine {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -230,6 +252,7 @@ struct RunningWorkoutDetailView: View {
     let workout: RunningWorkoutTemplate
     let selectionTitle: String?
     let onSelect: ((RunningWorkoutTemplate) -> Void)?
+    let onStart: ((RunningWorkoutTemplate) -> Void)?
 
     @State private var showingDelete = false
 
@@ -282,6 +305,19 @@ struct RunningWorkoutDetailView: View {
                             block: block
                         )
                     }
+                }
+
+                if let onStart {
+                    Button {
+                        onStart(workout)
+                        dismiss()
+                    } label: {
+                        Label("Start Workout", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(ATHLTHTheme.accent)
                 }
 
                 if let onSelect {
