@@ -303,8 +303,21 @@ struct WorkoutSummary: Identifiable, Hashable {
         startDate = workout.startDate
         endDate = workout.endDate
         duration = workout.duration
-        distanceMeters = workout.totalDistance?.doubleValue(for: .meter())
-        activeEnergyKilocalories = workout.totalEnergyBurned?.doubleValue(for: .kilocalorie())
+        if let distance = workout.totalDistance,
+           distance.is(compatibleWith: .meter()) {
+            let value = distance.doubleValue(for: .meter())
+            distanceMeters = value.isFinite ? value : nil
+        } else {
+            distanceMeters = nil
+        }
+
+        if let energy = workout.totalEnergyBurned,
+           energy.is(compatibleWith: .kilocalorie()) {
+            let value = energy.doubleValue(for: .kilocalorie())
+            activeEnergyKilocalories = value.isFinite ? value : nil
+        } else {
+            activeEnergyKilocalories = nil
+        }
     }
 
     var distanceKilometers: Double? {
