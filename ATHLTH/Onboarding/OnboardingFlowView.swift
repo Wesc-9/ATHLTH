@@ -54,6 +54,7 @@ struct OnboardingFlowView: View {
     @State private var allowPersonalizedOffers = false
     @State private var importedHealthDetails: HealthProfileBasics = .empty
     @State private var healthRequestInProgress = false
+    @State private var appleHealthSkipped = false
     @State private var showingEmailAuth = false
     @State private var legalDocument: LegalDocumentKind?
     @State private var usernameSuggestions: [String] = []
@@ -1546,18 +1547,16 @@ struct OnboardingFlowView: View {
                     )
                 }
 
-                if healthReadyForSummary {
-                    Divider()
-                        .padding(.leading, 44)
+                Divider()
+                    .padding(.leading, 44)
 
-                    readySetupRow(
-                        title: "Apple Health",
-                        value: "Health data connected",
-                        icon: "heart.fill",
-                        tint: Color(red: 0.90, green: 0.25, blue: 0.34),
-                        complete: true
-                    )
-                }
+                readySetupRow(
+                    title: "Apple Health",
+                    value: readyAppleHealthSummary,
+                    icon: "heart.fill",
+                    tint: readyAppleHealthTint,
+                    complete: readyAppleHealthConnected
+                )
 
                 Divider()
                     .padding(.leading, 44)
@@ -1618,6 +1617,49 @@ struct OnboardingFlowView: View {
             Spacer(minLength: 34)
         }
         .frame(maxWidth: .infinity, minHeight: 600)
+    }
+
+    private var readyAppleHealthConnected: Bool {
+        guard health.authorizationError == nil,
+              !appleHealthSkipped,
+              health.hasRequestedAuthorization
+        else {
+            return false
+        }
+
+        return healthReadyForSummary || health.canWriteWorkouts
+    }
+
+    private var readyAppleHealthSummary: String {
+        if appleHealthSkipped && !health.hasRequestedAuthorization {
+            return "Not connected"
+        }
+
+        if health.authorizationError != nil {
+            return "Setup needs attention"
+        }
+
+        guard health.hasRequestedAuthorization else {
+            return "Not connected"
+        }
+
+        if readyAppleHealthConnected {
+            return "Connected"
+        }
+
+        return "No readable Health data available"
+    }
+
+    private var readyAppleHealthTint: Color {
+        if readyAppleHealthConnected {
+            return Color(red: 0.90, green: 0.25, blue: 0.34)
+        }
+
+        if health.authorizationError != nil {
+            return .orange
+        }
+
+        return OnboardingTheme.faintText
     }
 
     private var readyDeviceSummary: String {
@@ -1763,6 +1805,7 @@ struct OnboardingFlowView: View {
 
                     if health.hasRequestedAuthorization {
                         footerButton(title: "Continue") {
+                            appleHealthSkipped = false
                             saveProfileData()
                             step = .ready
                         }
@@ -1777,6 +1820,7 @@ struct OnboardingFlowView: View {
                         }
 
                         Button("Not now") {
+                            appleHealthSkipped = true
                             saveProfileData()
                             step = .ready
                         }
@@ -2210,6 +2254,7 @@ struct OnboardingFlowView: View {
             step = .connections
 
         case .connections:
+            appleHealthSkipped = !health.hasRequestedAuthorization
             saveProfileData()
             connectionStage = .device
             step = .ready
@@ -2256,6 +2301,7 @@ struct OnboardingFlowView: View {
 
         Task {
             healthRequestInProgress = true
+            appleHealthSkipped = false
 
             await health.requestAuthorization()
             await health.completeAuthorizationSetup()
@@ -2267,7 +2313,16 @@ struct OnboardingFlowView: View {
             await health.refreshAll()
             await health.refreshPersonalDetails()
             importedHealthDetails = health.personalDetails
+
+            saveProfileData()
             healthRequestInProgress = false
+
+            // The Health permission sheet is the interaction. Once iOS
+            // returns to ATHLTH, go straight to the final setup summary rather
+            // than showing a second near-identical Health confirmation page.
+            withAnimation(.easeInOut(duration: 0.22)) {
+                step = .ready
+            }
         }
     }
 
