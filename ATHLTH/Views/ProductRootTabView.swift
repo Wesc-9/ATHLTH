@@ -81,6 +81,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var goalStore: GoalStore
@@ -218,55 +219,55 @@ struct ATHLTHHomeView: View {
                             }
                         }
 
-                        HStack(alignment: .top, spacing: 10) {
-                            HomeDayStatus(
-                                title: "Move",
-                                value: moveValue,
-                                subtitle: moveSubtitle,
-                                icon: "flame.fill",
-                                progress: moveProgress
-                            )
+                        if shouldShowAnyDaySummary {
+                            HStack(alignment: .top, spacing: 10) {
+                                if shouldShowMoveSummary {
+                                    HomeDayStatus(
+                                        title: "Move",
+                                        value: moveValue,
+                                        subtitle: moveSubtitle,
+                                        icon: "flame.fill",
+                                        progress: moveProgress
+                                    )
+                                }
 
-                            if shouldShowRecoverySummary {
-                                HomeDayStatus(
-                                    title: "Recovery",
-                                    value: recoveryValue,
-                                    subtitle: health.recovery.state.title,
-                                    icon: health.recovery.state.systemImage,
-                                    progress: health.recovery.score.map {
-                                        Double($0) / 100
-                                    }
-                                )
+                                if shouldShowRecoverySummary {
+                                    HomeDayStatus(
+                                        title: "Recovery",
+                                        value: recoveryValue,
+                                        subtitle: health.recovery.state.title,
+                                        icon: health.recovery.state.systemImage,
+                                        progress: health.recovery.score.map {
+                                            Double($0) / 100
+                                        }
+                                    )
+                                }
+
+                                if shouldShowSleepSummary {
+                                    HomeDayStatus(
+                                        title: "Sleep",
+                                        value: sleepValue,
+                                        subtitle: sleepSubtitle,
+                                        icon: "moon.fill",
+                                        progress: health.sleep.totalAsleep > 0
+                                            ? min(health.sleep.totalAsleep / (8 * 3_600), 1)
+                                            : nil
+                                    )
+                                }
                             }
-
-                            if shouldShowSleepSummary {
-                                HomeDayStatus(
-                                    title: "Sleep",
-                                    value: sleepValue,
-                                    subtitle: sleepSubtitle,
-                                    icon: "moon.fill",
-                                    progress: health.sleep.totalAsleep > 0
-                                        ? min(health.sleep.totalAsleep / (8 * 3_600), 1)
-                                        : nil
-                                )
-                            }
-                        }
-                        .padding(.top, 14)
-
-                        if settings.trainingDeviceProvider == .none &&
-                            !shouldShowRecoverySummary &&
-                            !shouldShowSleepSummary {
-                            HStack(spacing: 10) {
-                                Image(systemName: "iphone")
+                            .padding(.top, 14)
+                        } else {
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: health.hasRequestedAuthorization ? "heart.text.square" : "iphone")
                                     .foregroundStyle(ATHLTHTheme.accent)
+                                    .frame(width: 28)
 
-                                Text(
-                                    "Using iPhone mode. Sleep and recovery appear automatically if compatible data becomes available in Apple Health."
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                Text(homeNoHealthDetail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            .padding(.top, 10)
+                            .padding(.top, 12)
                         }
                     }
 
@@ -437,15 +438,21 @@ struct ATHLTHHomeView: View {
         if !health.hasRequestedAuthorization {
             switch settings.trainingDeviceProvider {
             case .garmin:
-                return "Garmin sync pending"
-            case .appleWatch, .none:
+                return "Garmin sync pending · Apple Health not connected"
+            case .appleWatch:
+                return watchConnection.isReady
+                    ? "Apple Watch connected · Apple Health not connected"
+                    : "Apple Watch setup incomplete"
+            case .none:
                 return "No health source connected"
             }
         }
 
         switch settings.trainingDeviceProvider {
         case .appleWatch:
-            return "Apple Health + Apple Watch"
+            return watchConnection.isReady
+                ? "Apple Health + Apple Watch"
+                : "Apple Health · Apple Watch setup incomplete"
         case .garmin:
             return "Apple Health · Garmin sync pending"
         case .none:
@@ -469,23 +476,45 @@ struct ATHLTHHomeView: View {
         return "\(greeting), \(session.profile.displayName)"
     }
 
-    private var shouldShowSleepSummary: Bool {
-        if settings.trainingDeviceProvider != .none {
-            return true
-        }
+    private var shouldShowMoveSummary: Bool {
+        health.training.activeEnergyKilocaloriesToday != nil ||
+            health.training.exerciseMinutesToday != nil ||
+            health.training.moveGoalKilocaloriesToday != nil
+    }
 
-        return health.sleep.totalAsleep > 0
+    private var shouldShowSleepSummary: Bool {
+        health.sleep.totalAsleep > 0
     }
 
     private var shouldShowRecoverySummary: Bool {
-        if settings.trainingDeviceProvider != .none {
-            return true
-        }
-
-        return health.recovery.score != nil ||
+        health.recovery.score != nil ||
             health.heart.hrvMilliseconds != nil ||
             health.heart.restingHeartRate != nil ||
             health.recovery.baselineDays > 0
+    }
+
+    private var shouldShowAnyDaySummary: Bool {
+        shouldShowMoveSummary ||
+            shouldShowRecoverySummary ||
+            shouldShowSleepSummary
+    }
+
+    private var homeNoHealthDetail: String {
+        if !health.hasRequestedAuthorization {
+            switch settings.trainingDeviceProvider {
+            case .appleWatch:
+                if watchConnection.isReady {
+                    return "Your Apple Watch is connected, but ATHLTH still needs Apple Health access before health metrics appear. Training plans, strength logging and social features remain available."
+                }
+                return "Apple Watch setup is incomplete and Apple Health is not connected. ATHLTH hides unavailable health cards while training plans, strength logging and social features remain available."
+            case .garmin:
+                return "Garmin sync is not active yet and Apple Health is not connected. ATHLTH keeps unavailable health cards out of the way."
+            case .none:
+                return "No watch or Apple Health is connected. ATHLTH stays focused on training plans, strength logging, routes, challenges and social features you can use without wearable data."
+            }
+        }
+
+        return "Apple Health is connected. Health cards appear automatically when compatible data becomes available, so ATHLTH does not fill your dashboard with empty metrics."
     }
 
     private var moveValue: String {
@@ -1959,9 +1988,7 @@ struct ATHLTHRecoveryView: View {
                                     Text("Recovery data isn’t available yet")
                                         .font(.headline)
 
-                                    Text(
-                                        "You selected No watch. ATHLTH will keep this page clean until compatible sleep, HRV or resting heart-rate data is available in Apple Health. You can connect a wearable later in Settings."
-                                    )
+                                    Text(recoveryUnavailableDetail)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -1983,15 +2010,33 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var shouldShowWearableRecoveryContent: Bool {
-        if settings.trainingDeviceProvider != .none {
-            return true
-        }
-
-        return health.recovery.score != nil ||
+        health.recovery.score != nil ||
             health.sleep.totalAsleep > 0 ||
             health.heart.hrvMilliseconds != nil ||
             health.heart.restingHeartRate != nil ||
             health.recovery.baselineDays > 0
+    }
+
+    private var recoveryUnavailableDetail: String {
+        if !health.hasRequestedAuthorization {
+            switch settings.trainingDeviceProvider {
+            case .appleWatch:
+                return "Apple Watch health metrics stay hidden until setup is complete and Apple Health data is available. You can still use training plans, log strength sessions and use the rest of ATHLTH."
+            case .garmin:
+                return "Garmin health sync is not active yet and Apple Health is not connected, so ATHLTH hides unavailable recovery metrics."
+            case .none:
+                return "You selected No watch and Apple Health is not connected. ATHLTH keeps this page clean instead of showing empty wearable metrics. You can connect Apple Health or a wearable later in Settings."
+            }
+        }
+
+        switch settings.trainingDeviceProvider {
+        case .none:
+            return "Apple Health is connected. ATHLTH will show recovery here when compatible sleep, HRV or resting heart-rate data becomes available; until then, empty wearable cards stay hidden."
+        case .appleWatch:
+            return "ATHLTH will show recovery as soon as compatible Apple Health data from your Watch or another source is available. Empty metrics stay hidden in the meantime."
+        case .garmin:
+            return "ATHLTH will show recovery when compatible Apple Health or future Garmin data becomes available."
+        }
     }
 
     private var recoveryHeadline: String {
@@ -2110,23 +2155,32 @@ struct ATHLTHProgressView: View {
                         focalOffsetX: 18
                     )
 
-                    periodPicker
+                    if health.hasRequestedAuthorization {
+                        periodPicker
 
-                    weeklyOverview
+                        weeklyOverview
 
-                    HStack(alignment: .top, spacing: 12) {
-                        workoutsCompletedCard
-                        dailyStepsCard
-                    }
+                        HStack(alignment: .top, spacing: 12) {
+                            workoutsCompletedCard
+                            dailyStepsCard
+                        }
 
-                    HStack(alignment: .top, spacing: 12) {
-                        consistencyCard
-                        personalRecordsCard
-                    }
+                        HStack(alignment: .top, spacing: 12) {
+                            consistencyCard
+                            personalRecordsCard
+                        }
 
-                    HStack(alignment: .top, spacing: 12) {
-                        monthlyStatsCard
-                        achievementsCard
+                        HStack(alignment: .top, spacing: 12) {
+                            monthlyStatsCard
+                            achievementsCard
+                        }
+                    } else {
+                        progressWithoutHealthCard
+
+                        HStack(alignment: .top, spacing: 12) {
+                            personalRecordsCard
+                            achievementsCard
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -2157,6 +2211,37 @@ struct ATHLTHProgressView: View {
                 goals: goalStore
             )
         }
+    }
+
+    private var progressWithoutHealthCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "chart.bar.xaxis")
+                    .font(.title2)
+                    .foregroundStyle(green)
+                    .frame(width: 48, height: 48)
+                    .background(
+                        green.opacity(0.08),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Progress without Apple Health")
+                        .font(.headline)
+
+                    Text(
+                        "Health-based charts stay hidden until Apple Health is connected. Strength records, goals, achievements and other ATHLTH-native progress remain available."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(18)
+        .progressReferenceCard()
     }
 
     private var periodPicker: some View {
