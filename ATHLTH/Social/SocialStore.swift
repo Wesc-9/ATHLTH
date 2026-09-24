@@ -187,7 +187,7 @@ final class SocialStore: ObservableObject {
         defer { isHomeFeedRefreshing = false }
 
         do {
-            feed = try await service.loadFeed()
+            feed = try await service.loadFeed(limit: 18)
             lastHomeFeedRefreshAt = Date()
         } catch {
             // A lightweight Home refresh must not overwrite a more important
