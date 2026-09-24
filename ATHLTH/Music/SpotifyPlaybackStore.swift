@@ -17,16 +17,10 @@ final class SpotifyPlaybackStore: ObservableObject {
         _ playlist: SpotifyPlaylistReference,
         settings: AppSettingsStore
     ) async {
-        guard
-            settings.spotifyConnected,
-            settings.spotifyAutoplayLinkedPlaylists
-        else {
-            return
-        }
-
-        // Preview behavior until the Spotify App Remote implementation is connected.
-        activePlaylist = playlist
-        lastStartedAt = Date()
+        // Spotify playback stays disabled until the real authorization and
+        // App Remote flow is implemented. Never simulate a successful start.
+        activePlaylist = nil
+        lastStartedAt = nil
     }
 
     func stopPreviewPlaybackState() {
