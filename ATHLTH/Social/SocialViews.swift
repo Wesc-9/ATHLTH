@@ -226,12 +226,6 @@ struct SocialHubView: View {
                             .frame(width: 38, height: 38)
                     }
                     .accessibilityLabel("New message")
-                } else {
-                    NavigationLink {
-                        SocialPrivacySettingsView()
-                    } label: {
-                        Image(systemName: "hand.raised.fill")
-                    }
                 }
             }
         }
