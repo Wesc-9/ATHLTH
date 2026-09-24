@@ -208,6 +208,56 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    func sendAudioCoachConfiguration(
+        _ configuration: WatchAudioCoachConfiguration
+    ) {
+        sendWatchPayload(
+            configuration,
+            kind: .audioCoachConfiguration
+        )
+    }
+
+    func sendRunningWorkout(
+        _ workout: WatchRunningWorkoutTransfer
+    ) {
+        sendWatchPayload(
+            workout,
+            kind: .runningWorkout
+        )
+    }
+
+    private func sendWatchPayload<T: Encodable>(
+        _ value: T,
+        kind: WatchTransferKind
+    ) {
+        guard
+            let session,
+            session.activationState == .activated,
+            let data = try? JSONEncoder().encode(value)
+        else {
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind: kind.rawValue,
+            WatchTransferMetadataKey.payload: data
+        ]
+
+        if session.isReachable {
+            session.sendMessage(
+                payload,
+                replyHandler: nil
+            ) { [weak self] error in
+                DispatchQueue.main.async {
+                    self?.workoutLaunchError =
+                        error.localizedDescription
+                }
+            }
+        } else {
+            session.transferUserInfo(payload)
+        }
+    }
+
     func clearCompletedWorkout() {
         DispatchQueue.main.async { [weak self] in
             self?.lastCompletedWorkout = nil
