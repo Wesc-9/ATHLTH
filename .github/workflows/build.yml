@@ -13,6 +13,7 @@ on:
       - release/v1.3.3
       - release/v1.3.4
       - release/v1.3.8
+      - release/v1.3.9
     paths:
       - .github/build-trigger
   pull_request:
