@@ -77,6 +77,40 @@ enum WatchWorkoutKind: String, Codable, CaseIterable, Hashable {
     }
 }
 
+struct WatchAudioCoachConfiguration: Codable, Hashable {
+    var enabled: Bool
+    var distanceIntervalMeters: Double?
+    var timeIntervalSeconds: TimeInterval?
+    var announceClockTime: Bool
+
+    static let disabled = WatchAudioCoachConfiguration(
+        enabled: false,
+        distanceIntervalMeters: nil,
+        timeIntervalSeconds: nil,
+        announceClockTime: false
+    )
+}
+
+enum WatchRunningStepMeasure: String, Codable, Hashable {
+    case distance
+    case time
+    case open
+}
+
+struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
+    let id: UUID
+    var title: String
+    var measure: WatchRunningStepMeasure
+    var distanceMeters: Double?
+    var durationSeconds: TimeInterval?
+    var intensityText: String?
+}
+
+struct WatchRunningWorkoutTransfer: Codable, Hashable {
+    var title: String
+    var steps: [WatchRunningWorkoutStep]
+}
+
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     let id: UUID
     var kind: WatchWorkoutKind
@@ -128,6 +162,8 @@ enum WatchTransferKind: String {
     case route
     case workoutResult
     case workoutCommand
+    case audioCoachConfiguration
+    case runningWorkout
     case connectivityProbe
     case connectivityAck
 }
