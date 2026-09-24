@@ -1584,11 +1584,12 @@ struct ATHLTHTrainView: View {
             return false
         }
 
-        if settings.trainingDeviceProvider == .appleWatch {
+        switch settings.trainingDeviceProvider {
+        case .appleWatch:
             return !watchConnection.workoutLaunchInProgress
+        case .garmin, .none:
+            return false
         }
-
-        return true
     }
 
     private func handleQuickStart(_ kind: WorkoutKind) {
