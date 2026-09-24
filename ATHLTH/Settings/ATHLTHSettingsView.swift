@@ -1018,8 +1018,11 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
 
         settings.trainingDeviceProvider = provider
 
-        if provider != .appleWatch,
-           settings.preferredWorkoutCapture == .appleWatch {
+        if provider == .none {
+            settings.preferredWorkoutCapture = .iPhone
+            settings.watchConnected = false
+        } else if provider != .appleWatch,
+                  settings.preferredWorkoutCapture == .appleWatch {
             settings.preferredWorkoutCapture = .iPhone
         }
 
@@ -1087,31 +1090,27 @@ private struct ATHLTHTrainingSettingsView: View {
     var body: some View {
         Form {
             Section("Workout") {
-                Picker(
-                    "Preferred workout device",
-                    selection: $settings.preferredWorkoutCapture
-                ) {
-                    Text("Automatic").tag(WorkoutCapturePreference.automatic)
-                    Text("iPhone").tag(WorkoutCapturePreference.iPhone)
+                if settings.trainingDeviceProvider != .none {
+                    Picker(
+                        "Preferred workout device",
+                        selection: $settings.preferredWorkoutCapture
+                    ) {
+                        Text("Automatic").tag(WorkoutCapturePreference.automatic)
+                        Text("iPhone").tag(WorkoutCapturePreference.iPhone)
 
-                    if settings.trainingDeviceProvider == .appleWatch {
-                        Text("Apple Watch")
-                            .tag(WorkoutCapturePreference.appleWatch)
+                        if settings.trainingDeviceProvider == .appleWatch {
+                            Text("Apple Watch")
+                                .tag(WorkoutCapturePreference.appleWatch)
+                        }
                     }
-                }
 
-                if settings.trainingDeviceProvider == .garmin {
-                    Text(
-                        "Garmin is your selected wearable. Until Garmin authorization is available, workouts started in ATHLTH use iPhone/manual capture and Garmin sync remains pending."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } else if settings.trainingDeviceProvider == .none {
-                    Text(
-                        "No watch selected. ATHLTH will never require an Apple Watch to open or use training features."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    if settings.trainingDeviceProvider == .garmin {
+                        Text(
+                            "Garmin is your selected wearable. Until Garmin authorization is available, workouts started in ATHLTH use iPhone/manual capture and Garmin sync remains pending."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                 }
 
                 Picker("Strength tracking", selection: $settings.defaultStrengthTracking) {
