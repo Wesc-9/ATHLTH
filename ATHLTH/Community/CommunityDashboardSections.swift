@@ -259,7 +259,13 @@ struct CommunityLeaderboardCard: View {
             )
         }
 
-        return result.sorted {
+        let visibleResult = result.filter {
+            scope == .friends ||
+            $0.isCurrentUser ||
+            $0.score > 0
+        }
+
+        return visibleResult.sorted {
             if $0.score == $1.score {
                 if $0.workoutCount == $1.workoutCount {
                     return $0.displayName.localizedCaseInsensitiveCompare(
