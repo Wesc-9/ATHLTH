@@ -451,6 +451,19 @@ struct ATHLTHHomeView: View {
             }
         }
 
+        if !health.hasTrainingHealthData {
+            switch settings.trainingDeviceProvider {
+            case .appleWatch:
+                return watchConnection.isReady
+                    ? "Apple Health configured · no training data yet"
+                    : "Apple Health configured · Watch setup incomplete"
+            case .garmin:
+                return "Apple Health configured · Garmin sync pending"
+            case .none:
+                return "Apple Health configured · no training data yet"
+            }
+        }
+
         switch settings.trainingDeviceProvider {
         case .appleWatch:
             return watchConnection.isReady
@@ -517,7 +530,7 @@ struct ATHLTHHomeView: View {
             }
         }
 
-        return "Apple Health is connected. Health cards appear automatically when compatible data becomes available, so ATHLTH does not fill your dashboard with empty metrics."
+        return "Apple Health is configured. Health cards appear automatically when compatible readable data becomes available, so ATHLTH does not fill your dashboard with empty metrics."
     }
 
     private var moveValue: String {
@@ -2040,7 +2053,7 @@ struct ATHLTHRecoveryView: View {
 
         switch settings.trainingDeviceProvider {
         case .none:
-            return "Apple Health is connected. ATHLTH will show recovery here when compatible sleep, HRV or resting heart-rate data becomes available; until then, empty wearable cards stay hidden."
+            return "Apple Health is configured. ATHLTH will show recovery here when compatible readable sleep, HRV or resting heart-rate data becomes available; until then, empty wearable cards stay hidden."
         case .appleWatch:
             return "ATHLTH will show recovery as soon as compatible Apple Health data from your Watch or another source is available. Empty metrics stay hidden in the meantime."
         case .garmin:
@@ -2165,7 +2178,8 @@ struct ATHLTHProgressView: View {
                     )
 
                     VStack(spacing: 14) {
-                    if health.hasRequestedAuthorization {
+                    if health.hasRequestedAuthorization &&
+                        (health.hasTrainingHealthData || progressHasHealthData) {
                         periodPicker
 
                         weeklyOverview
@@ -2239,11 +2253,17 @@ struct ATHLTHProgressView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Progress without Apple Health")
-                        .font(.headline)
+                    Text(
+                        health.hasRequestedAuthorization
+                            ? "No Apple Health progress data yet"
+                            : "Progress without Apple Health"
+                    )
+                    .font(.headline)
 
                     Text(
-                        "Health-based charts stay hidden until Apple Health is connected. Strength records, goals, achievements and other ATHLTH-native progress remain available."
+                        health.hasRequestedAuthorization
+                            ? "Apple Health is configured, but ATHLTH has not found readable workout, steps or sleep progress for this period yet. Health-based charts stay hidden instead of showing empty cards."
+                            : "Health-based charts stay hidden until Apple Health is connected. Strength records, goals, achievements and other ATHLTH-native progress remain available."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -2255,6 +2275,15 @@ struct ATHLTHProgressView: View {
         }
         .padding(18)
         .progressReferenceCard()
+    }
+
+    private var progressHasHealthData: Bool {
+        guard let snapshot = progressSnapshot else { return false }
+
+        return snapshot.workoutCount > 0 ||
+            (snapshot.totalSteps ?? 0) > 0 ||
+            (snapshot.averageSleepDuration ?? 0) > 0 ||
+            snapshot.trainingDuration > 0
     }
 
     private var periodPicker: some View {
