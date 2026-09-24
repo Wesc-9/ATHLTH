@@ -6,6 +6,7 @@ struct RunRouteBuilderView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
 
     @StateObject private var startSearch = RunRouteLocationSearchModel()
     @StateObject private var endSearch = RunRouteLocationSearchModel()
@@ -336,7 +337,7 @@ struct RunRouteBuilderView: View {
 
             if visibility == .publicProfile {
                 Label(
-                    "Public routes are marked for future route discovery and public challenges.",
+                    "Public routes can appear in Around You for nearby ATHLTH users and can be used in public challenges.",
                     systemImage: "globe.europe.africa.fill"
                 )
                 .font(.caption)
@@ -524,6 +525,10 @@ struct RunRouteBuilderView: View {
         )
 
         session.addImportedRoute(route)
+
+        Task {
+            await routeDiscovery.publish(route)
+        }
 
         if sendToWatchAfterSaving &&
             settings.trainingDeviceProvider == .appleWatch &&
