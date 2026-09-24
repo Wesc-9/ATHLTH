@@ -766,7 +766,7 @@ struct SocialFollowRecord: Codable, Hashable {
     }
 }
 
-private struct SocialFollowInsert: Encodable {
+struct SocialFollowInsert: Encodable {
     let followerID: UUID
     let followingID: UUID
 
