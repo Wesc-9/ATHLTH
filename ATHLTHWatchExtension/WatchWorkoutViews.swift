@@ -70,9 +70,9 @@ struct WatchWorkoutStartView: View {
                         .foregroundStyle(.primary)
 
                     Text(
-                        kind == .strength
-                            ? "Heart rate · calories · duration"
-                            : "Heart rate · GPS · distance"
+                        kind.supportsDistanceMetric
+                            ? "Heart rate · GPS · distance"
+                            : "Heart rate · calories · duration"
                     )
                     .font(.system(size: 9))
                     .foregroundStyle(WatchTheme.muted)
@@ -152,7 +152,7 @@ struct WatchActiveWorkoutView: View {
                     label: "KCAL"
                 )
 
-                if workoutManager.kind != .strength {
+                if workoutManager.kind.supportsDistanceMetric {
                     Divider()
 
                     metric(
