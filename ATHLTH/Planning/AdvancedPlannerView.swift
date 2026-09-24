@@ -218,10 +218,10 @@ struct TrainingPlanManagerView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Program Library")
+                        Text("Programs")
                             .font(.title3.weight(.bold))
                         Text(
-                            "Programs are reusable training structures. Start one when you're ready, then manage its actual dates and sessions in Calendar."
+                            "Create or start a reusable training program. Schedule its workouts in Plan."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -364,7 +364,7 @@ struct TrainingPlanManagerView: View {
 
                         Spacer()
 
-                        Button("Calendar") {
+                        Button("Plan") {
                             onOpenCalendar()
                         }
                         .font(.caption.weight(.semibold))
@@ -442,70 +442,6 @@ struct TrainingPlanManagerView: View {
                         }
                         .padding(.top, 10)
                     }
-                }
-
-                ATHLTHCard {
-                    ATHLTHSectionHeader(
-                        title: "Spotify",
-                        actionTitle: "Coming later"
-                    )
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label(
-                            "Spotify integration is not active yet",
-                            systemImage: "music.note"
-                        )
-                        .font(.headline)
-
-                        Text(
-                            "ATHLTH will only enable playlist linking and autoplay after the real Spotify authorization and playback flow is connected."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                        NavigationLink {
-                            SpotifySettingsView()
-                        } label: {
-                            Label(
-                                "About Spotify integration",
-                                systemImage: "info.circle"
-                            )
-                        }
-                    }
-                    .padding(.top, 10)
-                }
-
-                ATHLTHCard {
-                    ATHLTHSectionHeader(title: "Program building blocks")
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label(
-                            "Multiple sessions per day",
-                            systemImage: "square.stack.3d.up.fill"
-                        )
-                        Label(
-                            "Strength, run, walk, mobility and recovery",
-                            systemImage: "figure.mixed.cardio"
-                        )
-                        Label(
-                            "Structured run blocks, routes and intensity",
-                            systemImage: "figure.run"
-                        )
-                        Label(
-                            "Sets, reps, load, RPE, RIR and rest",
-                            systemImage: "dumbbell.fill"
-                        )
-                        Label(
-                            "Supersets and progression rules",
-                            systemImage: "arrow.triangle.2.circlepath"
-                        )
-                        Label(
-                            "Private, friends or public programs",
-                            systemImage: "person.2.fill"
-                        )
-                    }
-                    .font(.subheadline)
-                    .padding(.top, 10)
                 }
 
                 HStack(spacing: 10) {
