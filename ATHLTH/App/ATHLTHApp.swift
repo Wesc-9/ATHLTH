@@ -150,6 +150,7 @@ struct AppRootView: View {
                 allowed: settings.backgroundHealthSyncEnabled
             )
             await health.refreshAll()
+            syncAppleHealthProfileDetailsIfNeeded()
             await goals.refreshAutomaticMilestones(
                 health: health,
                 strength: strengthWorkout
@@ -185,6 +186,7 @@ struct AppRootView: View {
                 }
 
                 await health.refreshAll()
+                syncAppleHealthProfileDetailsIfNeeded()
                 await goals.refreshAutomaticMilestones(
                     health: health,
                     strength: strengthWorkout
@@ -273,6 +275,7 @@ struct AppRootView: View {
 
             Task {
                 await health.refreshAll()
+                syncAppleHealthProfileDetailsIfNeeded()
                 await goals.refreshAutomaticMilestones(
                     health: health,
                     strength: strengthWorkout
@@ -487,6 +490,19 @@ struct AppRootView: View {
         } message: {
             Text(authCallbackError ?? "Authentication could not be completed.")
         }
+    }
+
+    private func syncAppleHealthProfileDetailsIfNeeded() {
+        guard appSession.onboardingProfile?.personalDetailsSource == .appleHealth,
+              health.personalDetails.hasAnyValue
+        else {
+            return
+        }
+
+        appSession.updatePersonalDetails(
+            health.personalDetails,
+            source: .appleHealth
+        )
     }
 
     private func resolveStartupAuthentication() async {
