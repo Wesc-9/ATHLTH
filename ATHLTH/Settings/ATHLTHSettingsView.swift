@@ -866,69 +866,114 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
         Form {
             Section("Primary training device") {
                 ForEach(TrainingDeviceProvider.allCases) { provider in
-                    Button {
-                        guard provider != .garmin else { return }
+                    HStack(spacing: 10) {
+                        Button {
+                            select(provider)
+                        } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: provider.systemImage)
+                                    .font(.title3)
+                                    .foregroundStyle(
+                                        settings.trainingDeviceProvider == provider
+                                            ? ATHLTHTheme.accent
+                                            : .secondary
+                                    )
+                                    .frame(width: 34)
 
-                        settings.trainingDeviceProvider = provider
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 7) {
+                                        Text(provider.title)
+                                            .font(.headline)
+                                            .foregroundStyle(.primary)
 
-                        if provider != .appleWatch,
-                           settings.preferredWorkoutCapture == .appleWatch {
-                            settings.preferredWorkoutCapture = .iPhone
-                        }
+                                        if provider == .garmin {
+                                            Text("COMING SOON")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .tracking(0.7)
+                                                .foregroundStyle(.secondary)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 3)
+                                                .background(
+                                                    Color.primary.opacity(0.05),
+                                                    in: Capsule()
+                                                )
+                                        }
+                                    }
 
-                        if provider == .appleWatch {
-                            watchConnection.connect()
-                        }
-                    } label: {
-                        HStack(spacing: 14) {
-                            Image(systemName: provider.systemImage)
-                                .font(.title3)
+                                    Text(deviceSubtitle(provider))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .multilineTextAlignment(.leading)
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        settings.trainingDeviceProvider == provider
+                                        ? "checkmark.circle.fill"
+                                        : "circle"
+                                )
                                 .foregroundStyle(
                                     settings.trainingDeviceProvider == provider
                                         ? ATHLTHTheme.accent
-                                        : .secondary
+                                        : Color.secondary.opacity(0.55)
                                 )
-                                .frame(width: 34)
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(provider.title)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                Text(provider.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.leading)
                             }
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    settings.trainingDeviceProvider == provider
-                                    ? "checkmark.circle.fill"
-                                    : "circle"
-                            )
-                            .foregroundStyle(
-                                settings.trainingDeviceProvider == provider
-                                    ? ATHLTHTheme.accent
-                                    : Color.secondary.opacity(0.55)
-                            )
+                            .contentShape(Rectangle())
                         }
-                        .padding(.vertical, 4)
+                        .buttonStyle(.plain)
+                        .disabled(provider == .garmin)
+                        .opacity(provider == .garmin ? 0.62 : 1)
+
+                        if provider == .appleWatch {
+                            NavigationLink {
+                                AppleWatchConnectionView()
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.title3)
+                                    .foregroundStyle(ATHLTHTheme.accent)
+                                    .frame(width: 36, height: 36)
+                            }
+                            .accessibilityLabel("Apple Watch details")
+                        } else if provider == .garmin {
+                            NavigationLink {
+                                GarminConnectionSetupView()
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 36, height: 36)
+                            }
+                            .accessibilityLabel("Garmin setup information")
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .disabled(provider == .garmin)
-                    .opacity(provider == .garmin ? 0.52 : 1)
+                    .padding(.vertical, 4)
                 }
             }
 
-            switch settings.trainingDeviceProvider {
-            case .appleWatch:
+            if settings.trainingDeviceProvider == .appleWatch {
                 Section("Apple Watch") {
                     LabeledContent(
                         "Status",
                         value: watchConnection.statusText
                     )
+
+                    if watchConnection.state == .appNotInstalled {
+                        Label(
+                            "ATHLTH is not installed on the paired Watch.",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    } else if watchConnection.isReady {
+                        Label(
+                            "ATHLTH Watch app is installed and ready.",
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.accent)
+                    }
 
                     NavigationLink {
                         AppleWatchConnectionView()
@@ -936,69 +981,30 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                         Label(
                             watchConnection.isReady
                                 ? "Apple Watch details"
-                                : "Set up Apple Watch",
+                                : "Finish Apple Watch setup",
                             systemImage: "applewatch"
                         )
                     }
-
-                    Text(
-                        "Apple Watch can start ATHLTH workouts, mirror live workout data and receive routes when the ATHLTH Watch app is installed."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 }
+            }
 
-            case .garmin:
-                Section("Garmin Connect") {
-                    LabeledContent(
-                        "Status",
-                        value: "Coming soon"
-                    )
-
-                    Text(
-                        "Garmin Connect is coming soon. ATHLTH will enable this option after Garmin integration access is approved and production-ready."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section("Prepared data") {
-                    wearableCapabilityRow("Workouts", icon: "figure.run")
-                    wearableCapabilityRow("Heart rate & resting HR", icon: "heart.fill")
-                    wearableCapabilityRow("HRV", icon: "waveform.path.ecg")
-                    wearableCapabilityRow("Sleep", icon: "moon.fill")
-                    wearableCapabilityRow("Steps & active energy", icon: "flame.fill")
-                    wearableCapabilityRow("Distance & routes", icon: "map.fill")
-                    wearableCapabilityRow(
-                        "Progress & personal records",
-                        icon: "chart.line.uptrend.xyaxis"
-                    )
-
-                    Text(
-                        "Garmin data will be normalized into the same ATHLTH fields used by Home, Recovery, Progress, personal records and workout history. Missing metrics stay unavailable rather than using placeholder values."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-            case .none:
-                Section("No watch") {
-                    Label(
-                        "ATHLTH works without a wearable",
-                        systemImage: "checkmark.shield.fill"
-                    )
-                    .foregroundStyle(ATHLTHTheme.accent)
-
-                    Text(
-                        "Strength logging, plans, friends, challenges, routes and manual workout data remain available. Apple Health data from iPhone or other apps is used when available. Watch-only actions are hidden or disabled safely."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if settings.trainingDeviceProvider == .garmin {
+                Section("Garmin") {
+                    NavigationLink {
+                        GarminConnectionSetupView()
+                    } label: {
+                        Label("Set up Garmin", systemImage: "watch.analog")
+                    }
                 }
             }
         }
         .navigationTitle("Training Device")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if settings.trainingDeviceProvider == .appleWatch {
+                watchConnection.connect()
+            }
+        }
         .onChange(of: settings.trainingDeviceProvider) { _, provider in
             if provider != .appleWatch,
                settings.preferredWorkoutCapture == .appleWatch {
@@ -1007,13 +1013,71 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
         }
     }
 
-    @ViewBuilder
-    private func wearableCapabilityRow(
-        _ title: String,
-        icon: String
-    ) -> some View {
-        Label(title, systemImage: icon)
-            .foregroundStyle(.primary)
+    private func select(_ provider: TrainingDeviceProvider) {
+        guard provider != .garmin else { return }
+
+        settings.trainingDeviceProvider = provider
+
+        if provider != .appleWatch,
+           settings.preferredWorkoutCapture == .appleWatch {
+            settings.preferredWorkoutCapture = .iPhone
+        }
+
+        if provider == .appleWatch {
+            watchConnection.connect()
+        }
+    }
+
+    private func deviceSubtitle(
+        _ provider: TrainingDeviceProvider
+    ) -> String {
+        switch provider {
+        case .appleWatch:
+            switch watchConnection.state {
+            case .ready:
+                return "Connected · ATHLTH Watch app installed"
+            case .appNotInstalled:
+                return "Paired · ATHLTH Watch app not installed"
+            case .notPaired:
+                return "No paired Apple Watch found"
+            case .checking:
+                return "Checking Apple Watch…"
+            case .unsupported:
+                return "Apple Watch unavailable on this device"
+            }
+
+        case .garmin:
+            return "Setup will open here when Garmin access is enabled"
+
+        case .none:
+            return "Use ATHLTH with iPhone and available Apple Health data"
+        }
+    }
+}
+
+private struct GarminConnectionSetupView: View {
+    var body: some View {
+        Form {
+            Section("Garmin Connect") {
+                Label("Garmin integration is coming soon", systemImage: "watch.analog")
+                    .font(.headline)
+
+                Text(
+                    "When Garmin access is enabled, this screen will guide you through account authorization, permissions and the data ATHLTH can sync."
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+
+            Section("Planned sync") {
+                Label("Workouts and routes", systemImage: "figure.run")
+                Label("Heart rate and HRV", systemImage: "heart.fill")
+                Label("Sleep and recovery", systemImage: "moon.fill")
+                Label("Steps and activity", systemImage: "figure.walk")
+            }
+        }
+        .navigationTitle("Garmin Setup")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
