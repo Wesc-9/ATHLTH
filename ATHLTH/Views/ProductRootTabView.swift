@@ -33,7 +33,10 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Community", systemImage: "person.3.fill") }
                 .tag(4)
         }
-        .tint(ATHLTHTheme.accent)
+        .tint(ATHLTHTheme.accentDeep)
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarColorScheme(.light, for: .tabBar)
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .athlthRemoteNotificationTapped
@@ -1249,12 +1252,10 @@ struct ATHLTHTrainView: View {
                     )
 
                     VStack(spacing: 18) {
-                    Picker("Training section", selection: $selectedSection) {
-                        Text("Today").tag(0)
-                        Text("Plan").tag(1)
-                        Text("Library").tag(2)
-                    }
-                    .pickerStyle(.segmented)
+                    ATHLTHPremiumSegmentedControl(
+                        titles: ["Today", "Plan", "Library"],
+                        selection: $selectedSection
+                    )
 
                     switch selectedSection {
                     case 1:
@@ -1273,6 +1274,11 @@ struct ATHLTHTrainView: View {
                 }
             }
             .ignoresSafeArea(edges: .top)
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: Color.green.opacity(0.55)
+                )
+            )
             .sheet(item: $selectedPlanWorkout) { selection in
                 PlannedWorkoutDetailView(
                     planID: selection.planID,
@@ -2461,16 +2467,9 @@ struct ATHLTHRecoveryView: View {
             }
             .ignoresSafeArea(edges: .top)
             .background(
-                LinearGradient(
-                    colors: [
-                        .blue.opacity(0.035),
-                        ATHLTHTheme.accent.opacity(0.025),
-                        .clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                ATHLTHPremiumCanvas(
+                    accent: Color.blue.opacity(0.70)
                 )
-                .ignoresSafeArea()
             )
             .refreshable {
                 await health.refreshAll()
@@ -3331,7 +3330,11 @@ struct ATHLTHProgressView: View {
                 }
             }
             .ignoresSafeArea(edges: .top)
-            .background(canvas.ignoresSafeArea())
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: green.opacity(0.60)
+                )
+            )
             .refreshable {
                 async let selected: Void = loadProgressData()
                 async let support: Void = loadSupportingProgressData()
@@ -3424,12 +3427,30 @@ struct ATHLTHProgressView: View {
             }
         }
         .padding(4)
-        .background(.white.opacity(0.96), in: Capsule())
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    ATHLTHTheme.cardWarm.opacity(0.92)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: Capsule()
+        )
         .overlay {
             Capsule()
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                .stroke(
+                    ATHLTHTheme.premiumGold.opacity(0.12),
+                    lineWidth: 0.8
+                )
         }
-        .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.07),
+            radius: 12,
+            x: 0,
+            y: 6
+        )
     }
 
     private var weeklyOverview: some View {
