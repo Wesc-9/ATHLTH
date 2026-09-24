@@ -3283,39 +3283,56 @@ struct ATHLTHRecoveryView: View {
     private var recoveryScoreCard: some View {
         ATHLTHCard {
             ATHLTHSectionHeader(
-                title: "Recovery",
+                title: "Readiness",
                 actionTitle: "Today"
             )
 
             if let score = health.recovery.score {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .center, spacing: 18) {
-                        ATHLTHProgressRing(
-                            title: health.recovery.state.title,
-                            value: "\(score)",
-                            progress: Double(score) / 100,
-                            icon: health.recovery.state.systemImage,
-                            tint: ATHLTHTheme.accent
+                HStack(alignment: .center, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(
+                            alignment: .firstTextBaseline,
+                            spacing: 3
+                        ) {
+                            Text("\(score)")
+                                .font(
+                                    .system(
+                                        size: 58,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                                .contentTransition(.numericText())
+
+                            Text("/100")
+                                .font(
+                                    .subheadline.weight(.semibold)
+                                )
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Label(
+                            health.recovery.state.title,
+                            systemImage:
+                                health.recovery.state.systemImage
                         )
-                        .frame(width: 116)
-
-                        recoveryScoreCopy
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accent)
                     }
+                    .frame(
+                        minWidth: 132,
+                        alignment: .leading
+                    )
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        ATHLTHProgressRing(
-                            title: health.recovery.state.title,
-                            value: "\(score)",
-                            progress: Double(score) / 100,
-                            icon: health.recovery.state.systemImage,
-                            tint: ATHLTHTheme.accent
-                        )
-                        .frame(maxWidth: .infinity)
+                    Divider()
+                        .frame(height: 92)
 
-                        recoveryScoreCopy
-                    }
+                    recoveryScoreCopy
                 }
-                .padding(.top, 10)
+                .padding(.top, 8)
             } else {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: "waveform.path.ecg")
@@ -3337,7 +3354,10 @@ struct ATHLTHRecoveryView: View {
                         Text(health.recovery.detail)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
                     }
 
                     Spacer(minLength: 0)
@@ -3724,15 +3744,28 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var guidanceTitle: String {
+        if sorenessStore.highestTodayLevel == .high {
+            return "Protect sore muscle groups today"
+        }
+
+        if sorenessStore.highestTodayLevel == .moderate {
+            return "Adjust around sore areas"
+        }
+
+        if let ratio = recoverySnapshot.trainingLoad.ratio,
+           ratio >= 1.50 {
+            return "Training load is high"
+        }
+
         switch health.recovery.state {
         case .ready:
-            return "Normal training load"
+            return "Good day for a hard session"
         case .balanced:
             return "Train as planned"
         case .takeItEasy:
-            return "Consider lower intensity"
+            return "Consider active recovery"
         case .recover:
-            return "Recovery first"
+            return "Prioritize recovery today"
         case .buildingBaseline:
             switch settings.trainingDeviceProvider {
             case .appleWatch:
@@ -3746,15 +3779,28 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var guidanceDetail: String {
+        if sorenessStore.highestTodayLevel == .high {
+            return "Your body check-in shows high soreness. Keep those muscle groups out of heavy work and choose another area, mobility or easy recovery."
+        }
+
+        if sorenessStore.highestTodayLevel == .moderate {
+            return "Moderate soreness is logged today. You can still train, but reduce load on the affected muscle groups or choose a different focus."
+        }
+
+        if let ratio = recoverySnapshot.trainingLoad.ratio,
+           ratio >= 1.50 {
+            return "Your last 7 days are substantially above your recent 28-day weekly average. Consider lower volume, easier intensity or a recovery session today."
+        }
+
         switch health.recovery.state {
         case .ready:
-            return "Your current recovery signals support a normal session today."
+            return "Sleep, HRV and resting heart rate support a normal-to-hard training day. Use your planned session and how you feel as the final check."
         case .balanced:
             return "Your signals are close to baseline. Follow the plan and adjust if effort feels unusually high."
         case .takeItEasy:
-            return "Sleep, HRV or resting heart rate are below your recent pattern. Consider reducing intensity or volume."
+            return "One or more recovery signals are below your recent pattern. Easy cardio, mobility or reduced training volume may fit better today."
         case .recover:
-            return "Your combined recovery signals are well below baseline. A rest day, mobility or easy activity may be more appropriate."
+            return "Your combined recovery signals are well below baseline. Rest, mobility, breathing or very easy activity may be more appropriate."
         case .buildingBaseline:
             switch settings.trainingDeviceProvider {
             case .appleWatch:
@@ -3766,6 +3812,14 @@ struct ATHLTHRecoveryView: View {
             }
         }
     }
+
+    private var muscleRecoveryStatuses: [MuscleRecoveryStatus] {
+        MuscleRecoveryEngine.statuses(
+            history: strengthWorkout.workoutHistory,
+            soreness: sorenessStore
+        )
+    }
+
 }
 
 private struct ATHLTHProgressHero: View {
