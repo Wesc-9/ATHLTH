@@ -719,6 +719,19 @@ struct OnboardingFlowView: View {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             selectedTrainingFocus = focus
                         }
+
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(180))
+                            guard selectedTrainingFocus == focus,
+                                  goalsStage == .trainingStyle
+                            else {
+                                return
+                            }
+
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                goalsStage = .goalSelection
+                            }
+                        }
                     }
                 }
             }
@@ -1696,14 +1709,7 @@ struct OnboardingFlowView: View {
             case .goals:
                 switch goalsStage {
                 case .trainingStyle:
-                    footerButton(
-                        title: "Continue",
-                        disabled: selectedTrainingFocus == nil
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.20)) {
-                            goalsStage = .goalSelection
-                        }
-                    }
+                    EmptyView()
 
                 case .goalSelection:
                     footerButton(
