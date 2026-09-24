@@ -299,7 +299,10 @@ struct HomeAroundYouSection: View {
             }
         }
         .task {
-            async let routesRefresh: Void = routeDiscovery.refresh()
+            async let routesRefresh: Void =
+                routeDiscovery.syncOwnedPublicRoutes(
+                    session.savedRoutes
+                )
             async let eventsRefresh: Void = community.refresh()
             _ = await (routesRefresh, eventsRefresh)
         }
@@ -555,7 +558,10 @@ struct AroundYouExploreView: View {
             }
         }
         .task {
-            async let routesRefresh: Void = routeDiscovery.refresh()
+            async let routesRefresh: Void =
+                routeDiscovery.syncOwnedPublicRoutes(
+                    session.savedRoutes
+                )
             async let eventsRefresh: Void = community.refresh()
             _ = await (routesRefresh, eventsRefresh)
         }
