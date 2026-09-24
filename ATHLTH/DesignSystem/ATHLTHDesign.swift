@@ -51,30 +51,12 @@ struct ATHLTHCard<Content: View>: View {
                     LinearGradient(
                         colors: [
                             ATHLTHTheme.card,
-                            ATHLTHTheme.cardWarm.opacity(0.72),
-                            ATHLTHTheme.surfaceSage.opacity(0.48)
+                            ATHLTHTheme.cardWarm.opacity(0.62)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .overlay {
-                    RadialGradient(
-                        colors: [
-                            ATHLTHTheme.premiumGold.opacity(0.075),
-                            Color.clear
-                        ],
-                        center: .topTrailing,
-                        startRadius: 0,
-                        endRadius: 220
-                    )
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: ATHLTHTheme.cornerRadius,
-                            style: .continuous
-                        )
-                    )
-                }
             }
             .overlay {
                 RoundedRectangle(
@@ -82,29 +64,15 @@ struct ATHLTHCard<Content: View>: View {
                     style: .continuous
                 )
                 .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.90),
-                            ATHLTHTheme.premiumGold.opacity(0.10),
-                            Color.black.opacity(0.035)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
+                    Color.white.opacity(0.72),
                     lineWidth: 0.8
                 )
             }
             .shadow(
-                color: ATHLTHTheme.accentDeep.opacity(0.085),
-                radius: 20,
+                color: ATHLTHTheme.accentDeep.opacity(0.075),
+                radius: 16,
                 x: 0,
-                y: 10
-            )
-            .shadow(
-                color: ATHLTHTheme.premiumGold.opacity(0.025),
-                radius: 26,
-                x: 0,
-                y: 14
+                y: 7
             )
     }
 }
