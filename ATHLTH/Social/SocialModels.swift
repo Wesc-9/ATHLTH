@@ -109,6 +109,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
     var discoverable: Bool
     var allowFriendRequests: Bool
     var allowDirectMessages: String
+    var trainingFocusVisibility: String
     var trainingPresenceVisibility: String
     var performanceStatsVisibility: String
     var trophyCabinetVisibility: String
@@ -134,6 +135,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
         case discoverable
         case allowFriendRequests = "allow_friend_requests"
         case allowDirectMessages = "allow_direct_messages"
+        case trainingFocusVisibility = "training_focus_visibility"
         case trainingPresenceVisibility = "training_presence_visibility"
         case performanceStatsVisibility = "performance_stats_visibility"
         case trophyCabinetVisibility = "trophy_cabinet_visibility"
@@ -157,10 +159,11 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
     static func fallback(userID: UUID) -> SocialPrivacySettings {
         SocialPrivacySettings(
             userID: userID,
-            profileVisibility: "friends",
-            discoverable: true,
+            profileVisibility: "private",
+            discoverable: false,
             allowFriendRequests: true,
             allowDirectMessages: "requests",
+            trainingFocusVisibility: "private",
             trainingPresenceVisibility: "private",
             performanceStatsVisibility: "private",
             trophyCabinetVisibility: "private",
@@ -180,6 +183,18 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
             createdAt: nil,
             updatedAt: nil
         )
+    }
+}
+
+struct SocialTrainingFocusRecord: Codable, Equatable, Hashable {
+    let userID: UUID
+    let focus: TrainingFocus
+    var updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case focus
+        case updatedAt = "updated_at"
     }
 }
 
@@ -394,6 +409,7 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
 
 struct SocialFriendProfile: Hashable {
     let card: SocialProfileCard
+    let trainingFocus: TrainingFocus?
     let presence: SocialPresenceRecord?
     let performance: SocialPerformanceStats?
     let trophies: [SocialTrophyShowcaseItem]
