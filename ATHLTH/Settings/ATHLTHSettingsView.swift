@@ -687,6 +687,11 @@ struct ATHLTHSettingsView: View {
         if health.lastSuccessfulRefreshAt != nil && !health.hasTrainingHealthData {
             return health.personalDetails.hasAnyValue ? "Profile only" : "No data"
         }
+        if health.lastSuccessfulRefreshAt != nil &&
+            health.hasTrainingHealthData &&
+            !health.canWriteWorkouts {
+            return "Read only"
+        }
         return health.lastSuccessfulRefreshAt != nil ? "Synced" : "Ready"
     }
 
@@ -713,7 +718,11 @@ struct ATHLTHSettingsView: View {
             let relative = formatter.localizedString(for: lastRefresh, relativeTo: Date())
 
             if health.hasTrainingHealthData {
-                return "Apple Health training data imported successfully. Last synced \(relative)."
+                if health.canWriteWorkouts {
+                    return "Apple Health training data imported successfully. Last synced \(relative)."
+                }
+
+                return "Apple Health data was imported \(relative), but workout write access is off. Tap Sync now to review Health permissions."
             }
 
             if health.personalDetails.hasAnyValue {
@@ -753,7 +762,9 @@ struct ATHLTHSettingsView: View {
         }
 
         if health.hasTrainingHealthData {
-            return "Connected · training and health data is available"
+            return health.canWriteWorkouts
+                ? "Connected · training and health data is available"
+                : "Connected for reading · workout write access is off"
         }
 
         if health.personalDetails.hasAnyValue {
@@ -821,7 +832,8 @@ struct ATHLTHSettingsView: View {
 
         Task {
             healthRequestInProgress = true
-            health.resumeUserInitiatedHealthSync()
+            await health.requestAuthorization()
+            await health.completeAuthorizationSetup()
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
@@ -832,15 +844,12 @@ struct ATHLTHSettingsView: View {
     }
 
     private func syncHealthProfileFromAppleHealthIfAppropriate() {
-        guard session.onboardingProfile?.personalDetailsSource != .manual,
-              health.personalDetails.hasAnyValue
-        else {
+        guard health.personalDetails.hasAnyValue else {
             return
         }
 
-        session.updatePersonalDetails(
-            health.personalDetails,
-            source: .appleHealth
+        session.mergePersonalDetailsFromAppleHealth(
+            health.personalDetails
         )
     }
 
