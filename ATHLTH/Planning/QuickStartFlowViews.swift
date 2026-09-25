@@ -137,6 +137,7 @@ struct RunQuickStartConfiguration {
     let workout: RunningWorkoutTemplate?
     let audioCoach: WatchAudioCoachConfiguration
     let friends: [SocialProfileCard]
+    let gearIDs: Set<UUID>
 
     var title: String {
         switch mode {
@@ -153,6 +154,7 @@ struct RunQuickStartConfiguration {
 struct WalkQuickStartConfiguration {
     let audioCoach: WatchAudioCoachConfiguration
     let friends: [SocialProfileCard]
+    let gearIDs: Set<UUID>
 }
 
 struct RunQuickStartSheet: View {
@@ -161,6 +163,7 @@ struct RunQuickStartSheet: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var gear: ProfileGearStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
@@ -170,6 +173,7 @@ struct RunQuickStartSheet: View {
     @State private var selectedRoute: TrainingRoute?
     @State private var selectedWorkout: RunningWorkoutTemplate?
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var selectedGearIDs: Set<UUID> = []
 
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
@@ -201,6 +205,12 @@ struct RunQuickStartSheet: View {
                     introCard
                     modeCard
                     selectionCard
+
+                    WorkoutGearSelectionCard(
+                        selectedGearIDs: $selectedGearIDs,
+                        activity: .running
+                    )
+
                     ATHLTHPlusFeatureGate(
                         feature: .audioCoach,
                         title: "Audio Coach · ATHLTH+",
@@ -275,6 +285,17 @@ struct RunQuickStartSheet: View {
 
                 if social.friends.isEmpty {
                     await social.refresh()
+                }
+
+                if gear.items.isEmpty {
+                    await gear.refresh()
+                }
+
+                if selectedGearIDs.isEmpty {
+                    selectedGearIDs =
+                        gear.initialGearSelection(
+                            for: .running
+                        )
                 }
             }
         }
@@ -528,7 +549,8 @@ struct RunQuickStartSheet: View {
                     route: selectedRoute,
                     workout: selectedWorkout,
                     audioCoach: audioCoachConfiguration,
-                    friends: friends
+                    friends: friends,
+                    gearIDs: selectedGearIDs
                 )
             )
             dismiss()
@@ -603,12 +625,14 @@ struct WalkQuickStartSheet: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var gear: ProfileGearStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let onStart: (WalkQuickStartConfiguration) -> Void
 
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var selectedGearIDs: Set<UUID> = []
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var didLoadAudioCoachDefaults = false
 
@@ -646,6 +670,11 @@ struct WalkQuickStartSheet: View {
                         }
                     }
 
+                    WorkoutGearSelectionCard(
+                        selectedGearIDs: $selectedGearIDs,
+                        activity: .walking
+                    )
+
                     ATHLTHPlusFeatureGate(
                         feature: .audioCoach,
                         title: "Audio Coach · ATHLTH+",
@@ -676,7 +705,8 @@ struct WalkQuickStartSheet: View {
                                     session.canAccess(.audioCoach)
                                         ? audioCoachDraft.configuration()
                                         : .disabled,
-                                friends: friends
+                                friends: friends,
+                                gearIDs: selectedGearIDs
                             )
                         )
                         dismiss()
@@ -717,6 +747,10 @@ struct WalkQuickStartSheet: View {
 
                 if social.friends.isEmpty {
                     await social.refresh()
+                }
+
+                if gear.items.isEmpty {
+                    await gear.refresh()
                 }
             }
         }
