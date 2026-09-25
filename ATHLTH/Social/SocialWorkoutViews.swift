@@ -95,16 +95,33 @@ struct WorkoutFriendPicker: View {
 struct QuickWorkoutStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var gear: ProfileGearStore
 
     let kind: WorkoutKind
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
-    let onStart: ([SocialProfileCard]) -> Void
+    let onStart: ([SocialProfileCard], Set<UUID>) -> Void
 
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var selectedGearIDs: Set<UUID> = []
 
     private var canStart: Bool {
         trainingDeviceProvider == .appleWatch && watchConnected
+    }
+
+    private var workoutActivity: WorkoutActivity {
+        switch kind {
+        case .running:
+            return .running
+        case .walking:
+            return .walking
+        case .strength:
+            return .strength
+        case .mobility:
+            return .yoga
+        case .recovery, .custom:
+            return .other
+        }
     }
 
     private var deviceStatusText: String {
@@ -130,14 +147,17 @@ struct QuickWorkoutStartSheet: View {
                                 .font(.system(size: 28, weight: .semibold))
                                 .foregroundStyle(ATHLTHTheme.accent)
                                 .frame(width: 52, height: 52)
-                                .background(ATHLTHTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 15))
+                                .background(
+                                    ATHLTHTheme.accent.opacity(0.10),
+                                    in: RoundedRectangle(cornerRadius: 15)
+                                )
 
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(kind.title)
                                     .font(.title2.bold())
                                 Text(deviceStatusText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
 
                             Spacer()
@@ -150,9 +170,11 @@ struct QuickWorkoutStartSheet: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("Route")
                                         .font(.headline)
-                                    Text("Optional · create or pick a saved route before you start.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    Text(
+                                        "Optional · create or pick a saved route before you start."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                                 }
 
                                 Spacer()
@@ -160,7 +182,10 @@ struct QuickWorkoutStartSheet: View {
                                 NavigationLink {
                                     RunRouteBuilderView()
                                 } label: {
-                                    Label("Create", systemImage: "map.fill")
+                                    Label(
+                                        "Create",
+                                        systemImage: "map.fill"
+                                    )
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .controlSize(.small)
@@ -170,12 +195,20 @@ struct QuickWorkoutStartSheet: View {
                             NavigationLink {
                                 SavedRoutesView()
                             } label: {
-                                Label("Saved Routes", systemImage: "map")
-                                    .font(.subheadline.weight(.semibold))
+                                Label(
+                                    "Saved Routes",
+                                    systemImage: "map"
+                                )
+                                .font(.subheadline.weight(.semibold))
                             }
                             .padding(.top, 10)
                         }
                     }
+
+                    WorkoutGearSelectionCard(
+                        selectedGearIDs: $selectedGearIDs,
+                        activity: workoutActivity
+                    )
 
                     ATHLTHCard {
                         WorkoutFriendPicker(
@@ -187,7 +220,11 @@ struct QuickWorkoutStartSheet: View {
                         let selected = social.friends.filter {
                             selectedFriendIDs.contains($0.userID)
                         }
-                        onStart(selected)
+
+                        onStart(
+                            selected,
+                            selectedGearIDs
+                        )
                         dismiss()
                     } label: {
                         Label(
@@ -210,12 +247,25 @@ struct QuickWorkoutStartSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        dismiss()
+                    }
                 }
             }
             .task {
                 if social.friends.isEmpty {
                     await social.refresh()
+                }
+
+                if gear.items.isEmpty {
+                    await gear.refresh()
+                }
+
+                if selectedGearIDs.isEmpty {
+                    selectedGearIDs =
+                        gear.initialGearSelection(
+                            for: workoutActivity
+                        )
                 }
             }
         }
