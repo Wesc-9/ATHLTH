@@ -19,6 +19,7 @@ struct ATHLTHApp: App {
     @StateObject private var social = SocialStore()
     @StateObject private var messaging = MessagingStore()
     @StateObject private var communityEvents = CommunityEventStore()
+    @StateObject private var communityGroups = CommunityGroupStore()
     @StateObject private var routeDiscovery = RouteDiscoveryStore()
     @StateObject private var trophies = TrophyStore()
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
@@ -49,6 +50,7 @@ struct ATHLTHApp: App {
                 .environmentObject(social)
                 .environmentObject(messaging)
                 .environmentObject(communityEvents)
+                .environmentObject(communityGroups)
                 .environmentObject(routeDiscovery)
                 .environmentObject(trophies)
                 .environmentObject(spotifyPlayback)
@@ -102,6 +104,7 @@ struct AppRootView: View {
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var communityGroups: CommunityGroupStore
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
@@ -139,6 +142,7 @@ struct AppRootView: View {
                 await refreshSocialCore()
                 await messaging.refresh()
                 await gear.refresh()
+                await communityGroups.refresh()
             }
 
             if health.needsHealthRefreshRecovery {
@@ -304,6 +308,9 @@ struct AppRootView: View {
                 await gear.savePreparedGearUsage(
                     for: publishable
                 )
+                await communityGroups.recordCompletedWorkout(
+                    publishable
+                )
                 notifications.syncGearUsageAlerts(
                     from: gear
                 )
@@ -350,6 +357,9 @@ struct AppRootView: View {
                     )
                 await gear.savePreparedGearUsage(
                     for: publishable
+                )
+                await communityGroups.recordCompletedWorkout(
+                    publishable
                 )
                 notifications.syncGearUsageAlerts(
                     from: gear
