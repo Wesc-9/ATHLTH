@@ -253,6 +253,10 @@ struct ATHLTHHomeView: View {
                         )
                     }
 
+                    if let goal = homeActiveGoal {
+                        homeActiveGoalCard(goal)
+                    }
+
                     if health.hasRequestedAuthorization {
                         ATHLTHCard {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -892,6 +896,187 @@ struct ATHLTHHomeView: View {
         }
 
         return "Short night"
+    }
+
+    private var homeActiveGoal: ATHLTHGoal? {
+        if let primary = goalStore.primaryGoal,
+           primary.status == .active {
+            return primary
+        }
+
+        return goalStore.activeGoals.first {
+            $0.status == .active
+        }
+    }
+
+    private func homeActiveGoalCard(
+        _ goal: ATHLTHGoal
+    ) -> some View {
+        NavigationLink {
+            GoalDetailView(goalID: goal.id)
+        } label: {
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: goal.category.systemImage)
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(.green)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Color.green.opacity(0.10),
+                                in: RoundedRectangle(
+                                    cornerRadius: 14,
+                                    style: .continuous
+                                )
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("ACTIVE GOAL")
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1.2)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+
+                            Text(goal.title)
+                                .font(.headline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                                .lineLimit(2)
+                        }
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(
+                                "\(Int((goal.progress * 100).rounded()))%"
+                            )
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+
+                            Text("complete")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    ProgressView(value: goal.progress)
+                        .tint(.green)
+
+                    HStack(alignment: .top, spacing: 12) {
+                        if let milestone = homeNextMilestone(
+                            for: goal
+                        ) {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "flag.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text("Next milestone")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+
+                                    Text(milestone.title)
+                                        .font(
+                                            .caption.weight(.semibold)
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme.primaryText
+                                        )
+                                        .lineLimit(2)
+                                }
+                            }
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+                        } else {
+                            HStack(spacing: 8) {
+                                Image(
+                                    systemName:
+                                        "checkmark.circle.fill"
+                                )
+                                .foregroundStyle(.green)
+
+                                Text(
+                                    goal.progress >= 1
+                                        ? "Goal complete"
+                                        : "Keep progressing"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                            }
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+                        }
+
+                        if let deadline = goal.deadline {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(homeGoalDeadlineLabel(deadline))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+                                Text("remaining")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func homeNextMilestone(
+        for goal: ATHLTHGoal
+    ) -> GoalMilestone? {
+        goal.milestones.first {
+            !$0.isCompleted
+        }
+    }
+
+    private func homeGoalDeadlineLabel(
+        _ deadline: Date
+    ) -> String {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let target = calendar.startOfDay(for: deadline)
+        let days = calendar.dateComponents(
+            [.day],
+            from: today,
+            to: target
+        ).day ?? 0
+
+        if days < 0 {
+            return "Overdue"
+        }
+
+        if days == 0 {
+            return "Today"
+        }
+
+        if days == 1 {
+            return "1 day"
+        }
+
+        return "\(days) days"
     }
 
     private var shouldShowGettingStarted: Bool {
@@ -5565,100 +5750,96 @@ struct ATHLTHProfileView: View {
     }
 
     private var goalsAndTrophies: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 12) {
-                goalsCard
-                trophiesCard
-            }
-
-            VStack(spacing: 12) {
-                goalsCard
-                trophiesCard
-            }
+        VStack(spacing: 12) {
+            goalsCard
+            trophiesCard
         }
     }
 
     private var goalsCard: some View {
-        Group {
-            if let goal = goalStore.primaryGoal {
-                NavigationLink {
-                    GoalDetailView(goalID: goal.id)
-                } label: {
-                    ATHLTHCard {
-                        HStack(spacing: 12) {
-                            Image(systemName: "target")
-                                .font(.system(size: 19, weight: .semibold))
-                                .foregroundStyle(.green)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    Color.green.opacity(0.10),
-                                    in: Circle()
+        NavigationLink {
+            GoalsHubView()
+        } label: {
+            ATHLTHCard {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "target")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            Color.green.opacity(0.10),
+                            in: RoundedRectangle(
+                                cornerRadius: 14,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 7) {
+                            Text("Goals")
+                                .font(.headline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
                                 )
 
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Goals")
-                                    .font(.headline)
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                                Text(goal.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-                                    .lineLimit(1)
-
-                                Text("\(Int((goal.progress * 100).rounded()))% complete")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.tertiary)
-                        }
-
-                        ProgressView(value: goal.progress)
-                            .tint(.green)
-                            .padding(.top, 8)
-                    }
-                }
-                .buttonStyle(.plain)
-            } else {
-                NavigationLink {
-                    GoalsHubView()
-                } label: {
-                    ATHLTHCard {
-                        HStack(spacing: 12) {
-                            Image(systemName: "target")
-                                .font(.system(size: 19, weight: .semibold))
+                            if !goalStore.activeGoals.isEmpty {
+                                Text(
+                                    "\(goalStore.activeGoals.count)"
+                                )
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(.green)
-                                .frame(width: 44, height: 44)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
                                 .background(
                                     Color.green.opacity(0.10),
-                                    in: Circle()
+                                    in: Capsule()
                                 )
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Goals")
-                                    .font(.headline)
-                                    .foregroundStyle(
-                                        ATHLTHTheme.primaryText
-                                    )
-                                Text("Set your first goal")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
                             }
+                        }
 
-                            Spacer()
+                        if let goal = goalStore.primaryGoal ??
+                            goalStore.activeGoals.first {
+                            Text(goal.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                                .lineLimit(1)
 
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(.green)
+                            Text(
+                                "\(Int((goal.progress * 100).rounded()))% complete · Open Goal Hub"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        } else {
+                            Text("Create and manage your goals")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("See All")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.green)
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-                .buttonStyle(.plain)
+
+                if let goal = goalStore.primaryGoal ??
+                    goalStore.activeGoals.first {
+                    ProgressView(value: goal.progress)
+                        .tint(.green)
+                        .padding(.top, 10)
+                }
             }
         }
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
     }
 
