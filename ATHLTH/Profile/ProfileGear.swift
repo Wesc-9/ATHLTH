@@ -1131,12 +1131,10 @@ struct ProfileGearSummaryView: View {
                 let stats = gear.usageStats(for: item)
 
                 Text(
-                    stats.totalDistanceMeters > 0
-                        ? String(
-                            format: "%.0f km",
-                            stats.totalDistanceMeters / 1_000
-                        )
-                        : "Ready"
+                    shoeSummary(
+                        item: item,
+                        stats: stats
+                    )
                 )
                 .font(.system(size: 8.5, weight: .medium))
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1144,6 +1142,35 @@ struct ProfileGearSummaryView: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func shoeSummary(
+        item: ProfileGearItem,
+        stats: ProfileGearUsageStats
+    ) -> String {
+        guard stats.totalDistanceMeters > 0 else {
+            return "Ready"
+        }
+
+        let kilometers = stats.totalDistanceMeters / 1_000
+        let distance = String(
+            format: "%.0f km",
+            kilometers
+        )
+
+        guard let target =
+                gear.details(for: item)?
+                    .replacementTargetKM,
+              target > 0
+        else {
+            return distance
+        }
+
+        let percentage = Int(
+            min(max(kilometers / target, 0), 9.99) *
+                100
+        )
+        return "\(distance) · \(percentage)%"
     }
 
     private func gearIcon(_ category: ProfileGearCategory) -> some View {
