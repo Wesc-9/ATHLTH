@@ -505,6 +505,12 @@ struct ProfileGearDetailView: View {
             LazyVStack(spacing: 16) {
                 hero
                 usageCard
+
+                if currentItem.category == .shoes,
+                   !history.isEmpty {
+                    shoeInsightsCard
+                }
+
                 detailsCard
                 historyCard
             }
@@ -704,9 +710,25 @@ struct ProfileGearDetailView: View {
                                 : ATHLTHTheme.accent
                         )
 
-                    Text(replacementMessage(progress))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    if progress >= 0.80 {
+                        Label(
+                            replacementMessage(progress),
+                            systemImage:
+                                progress >= 1
+                                    ? "exclamationmark.circle.fill"
+                                    : "shoeprints.fill"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(
+                            progress >= 1
+                                ? Color.orange
+                                : ATHLTHTheme.accentDeep
+                        )
+                    } else {
+                        Text(replacementMessage(progress))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.top, 14)
             }
@@ -732,6 +754,73 @@ struct ProfileGearDetailView: View {
                 }
                 .padding(.top, 12)
             }
+        }
+    }
+
+    private var shoeInsightsCard: some View {
+        let distances = history.compactMap(\.distanceMeters)
+        let longest = distances.max() ?? 0
+        let average =
+            distances.isEmpty
+                ? 0
+                : distances.reduce(0, +) /
+                    Double(distances.count)
+        let threshold = Calendar.current.date(
+            byAdding: .day,
+            value: -30,
+            to: Date()
+        ) ?? .distantPast
+        let last30 = history
+            .filter { $0.startedAt >= threshold }
+            .compactMap(\.distanceMeters)
+            .reduce(0, +)
+
+        return ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Shoe Insights")
+                        .font(.title3.weight(.bold))
+                    Text(
+                        "Based only on workouts linked to this pair."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                RunningShoeIcon(
+                    color: ATHLTHTheme.accentDeep
+                )
+                .frame(width: 34, height: 26)
+            }
+
+            HStack(spacing: 8) {
+                usageMetric(
+                    title: "Longest",
+                    value: String(
+                        format: "%.1f km",
+                        longest / 1_000
+                    )
+                )
+
+                usageMetric(
+                    title: "Avg workout",
+                    value: String(
+                        format: "%.1f km",
+                        average / 1_000
+                    )
+                )
+
+                usageMetric(
+                    title: "Last 30d",
+                    value: String(
+                        format: "%.0f km",
+                        last30 / 1_000
+                    )
+                )
+            }
+            .padding(.top, 12)
         }
     }
 
