@@ -742,6 +742,18 @@ final class ProfileGearStore: ObservableObject {
             }
 
             await refresh()
+
+            if item.category == .shoes,
+               defaultRunningShoe == nil,
+               let replacement =
+                    items(in: .shoes).first(
+                        where: isActive
+                    ) {
+                await setDefaultRunningShoe(
+                    replacement
+                )
+            }
+
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -777,14 +789,13 @@ final class ProfileGearStore: ObservableObject {
         _ item: ProfileGearItem
     ) async {
         guard item.category == .shoes,
-              isActive(item),
-              let detail = detailRecords[item.id]
+              isActive(item)
         else {
             return
         }
 
         var draft = ProfileGearDetailDraft(
-            record: detail,
+            record: detailRecords[item.id],
             category: .shoes
         )
         draft.isDefaultForRunning = true
@@ -901,6 +912,17 @@ final class ProfileGearStore: ObservableObject {
                 where: isActive
             ) {
                 await setFeatured(replacement)
+            }
+
+            if item.category == .shoes,
+               defaultRunningShoe == nil,
+               let replacement =
+                    items(in: .shoes).first(
+                        where: isActive
+                    ) {
+                await setDefaultRunningShoe(
+                    replacement
+                )
             }
         } catch {
             errorMessage = error.localizedDescription
