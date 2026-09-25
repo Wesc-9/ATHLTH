@@ -255,6 +255,8 @@ struct ATHLTHHomeView: View {
 
                     if let goal = homeActiveGoal {
                         homeActiveGoalCard(goal)
+                    } else {
+                        homeCreateFirstGoalCard
                     }
 
                     if health.hasRequestedAuthorization {
@@ -1042,6 +1044,58 @@ struct ATHLTHHomeView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var homeCreateFirstGoalCard: some View {
+        NavigationLink {
+            GoalCreationView()
+        } label: {
+            ATHLTHCard {
+                HStack(spacing: 14) {
+                    Image(systemName: "target")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .frame(width: 48, height: 48)
+                        .background(
+                            Color.green.opacity(0.10),
+                            in: RoundedRectangle(
+                                cornerRadius: 15,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SET YOUR FIRST GOAL")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+
+                        Text("Create your first goal")
+                            .font(.headline)
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+
+                        Text(
+                            "Set a target and let ATHLTH track your progress. Tap here to get started."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.green)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Create your first goal")
     }
 
     private func homeNextMilestone(
