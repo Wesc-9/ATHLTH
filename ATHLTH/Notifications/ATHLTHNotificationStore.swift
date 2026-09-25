@@ -255,6 +255,66 @@ final class ATHLTHNotificationStore: ObservableObject {
         )
     }
 
+    func syncGearUsageAlerts(
+        from gear: ProfileGearStore
+    ) {
+        for item in gear.items(in: .shoes)
+        where gear.isActive(item) {
+            guard
+                let target =
+                    gear.details(for: item)?
+                        .replacementTargetKM,
+                target > 0
+            else {
+                continue
+            }
+
+            let usedKM =
+                gear.usageStats(for: item)
+                    .totalDistanceMeters / 1_000
+            let progress = usedKM / target
+
+            for threshold in [0.80, 0.90, 1.00]
+            where progress >= threshold {
+                let percentage =
+                    Int((threshold * 100).rounded())
+                let message: String
+
+                if threshold >= 1 {
+                    message =
+                        String(
+                            format:
+                                "%@ has reached %.0f km of your %.0f km target. Check the shoe’s condition and comfort before deciding whether to retire it.",
+                            item.name,
+                            usedKM,
+                            target
+                        )
+                } else {
+                    message =
+                        String(
+                            format:
+                                "%@ has reached %.0f km of your %.0f km target. Keep an eye on wear and comfort.",
+                            item.name,
+                            usedKM,
+                            target
+                        )
+                }
+
+                add(
+                    ATHLTHNotificationDraft(
+                        eventKey:
+                            "gear-\(item.id.uuidString)-replacement-\(percentage)",
+                        kind: .system,
+                        title:
+                            "\(item.name) · \(percentage)% of shoe target",
+                        message: message
+                    ),
+                    deliverSystemAlert: false
+                )
+            }
+        }
+    }
+
     func markRead(_ id: UUID) {
         guard let index = items.firstIndex(where: { $0.id == id }),
               items[index].readAt == nil
