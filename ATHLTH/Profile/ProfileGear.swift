@@ -33,7 +33,7 @@ enum ProfileGearCategory: String, CaseIterable, Identifiable, Codable {
     var systemImage: String {
         switch self {
         case .watch: return "applewatch"
-        case .shoes: return "figure.run"
+        case .shoes: return "shoeprints.fill"
         case .headphones: return "headphones"
         case .other: return "square.grid.2x2.fill"
         }
@@ -59,6 +59,281 @@ struct ProfileGearItem: Codable, Identifiable, Hashable {
         case isFeatured = "is_featured"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+}
+
+enum ProfileGearStatus: String, Codable, CaseIterable, Identifiable {
+    case active
+    case retired
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .active: return "Active"
+        case .retired: return "Retired"
+        }
+    }
+}
+
+enum ShoeUseType: String, Codable, CaseIterable, Identifiable {
+    case daily
+    case tempo
+    case race
+    case trail
+    case treadmill
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .daily: return "Daily"
+        case .tempo: return "Tempo"
+        case .race: return "Race"
+        case .trail: return "Trail"
+        case .treadmill: return "Treadmill"
+        case .other: return "Other"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .daily: return "sun.max.fill"
+        case .tempo: return "speedometer"
+        case .race: return "flag.checkered"
+        case .trail: return "mountain.2.fill"
+        case .treadmill: return "figure.run.treadmill"
+        case .other: return "ellipsis.circle.fill"
+        }
+    }
+}
+
+struct ProfileGearDetailRecord: Codable, Hashable {
+    let gearID: UUID
+    let userID: UUID
+    var brand: String?
+    var model: String?
+    var colorName: String?
+    var purchasedAt: String?
+    var firstUsedAt: String?
+    var sizeLabel: String?
+    var shoeUseType: ShoeUseType?
+    var gearTypeLabel: String?
+    var status: ProfileGearStatus
+    var retiredAt: Date?
+    var replacementTargetKM: Double?
+    var isDefaultForRunning: Bool
+    var notes: String?
+    let createdAt: Date?
+    var updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case gearID = "gear_id"
+        case userID = "user_id"
+        case brand
+        case model
+        case colorName = "color_name"
+        case purchasedAt = "purchased_at"
+        case firstUsedAt = "first_used_at"
+        case sizeLabel = "size_label"
+        case shoeUseType = "shoe_use_type"
+        case gearTypeLabel = "gear_type_label"
+        case status
+        case retiredAt = "retired_at"
+        case replacementTargetKM = "replacement_target_km"
+        case isDefaultForRunning = "is_default_for_running"
+        case notes
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    var purchasedDate: Date? {
+        GearDateCodec.date(from: purchasedAt)
+    }
+
+    var firstUsedDate: Date? {
+        GearDateCodec.date(from: firstUsedAt)
+    }
+}
+
+struct ProfileGearDetailDraft: Hashable {
+    var brand = ""
+    var model = ""
+    var colorName = ""
+    var purchasedAt: Date?
+    var firstUsedAt: Date?
+    var sizeLabel = ""
+    var shoeUseType: ShoeUseType = .daily
+    var gearTypeLabel = ""
+    var status: ProfileGearStatus = .active
+    var replacementTargetKM: Double?
+    var isDefaultForRunning = false
+    var notes = ""
+
+    init(
+        record: ProfileGearDetailRecord? = nil,
+        category: ProfileGearCategory
+    ) {
+        guard let record else {
+            shoeUseType = .daily
+            return
+        }
+
+        brand = record.brand ?? ""
+        model = record.model ?? ""
+        colorName = record.colorName ?? ""
+        purchasedAt = record.purchasedDate
+        firstUsedAt = record.firstUsedDate
+        sizeLabel = record.sizeLabel ?? ""
+        shoeUseType = record.shoeUseType ?? .daily
+        gearTypeLabel = record.gearTypeLabel ?? ""
+        status = record.status
+        replacementTargetKM = record.replacementTargetKM
+        isDefaultForRunning =
+            category == .shoes && record.isDefaultForRunning
+        notes = record.notes ?? ""
+    }
+}
+
+private struct ProfileGearDetailWrite: Encodable {
+    let gearID: UUID
+    let userID: UUID
+    let brand: String?
+    let model: String?
+    let colorName: String?
+    let purchasedAt: String?
+    let firstUsedAt: String?
+    let sizeLabel: String?
+    let shoeUseType: ShoeUseType?
+    let gearTypeLabel: String?
+    let status: ProfileGearStatus
+    let retiredAt: Date?
+    let replacementTargetKM: Double?
+    let isDefaultForRunning: Bool
+    let notes: String?
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case gearID = "gear_id"
+        case userID = "user_id"
+        case brand
+        case model
+        case colorName = "color_name"
+        case purchasedAt = "purchased_at"
+        case firstUsedAt = "first_used_at"
+        case sizeLabel = "size_label"
+        case shoeUseType = "shoe_use_type"
+        case gearTypeLabel = "gear_type_label"
+        case status
+        case retiredAt = "retired_at"
+        case replacementTargetKM = "replacement_target_km"
+        case isDefaultForRunning = "is_default_for_running"
+        case notes
+        case updatedAt = "updated_at"
+    }
+}
+
+struct WorkoutGearUsageRecord: Codable, Identifiable, Hashable {
+    let id: UUID
+    let userID: UUID
+    let workoutID: UUID
+    let gearID: UUID
+    let workoutTitle: String
+    let activityType: String
+    let source: String
+    let startedAt: Date
+    let endedAt: Date
+    let durationSeconds: Double
+    let distanceMeters: Double?
+    let createdAt: Date?
+    var updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userID = "user_id"
+        case workoutID = "workout_id"
+        case gearID = "gear_id"
+        case workoutTitle = "workout_title"
+        case activityType = "activity_type"
+        case source
+        case startedAt = "started_at"
+        case endedAt = "ended_at"
+        case durationSeconds = "duration_seconds"
+        case distanceMeters = "distance_meters"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+private struct WorkoutGearUsageWrite: Encodable {
+    let userID: UUID
+    let workoutID: UUID
+    let gearID: UUID
+    let workoutTitle: String
+    let activityType: String
+    let source: String
+    let startedAt: Date
+    let endedAt: Date
+    let durationSeconds: Double
+    let distanceMeters: Double?
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case workoutID = "workout_id"
+        case gearID = "gear_id"
+        case workoutTitle = "workout_title"
+        case activityType = "activity_type"
+        case source
+        case startedAt = "started_at"
+        case endedAt = "ended_at"
+        case durationSeconds = "duration_seconds"
+        case distanceMeters = "distance_meters"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct ProfileGearUsageStats: Hashable {
+    let workoutCount: Int
+    let totalDuration: TimeInterval
+    let totalDistanceMeters: Double
+    let firstUsedAt: Date?
+    let lastUsedAt: Date?
+
+    static let empty = ProfileGearUsageStats(
+        workoutCount: 0,
+        totalDuration: 0,
+        totalDistanceMeters: 0,
+        firstUsedAt: nil,
+        lastUsedAt: nil
+    )
+}
+
+private enum GearDateCodec {
+    static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    static func string(from date: Date?) -> String? {
+        guard let date else { return nil }
+        return formatter.string(from: date)
+    }
+
+    static func date(from value: String?) -> Date? {
+        guard let value else { return nil }
+        return formatter.date(from: value)
+    }
+}
+
+private extension String {
+    var gearNilIfEmpty: String? {
+        let clean = trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? nil : clean
     }
 }
 
@@ -95,10 +370,14 @@ private struct ProfileGearUpdate: Encodable {
 @MainActor
 final class ProfileGearStore: ObservableObject {
     @Published private(set) var items: [ProfileGearItem] = []
+    @Published private(set) var detailRecords: [UUID: ProfileGearDetailRecord] = [:]
+    @Published private(set) var usageRecords: [WorkoutGearUsageRecord] = []
+    @Published private(set) var preparedWorkoutGearIDs: Set<UUID> = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
     private let client: SupabaseClient
+    private var hasPreparedWorkoutGearSelection = false
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -112,21 +391,143 @@ final class ProfileGearStore: ObservableObject {
         items
             .filter { $0.category == category }
             .sorted {
+                if isActive($0) != isActive($1) {
+                    return isActive($0) && !isActive($1)
+                }
                 if $0.isFeatured != $1.isFeatured {
                     return $0.isFeatured && !$1.isFeatured
                 }
-                return ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast)
+                return ($0.createdAt ?? .distantPast) >
+                    ($1.createdAt ?? .distantPast)
             }
     }
 
     func featuredItem(in category: ProfileGearCategory) -> ProfileGearItem? {
-        items.first { $0.category == category && $0.isFeatured }
-            ?? items(in: category).first
+        items.first {
+            $0.category == category &&
+            $0.isFeatured &&
+            isActive($0)
+        } ?? items(in: category).first(where: isActive)
+    }
+
+    func details(for item: ProfileGearItem) -> ProfileGearDetailRecord? {
+        detailRecords[item.id]
+    }
+
+    func isActive(_ item: ProfileGearItem) -> Bool {
+        detailRecords[item.id]?.status != .retired
+    }
+
+    var defaultRunningShoe: ProfileGearItem? {
+        items(in: .shoes).first {
+            isActive($0) &&
+            detailRecords[$0.id]?.isDefaultForRunning == true
+        }
+    }
+
+    func activeItems(
+        for activity: WorkoutActivity
+    ) -> [ProfileGearItem] {
+        items.filter { item in
+            guard isActive(item) else { return false }
+
+            if item.category == .shoes {
+                return activity == .running || activity == .walking
+            }
+
+            return true
+        }
+        .sorted {
+            if $0.category == .shoes &&
+                detailRecords[$0.id]?.isDefaultForRunning == true {
+                return true
+            }
+            if $1.category == .shoes &&
+                detailRecords[$1.id]?.isDefaultForRunning == true {
+                return false
+            }
+            return $0.name.localizedCaseInsensitiveCompare($1.name)
+                == .orderedAscending
+        }
+    }
+
+    func usage(for item: ProfileGearItem) -> [WorkoutGearUsageRecord] {
+        usageRecords
+            .filter { $0.gearID == item.id }
+            .sorted { $0.startedAt > $1.startedAt }
+    }
+
+    func usageStats(for item: ProfileGearItem) -> ProfileGearUsageStats {
+        let rows = usage(for: item)
+        guard !rows.isEmpty else { return .empty }
+
+        return ProfileGearUsageStats(
+            workoutCount: rows.count,
+            totalDuration: rows.reduce(0) { $0 + $1.durationSeconds },
+            totalDistanceMeters: rows.reduce(0) {
+                $0 + ($1.distanceMeters ?? 0)
+            },
+            firstUsedAt: rows.map(\.startedAt).min(),
+            lastUsedAt: rows.map(\.startedAt).max()
+        )
+    }
+
+    func gearIDs(for workoutID: UUID) -> Set<UUID> {
+        Set(
+            usageRecords
+                .filter { $0.workoutID == workoutID }
+                .map(\.gearID)
+        )
+    }
+
+    func initialGearSelection(
+        for activity: WorkoutActivity
+    ) -> Set<UUID> {
+        guard activity == .running,
+              let defaultRunningShoe
+        else {
+            return []
+        }
+
+        return [defaultRunningShoe.id]
+    }
+
+    func prepareNextWorkoutGear(_ gearIDs: Set<UUID>) {
+        preparedWorkoutGearIDs = gearIDs
+        hasPreparedWorkoutGearSelection = true
+    }
+
+    func clearPreparedWorkoutGear() {
+        preparedWorkoutGearIDs = []
+        hasPreparedWorkoutGearSelection = false
+    }
+
+    func savePreparedGearUsage(
+        for workout: SocialPublishableWorkout
+    ) async {
+        let selected: Set<UUID>
+
+        if hasPreparedWorkoutGearSelection {
+            selected = preparedWorkoutGearIDs
+        } else if workout.activity == .running,
+                  let defaultRunningShoe {
+            selected = [defaultRunningShoe.id]
+        } else {
+            selected = []
+        }
+
+        _ = await saveGearUsage(
+            for: workout,
+            gearIDs: selected
+        )
+        clearPreparedWorkoutGear()
     }
 
     func refresh() async {
         guard let userID = currentUserID else {
             items = []
+            detailRecords = [:]
+            usageRecords = []
             return
         }
 
@@ -142,7 +543,25 @@ final class ProfileGearStore: ObservableObject {
                 .execute()
                 .value
 
+            let details: [ProfileGearDetailRecord] = try await client
+                .from("profile_gear_details")
+                .select()
+                .eq("user_id", value: userID)
+                .execute()
+                .value
+
+            let usage: [WorkoutGearUsageRecord] = try await client
+                .from("workout_gear_usage")
+                .select()
+                .eq("user_id", value: userID)
+                .execute()
+                .value
+
             items = rows
+            detailRecords = Dictionary(
+                uniqueKeysWithValues: details.map { ($0.gearID, $0) }
+            )
+            usageRecords = usage.sorted { $0.startedAt > $1.startedAt }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -152,7 +571,10 @@ final class ProfileGearStore: ObservableObject {
         name: String,
         category: ProfileGearCategory,
         jpegData: Data?,
-        showOnProfile: Bool
+        showOnProfile: Bool,
+        detailDraft: ProfileGearDetailDraft = .init(
+            category: .other
+        )
     ) async -> Bool {
         guard let userID = currentUserID else {
             errorMessage = "You need to be signed in to add gear."
@@ -176,7 +598,8 @@ final class ProfileGearStore: ObservableObject {
             )
 
             let shouldFeature =
-                showOnProfile || featuredItem(in: category) == nil
+                detailDraft.status == .active &&
+                (showOnProfile || featuredItem(in: category) == nil)
 
             if shouldFeature {
                 try await clearFeatured(category)
@@ -196,6 +619,22 @@ final class ProfileGearStore: ObservableObject {
                 .insert(payload)
                 .execute()
 
+            do {
+                try await saveDetails(
+                    gearID: itemID,
+                    category: category,
+                    draft: detailDraft
+                )
+            } catch {
+                try? await client
+                    .from("profile_gear")
+                    .delete()
+                    .eq("id", value: itemID)
+                    .eq("user_id", value: userID)
+                    .execute()
+                throw error
+            }
+
             await refresh()
             return true
         } catch {
@@ -208,7 +647,8 @@ final class ProfileGearStore: ObservableObject {
         _ item: ProfileGearItem,
         name: String,
         jpegData: Data?,
-        showOnProfile: Bool
+        showOnProfile: Bool,
+        detailDraft: ProfileGearDetailDraft? = nil
     ) async -> Bool {
         guard let userID = currentUserID,
               userID == item.userID
@@ -233,8 +673,15 @@ final class ProfileGearStore: ObservableObject {
             )
             let resolvedImage = uploaded?.absoluteString ?? item.imageURL
             let categoryItems = items(in: item.category)
+            let status = detailDraft?.status ??
+                detailRecords[item.id]?.status ??
+                .active
             let shouldFeature =
-                showOnProfile || (item.isFeatured && categoryItems.count == 1)
+                status == .active &&
+                (
+                    showOnProfile ||
+                    (item.isFeatured && categoryItems.count == 1)
+                )
 
             if shouldFeature {
                 try await clearFeatured(item.category)
@@ -253,6 +700,14 @@ final class ProfileGearStore: ObservableObject {
                 .eq("user_id", value: userID)
                 .execute()
 
+            if let detailDraft {
+                try await saveDetails(
+                    gearID: item.id,
+                    category: item.category,
+                    draft: detailDraft
+                )
+            }
+
             await refresh()
             return true
         } catch {
@@ -263,7 +718,8 @@ final class ProfileGearStore: ObservableObject {
 
     func setFeatured(_ item: ProfileGearItem) async {
         guard let userID = currentUserID,
-              userID == item.userID
+              userID == item.userID,
+              isActive(item)
         else {
             return
         }
@@ -281,6 +737,101 @@ final class ProfileGearStore: ObservableObject {
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func setDefaultRunningShoe(
+        _ item: ProfileGearItem
+    ) async {
+        guard item.category == .shoes,
+              isActive(item),
+              let detail = detailRecords[item.id]
+        else {
+            return
+        }
+
+        var draft = ProfileGearDetailDraft(
+            record: detail,
+            category: .shoes
+        )
+        draft.isDefaultForRunning = true
+
+        do {
+            try await saveDetails(
+                gearID: item.id,
+                category: .shoes,
+                draft: draft
+            )
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func saveGearUsage(
+        for workout: SocialPublishableWorkout,
+        gearIDs: Set<UUID>
+    ) async -> Bool {
+        guard let userID = currentUserID else {
+            errorMessage = "Sign in to save workout gear."
+            return false
+        }
+
+        let ownedIDs = Set(
+            items
+                .filter { $0.userID == userID }
+                .map(\.id)
+        )
+        let selected = gearIDs.intersection(ownedIDs)
+        let existing = usageRecords.filter {
+            $0.workoutID == workout.id
+        }
+
+        do {
+            if !selected.isEmpty {
+                let writes = selected.map { gearID in
+                    WorkoutGearUsageWrite(
+                        userID: userID,
+                        workoutID: workout.id,
+                        gearID: gearID,
+                        workoutTitle: String(
+                            workout.title.prefix(160)
+                        ),
+                        activityType: workout.activity.rawValue,
+                        source: String(workout.source.prefix(80)),
+                        startedAt: workout.startDate,
+                        endedAt: workout.endDate,
+                        durationSeconds: max(workout.duration, 0),
+                        distanceMeters:
+                            workout.distanceMeters.map { max($0, 0) },
+                        updatedAt: Date()
+                    )
+                }
+
+                try await client
+                    .from("workout_gear_usage")
+                    .upsert(
+                        writes,
+                        onConflict: "user_id,workout_id,gear_id"
+                    )
+                    .execute()
+            }
+
+            for record in existing
+            where !selected.contains(record.gearID) {
+                try await client
+                    .from("workout_gear_usage")
+                    .delete()
+                    .eq("id", value: record.id)
+                    .eq("user_id", value: userID)
+                    .execute()
+            }
+
+            await refreshUsage()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -313,7 +864,9 @@ final class ProfileGearStore: ObservableObject {
             if !items.contains(where: {
                 $0.category == item.category && $0.isFeatured
             }),
-            let replacement = items(in: item.category).first {
+            let replacement = items(in: item.category).first(
+                where: isActive
+            ) {
                 await setFeatured(replacement)
             }
         } catch {
@@ -321,7 +874,98 @@ final class ProfileGearStore: ObservableObject {
         }
     }
 
-    private func clearFeatured(_ category: ProfileGearCategory) async throws {
+    private func saveDetails(
+        gearID: UUID,
+        category: ProfileGearCategory,
+        draft: ProfileGearDetailDraft
+    ) async throws {
+        guard let userID = currentUserID else {
+            throw ProfileGearError.notAuthenticated
+        }
+
+        let isActiveStatus = draft.status == .active
+        var shouldDefault =
+            category == .shoes &&
+            isActiveStatus &&
+            draft.isDefaultForRunning
+
+        if category == .shoes,
+           isActiveStatus,
+           defaultRunningShoe == nil {
+            shouldDefault = true
+        }
+
+        if shouldDefault {
+            try await client
+                .from("profile_gear_details")
+                .update(["is_default_for_running": false])
+                .eq("user_id", value: userID)
+                .execute()
+        }
+
+        let payload = ProfileGearDetailWrite(
+            gearID: gearID,
+            userID: userID,
+            brand: draft.brand.gearNilIfEmpty,
+            model: draft.model.gearNilIfEmpty,
+            colorName: draft.colorName.gearNilIfEmpty,
+            purchasedAt: GearDateCodec.string(from: draft.purchasedAt),
+            firstUsedAt: GearDateCodec.string(from: draft.firstUsedAt),
+            sizeLabel:
+                category == .shoes
+                    ? draft.sizeLabel.gearNilIfEmpty
+                    : nil,
+            shoeUseType:
+                category == .shoes
+                    ? draft.shoeUseType
+                    : nil,
+            gearTypeLabel:
+                category == .other
+                    ? draft.gearTypeLabel.gearNilIfEmpty
+                    : nil,
+            status: draft.status,
+            retiredAt:
+                draft.status == .retired
+                    ? detailRecords[gearID]?.retiredAt ?? Date()
+                    : nil,
+            replacementTargetKM:
+                category == .shoes
+                    ? draft.replacementTargetKM
+                    : nil,
+            isDefaultForRunning: shouldDefault,
+            notes: draft.notes.gearNilIfEmpty,
+            updatedAt: Date()
+        )
+
+        try await client
+            .from("profile_gear_details")
+            .upsert(payload)
+            .execute()
+    }
+
+    private func refreshUsage() async {
+        guard let userID = currentUserID else {
+            usageRecords = []
+            return
+        }
+
+        do {
+            let rows: [WorkoutGearUsageRecord] = try await client
+                .from("workout_gear_usage")
+                .select()
+                .eq("user_id", value: userID)
+                .execute()
+                .value
+
+            usageRecords = rows.sorted { $0.startedAt > $1.startedAt }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func clearFeatured(
+        _ category: ProfileGearCategory
+    ) async throws {
         guard let userID = currentUserID else { return }
 
         try await client
@@ -374,18 +1018,24 @@ final class ProfileGearStore: ObservableObject {
         return components?.url ?? publicURL
     }
 
-    private func imagePath(userID: UUID, itemID: UUID) -> String {
+    private func imagePath(
+        userID: UUID,
+        itemID: UUID
+    ) -> String {
         "\(userID.uuidString.lowercased())/\(itemID.uuidString.lowercased()).jpg"
     }
 }
 
 enum ProfileGearError: LocalizedError {
     case imageTooLarge
+    case notAuthenticated
 
     var errorDescription: String? {
         switch self {
         case .imageTooLarge:
             return "Gear photos must be smaller than 5 MB."
+        case .notAuthenticated:
+            return "You need to be signed in to update gear."
         }
     }
 }
