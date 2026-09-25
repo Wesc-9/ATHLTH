@@ -259,7 +259,10 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
 
+    @Published var audioCoachEnabledByDefault: Bool { didSet { persist() } }
     @Published var audioCoachLanguage: WatchAudioCoachLanguage { didSet { persist() } }
+    @Published var audioCoachDistanceTriggerEnabled: Bool { didSet { persist() } }
+    @Published var audioCoachTimeTriggerEnabled: Bool { didSet { persist() } }
     @Published var audioCoachDistanceIntervalKilometers: Double { didSet { persist() } }
     @Published var audioCoachTimeIntervalMinutes: Int { didSet { persist() } }
     @Published var audioCoachAnnounceDistance: Bool { didSet { persist() } }
@@ -387,12 +390,24 @@ final class AppSettingsStore: ObservableObject {
         audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
         hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
 
+        audioCoachEnabledByDefault =
+            defaults.object(
+                forKey: "settings.audioCoach.enabledByDefault"
+            ) as? Bool ?? false
         audioCoachLanguage =
             WatchAudioCoachLanguage(
                 rawValue: defaults.string(
                     forKey: "settings.audioCoach.language"
                 ) ?? ""
             ) ?? .system
+        audioCoachDistanceTriggerEnabled =
+            defaults.object(
+                forKey: "settings.audioCoach.distanceTriggerEnabled"
+            ) as? Bool ?? true
+        audioCoachTimeTriggerEnabled =
+            defaults.object(
+                forKey: "settings.audioCoach.timeTriggerEnabled"
+            ) as? Bool ?? false
         audioCoachDistanceIntervalKilometers =
             defaults.object(
                 forKey: "settings.audioCoach.distanceIntervalKilometers"
@@ -490,8 +505,20 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
 
         defaults.set(
+            audioCoachEnabledByDefault,
+            forKey: "settings.audioCoach.enabledByDefault"
+        )
+        defaults.set(
             audioCoachLanguage.rawValue,
             forKey: "settings.audioCoach.language"
+        )
+        defaults.set(
+            audioCoachDistanceTriggerEnabled,
+            forKey: "settings.audioCoach.distanceTriggerEnabled"
+        )
+        defaults.set(
+            audioCoachTimeTriggerEnabled,
+            forKey: "settings.audioCoach.timeTriggerEnabled"
         )
         defaults.set(
             audioCoachDistanceIntervalKilometers,
@@ -551,6 +578,40 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(watchConnected, forKey: "settings.watchConnected")
         defaults.set(spotifyConnected, forKey: "settings.spotifyConnected")
         defaults.set(homeAssistantConnected, forKey: "settings.homeAssistantConnected")
+    }
+
+    func audioCoachConfiguration(
+        enabled: Bool,
+        routeDistanceMeters: Double? = nil
+    ) -> WatchAudioCoachConfiguration {
+        WatchAudioCoachConfiguration(
+            enabled: enabled,
+            language: audioCoachLanguage,
+            distanceIntervalMeters:
+                audioCoachDistanceTriggerEnabled
+                    ? audioCoachDistanceIntervalKilometers * 1_000
+                    : nil,
+            timeIntervalSeconds:
+                audioCoachTimeTriggerEnabled
+                    ? Double(audioCoachTimeIntervalMinutes * 60)
+                    : nil,
+            announceDistance: audioCoachAnnounceDistance,
+            announceElapsedTime: audioCoachAnnounceElapsedTime,
+            announceAveragePace: audioCoachAnnounceAveragePace,
+            announceClockTime: audioCoachAnnounceClockTime,
+            announceHeartRate: audioCoachAnnounceHeartRate,
+            announceRemainingRouteDistance:
+                audioCoachAnnounceRemainingRouteDistance,
+            announceEstimatedRemainingRouteTime:
+                audioCoachAnnounceEstimatedRemainingRouteTime,
+            routeDistanceMeters: routeDistanceMeters,
+            announceCurrentWorkoutStep:
+                audioCoachAnnounceCurrentWorkoutStep,
+            announceRemainingStepTime:
+                audioCoachAnnounceRemainingStepTime,
+            announceRemainingStepDistance:
+                audioCoachAnnounceRemainingStepDistance
+        )
     }
 
     var shouldShowProfileSetupPrompt: Bool {
