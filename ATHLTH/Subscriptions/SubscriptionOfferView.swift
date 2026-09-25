@@ -117,7 +117,7 @@ struct SubscriptionOfferView: View {
                 .font(.system(size: 36, weight: .bold))
                 .multilineTextAlignment(.center)
 
-            Text("Build smarter training programs with ATHLTH AI.")
+            Text("Smarter training with ATHLTH AI and Audio Coach.")
                 .font(.subheadline)
                 .foregroundStyle(OnboardingTheme.mutedText)
                 .multilineTextAlignment(.center)
@@ -156,6 +156,10 @@ struct SubscriptionOfferView: View {
                 benefit(
                     "Goal, date and availability-aware AI planning",
                     icon: "target"
+                )
+                benefit(
+                    "Audio Coach with pace, route progress and workout-step guidance",
+                    icon: "waveform.and.mic"
                 )
             }
         }
