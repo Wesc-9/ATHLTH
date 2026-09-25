@@ -77,17 +77,64 @@ enum WatchWorkoutKind: String, Codable, CaseIterable, Hashable {
     }
 }
 
+enum WatchAudioCoachLanguage: String, Codable, CaseIterable, Hashable {
+    case system
+    case english = "en-US"
+    case norwegian = "nb-NO"
+    case german = "de-DE"
+    case spanish = "es-ES"
+    case french = "fr-FR"
+    case italian = "it-IT"
+
+    var title: String {
+        switch self {
+        case .system: return "System"
+        case .english: return "English"
+        case .norwegian: return "Norsk"
+        case .german: return "Deutsch"
+        case .spanish: return "Español"
+        case .french: return "Français"
+        case .italian: return "Italiano"
+        }
+    }
+}
+
 struct WatchAudioCoachConfiguration: Codable, Hashable {
     var enabled: Bool
+    var language: WatchAudioCoachLanguage
     var distanceIntervalMeters: Double?
     var timeIntervalSeconds: TimeInterval?
+
+    var announceDistance: Bool
+    var announceElapsedTime: Bool
+    var announceAveragePace: Bool
     var announceClockTime: Bool
+    var announceHeartRate: Bool
+
+    var announceRemainingRouteDistance: Bool
+    var announceEstimatedRemainingRouteTime: Bool
+    var routeDistanceMeters: Double?
+
+    var announceCurrentWorkoutStep: Bool
+    var announceRemainingStepTime: Bool
+    var announceRemainingStepDistance: Bool
 
     static let disabled = WatchAudioCoachConfiguration(
         enabled: false,
+        language: .system,
         distanceIntervalMeters: nil,
         timeIntervalSeconds: nil,
-        announceClockTime: false
+        announceDistance: false,
+        announceElapsedTime: false,
+        announceAveragePace: false,
+        announceClockTime: false,
+        announceHeartRate: false,
+        announceRemainingRouteDistance: false,
+        announceEstimatedRemainingRouteTime: false,
+        routeDistanceMeters: nil,
+        announceCurrentWorkoutStep: false,
+        announceRemainingStepTime: false,
+        announceRemainingStepDistance: false
     )
 }
 
