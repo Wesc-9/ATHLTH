@@ -259,6 +259,20 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
 
+    @Published var audioCoachLanguage: WatchAudioCoachLanguage { didSet { persist() } }
+    @Published var audioCoachDistanceIntervalKilometers: Double { didSet { persist() } }
+    @Published var audioCoachTimeIntervalMinutes: Int { didSet { persist() } }
+    @Published var audioCoachAnnounceDistance: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceElapsedTime: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceAveragePace: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceClockTime: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceHeartRate: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceRemainingRouteDistance: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceEstimatedRemainingRouteTime: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceCurrentWorkoutStep: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceRemainingStepTime: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceRemainingStepDistance: Bool { didSet { persist() } }
+
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
     @Published var challengeNotificationsEnabled: Bool { didSet { persist() } }
@@ -373,6 +387,61 @@ final class AppSettingsStore: ObservableObject {
         audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
         hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
 
+        audioCoachLanguage =
+            WatchAudioCoachLanguage(
+                rawValue: defaults.string(
+                    forKey: "settings.audioCoach.language"
+                ) ?? ""
+            ) ?? .system
+        audioCoachDistanceIntervalKilometers =
+            defaults.object(
+                forKey: "settings.audioCoach.distanceIntervalKilometers"
+            ) as? Double ?? 1.0
+        audioCoachTimeIntervalMinutes =
+            defaults.object(
+                forKey: "settings.audioCoach.timeIntervalMinutes"
+            ) as? Int ?? 10
+        audioCoachAnnounceDistance =
+            defaults.object(
+                forKey: "settings.audioCoach.announceDistance"
+            ) as? Bool ?? true
+        audioCoachAnnounceElapsedTime =
+            defaults.object(
+                forKey: "settings.audioCoach.announceElapsedTime"
+            ) as? Bool ?? true
+        audioCoachAnnounceAveragePace =
+            defaults.object(
+                forKey: "settings.audioCoach.announceAveragePace"
+            ) as? Bool ?? true
+        audioCoachAnnounceClockTime =
+            defaults.object(
+                forKey: "settings.audioCoach.announceClockTime"
+            ) as? Bool ?? false
+        audioCoachAnnounceHeartRate =
+            defaults.object(
+                forKey: "settings.audioCoach.announceHeartRate"
+            ) as? Bool ?? false
+        audioCoachAnnounceRemainingRouteDistance =
+            defaults.object(
+                forKey: "settings.audioCoach.announceRemainingRouteDistance"
+            ) as? Bool ?? true
+        audioCoachAnnounceEstimatedRemainingRouteTime =
+            defaults.object(
+                forKey: "settings.audioCoach.announceEstimatedRemainingRouteTime"
+            ) as? Bool ?? true
+        audioCoachAnnounceCurrentWorkoutStep =
+            defaults.object(
+                forKey: "settings.audioCoach.announceCurrentWorkoutStep"
+            ) as? Bool ?? true
+        audioCoachAnnounceRemainingStepTime =
+            defaults.object(
+                forKey: "settings.audioCoach.announceRemainingStepTime"
+            ) as? Bool ?? true
+        audioCoachAnnounceRemainingStepDistance =
+            defaults.object(
+                forKey: "settings.audioCoach.announceRemainingStepDistance"
+            ) as? Bool ?? true
+
         workoutRemindersEnabled = defaults.object(forKey: "settings.workoutReminders") as? Bool ?? true
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
         challengeNotificationsEnabled = defaults.object(forKey: "settings.challengeNotifications") as? Bool ?? true
@@ -419,6 +488,59 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(autoPublishCompletedWorkouts, forKey: "settings.autoPublishCompletedWorkouts")
         defaults.set(audioCuesEnabled, forKey: "settings.audioCues")
         defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
+
+        defaults.set(
+            audioCoachLanguage.rawValue,
+            forKey: "settings.audioCoach.language"
+        )
+        defaults.set(
+            audioCoachDistanceIntervalKilometers,
+            forKey: "settings.audioCoach.distanceIntervalKilometers"
+        )
+        defaults.set(
+            audioCoachTimeIntervalMinutes,
+            forKey: "settings.audioCoach.timeIntervalMinutes"
+        )
+        defaults.set(
+            audioCoachAnnounceDistance,
+            forKey: "settings.audioCoach.announceDistance"
+        )
+        defaults.set(
+            audioCoachAnnounceElapsedTime,
+            forKey: "settings.audioCoach.announceElapsedTime"
+        )
+        defaults.set(
+            audioCoachAnnounceAveragePace,
+            forKey: "settings.audioCoach.announceAveragePace"
+        )
+        defaults.set(
+            audioCoachAnnounceClockTime,
+            forKey: "settings.audioCoach.announceClockTime"
+        )
+        defaults.set(
+            audioCoachAnnounceHeartRate,
+            forKey: "settings.audioCoach.announceHeartRate"
+        )
+        defaults.set(
+            audioCoachAnnounceRemainingRouteDistance,
+            forKey: "settings.audioCoach.announceRemainingRouteDistance"
+        )
+        defaults.set(
+            audioCoachAnnounceEstimatedRemainingRouteTime,
+            forKey: "settings.audioCoach.announceEstimatedRemainingRouteTime"
+        )
+        defaults.set(
+            audioCoachAnnounceCurrentWorkoutStep,
+            forKey: "settings.audioCoach.announceCurrentWorkoutStep"
+        )
+        defaults.set(
+            audioCoachAnnounceRemainingStepTime,
+            forKey: "settings.audioCoach.announceRemainingStepTime"
+        )
+        defaults.set(
+            audioCoachAnnounceRemainingStepDistance,
+            forKey: "settings.audioCoach.announceRemainingStepDistance"
+        )
 
         defaults.set(workoutRemindersEnabled, forKey: "settings.workoutReminders")
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
