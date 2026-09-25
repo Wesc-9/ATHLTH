@@ -1501,6 +1501,7 @@ struct ProfileGearThumb: View {
 struct ProfileGearEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
     let category: ProfileGearCategory
     let existing: ProfileGearItem?
@@ -1974,6 +1975,9 @@ struct ProfileGearEditorView: View {
         }
 
         if ok {
+            notifications.syncGearUsageAlerts(
+                from: gear
+            )
             dismiss()
         }
     }
