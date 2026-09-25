@@ -1053,21 +1053,33 @@ struct StrengthQuickBuilderView: View {
 }
 
 struct AudioCoachSetupCard: View {
-    @Binding var enabled: Bool
-    @Binding var announceDistance: Bool
-    @Binding var announceTime: Bool
-    @Binding var distanceIntervalKilometers: Double
-    @Binding var timeIntervalMinutes: Int
-    @Binding var announceClockTime: Bool
+    @Binding var draft: AudioCoachDraft
+    let showRouteOptions: Bool
+    let showStructuredOptions: Bool
 
     var body: some View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Audio Coach")
-                        .font(.headline)
+                    HStack(spacing: 7) {
+                        Text("Audio Coach")
+                            .font(.headline)
+
+                        Text("ATHLTH+")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(
+                                ATHLTHTheme.premiumGold
+                            )
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft,
+                                in: Capsule()
+                            )
+                    }
+
                     Text(
-                        "Spoken updates from Apple Watch while you move."
+                        "Choose when Apple Watch speaks and exactly what it tells you."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1075,29 +1087,37 @@ struct AudioCoachSetupCard: View {
 
                 Spacer()
 
-                Toggle("", isOn: $enabled)
+                Toggle("", isOn: $draft.enabled)
                     .labelsHidden()
             }
 
-            if enabled {
-                VStack(spacing: 12) {
+            if draft.enabled {
+                VStack(alignment: .leading, spacing: 14) {
+                    Divider()
+
+                    Text("WHEN TO SPEAK")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.0)
+                        .foregroundStyle(.secondary)
+
                     Toggle(
                         "Distance updates",
-                        isOn: $announceDistance
+                        isOn: $draft.distanceTriggerEnabled
                     )
 
-                    if announceDistance {
+                    if draft.distanceTriggerEnabled {
                         HStack {
                             Text("Every")
                             Spacer()
                             Picker(
                                 "Distance interval",
                                 selection:
-                                    $distanceIntervalKilometers
+                                    $draft.distanceIntervalKilometers
                             ) {
                                 Text("0.5 km").tag(0.5)
                                 Text("1 km").tag(1.0)
                                 Text("2 km").tag(2.0)
+                                Text("5 km").tag(5.0)
                             }
                             .pickerStyle(.menu)
                         }
@@ -1105,17 +1125,17 @@ struct AudioCoachSetupCard: View {
 
                     Toggle(
                         "Time updates",
-                        isOn: $announceTime
+                        isOn: $draft.timeTriggerEnabled
                     )
 
-                    if announceTime {
+                    if draft.timeTriggerEnabled {
                         HStack {
                             Text("Every")
                             Spacer()
                             Picker(
                                 "Time interval",
                                 selection:
-                                    $timeIntervalMinutes
+                                    $draft.timeIntervalMinutes
                             ) {
                                 Text("5 min").tag(5)
                                 Text("10 min").tag(10)
@@ -1126,13 +1146,106 @@ struct AudioCoachSetupCard: View {
                         }
                     }
 
+                    Divider()
+
+                    Text("WHAT TO ANNOUNCE")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.0)
+                        .foregroundStyle(.secondary)
+
                     Toggle(
-                        "Include current time",
-                        isOn: $announceClockTime
+                        "Distance",
+                        isOn: $draft.announceDistance
+                    )
+                    Toggle(
+                        "Elapsed time",
+                        isOn: $draft.announceElapsedTime
+                    )
+                    Toggle(
+                        "Average pace",
+                        isOn: $draft.announceAveragePace
+                    )
+                    Toggle(
+                        "Current time",
+                        isOn: $draft.announceClockTime
+                    )
+                    Toggle(
+                        "Heart rate",
+                        isOn: $draft.announceHeartRate
                     )
 
+                    if showRouteOptions {
+                        Divider()
+
+                        Text("ROUTE")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.0)
+                            .foregroundStyle(.secondary)
+
+                        Toggle(
+                            "Remaining distance",
+                            isOn:
+                                $draft
+                                    .announceRemainingRouteDistance
+                        )
+                        Toggle(
+                            "Estimated time remaining",
+                            isOn:
+                                $draft
+                                    .announceEstimatedRemainingRouteTime
+                        )
+                    }
+
+                    if showStructuredOptions {
+                        Divider()
+
+                        Text("STRUCTURED WORKOUT")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.0)
+                            .foregroundStyle(.secondary)
+
+                        Toggle(
+                            "Current / next step",
+                            isOn:
+                                $draft
+                                    .announceCurrentWorkoutStep
+                        )
+                        Toggle(
+                            "Remaining step time",
+                            isOn:
+                                $draft
+                                    .announceRemainingStepTime
+                        )
+                        Toggle(
+                            "Remaining step distance",
+                            isOn:
+                                $draft
+                                    .announceRemainingStepDistance
+                        )
+                    }
+
+                    Divider()
+
+                    HStack {
+                        Text("Language")
+                        Spacer()
+                        Picker(
+                            "Language",
+                            selection: $draft.language
+                        ) {
+                            ForEach(
+                                WatchAudioCoachLanguage.allCases,
+                                id: \.rawValue
+                            ) { language in
+                                Text(language.title)
+                                    .tag(language)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+
                     Text(
-                        "Updates include elapsed time, distance and average pace when available. Structured runs also announce the next block."
+                        "Your Settings defaults are loaded here automatically. Changes on this screen apply only to this workout."
                     )
                     .font(.caption2)
                     .foregroundStyle(.secondary)
