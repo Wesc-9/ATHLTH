@@ -820,6 +820,7 @@ struct PostWorkoutReviewView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
     let workout: SocialPublishableWorkout
     let wasAutoPublished: Bool
@@ -1067,6 +1068,12 @@ struct PostWorkoutReviewView: View {
             for: workout,
             gearIDs: selectedGearIDs
         )
+
+        if gearSaved {
+            notifications.syncGearUsageAlerts(
+                from: gear
+            )
+        }
 
         let reviewSaved = await social.saveWorkoutReview(
             workout,
