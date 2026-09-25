@@ -486,9 +486,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         guard workout.steps.indices.contains(nextIndex) else {
             structuredWorkoutComplete = true
-            if audioCoachConfiguration.enabled {
+            if audioCoachConfiguration.enabled &&
+                audioCoachConfiguration.announceCurrentWorkoutStep {
                 speak(
-                    "Structured workout complete. Continue easy or finish your workout when ready."
+                    coachPhrase(
+                        english:
+                            "Structured workout complete. Continue easy or finish your workout when ready.",
+                        norwegian:
+                            "Den strukturerte økten er fullført. Fortsett rolig eller avslutt økten når du er klar."
+                    )
                 )
             }
             return
@@ -508,13 +514,36 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         prefix: String
     ) {
         guard audioCoachConfiguration.enabled,
+              audioCoachConfiguration.announceCurrentWorkoutStep,
               let step = currentStructuredRunningStep
         else {
             return
         }
 
+        let localizedPrefix: String = {
+            switch prefix {
+            case "Starting":
+                return coachPhrase(
+                    english: "Starting",
+                    norwegian: "Starter"
+                )
+            case "Next":
+                return coachPhrase(
+                    english: "Next",
+                    norwegian: "Neste"
+                )
+            case "Current":
+                return coachPhrase(
+                    english: "Current",
+                    norwegian: "Nå"
+                )
+            default:
+                return prefix
+            }
+        }()
+
         var parts = [
-            prefix,
+            localizedPrefix,
             step.title
         ]
 
@@ -561,39 +590,190 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private var metricsAnnouncement: String {
         var parts: [String] = []
+        let configuration = audioCoachConfiguration
 
-        if distanceMeters > 0 {
+        if configuration.announceDistance,
+           distanceMeters > 0 {
             parts.append(
-                String(
-                    format: "%.1f kilometers",
-                    distanceMeters / 1_000
+                coachPhrase(
+                    english: "Distance",
+                    norwegian: "Distanse"
+                ) + " " +
+                spokenDistance(distanceMeters)
+            )
+        }
+
+        if configuration.announceElapsedTime {
+            parts.append(
+                coachPhrase(
+                    english: "Elapsed time",
+                    norwegian: "Tid"
+                ) + " " +
+                spokenDuration(elapsedTime)
+            )
+        }
+
+        let averageSecondsPerKilometer:
+            TimeInterval? = {
+            guard distanceMeters >= 100,
+                  elapsedTime > 0
+            else {
+                return nil
+            }
+
+            return elapsedTime /
+                (distanceMeters / 1_000)
+        }()
+
+        if configuration.announceAveragePace,
+           let averageSecondsPerKilometer {
+            parts.append(
+                coachPhrase(
+                    english: "Average pace",
+                    norwegian: "Gjennomsnittstempo"
+                ) + " " +
+                spokenPace(averageSecondsPerKilometer)
+            )
+        }
+
+        if configuration.announceHeartRate,
+           heartRate > 0 {
+            parts.append(
+                coachPhrase(
+                    english: "Heart rate",
+                    norwegian: "Puls"
+                ) + " " +
+                "\(Int(heartRate.rounded())) " +
+                coachPhrase(
+                    english: "beats per minute",
+                    norwegian: "slag per minutt"
                 )
             )
         }
 
-        parts.append(spokenDuration(elapsedTime))
-
-        if distanceMeters >= 100,
-           elapsedTime > 0 {
-            let secondsPerKilometer =
-                elapsedTime / (distanceMeters / 1_000)
-            parts.append(
-                "Average pace " +
-                spokenPace(secondsPerKilometer)
-            )
-        }
-
-        if audioCoachConfiguration.announceClockTime {
+        if configuration.announceClockTime {
             let formatter = DateFormatter()
             formatter.timeStyle = .short
             formatter.dateStyle = .none
             parts.append(
-                "Time " + formatter.string(from: Date())
+                coachPhrase(
+                    english: "Time",
+                    norwegian: "Klokken"
+                ) + " " +
+                formatter.string(from: Date())
             )
+        }
+
+        if let totalRouteMeters =
+                configuration.routeDistanceMeters,
+           totalRouteMeters > 0 {
+            let remainingMeters = max(
+                totalRouteMeters - distanceMeters,
+                0
+            )
+
+            if configuration
+                .announceRemainingRouteDistance {
+                parts.append(
+                    coachPhrase(
+                        english: "Remaining distance",
+                        norwegian: "Gjenstående distanse"
+                    ) + " " +
+                    spokenDistance(remainingMeters)
+                )
+            }
+
+            if configuration
+                .announceEstimatedRemainingRouteTime,
+               let averageSecondsPerKilometer,
+               remainingMeters > 0 {
+                let estimatedRemaining =
+                    averageSecondsPerKilometer *
+                    (remainingMeters / 1_000)
+
+                parts.append(
+                    coachPhrase(
+                        english: "Estimated time remaining",
+                        norwegian: "Estimert tid igjen"
+                    ) + " " +
+                    spokenDuration(estimatedRemaining)
+                )
+            }
+        }
+
+        if let step = currentStructuredRunningStep {
+            let elapsedInStep =
+                max(
+                    elapsedTime -
+                    structuredStepStartElapsedTime,
+                    0
+                )
+            let distanceInStep =
+                max(
+                    distanceMeters -
+                    structuredStepStartDistanceMeters,
+                    0
+                )
+
+            if configuration
+                .announceRemainingStepTime,
+               step.measure == .time,
+               let target = step.durationSeconds {
+                let remaining = max(
+                    target - elapsedInStep,
+                    0
+                )
+                parts.append(
+                    coachPhrase(
+                        english: "Time remaining in this step",
+                        norwegian: "Tid igjen i denne delen"
+                    ) + " " +
+                    spokenDuration(remaining)
+                )
+            }
+
+            if configuration
+                .announceRemainingStepDistance,
+               step.measure == .distance,
+               let target = step.distanceMeters {
+                let remaining = max(
+                    target - distanceInStep,
+                    0
+                )
+                parts.append(
+                    coachPhrase(
+                        english: "Distance remaining in this step",
+                        norwegian: "Distanse igjen i denne delen"
+                    ) + " " +
+                    spokenDistance(remaining)
+                )
+            }
         }
 
         return parts.joined(separator: ". ")
     }
+
+    private func spokenDistance(
+        _ meters: Double
+    ) -> String {
+        if meters >= 1_000 {
+            return String(
+                format: "%.1f %@",
+                meters / 1_000,
+                coachPhrase(
+                    english: "kilometers",
+                    norwegian: "kilometer"
+                )
+            )
+        }
+
+        return "\(Int(meters.rounded())) " +
+            coachPhrase(
+                english: "meters",
+                norwegian: "meter"
+            )
+    }
+
 
     private func spokenDuration(
         _ duration: TimeInterval
@@ -610,25 +790,54 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         if hours > 0 {
             parts.append(
-                "\(hours) hour\(hours == 1 ? "" : "s")"
+                "\(hours) " +
+                coachPhrase(
+                    english: hours == 1 ? "hour" : "hours",
+                    norwegian: hours == 1 ? "time" : "timer"
+                )
             )
         }
 
         if minutes > 0 {
             parts.append(
-                "\(minutes) minute\(minutes == 1 ? "" : "s")"
+                "\(minutes) " +
+                coachPhrase(
+                    english:
+                        minutes == 1
+                            ? "minute"
+                            : "minutes",
+                    norwegian:
+                        minutes == 1
+                            ? "minutt"
+                            : "minutter"
+                )
             )
         }
 
         if hours == 0,
            seconds > 0 {
             parts.append(
-                "\(seconds) second\(seconds == 1 ? "" : "s")"
+                "\(seconds) " +
+                coachPhrase(
+                    english:
+                        seconds == 1
+                            ? "second"
+                            : "seconds",
+                    norwegian:
+                        seconds == 1
+                            ? "sekund"
+                            : "sekunder"
+                )
             )
         }
 
-        return parts.isEmpty ? "0 seconds" :
-            parts.joined(separator: " ")
+        return parts.isEmpty
+            ? "0 " +
+                coachPhrase(
+                    english: "seconds",
+                    norwegian: "sekunder"
+                )
+            : parts.joined(separator: " ")
     }
 
     private func spokenPace(
@@ -641,11 +850,80 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
 
+        let value: String
+
         if seconds == 0 {
-            return "\(minutes) minutes per kilometer"
+            value =
+                "\(minutes) " +
+                coachPhrase(
+                    english: "minutes",
+                    norwegian: "minutter"
+                )
+        } else {
+            value =
+                "\(minutes) " +
+                coachPhrase(
+                    english: "minutes",
+                    norwegian: "minutter"
+                ) +
+                " \(seconds) " +
+                coachPhrase(
+                    english: "seconds",
+                    norwegian: "sekunder"
+                )
         }
 
-        return "\(minutes) minutes \(seconds) seconds per kilometer"
+        return value + " " +
+            coachPhrase(
+                english: "per kilometer",
+                norwegian: "per kilometer"
+            )
+    }
+
+    private func coachPhrase(
+        english: String,
+        norwegian: String
+    ) -> String {
+        switch audioCoachConfiguration.language {
+        case .norwegian:
+            return norwegian
+        case .system:
+            let languageCode =
+                Locale.autoupdatingCurrent.language.languageCode?
+                    .identifier
+            return languageCode == "nb" ||
+                languageCode == "nn" ||
+                languageCode == "no"
+                ? norwegian
+                : english
+        case .english,
+             .german,
+             .spanish,
+             .french,
+             .italian:
+            // Full phrase localization can expand independently.
+            // Until then these voices use the stable English coach copy.
+            return english
+        }
+    }
+
+    private var audioCoachVoiceLanguage: String? {
+        switch audioCoachConfiguration.language {
+        case .system:
+            return nil
+        case .english:
+            return "en-US"
+        case .norwegian:
+            return "nb-NO"
+        case .german:
+            return "de-DE"
+        case .spanish:
+            return "es-ES"
+        case .french:
+            return "fr-FR"
+        case .italian:
+            return "it-IT"
+        }
     }
 
     private func speak(
@@ -662,6 +940,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let utterance = AVSpeechUtterance(
             string: text
         )
+        if let audioCoachVoiceLanguage,
+           let voice = AVSpeechSynthesisVoice(
+                language: audioCoachVoiceLanguage
+           ) {
+            utterance.voice = voice
+        }
         utterance.rate = 0.48
         utterance.volume = 1.0
         speechSynthesizer.speak(utterance)
