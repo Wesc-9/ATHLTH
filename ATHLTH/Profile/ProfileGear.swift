@@ -377,10 +377,20 @@ final class ProfileGearStore: ObservableObject {
     @Published var errorMessage: String?
 
     private let client: SupabaseClient
+    private let defaults = UserDefaults.standard
     private var hasPreparedWorkoutGearSelection = false
+    private var preparedWorkoutGearAt: Date?
+
+    private static let preparedGearIDsKey =
+        "athlth.gear.prepared-workout-ids"
+    private static let preparedGearDateKey =
+        "athlth.gear.prepared-workout-date"
+    private static let preparedGearMaxAge:
+        TimeInterval = 36 * 60 * 60
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
+        restorePreparedWorkoutGear()
     }
 
     var currentUserID: UUID? {
@@ -495,19 +505,42 @@ final class ProfileGearStore: ObservableObject {
     func prepareNextWorkoutGear(_ gearIDs: Set<UUID>) {
         preparedWorkoutGearIDs = gearIDs
         hasPreparedWorkoutGearSelection = true
+        preparedWorkoutGearAt = Date()
+
+        defaults.set(
+            gearIDs.map(\.uuidString),
+            forKey: Self.preparedGearIDsKey
+        )
+        defaults.set(
+            preparedWorkoutGearAt?.timeIntervalSince1970,
+            forKey: Self.preparedGearDateKey
+        )
     }
 
     func clearPreparedWorkoutGear() {
         preparedWorkoutGearIDs = []
         hasPreparedWorkoutGearSelection = false
+        preparedWorkoutGearAt = nil
+        defaults.removeObject(
+            forKey: Self.preparedGearIDsKey
+        )
+        defaults.removeObject(
+            forKey: Self.preparedGearDateKey
+        )
     }
 
     func savePreparedGearUsage(
         for workout: SocialPublishableWorkout
     ) async {
         let selected: Set<UUID>
+        let preparedIsCurrent =
+            hasPreparedWorkoutGearSelection &&
+            preparedWorkoutGearAt.map {
+                abs(Date().timeIntervalSince($0)) <=
+                    Self.preparedGearMaxAge
+            } == true
 
-        if hasPreparedWorkoutGearSelection {
+        if preparedIsCurrent {
             selected = preparedWorkoutGearIDs
         } else if workout.activity == .running,
                   let defaultRunningShoe {
@@ -872,6 +905,42 @@ final class ProfileGearStore: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func restorePreparedWorkoutGear() {
+        let rawIDs =
+            defaults.stringArray(
+                forKey: Self.preparedGearIDsKey
+            ) ?? []
+        let timestamp =
+            defaults.double(
+                forKey: Self.preparedGearDateKey
+            )
+
+        guard timestamp > 0 else {
+            return
+        }
+
+        let date = Date(
+            timeIntervalSince1970: timestamp
+        )
+        guard abs(Date().timeIntervalSince(date)) <=
+                Self.preparedGearMaxAge
+        else {
+            defaults.removeObject(
+                forKey: Self.preparedGearIDsKey
+            )
+            defaults.removeObject(
+                forKey: Self.preparedGearDateKey
+            )
+            return
+        }
+
+        preparedWorkoutGearIDs = Set(
+            rawIDs.compactMap(UUID.init(uuidString:))
+        )
+        preparedWorkoutGearAt = date
+        hasPreparedWorkoutGearSelection = true
     }
 
     private func saveDetails(
