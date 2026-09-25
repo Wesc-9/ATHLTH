@@ -1125,21 +1125,38 @@ struct ProfileGearSummaryView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
                 .frame(maxWidth: .infinity)
+
+            if category == .shoes,
+               let item {
+                let stats = gear.usageStats(for: item)
+
+                Text(
+                    stats.totalDistanceMeters > 0
+                        ? String(
+                            format: "%.0f km",
+                            stats.totalDistanceMeters / 1_000
+                        )
+                        : "Ready"
+                )
+                .font(.system(size: 8.5, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity)
     }
 
     private func gearIcon(_ category: ProfileGearCategory) -> some View {
-        Image(systemName: category.systemImage)
-            .font(.system(size: 20, weight: .medium))
-            .foregroundStyle(ATHLTHTheme.accentDeep)
+        ProfileGearCategoryIcon(
+            category: category,
+            size: 20
+        )
     }
 }
 
 struct ProfileGearManagerView: View {
     @EnvironmentObject private var gear: ProfileGearStore
 
-    @State private var editingItem: ProfileGearItem?
     @State private var addingCategory: ProfileGearCategory?
 
     var body: some View {
@@ -1159,13 +1176,21 @@ struct ProfileGearManagerView: View {
                         }
                     } else {
                         ForEach(categoryItems) { item in
-                            gearRow(item)
+                            NavigationLink {
+                                ProfileGearDetailView(item: item)
+                            } label: {
+                                gearRow(item)
+                            }
                         }
                         .onDelete { offsets in
                             let rows = categoryItems
                             for index in offsets {
-                                guard rows.indices.contains(index) else { continue }
-                                Task { await gear.delete(rows[index]) }
+                                guard rows.indices.contains(index)
+                                else { continue }
+
+                                Task {
+                                    await gear.delete(rows[index])
+                                }
                             }
                         }
 
@@ -1176,10 +1201,19 @@ struct ProfileGearManagerView: View {
                         }
                     }
                 } header: {
-                    HStack {
-                        Label(category.title, systemImage: category.systemImage)
+                    HStack(spacing: 8) {
+                        ProfileGearCategoryIcon(
+                            category: category,
+                            size: 15,
+                            color: .secondary
+                        )
+
+                        Text(category.title)
+
                         Spacer()
-                        if let featured = gear.featuredItem(in: category) {
+
+                        if let featured =
+                            gear.featuredItem(in: category) {
                             Text("Profile: \(featured.name)")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -1191,9 +1225,12 @@ struct ProfileGearManagerView: View {
 
             if let error = gear.errorMessage {
                 Section {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                    Label(
+                        error,
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
                 }
             }
         }
@@ -1202,73 +1239,128 @@ struct ProfileGearManagerView: View {
         .task {
             await gear.refresh()
         }
+        .refreshable {
+            await gear.refresh()
+        }
         .sheet(item: $addingCategory) { category in
             NavigationStack {
                 ProfileGearEditorView(category: category)
             }
             .environmentObject(gear)
         }
-        .sheet(item: $editingItem) { item in
-            NavigationStack {
-                ProfileGearEditorView(category: item.category, existing: item)
-            }
-            .environmentObject(gear)
-        }
     }
 
-    private func gearRow(_ item: ProfileGearItem) -> some View {
-        HStack(spacing: 12) {
+    private func gearRow(
+        _ item: ProfileGearItem
+    ) -> some View {
+        let details = gear.details(for: item)
+        let stats = gear.usageStats(for: item)
+
+        return HStack(spacing: 12) {
             ProfileGearThumb(item: item)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.name)
-                    .font(.subheadline.weight(.semibold))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(item.name)
+                        .font(.subheadline.weight(.semibold))
 
-                Text(item.isFeatured ? "Shown on profile" : "Saved gear")
-                    .font(.caption)
-                    .foregroundStyle(item.isFeatured ? ATHLTHTheme.accent : .secondary)
+                    if details?.status == .retired {
+                        Text("RETIRED")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.secondary)
+                    } else if details?.isDefaultForRunning == true {
+                        Text("DEFAULT")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                    }
+                }
+
+                Text(
+                    rowSubtitle(
+                        item,
+                        details: details,
+                        stats: stats
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
 
             Spacer()
 
-            if !item.isFeatured {
-                Button {
-                    Task { await gear.setFeatured(item) }
-                } label: {
-                    Image(systemName: "star")
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Show \(item.name) on profile")
-            } else {
+            if item.isFeatured {
                 Image(systemName: "star.fill")
                     .foregroundStyle(ATHLTHTheme.accent)
             }
-
-            Button {
-                editingItem = item
-            } label: {
-                Image(systemName: "pencil")
-            }
-            .buttonStyle(.borderless)
         }
         .padding(.vertical, 3)
     }
+
+    private func rowSubtitle(
+        _ item: ProfileGearItem,
+        details: ProfileGearDetailRecord?,
+        stats: ProfileGearUsageStats
+    ) -> String {
+        var parts: [String] = []
+
+        if let brand = details?.brand {
+            parts.append(brand)
+        }
+
+        if item.category == .shoes {
+            if let use = details?.shoeUseType {
+                parts.append(use.title)
+            }
+
+            if stats.totalDistanceMeters > 0 {
+                parts.append(
+                    String(
+                        format: "%.0f km",
+                        stats.totalDistanceMeters / 1_000
+                    )
+                )
+            }
+        } else if stats.workoutCount > 0 {
+            parts.append(
+                "\(stats.workoutCount) workout\(stats.workoutCount == 1 ? "" : "s")"
+            )
+        }
+
+        if parts.isEmpty {
+            parts.append(
+                item.isFeatured
+                    ? "Shown on profile"
+                    : "Saved gear"
+            )
+        }
+
+        return parts.joined(separator: " · ")
+    }
 }
 
-private struct ProfileGearThumb: View {
+struct ProfileGearThumb: View {
     let item: ProfileGearItem
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(Color.primary.opacity(0.045))
+            RoundedRectangle(
+                cornerRadius: 11,
+                style: .continuous
+            )
+            .fill(Color.primary.opacity(0.045))
 
             if let value = item.imageURL,
                let url = URL(string: value) {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
-                        image.resizable().scaledToFit().padding(5)
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .padding(5)
                     default:
                         fallback
                     }
@@ -1281,13 +1373,14 @@ private struct ProfileGearThumb: View {
     }
 
     private var fallback: some View {
-        Image(systemName: item.category.systemImage)
-            .font(.system(size: 21, weight: .medium))
-            .foregroundStyle(ATHLTHTheme.accentDeep)
+        ProfileGearCategoryIcon(
+            category: item.category,
+            size: 21
+        )
     }
 }
 
-private struct ProfileGearEditorView: View {
+struct ProfileGearEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var gear: ProfileGearStore
 
@@ -1298,8 +1391,13 @@ private struct ProfileGearEditorView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
     @State private var showOnProfile: Bool
+    @State private var detailDraft: ProfileGearDetailDraft
+    @State private var hasPurchasedDate = false
+    @State private var hasFirstUsedDate = false
+    @State private var replacementTargetText = ""
     @State private var saving = false
     @State private var localError: String?
+    @State private var didLoadDetails = false
 
     init(
         category: ProfileGearCategory,
@@ -1308,21 +1406,65 @@ private struct ProfileGearEditorView: View {
         self.category = category
         self.existing = existing
         _name = State(initialValue: existing?.name ?? "")
-        _showOnProfile = State(initialValue: existing?.isFeatured ?? true)
+        _showOnProfile = State(
+            initialValue: existing?.isFeatured ?? true
+        )
+        _detailDraft = State(
+            initialValue: ProfileGearDetailDraft(
+                category: category
+            )
+        )
     }
 
     var body: some View {
         Form {
             Section("Item") {
-                TextField("Name", text: $name)
+                TextField(
+                    category == .shoes
+                        ? "Display name, e.g. Pegasus 42"
+                        : "Name",
+                    text: $name
+                )
 
-                Toggle("Show on profile", isOn: $showOnProfile)
+                Picker(
+                    "Status",
+                    selection: $detailDraft.status
+                ) {
+                    ForEach(ProfileGearStatus.allCases) { status in
+                        Text(status.title).tag(status)
+                    }
+                }
+
+                Toggle(
+                    "Show on profile",
+                    isOn: $showOnProfile
+                )
+                .disabled(detailDraft.status == .retired)
 
                 Text(
-                    "Only one \(category.shortTitle.lowercased()) is shown on your profile. You can keep several items saved here and switch the featured one anytime."
+                    "Only one \(category.shortTitle.lowercased()) is featured on your profile. Retired gear stays in history but is removed from new workout choices."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            }
+
+            if category == .shoes {
+                shoeDetailsSection
+            } else {
+                generalDetailsSection
+            }
+
+            if let existing {
+                usageSection(existing)
+            }
+
+            Section("Notes") {
+                TextField(
+                    "Optional notes",
+                    text: $detailDraft.notes,
+                    axis: .vertical
+                )
+                .lineLimit(2...5)
             }
 
             Section("Photo") {
@@ -1334,7 +1476,9 @@ private struct ProfileGearEditorView: View {
                         matching: .images
                     ) {
                         Label(
-                            imageData == nil ? "Choose photo" : "Change photo",
+                            imageData == nil
+                                ? "Choose photo"
+                                : "Change photo",
                             systemImage: "photo"
                         )
                     }
@@ -1347,45 +1491,239 @@ private struct ProfileGearEditorView: View {
                 .foregroundStyle(.secondary)
             }
 
-            if let displayedError = localError ?? gear.errorMessage {
+            if let displayedError =
+                localError ?? gear.errorMessage {
                 Section {
                     Label(
                         displayedError,
-                        systemImage: "exclamationmark.triangle.fill"
+                        systemImage:
+                            "exclamationmark.triangle.fill"
                     )
                     .font(.caption)
                     .foregroundStyle(.orange)
                 }
             }
         }
-        .navigationTitle(existing == nil ? "Add \(category.shortTitle)" : "Edit \(category.shortTitle)")
+        .navigationTitle(
+            existing == nil
+                ? "Add \(category.shortTitle)"
+                : "Edit \(category.shortTitle)"
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
+                Button("Cancel") {
+                    dismiss()
+                }
             }
 
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     Task { await save() }
                 }
-                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
+                .disabled(
+                    name.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty ||
+                    saving
+                )
+            }
+        }
+        .onChange(of: detailDraft.status) { _, status in
+            if status == .retired {
+                detailDraft.isDefaultForRunning = false
+                showOnProfile = false
             }
         }
         .onChange(of: selectedPhoto) { _, newValue in
             guard let newValue else { return }
+
             Task {
                 do {
-                    guard let raw = try await newValue.loadTransferable(type: Data.self),
-                          let image = UIImage(data: raw),
-                          let jpeg = image.jpegData(compressionQuality: 0.82)
+                    guard
+                        let raw = try await newValue
+                            .loadTransferable(type: Data.self),
+                        let image = UIImage(data: raw),
+                        let jpeg = image.jpegData(
+                            compressionQuality: 0.82
+                        )
                     else {
                         throw ProfileGearError.imageTooLarge
                     }
+
                     imageData = jpeg
                 } catch {
                     localError = error.localizedDescription
                 }
+            }
+        }
+        .task {
+            guard !didLoadDetails else { return }
+            didLoadDetails = true
+
+            if gear.items.isEmpty {
+                await gear.refresh()
+            }
+
+            if let existing,
+               let record = gear.details(for: existing) {
+                detailDraft = ProfileGearDetailDraft(
+                    record: record,
+                    category: category
+                )
+                hasPurchasedDate =
+                    detailDraft.purchasedAt != nil
+                hasFirstUsedDate =
+                    detailDraft.firstUsedAt != nil
+
+                if let target =
+                    detailDraft.replacementTargetKM {
+                    replacementTargetText =
+                        String(format: "%.0f", target)
+                }
+            } else if category == .shoes,
+                      gear.defaultRunningShoe == nil {
+                detailDraft.isDefaultForRunning = true
+            }
+        }
+    }
+
+    private var shoeDetailsSection: some View {
+        Section("Shoe Details") {
+            TextField("Brand", text: $detailDraft.brand)
+            TextField("Model", text: $detailDraft.model)
+            TextField("Color", text: $detailDraft.colorName)
+            TextField("Size", text: $detailDraft.sizeLabel)
+
+            Picker(
+                "Rotation",
+                selection: $detailDraft.shoeUseType
+            ) {
+                ForEach(ShoeUseType.allCases) { type in
+                    Label(type.title, systemImage: type.icon)
+                        .tag(type)
+                }
+            }
+
+            Toggle(
+                "Purchased date",
+                isOn: $hasPurchasedDate
+            )
+
+            if hasPurchasedDate {
+                DatePicker(
+                    "Purchased",
+                    selection: Binding(
+                        get: {
+                            detailDraft.purchasedAt ?? Date()
+                        },
+                        set: {
+                            detailDraft.purchasedAt = $0
+                        }
+                    ),
+                    in: ...Date(),
+                    displayedComponents: .date
+                )
+            }
+
+            Toggle(
+                "First used date",
+                isOn: $hasFirstUsedDate
+            )
+
+            if hasFirstUsedDate {
+                DatePicker(
+                    "First used",
+                    selection: Binding(
+                        get: {
+                            detailDraft.firstUsedAt ?? Date()
+                        },
+                        set: {
+                            detailDraft.firstUsedAt = $0
+                        }
+                    ),
+                    in: ...Date(),
+                    displayedComponents: .date
+                )
+            }
+
+            TextField(
+                "Replacement target (km)",
+                text: $replacementTargetText
+            )
+            .keyboardType(.decimalPad)
+
+            Toggle(
+                "Default running shoe",
+                isOn: $detailDraft.isDefaultForRunning
+            )
+            .disabled(detailDraft.status == .retired)
+
+            Text(
+                "ATHLTH uses the actual completed workout distance. A 10 km planned run that finishes at 8.4 km adds 8.4 km to the selected shoes."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var generalDetailsSection: some View {
+        Section("Details") {
+            if category == .other {
+                TextField(
+                    "Type, e.g. chest strap or vest",
+                    text: $detailDraft.gearTypeLabel
+                )
+            }
+
+            TextField("Brand", text: $detailDraft.brand)
+            TextField("Model", text: $detailDraft.model)
+            TextField("Color", text: $detailDraft.colorName)
+
+            Text(
+                "Other gear tracks workout count, total time and last use. Distance is only emphasized for shoes."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func usageSection(
+        _ item: ProfileGearItem
+    ) -> some View {
+        let stats = gear.usageStats(for: item)
+
+        return Section("Usage") {
+            LabeledContent(
+                "Workouts",
+                value: "\(stats.workoutCount)"
+            )
+
+            LabeledContent(
+                "Time",
+                value: compactDuration(
+                    stats.totalDuration
+                )
+            )
+
+            if category == .shoes {
+                LabeledContent(
+                    "Distance",
+                    value: String(
+                        format: "%.0f km",
+                        stats.totalDistanceMeters / 1_000
+                    )
+                )
+            }
+
+            if let lastUsed = stats.lastUsedAt {
+                LabeledContent(
+                    "Last used",
+                    value: lastUsed.formatted(
+                        date: .abbreviated,
+                        time: .omitted
+                    )
+                )
             }
         }
     }
@@ -1401,7 +1739,9 @@ private struct ProfileGearEditorView: View {
                 .padding(6)
                 .background(
                     Color.primary.opacity(0.04),
-                    in: RoundedRectangle(cornerRadius: 16)
+                    in: RoundedRectangle(
+                        cornerRadius: 16
+                    )
                 )
         } else if let existing,
                   let value = existing.imageURL,
@@ -1409,7 +1749,10 @@ private struct ProfileGearEditorView: View {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
-                    image.resizable().scaledToFit().padding(6)
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .padding(6)
                 default:
                     defaultPreview
                 }
@@ -1417,7 +1760,9 @@ private struct ProfileGearEditorView: View {
             .frame(width: 82, height: 82)
             .background(
                 Color.primary.opacity(0.04),
-                in: RoundedRectangle(cornerRadius: 16)
+                in: RoundedRectangle(
+                    cornerRadius: 16
+                )
             )
         } else {
             defaultPreview
@@ -1425,14 +1770,17 @@ private struct ProfileGearEditorView: View {
     }
 
     private var defaultPreview: some View {
-        Image(systemName: category.systemImage)
-            .font(.system(size: 34, weight: .medium))
-            .foregroundStyle(ATHLTHTheme.accentDeep)
-            .frame(width: 82, height: 82)
-            .background(
-                Color.primary.opacity(0.04),
-                in: RoundedRectangle(cornerRadius: 16)
+        ProfileGearCategoryIcon(
+            category: category,
+            size: 34
+        )
+        .frame(width: 82, height: 82)
+        .background(
+            Color.primary.opacity(0.04),
+            in: RoundedRectangle(
+                cornerRadius: 16
             )
+        )
     }
 
     private func save() async {
@@ -1440,25 +1788,94 @@ private struct ProfileGearEditorView: View {
         localError = nil
         defer { saving = false }
 
+        if hasPurchasedDate {
+            detailDraft.purchasedAt =
+                detailDraft.purchasedAt ?? Date()
+        } else {
+            detailDraft.purchasedAt = nil
+        }
+
+        if hasFirstUsedDate {
+            detailDraft.firstUsedAt =
+                detailDraft.firstUsedAt ?? Date()
+        } else {
+            detailDraft.firstUsedAt = nil
+        }
+
+        if let purchased = detailDraft.purchasedAt,
+           let firstUsed = detailDraft.firstUsedAt,
+           firstUsed < Calendar.current.startOfDay(
+                for: purchased
+           ) {
+            localError =
+                "First used date cannot be before the purchase date."
+            return
+        }
+
+        if category == .shoes {
+            let cleanTarget = replacementTargetText
+                .replacingOccurrences(of: ",", with: ".")
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+            if cleanTarget.isEmpty {
+                detailDraft.replacementTargetKM = nil
+            } else if let target = Double(cleanTarget),
+                      target > 0,
+                      target <= 5_000 {
+                detailDraft.replacementTargetKM = target
+            } else {
+                localError =
+                    "Replacement target must be between 1 and 5000 km."
+                return
+            }
+        } else {
+            detailDraft.replacementTargetKM = nil
+            detailDraft.isDefaultForRunning = false
+        }
+
         let ok: Bool
+
         if let existing {
             ok = await gear.update(
                 existing,
                 name: name,
                 jpegData: imageData,
-                showOnProfile: showOnProfile
+                showOnProfile: showOnProfile,
+                detailDraft: detailDraft
             )
         } else {
             ok = await gear.add(
                 name: name,
                 category: category,
                 jpegData: imageData,
-                showOnProfile: showOnProfile
+                showOnProfile: showOnProfile,
+                detailDraft: detailDraft
             )
         }
 
         if ok {
             dismiss()
         }
+    }
+
+    private func compactDuration(
+        _ seconds: TimeInterval
+    ) -> String {
+        let minutes = max(
+            Int((seconds / 60).rounded()),
+            0
+        )
+
+        if minutes >= 60 {
+            let hours = minutes / 60
+            let remainder = minutes % 60
+            return remainder == 0
+                ? "\(hours)h"
+                : "\(hours)h \(remainder)m"
+        }
+
+        return "\(minutes)m"
     }
 }
