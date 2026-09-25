@@ -81,20 +81,12 @@ enum WatchAudioCoachLanguage: String, Codable, CaseIterable, Hashable {
     case system
     case english = "en-US"
     case norwegian = "nb-NO"
-    case german = "de-DE"
-    case spanish = "es-ES"
-    case french = "fr-FR"
-    case italian = "it-IT"
 
     var title: String {
         switch self {
         case .system: return "System"
         case .english: return "English"
         case .norwegian: return "Norsk"
-        case .german: return "Deutsch"
-        case .spanish: return "Español"
-        case .french: return "Français"
-        case .italian: return "Italiano"
         }
     }
 }
