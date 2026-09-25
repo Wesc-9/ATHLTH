@@ -445,6 +445,7 @@ struct ATHLTHCommunityView: View {
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var groups: CommunityGroupStore
 
     @State private var showingCreateEvent = false
     @State private var showingCreateChallenge = false
@@ -458,28 +459,6 @@ struct ATHLTHCommunityView: View {
         }
     }
 
-
-    private var activeFriendsThisWeek: Int {
-        let threshold = Calendar.current.date(
-            byAdding: .day,
-            value: -7,
-            to: Date()
-        ) ?? .distantPast
-        let friendIDs = Set(social.friends.map(\.userID))
-
-        return Set<UUID>(
-            social.feed.compactMap { item -> UUID? in
-                guard item.activity.kind == "workout",
-                      item.activity.createdAt >= threshold,
-                      friendIDs.contains(item.actor.userID)
-                else {
-                    return nil
-                }
-
-                return item.actor.userID
-            }
-        ).count
-    }
 
     private var discoverPeople: [SocialProfileCard] {
         social.visibleProfiles.filter { profile in
@@ -513,7 +492,7 @@ struct ATHLTHCommunityView: View {
             } content: {
                 LazyVStack(spacing: 18) {
                     CommunityPulseCard(
-                        activeFriends: activeFriendsThisWeek,
+                        groupsCount: groups.joinedGroups.count,
                         activeChallenges: activeChallenges.count,
                         upcomingEvents: community.upcomingEvents.count
                     )
@@ -876,7 +855,8 @@ struct ATHLTHCommunityView: View {
     private func refreshCommunity() async {
         async let eventRefresh: Void = community.refresh()
         async let socialRefresh: Void = social.refresh(challengeStore: challenges)
-        _ = await (eventRefresh, socialRefresh)
+        async let groupRefresh: Void = groups.refresh()
+        _ = await (eventRefresh, socialRefresh, groupRefresh)
         challenges.refreshStatuses()
     }
 }
