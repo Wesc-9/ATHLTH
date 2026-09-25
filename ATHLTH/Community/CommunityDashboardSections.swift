@@ -69,18 +69,23 @@ struct CommunityLeaderboardEntry: Identifiable, Hashable {
 }
 
 struct CommunityPulseCard: View {
-    let activeFriends: Int
+    let groupsCount: Int
     let activeChallenges: Int
     let upcomingEvents: Int
 
     var body: some View {
         HStack(spacing: 9) {
-            pulseTile(
-                value: "\(activeFriends)",
-                title: "friends active",
-                icon: "person.2.fill",
-                tint: ATHLTHTheme.vitality
-            )
+            NavigationLink {
+                CommunityGroupsView()
+            } label: {
+                pulseTile(
+                    value: "\(groupsCount)",
+                    title: "groups",
+                    icon: "person.3.fill",
+                    tint: .indigo
+                )
+            }
+            .buttonStyle(.plain)
 
             pulseTile(
                 value: "\(activeChallenges)",
