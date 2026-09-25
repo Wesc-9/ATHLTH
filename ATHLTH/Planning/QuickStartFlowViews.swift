@@ -1,5 +1,99 @@
 import SwiftUI
 
+struct AudioCoachDraft {
+    var enabled = false
+    var distanceTriggerEnabled = true
+    var timeTriggerEnabled = false
+    var distanceIntervalKilometers = 1.0
+    var timeIntervalMinutes = 10
+
+    var announceDistance = true
+    var announceElapsedTime = true
+    var announceAveragePace = true
+    var announceClockTime = false
+    var announceHeartRate = false
+
+    var announceRemainingRouteDistance = true
+    var announceEstimatedRemainingRouteTime = true
+
+    var announceCurrentWorkoutStep = true
+    var announceRemainingStepTime = true
+    var announceRemainingStepDistance = true
+
+    var language: WatchAudioCoachLanguage = .system
+
+    mutating func load(from settings: AppSettingsStore) {
+        enabled = settings.audioCoachEnabledByDefault
+        distanceTriggerEnabled =
+            settings.audioCoachDistanceTriggerEnabled
+        timeTriggerEnabled =
+            settings.audioCoachTimeTriggerEnabled
+        distanceIntervalKilometers =
+            settings.audioCoachDistanceIntervalKilometers
+        timeIntervalMinutes =
+            settings.audioCoachTimeIntervalMinutes
+        announceDistance =
+            settings.audioCoachAnnounceDistance
+        announceElapsedTime =
+            settings.audioCoachAnnounceElapsedTime
+        announceAveragePace =
+            settings.audioCoachAnnounceAveragePace
+        announceClockTime =
+            settings.audioCoachAnnounceClockTime
+        announceHeartRate =
+            settings.audioCoachAnnounceHeartRate
+        announceRemainingRouteDistance =
+            settings.audioCoachAnnounceRemainingRouteDistance
+        announceEstimatedRemainingRouteTime =
+            settings.audioCoachAnnounceEstimatedRemainingRouteTime
+        announceCurrentWorkoutStep =
+            settings.audioCoachAnnounceCurrentWorkoutStep
+        announceRemainingStepTime =
+            settings.audioCoachAnnounceRemainingStepTime
+        announceRemainingStepDistance =
+            settings.audioCoachAnnounceRemainingStepDistance
+        language = settings.audioCoachLanguage
+    }
+
+    func configuration(
+        routeDistanceMeters: Double? = nil
+    ) -> WatchAudioCoachConfiguration {
+        WatchAudioCoachConfiguration(
+            enabled: enabled,
+            language: language,
+            distanceIntervalMeters:
+                enabled && distanceTriggerEnabled
+                    ? distanceIntervalKilometers * 1_000
+                    : nil,
+            timeIntervalSeconds:
+                enabled && timeTriggerEnabled
+                    ? Double(timeIntervalMinutes * 60)
+                    : nil,
+            announceDistance: enabled && announceDistance,
+            announceElapsedTime:
+                enabled && announceElapsedTime,
+            announceAveragePace:
+                enabled && announceAveragePace,
+            announceClockTime:
+                enabled && announceClockTime,
+            announceHeartRate:
+                enabled && announceHeartRate,
+            announceRemainingRouteDistance:
+                enabled && announceRemainingRouteDistance,
+            announceEstimatedRemainingRouteTime:
+                enabled &&
+                announceEstimatedRemainingRouteTime,
+            routeDistanceMeters: routeDistanceMeters,
+            announceCurrentWorkoutStep:
+                enabled && announceCurrentWorkoutStep,
+            announceRemainingStepTime:
+                enabled && announceRemainingStepTime,
+            announceRemainingStepDistance:
+                enabled && announceRemainingStepDistance
+        )
+    }
+}
+
 enum RunQuickStartMode: String, CaseIterable, Identifiable {
     case free
     case route
@@ -65,6 +159,7 @@ struct RunQuickStartSheet: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
@@ -78,12 +173,8 @@ struct RunQuickStartSheet: View {
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
 
-    @State private var audioCoachEnabled = false
-    @State private var announceDistance = true
-    @State private var announceTime = true
-    @State private var distanceIntervalKilometers = 1.0
-    @State private var timeIntervalMinutes = 10
-    @State private var announceClockTime = true
+    @State private var audioCoachDraft = AudioCoachDraft()
+    @State private var didLoadAudioCoachDefaults = false
 
     private var canStart: Bool {
         guard trainingDeviceProvider == .appleWatch,
@@ -109,17 +200,21 @@ struct RunQuickStartSheet: View {
                     introCard
                     modeCard
                     selectionCard
-                    AudioCoachSetupCard(
-                        enabled: $audioCoachEnabled,
-                        announceDistance: $announceDistance,
-                        announceTime: $announceTime,
-                        distanceIntervalKilometers:
-                            $distanceIntervalKilometers,
-                        timeIntervalMinutes:
-                            $timeIntervalMinutes,
-                        announceClockTime:
-                            $announceClockTime
-                    )
+                    ATHLTHPlusFeatureGate(
+                        feature: .audioCoach,
+                        title: "Audio Coach · ATHLTH+",
+                        message:
+                            "Choose spoken pace, time, route progress and workout-step updates."
+                    ) {
+                        AudioCoachSetupCard(
+                            draft: $audioCoachDraft,
+                            showRouteOptions:
+                                mode == .route ||
+                                selectedWorkout?.routeID != nil,
+                            showStructuredOptions:
+                                mode == .structured
+                        )
+                    }
 
                     ATHLTHCard {
                         WorkoutFriendPicker(
@@ -172,6 +267,11 @@ struct RunQuickStartSheet: View {
                 }
             }
             .task {
+                if !didLoadAudioCoachDefaults {
+                    audioCoachDraft.load(from: settings)
+                    didLoadAudioCoachDefaults = true
+                }
+
                 if social.friends.isEmpty {
                     await social.refresh()
                 }
@@ -470,37 +570,46 @@ struct RunQuickStartSheet: View {
 
     private var audioCoachConfiguration:
         WatchAudioCoachConfiguration {
-        WatchAudioCoachConfiguration(
-            enabled: audioCoachEnabled,
-            distanceIntervalMeters:
-                audioCoachEnabled && announceDistance
-                    ? distanceIntervalKilometers * 1_000
-                    : nil,
-            timeIntervalSeconds:
-                audioCoachEnabled && announceTime
-                    ? Double(timeIntervalMinutes * 60)
-                    : nil,
-            announceClockTime:
-                audioCoachEnabled && announceClockTime
+        guard session.canAccess(.audioCoach) else {
+            return .disabled
+        }
+
+        let routeDistanceMeters: Double? = {
+            if let route = selectedRoute {
+                return route.distanceKilometers * 1_000
+            }
+
+            if let workout = selectedWorkout,
+               let routeID = workout.routeID,
+               let route = session.savedRoutes.first(
+                    where: { $0.id == routeID }
+               ) {
+                return route.distanceKilometers * 1_000
+            }
+
+            return nil
+        }()
+
+        return audioCoachDraft.configuration(
+            routeDistanceMeters: routeDistanceMeters
         )
     }
+
 }
 
 struct WalkQuickStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let onStart: (WalkQuickStartConfiguration) -> Void
 
     @State private var selectedFriendIDs: Set<UUID> = []
-    @State private var audioCoachEnabled = false
-    @State private var announceDistance = true
-    @State private var announceTime = true
-    @State private var distanceIntervalKilometers = 1.0
-    @State private var timeIntervalMinutes = 10
-    @State private var announceClockTime = true
+    @State private var audioCoachDraft = AudioCoachDraft()
+    @State private var didLoadAudioCoachDefaults = false
 
     var body: some View {
         NavigationStack {
@@ -536,17 +645,18 @@ struct WalkQuickStartSheet: View {
                         }
                     }
 
-                    AudioCoachSetupCard(
-                        enabled: $audioCoachEnabled,
-                        announceDistance: $announceDistance,
-                        announceTime: $announceTime,
-                        distanceIntervalKilometers:
-                            $distanceIntervalKilometers,
-                        timeIntervalMinutes:
-                            $timeIntervalMinutes,
-                        announceClockTime:
-                            $announceClockTime
-                    )
+                    ATHLTHPlusFeatureGate(
+                        feature: .audioCoach,
+                        title: "Audio Coach · ATHLTH+",
+                        message:
+                            "Unlock spoken distance, time, pace and heart-rate updates."
+                    ) {
+                        AudioCoachSetupCard(
+                            draft: $audioCoachDraft,
+                            showRouteOptions: false,
+                            showStructuredOptions: false
+                        )
+                    }
 
                     ATHLTHCard {
                         WorkoutFriendPicker(
@@ -562,26 +672,9 @@ struct WalkQuickStartSheet: View {
                         onStart(
                             WalkQuickStartConfiguration(
                                 audioCoach:
-                                    WatchAudioCoachConfiguration(
-                                        enabled: audioCoachEnabled,
-                                        distanceIntervalMeters:
-                                            audioCoachEnabled &&
-                                            announceDistance
-                                                ? distanceIntervalKilometers *
-                                                    1_000
-                                                : nil,
-                                        timeIntervalSeconds:
-                                            audioCoachEnabled &&
-                                            announceTime
-                                                ? Double(
-                                                    timeIntervalMinutes *
-                                                    60
-                                                )
-                                                : nil,
-                                        announceClockTime:
-                                            audioCoachEnabled &&
-                                            announceClockTime
-                                    ),
+                                    session.canAccess(.audioCoach)
+                                        ? audioCoachDraft.configuration()
+                                        : .disabled,
                                 friends: friends
                             )
                         )
@@ -616,6 +709,11 @@ struct WalkQuickStartSheet: View {
                 }
             }
             .task {
+                if !didLoadAudioCoachDefaults {
+                    audioCoachDraft.load(from: settings)
+                    didLoadAudioCoachDefaults = true
+                }
+
                 if social.friends.isEmpty {
                     await social.refresh()
                 }
