@@ -304,6 +304,9 @@ struct AppRootView: View {
                 await gear.savePreparedGearUsage(
                     for: publishable
                 )
+                notifications.syncGearUsageAlerts(
+                    from: gear
+                )
                 await handleCompletedWorkoutReview(
                     publishable
                 )
@@ -347,6 +350,9 @@ struct AppRootView: View {
                     )
                 await gear.savePreparedGearUsage(
                     for: publishable
+                )
+                notifications.syncGearUsageAlerts(
+                    from: gear
                 )
                 await handleCompletedWorkoutReview(
                     publishable
