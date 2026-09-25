@@ -290,6 +290,7 @@ struct WorkoutHistoryDetailView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var gear: ProfileGearStore
 
     let workout: SocialPublishableWorkout
 
@@ -335,6 +336,7 @@ struct WorkoutHistoryDetailView: View {
                 }
 
                 metricGrid
+                workoutGearCard
 
                 ATHLTHCard {
                     HStack {
@@ -401,19 +403,142 @@ struct WorkoutHistoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: workout.id) {
             healthDetailLoaded = false
+            async let gearRefresh: Void = {
+                if gear.items.isEmpty {
+                    await gear.refresh()
+                }
+            }()
+
             activity = await social.workoutActivity(for: workout.id)
             healthDetail = await health.workoutDetail(for: workout.id)
+            await gearRefresh
             healthDetailLoaded = true
         }
         .sheet(isPresented: $showingReview, onDismiss: {
             Task {
                 activity = await social.workoutActivity(for: workout.id)
+                await gear.refresh()
             }
         }) {
             PostWorkoutReviewView(
                 workout: workout,
                 wasAutoPublished: activity != nil
             )
+        }
+    }
+
+    private var assignedGear: [ProfileGearItem] {
+        let selectedIDs = gear.gearIDs(for: workout.id)
+        return gear.items.filter {
+            selectedIDs.contains($0.id)
+        }
+        .sorted {
+            if $0.category == .shoes &&
+                $1.category != .shoes {
+                return true
+            }
+            if $1.category == .shoes &&
+                $0.category != .shoes {
+                return false
+            }
+            return $0.name.localizedCaseInsensitiveCompare(
+                $1.name
+            ) == .orderedAscending
+        }
+    }
+
+    private var workoutGearCard: some View {
+        ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Gear")
+                        .font(.headline)
+
+                    Text(
+                        assignedGear.isEmpty
+                            ? "No gear attached to this workout."
+                            : "Equipment used for this workout."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button(
+                    assignedGear.isEmpty ? "Add" : "Edit"
+                ) {
+                    showingReview = true
+                }
+                .font(.caption.weight(.semibold))
+            }
+
+            if !assignedGear.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(assignedGear) { item in
+                        NavigationLink {
+                            ProfileGearDetailView(item: item)
+                        } label: {
+                            HStack(spacing: 11) {
+                                ProfileGearCategoryIcon(
+                                    category: item.category,
+                                    size: 18
+                                )
+                                .frame(width: 38, height: 38)
+                                .background(
+                                    ATHLTHTheme.surfaceSage.opacity(0.55),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 11
+                                    )
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(item.name)
+                                        .font(
+                                            .subheadline
+                                                .weight(.semibold)
+                                        )
+                                        .foregroundStyle(.primary)
+
+                                    if item.category == .shoes {
+                                        let stats =
+                                            gear.usageStats(for: item)
+                                        Text(
+                                            String(
+                                                format: "%.0f km total",
+                                                stats.totalDistanceMeters /
+                                                    1_000
+                                            )
+                                        )
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    } else {
+                                        Text(item.category.title)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.vertical, 9)
+                        }
+                        .buttonStyle(.plain)
+
+                        if item.id != assignedGear.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+                .padding(.top, 8)
+            }
         }
     }
 
@@ -694,6 +819,7 @@ struct PostWorkoutReviewView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var gear: ProfileGearStore
 
     let workout: SocialPublishableWorkout
     let wasAutoPublished: Bool
@@ -702,6 +828,7 @@ struct PostWorkoutReviewView: View {
     @State private var descriptionText = ""
     @State private var effort = 5.0
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var selectedGearIDs: Set<UUID> = []
     @State private var saving = false
     @State private var alreadyPublished = false
 
@@ -754,6 +881,11 @@ struct PostWorkoutReviewView: View {
                             .textFieldStyle(.roundedBorder)
                         }
                     }
+
+                    WorkoutGearSelectionCard(
+                        selectedGearIDs: $selectedGearIDs,
+                        activity: workout.activity
+                    )
 
                     ATHLTHCard {
                         WorkoutFriendPicker(
@@ -897,7 +1029,17 @@ struct PostWorkoutReviewView: View {
 
     private func loadExistingReview() async {
         visibility = settings.defaultActivityVisibility
-        selectedFriendIDs = social.workoutAssociatedFriendIDs(for: workout.id)
+        selectedFriendIDs =
+            social.workoutAssociatedFriendIDs(
+                for: workout.id
+            )
+
+        if gear.items.isEmpty {
+            await gear.refresh()
+        }
+        selectedGearIDs = gear.gearIDs(
+            for: workout.id
+        )
 
         if let activity = await social.workoutActivity(for: workout.id) {
             alreadyPublished = true
@@ -921,7 +1063,12 @@ struct PostWorkoutReviewView: View {
         saving = true
         defer { saving = false }
 
-        let success = await social.saveWorkoutReview(
+        let gearSaved = await gear.saveGearUsage(
+            for: workout,
+            gearIDs: selectedGearIDs
+        )
+
+        let reviewSaved = await social.saveWorkoutReview(
             workout,
             visibility: visibility,
             description: descriptionText,
@@ -931,7 +1078,7 @@ struct PostWorkoutReviewView: View {
             creatorUsername: session.profile.username
         )
 
-        if success {
+        if gearSaved && reviewSaved {
             dismiss()
         }
     }
