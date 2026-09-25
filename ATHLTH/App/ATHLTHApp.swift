@@ -97,6 +97,7 @@ struct AppRootView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
+    @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var social: SocialStore
@@ -137,6 +138,7 @@ struct AppRootView: View {
                 await syncPushPreferences()
                 await refreshSocialCore()
                 await messaging.refresh()
+                await gear.refresh()
             }
 
             if health.needsHealthRefreshRecovery {
@@ -296,8 +298,14 @@ struct AppRootView: View {
                     sourceWorkoutID: result.healthKitWorkoutUUID ?? result.id,
                     endedAt: result.endedAt
                 )
-                await handleCompletedWorkoutReview(
+
+                let publishable =
                     SocialPublishableWorkout(watchResult: result)
+                await gear.savePreparedGearUsage(
+                    for: publishable
+                )
+                await handleCompletedWorkoutReview(
+                    publishable
                 )
                 await refreshTrophiesAndNotifications()
                 await social.syncChallenges(challengeStore)
@@ -333,8 +341,15 @@ struct AppRootView: View {
                         endedAt: endedAt
                     )
                 }
+                let publishable =
+                    SocialPublishableWorkout(
+                        strengthWorkout: workout
+                    )
+                await gear.savePreparedGearUsage(
+                    for: publishable
+                )
                 await handleCompletedWorkoutReview(
-                    SocialPublishableWorkout(strengthWorkout: workout)
+                    publishable
                 )
                 await social.syncChallenges(challengeStore)
                 await refreshTrophiesAndNotifications()
