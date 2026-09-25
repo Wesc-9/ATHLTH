@@ -896,13 +896,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 languageCode == "no"
                 ? norwegian
                 : english
-        case .english,
-             .german,
-             .spanish,
-             .french,
-             .italian:
-            // Full phrase localization can expand independently.
-            // Until then these voices use the stable English coach copy.
+        case .english:
             return english
         }
     }
@@ -915,14 +909,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return "en-US"
         case .norwegian:
             return "nb-NO"
-        case .german:
-            return "de-DE"
-        case .spanish:
-            return "es-ES"
-        case .french:
-            return "fr-FR"
-        case .italian:
-            return "it-IT"
         }
     }
 
