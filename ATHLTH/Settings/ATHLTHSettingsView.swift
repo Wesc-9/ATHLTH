@@ -257,6 +257,36 @@ struct ATHLTHSettingsView: View {
                             SettingsDivider()
 
                             NavigationLink {
+                                ATHLTHAudioCoachSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "waveform.and.mic",
+                                    iconTint: ATHLTHTheme.premiumGold,
+                                    iconBackground:
+                                        ATHLTHTheme.premiumGoldSoft,
+                                    title: "Audio Coach",
+                                    subtitle:
+                                        "ATHLTH+ · voice, language, pace and route updates"
+                                ) {
+                                    HStack(spacing: 7) {
+                                        Text("ATHLTH+")
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(
+                                                ATHLTHTheme.premiumGold
+                                            )
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(
+                                                ATHLTHTheme.mutedText
+                                                    .opacity(0.72)
+                                            )
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
                                 ATHLTHNotificationSettingsView()
                             } label: {
                                 PremiumSettingsRow(
