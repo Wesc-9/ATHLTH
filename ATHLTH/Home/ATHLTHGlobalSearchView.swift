@@ -1,19 +1,56 @@
+import Foundation
 import MapKit
 import SwiftUI
+
+enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
+    case all = "All"
+    case friends = "Friends"
+    case events = "Events"
+    case groups = "Groups"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .all: return "sparkles"
+        case .friends: return "person.2.fill"
+        case .events: return "calendar"
+        case .groups: return "person.3.fill"
+        }
+    }
+}
 
 struct ATHLTHGlobalSearchView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var routes: RouteDiscoveryStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var challenges: ChallengeStore
+    @EnvironmentObject private var groups: CommunityGroupStore
+
+    @AppStorage("athlth.globalSearch.recent")
+    private var recentSearchesRaw = "[]"
 
     @State private var query = ""
+    @State private var scope: ATHLTHGlobalSearchScope = .all
     @FocusState private var searchFocused: Bool
 
     private var normalizedQuery: String {
         query
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+    }
+
+    private var recentSearches: [String] {
+        guard let data = recentSearchesRaw.data(using: .utf8),
+              let values = try? JSONDecoder().decode(
+                [String].self,
+                from: data
+              )
+        else {
+            return []
+        }
+
+        return values
     }
 
     var body: some View {
@@ -25,6 +62,8 @@ struct ATHLTHGlobalSearchView: View {
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 18) {
+                        filterBar
+
                         if normalizedQuery.isEmpty {
                             searchLanding
                         } else {
@@ -42,34 +81,72 @@ struct ATHLTHGlobalSearchView: View {
             .searchable(
                 text: $query,
                 placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "People, routes, events, challenges"
+                prompt: "Friends, events, groups and more"
             )
             .focused($searchFocused)
+            .onSubmit(of: .search) {
+                rememberSearch(query)
+            }
             .task {
                 async let routeRefresh: Void = routes.refresh()
                 async let eventRefresh: Void = community.refresh()
-                _ = await (routeRefresh, eventRefresh)
+                async let groupRefresh: Void = groups.refresh()
+                _ = await (
+                    routeRefresh,
+                    eventRefresh,
+                    groupRefresh
+                )
                 searchFocused = true
             }
-            .task(id: normalizedQuery) {
-                let term = normalizedQuery
+        }
+    }
 
-                guard term.count >= 2 else {
-                    if term.isEmpty {
-                        social.clearSearch()
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(ATHLTHGlobalSearchScope.allCases) { item in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.16)) {
+                            scope = item
+                        }
+                    } label: {
+                        Label(item.rawValue, systemImage: item.icon)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                scope == item
+                                    ? Color.white
+                                    : ATHLTHTheme.primaryText
+                            )
+                            .padding(.horizontal, 13)
+                            .frame(height: 36)
+                            .background(
+                                scope == item
+                                    ? ATHLTHTheme.accentDeep
+                                    : ATHLTHTheme.card,
+                                in: Capsule()
+                            )
+                            .overlay {
+                                if scope != item {
+                                    Capsule()
+                                        .stroke(
+                                            Color.primary.opacity(0.08),
+                                            lineWidth: 1
+                                        )
+                                }
+                            }
                     }
-                    return
+                    .buttonStyle(.plain)
                 }
-
-                try? await Task.sleep(for: .milliseconds(260))
-                guard !Task.isCancelled else { return }
-                await social.search(term)
             }
         }
     }
 
     private var searchLanding: some View {
         VStack(alignment: .leading, spacing: 18) {
+            if !recentSearches.isEmpty {
+                recentSearchesSection
+            }
+
             ATHLTHCard {
                 HStack(spacing: 14) {
                     Image(systemName: "magnifyingglass")
@@ -88,7 +165,7 @@ struct ATHLTHGlobalSearchView: View {
                         Text("Find anything in ATHLTH")
                             .font(.headline)
                         Text(
-                            "Search athletes, public routes, upcoming events and your challenges."
+                            "Search friends, local groups, upcoming events, routes and challenges."
                         )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -99,90 +176,185 @@ struct ATHLTHGlobalSearchView: View {
                 }
             }
 
-            if !community.upcomingEvents.isEmpty ||
-                !routes.routes.isEmpty ||
-                !challenges.visibleChallenges.isEmpty {
-                Text("DISCOVER")
+            if scope == .all {
+                discoverSection
+            } else if scope == .groups && groups.groups.isEmpty {
+                NavigationLink {
+                    CommunityGroupsView()
+                } label: {
+                    discoveryRow(
+                        icon: "person.3.fill",
+                        tint: .indigo,
+                        title: "Discover Groups",
+                        subtitle: "Find or create a group for your city or area"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var recentSearchesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("RECENT SEARCHES")
                     .font(.caption.weight(.semibold))
-                    .tracking(1.8)
+                    .tracking(1.5)
                     .foregroundStyle(ATHLTHTheme.mutedText)
 
-                if let event = community.upcomingEvents.first {
-                    NavigationLink {
-                        CommunityEventDetailView(eventID: event.id)
-                    } label: {
-                        discoveryRow(
-                            icon: event.event.activityType.systemImage,
-                            tint: .purple,
-                            title: event.event.title,
-                            subtitle: "Upcoming event · " +
-                                event.event.startsAt.formatted(
-                                    date: .abbreviated,
-                                    time: .shortened
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
+                Spacer()
 
-                if let route = routes.routes.first {
-                    NavigationLink {
-                        ATHLTHGlobalRouteDetailView(route: route)
-                    } label: {
-                        discoveryRow(
-                            icon: "map.fill",
-                            tint: .green,
-                            title: route.title,
-                            subtitle: String(
-                                format: "%.1f km · Public route",
-                                route.distanceKilometers
-                            )
-                        )
-                    }
-                    .buttonStyle(.plain)
+                Button("Clear") {
+                    recentSearchesRaw = "[]"
                 }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
 
-                if let challenge = challenges.visibleChallenges.first {
-                    NavigationLink {
-                        ChallengeDetailView(challengeID: challenge.id)
-                    } label: {
-                        discoveryRow(
-                            icon: challenge.sport.systemImage,
-                            tint: .orange,
-                            title: challenge.title,
-                            subtitle: "Challenge · " + challenge.sport.title
-                        )
+            ATHLTHCard {
+                VStack(spacing: 0) {
+                    ForEach(
+                        Array(recentSearches.prefix(6).enumerated()),
+                        id: \.offset
+                    ) { index, value in
+                        Button {
+                            query = value
+                            searchFocused = true
+                        } label: {
+                            HStack(spacing: 11) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .foregroundStyle(
+                                        ATHLTHTheme.mutedText
+                                    )
+                                    .frame(width: 24)
+
+                                Text(value)
+                                    .font(.subheadline)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+                                    .lineLimit(1)
+
+                                Spacer()
+
+                                Image(systemName: "arrow.up.left")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .frame(height: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < min(recentSearches.count, 6) - 1 {
+                            Divider()
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
     @ViewBuilder
+    private var discoverSection: some View {
+        if !community.upcomingEvents.isEmpty ||
+            !routes.routes.isEmpty ||
+            !challenges.visibleChallenges.isEmpty ||
+            !groups.groups.isEmpty {
+            Text("DISCOVER")
+                .font(.caption.weight(.semibold))
+                .tracking(1.8)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            if let group = groups.groups.first {
+                NavigationLink {
+                    CommunityGroupDetailView(group: group)
+                } label: {
+                    discoveryRow(
+                        icon: "person.3.fill",
+                        tint: .indigo,
+                        title: group.name,
+                        subtitle: group.locationName + " · Group"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let event = community.upcomingEvents.first {
+                NavigationLink {
+                    CommunityEventDetailView(eventID: event.id)
+                } label: {
+                    discoveryRow(
+                        icon: event.event.activityType.systemImage,
+                        tint: .purple,
+                        title: event.event.title,
+                        subtitle: "Upcoming event · " +
+                            event.event.startsAt.formatted(
+                                date: .abbreviated,
+                                time: .shortened
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let route = routes.routes.first {
+                NavigationLink {
+                    ATHLTHGlobalRouteDetailView(route: route)
+                } label: {
+                    discoveryRow(
+                        icon: "map.fill",
+                        tint: .green,
+                        title: route.title,
+                        subtitle: String(
+                            format: "%.1f km · Public route",
+                            route.distanceKilometers
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let challenge = challenges.visibleChallenges.first {
+                NavigationLink {
+                    ChallengeDetailView(challengeID: challenge.id)
+                } label: {
+                    discoveryRow(
+                        icon: challenge.sport.systemImage,
+                        tint: .orange,
+                        title: challenge.title,
+                        subtitle: "Challenge · " + challenge.sport.title
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
     private var searchResults: some View {
-        let people = peopleResults
-        let routeResults = matchingRoutes
+        let friends = matchingFriends
         let eventResults = matchingEvents
+        let groupResults = matchingGroups
+        let routeResults = matchingRoutes
         let challengeResults = matchingChallenges
 
         if normalizedQuery.count < 2 {
             ContentUnavailableView(
                 "Keep typing",
                 systemImage: "text.magnifyingglass",
-                description: Text("Type at least two characters to search ATHLTH.")
+                description: Text(
+                    "Type at least two characters to search ATHLTH."
+                )
             )
             .padding(.vertical, 80)
-        } else if people.isEmpty &&
-                    routeResults.isEmpty &&
-                    eventResults.isEmpty &&
-                    challengeResults.isEmpty {
+        } else if visibleResultCount == 0 {
             ContentUnavailableView.search(text: query)
                 .padding(.vertical, 80)
         } else {
-            if !people.isEmpty {
-                resultSection("PEOPLE") {
-                    ForEach(people.prefix(8)) { profile in
+            if (scope == .all || scope == .friends) && !friends.isEmpty {
+                resultSection("FRIENDS") {
+                    ForEach(friends.prefix(8)) { profile in
                         NavigationLink {
                             FriendProfileView(userID: profile.userID)
                         } label: {
@@ -192,23 +364,23 @@ struct ATHLTHGlobalSearchView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(profile.resolvedName)
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .foregroundStyle(
+                                            ATHLTHTheme.primaryText
+                                        )
                                     Text(profile.usernameLabel)
                                         .font(.caption)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .foregroundStyle(
+                                            ATHLTHTheme.mutedText
+                                        )
                                 }
 
                                 Spacer()
 
-                                Text(
-                                    social.relationshipState(
-                                        with: profile.userID
-                                    ) == .friends
-                                        ? "Friend"
-                                        : "Profile"
-                                )
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text("Friend")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(
+                                        ATHLTHTheme.accentDeep
+                                    )
 
                                 Image(systemName: "chevron.right")
                                     .font(.caption2.bold())
@@ -217,29 +389,45 @@ struct ATHLTHGlobalSearchView: View {
                             .padding(12)
                         }
                         .buttonStyle(.plain)
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                rememberSearch(query)
+                            }
+                        )
                     }
                 }
             }
 
-            if !routeResults.isEmpty {
-                resultSection("ROUTES") {
-                    ForEach(routeResults.prefix(8)) { route in
+            if (scope == .all || scope == .groups) &&
+                !groupResults.isEmpty {
+                resultSection("GROUPS") {
+                    ForEach(groupResults.prefix(8)) { group in
                         NavigationLink {
-                            ATHLTHGlobalRouteDetailView(route: route)
+                            CommunityGroupDetailView(group: group)
                         } label: {
                             searchRow(
-                                icon: "map.fill",
-                                tint: .green,
-                                title: route.title,
-                                subtitle: routeSubtitle(route)
+                                icon: "person.3.fill",
+                                tint: .indigo,
+                                title: group.name,
+                                subtitle:
+                                    group.locationName +
+                                    (groups.joinedGroupIDs.contains(group.id)
+                                        ? " · Joined"
+                                        : " · Group")
                             )
                         }
                         .buttonStyle(.plain)
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                rememberSearch(query)
+                            }
+                        )
                     }
                 }
             }
 
-            if !eventResults.isEmpty {
+            if (scope == .all || scope == .events) &&
+                !eventResults.isEmpty {
                 resultSection("EVENTS") {
                     ForEach(eventResults.prefix(8)) { event in
                         NavigationLink {
@@ -259,13 +447,41 @@ struct ATHLTHGlobalSearchView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                rememberSearch(query)
+                            }
+                        )
                     }
                 }
             }
 
-            if !challengeResults.isEmpty {
+            if scope == .all && !routeResults.isEmpty {
+                resultSection("ROUTES") {
+                    ForEach(routeResults.prefix(6)) { route in
+                        NavigationLink {
+                            ATHLTHGlobalRouteDetailView(route: route)
+                        } label: {
+                            searchRow(
+                                icon: "map.fill",
+                                tint: .green,
+                                title: route.title,
+                                subtitle: routeSubtitle(route)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                rememberSearch(query)
+                            }
+                        )
+                    }
+                }
+            }
+
+            if scope == .all && !challengeResults.isEmpty {
                 resultSection("CHALLENGES") {
-                    ForEach(challengeResults.prefix(8)) { challenge in
+                    ForEach(challengeResults.prefix(6)) { challenge in
                         NavigationLink {
                             ChallengeDetailView(
                                 challengeID: challenge.id
@@ -287,23 +503,46 @@ struct ATHLTHGlobalSearchView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                rememberSearch(query)
+                            }
+                        )
                     }
                 }
             }
         }
     }
 
-    private var peopleResults: [SocialProfileCard] {
-        var seen = Set<UUID>()
-        let combined = social.friends + social.discoverResults
+    private var visibleResultCount: Int {
+        switch scope {
+        case .all:
+            return matchingFriends.count +
+                matchingEvents.count +
+                matchingGroups.count +
+                matchingRoutes.count +
+                matchingChallenges.count
+        case .friends:
+            return matchingFriends.count
+        case .events:
+            return matchingEvents.count
+        case .groups:
+            return matchingGroups.count
+        }
+    }
 
-        return combined.filter {
-            guard seen.insert($0.userID).inserted else { return false }
+    private var matchingFriends: [SocialProfileCard] {
+        social.friends.filter {
+            $0.resolvedName.lowercased().contains(normalizedQuery) ||
+            $0.usernameLabel.lowercased().contains(normalizedQuery)
+        }
+    }
 
-            if normalizedQuery.isEmpty { return true }
-
-            return $0.resolvedName.lowercased().contains(normalizedQuery) ||
-                $0.usernameLabel.lowercased().contains(normalizedQuery)
+    private var matchingGroups: [CommunityGroupRecord] {
+        groups.groups.filter {
+            $0.name.lowercased().contains(normalizedQuery) ||
+            $0.locationName.lowercased().contains(normalizedQuery) ||
+            $0.summary.lowercased().contains(normalizedQuery)
         }
     }
 
@@ -330,6 +569,27 @@ struct ATHLTHGlobalSearchView: View {
             $0.title.lowercased().contains(normalizedQuery) ||
             $0.sport.title.lowercased().contains(normalizedQuery)
         }
+    }
+
+    private func rememberSearch(_ raw: String) {
+        let clean = raw.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard clean.count >= 2 else { return }
+
+        var values = recentSearches.filter {
+            $0.caseInsensitiveCompare(clean) != .orderedSame
+        }
+        values.insert(clean, at: 0)
+        values = Array(values.prefix(6))
+
+        guard let data = try? JSONEncoder().encode(values),
+              let encoded = String(data: data, encoding: .utf8)
+        else {
+            return
+        }
+
+        recentSearchesRaw = encoded
     }
 
     @ViewBuilder
