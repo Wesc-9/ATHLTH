@@ -22,6 +22,7 @@ struct AudioCoachDraft {
 
     var language: WatchAudioCoachLanguage = .system
 
+    @MainActor
     mutating func load(from settings: AppSettingsStore) {
         enabled = settings.audioCoachEnabledByDefault
         distanceTriggerEnabled =
