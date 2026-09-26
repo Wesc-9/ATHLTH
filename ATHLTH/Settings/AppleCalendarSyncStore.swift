@@ -179,7 +179,7 @@ final class AppleCalendarSyncStore: ObservableObject {
 
         guard hasFullAccess else {
             errorMessage =
-                "Apple Calendar access is no longer available. Reconnect it in Settings."
+                "Calendar access is no longer available. Reconnect it in Settings."
             return
         }
 
