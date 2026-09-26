@@ -783,7 +783,27 @@ final class CommunityGroupStore: ObservableObject {
     }
 
     func members(in groupID: UUID) -> [CommunityGroupMemberRecord] {
-        membersByGroup[groupID] ?? []
+        var resolved = membersByGroup[groupID] ?? []
+
+        // The creator is always the Club owner in the backend. Surface that
+        // immediately even if the detailed membership query is still loading,
+        // so a freshly created Club never shows an empty Members screen.
+        if let group = group(for: groupID),
+           !resolved.contains(
+               where: { $0.userID == group.creatorID }
+           ) {
+            resolved.insert(
+                CommunityGroupMemberRecord(
+                    groupID: groupID,
+                    userID: group.creatorID,
+                    role: "owner",
+                    joinedAt: group.createdAt
+                ),
+                at: 0
+            )
+        }
+
+        return resolved
     }
 
     func announcements(
@@ -1020,7 +1040,17 @@ final class CommunityGroupStore: ObservableObject {
     }
 
     func loadGroupContent(_ groupID: UUID) async {
-        guard joinedGroupIDs.contains(groupID) else { return }
+        let creatorOwnsGroup =
+            groups.first {
+                $0.id == groupID &&
+                $0.creatorID == currentUserID
+            } != nil
+
+        guard joinedGroupIDs.contains(groupID) ||
+              creatorOwnsGroup
+        else {
+            return
+        }
 
         do {
             async let membersQuery: [CommunityGroupMemberRecord] = client
@@ -1200,6 +1230,21 @@ final class CommunityGroupStore: ObservableObject {
                 .insert(payload)
                 .execute()
 
+            let ownerMembership =
+                CommunityGroupMemberRecord(
+                    groupID: groupID,
+                    userID: userID,
+                    role: "owner",
+                    joinedAt: Date()
+                )
+
+            ownMemberships.removeAll {
+                $0.groupID == groupID &&
+                $0.userID == userID
+            }
+            ownMemberships.append(ownerMembership)
+            membersByGroup[groupID] = [ownerMembership]
+
             if let imageJPEGData {
                 guard imageJPEGData.count <= 5_242_880 else {
                     errorMessage =
@@ -1268,6 +1313,27 @@ final class CommunityGroupStore: ObservableObject {
             }
 
             await refresh()
+
+            // A refresh may finish before the detail membership cache is
+            // populated. Keep the owner visible and then hydrate the full
+            // Club content immediately.
+            if !ownMemberships.contains(
+                where: {
+                    $0.groupID == groupID &&
+                    $0.userID == userID
+                }
+            ) {
+                ownMemberships.append(ownerMembership)
+            }
+
+            if membersByGroup[groupID]?.contains(
+                where: { $0.userID == userID }
+            ) != true {
+                membersByGroup[groupID, default: []]
+                    .insert(ownerMembership, at: 0)
+            }
+
+            await loadGroupContent(groupID)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -2879,57 +2945,76 @@ struct CommunityGroupDetailView: View {
     }
 
     var body: some View {
-        ZStack {
-            ATHLTHPremiumCanvas(
-                accent: Color.indigo.opacity(0.30)
-            )
-
-            if isMember && selectedTab == .chat {
-                VStack(spacing: 12) {
-                    groupHeader
-                    groupAreaPicker
-
-                    chat
-                        .frame(maxHeight: .infinity)
-                }
-                .padding(.horizontal)
-                .padding(.top)
-                .padding(.bottom, 8)
-                .frame(maxWidth: 760, maxHeight: .infinity)
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity
+        GeometryReader { geometry in
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent: Color.indigo.opacity(0.30)
                 )
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        groupHeader
 
-                        if isMember {
-                            groupAreaPicker
+                if isMember && selectedTab == .chat {
+                    VStack(spacing: 0) {
+                        groupHeader(
+                            topInset:
+                                geometry.safeAreaInsets.top
+                        )
 
-                            switch selectedTab {
-                            case .overview:
-                                overview
-                            case .chat:
-                                EmptyView()
-                            case .events:
-                                events
-                            case .challenges:
-                                challenges
+                        groupAreaPicker
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 11)
+                            .background(
+                                ATHLTHTheme.canvasTop
+                                    .opacity(0.96)
+                            )
+
+                        Divider()
+                            .opacity(0.55)
+
+                        chat
+                            .frame(maxHeight: .infinity)
+                    }
+                    .ignoresSafeArea(edges: .top)
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            groupHeader(
+                                topInset:
+                                    geometry.safeAreaInsets.top
+                            )
+
+                            VStack(spacing: 16) {
+                                if isMember {
+                                    groupAreaPicker
+
+                                    switch selectedTab {
+                                    case .overview:
+                                        overview
+                                    case .chat:
+                                        EmptyView()
+                                    case .events:
+                                        events
+                                    case .challenges:
+                                        challenges
+                                    }
+                                } else {
+                                    membershipAccessCard
+                                }
                             }
-                        } else {
-                            membershipAccessCard
+                            .padding(.horizontal, 16)
+                            .padding(.top, 14)
+                            .padding(.bottom, 30)
+                            .frame(maxWidth: 760)
+                            .frame(maxWidth: .infinity)
                         }
                     }
-                    .padding()
-                    .frame(maxWidth: 760)
-                    .frame(maxWidth: .infinity)
+                    .ignoresSafeArea(edges: .top)
                 }
             }
         }
-        .navigationTitle(currentGroup.name)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingCreateEvent) {
             CommunityGroupEventCreateView(
                 group: currentGroup
@@ -2954,7 +3039,10 @@ struct CommunityGroupDetailView: View {
             if groups.groups.isEmpty {
                 await groups.refresh()
             }
-            if isMember {
+
+            if isMember ||
+                currentGroup.creatorID ==
+                    session.profile.userID {
                 await groups.loadGroupContent(
                     group.id
                 )
@@ -3084,13 +3172,12 @@ struct CommunityGroupDetailView: View {
         }
     }
 
-    private var groupHeader: some View {
+    private func groupHeader(
+        topInset: CGFloat
+    ) -> some View {
         ZStack(alignment: .bottomLeading) {
             groupHeroBackground
 
-            // Same readability treatment used on the ATHLTH profile hero:
-            // a bright leading gradient keeps the Club identity readable
-            // without hiding the photography.
             LinearGradient(
                 colors: [
                     Color.white.opacity(
@@ -3116,7 +3203,7 @@ struct CommunityGroupDetailView: View {
             LinearGradient(
                 colors: [
                     Color.clear,
-                    ATHLTHTheme.canvasBottom.opacity(0.34)
+                    ATHLTHTheme.canvasBottom.opacity(0.38)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -3213,7 +3300,9 @@ struct CommunityGroupDetailView: View {
                                     : "globe"
                         )
 
-                        if isMember {
+                        if isMember ||
+                            currentGroup.creatorID ==
+                                session.profile.userID {
                             Text(memberCountText)
                         }
                     }
@@ -3225,7 +3314,9 @@ struct CommunityGroupDetailView: View {
 
                 Spacer(minLength: 8)
 
-                if isMember {
+                if isMember ||
+                    currentGroup.creatorID ==
+                        session.profile.userID {
                     HStack(spacing: 8) {
                         NavigationLink {
                             CommunityGroupMembersView(
@@ -3246,7 +3337,7 @@ struct CommunityGroupDetailView: View {
                             )
                             .frame(width: 36, height: 36)
                             .background(
-                                Color.white.opacity(0.66),
+                                Color.white.opacity(0.70),
                                 in: Circle()
                             )
                         }
@@ -3323,26 +3414,70 @@ struct CommunityGroupDetailView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 58)
             .padding(.bottom, 20)
+
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(
+                                .system(
+                                    size: 14,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                            .frame(width: 38, height: 38)
+                            .background(
+                                Color.white.opacity(0.76),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white.opacity(0.88),
+                                        lineWidth: 1
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back")
+
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(
+                    .top,
+                    max(topInset + 8, 18)
+                )
+
+                Spacer()
+            }
         }
-        .frame(height: 224)
+        .frame(
+            height: 224 + max(topInset, 0)
+        )
         .frame(maxWidth: .infinity)
         .clipShape(
-            RoundedRectangle(
-                cornerRadius: 28,
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 28,
+                bottomTrailingRadius: 28,
+                topTrailingRadius: 0,
                 style: .continuous
             )
         )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-            .stroke(Color.white.opacity(0.78), lineWidth: 1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.white.opacity(0.58))
+                .frame(height: 1)
         }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.08),
+            color: ATHLTHTheme.accentDeep.opacity(0.07),
             radius: 18,
             x: 0,
             y: 8
@@ -4123,7 +4258,7 @@ struct CommunityGroupDetailView: View {
     }
 
     private var chat: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
             let messages = groups.messages(
                 in: group.id
             )
@@ -4137,10 +4272,10 @@ struct CommunityGroupDetailView: View {
                                 systemImage:
                                     "bubble.left.and.bubble.right",
                                 description: Text(
-                                    "Start the group conversation."
+                                    "Start the Club conversation."
                                 )
                             )
-                            .padding(.top, 54)
+                            .padding(.top, 70)
                         } else {
                             ForEach(messages) { message in
                                 messageRow(message)
@@ -4148,26 +4283,15 @@ struct CommunityGroupDetailView: View {
                             }
                         }
                     }
-                    .padding(12)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
                 }
                 .defaultScrollAnchor(.bottom)
                 .background(
-                    ATHLTHTheme.card,
-                    in: RoundedRectangle(
-                        cornerRadius: 22,
-                        style: .continuous
-                    )
+                    Color.white.opacity(0.48)
                 )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 22,
-                        style: .continuous
-                    )
-                    .stroke(
-                        ATHLTHTheme.border,
-                        lineWidth: 1
-                    )
-                }
                 .frame(maxHeight: .infinity)
                 .onChange(
                     of: messages.count
@@ -4208,11 +4332,14 @@ struct CommunityGroupDetailView: View {
                             into: messageDraft
                         )
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .background(.ultraThinMaterial)
             }
 
             HStack(alignment: .bottom, spacing: 10) {
                 TextField(
-                    "Message group",
+                    "Message Club",
                     text: $messageDraft,
                     axis: .vertical
                 )
@@ -4226,19 +4353,19 @@ struct CommunityGroupDetailView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(
-                    ATHLTHTheme.card,
+                    Color.white.opacity(0.86),
                     in: RoundedRectangle(
-                        cornerRadius: 17,
+                        cornerRadius: 18,
                         style: .continuous
                     )
                 )
                 .overlay {
                     RoundedRectangle(
-                        cornerRadius: 17,
+                        cornerRadius: 18,
                         style: .continuous
                     )
                     .stroke(
-                        ATHLTHTheme.border,
+                        ATHLTHTheme.border.opacity(0.82),
                         lineWidth: 1
                     )
                 }
@@ -4270,8 +4397,16 @@ struct CommunityGroupDetailView: View {
                         .isEmpty
                 )
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 9)
+            .padding(.bottom, 8)
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .top) {
+                Divider()
+                    .opacity(0.55)
+            }
         }
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: selectedTab) {
             guard selectedTab == .chat else {
                 return
