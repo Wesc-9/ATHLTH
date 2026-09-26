@@ -313,6 +313,21 @@ struct AppRootView: View {
                 result.kind == .strength &&
                 strengthWorkout.activeWorkout?.captureDevice == .appleWatch
 
+            let watchMatchesCompletedStrength =
+                result.kind == .strength &&
+                strengthWorkout.completedWorkout?.captureDevice == .appleWatch &&
+                strengthWorkout.completedWorkout.map {
+                    abs(
+                        result.endedAt.timeIntervalSince(
+                            $0.endedAt ?? result.endedAt
+                        )
+                    ) < 180
+                } == true
+
+            let watchBelongsToATHLTHStrength =
+                watchFinishedActiveStrength ||
+                watchMatchesCompletedStrength
+
             if result.kind == .strength {
                 let metrics = LinkedHealthWorkoutMetrics(
                     healthKitWorkoutUUID: result.healthKitWorkoutUUID,
@@ -342,7 +357,7 @@ struct AppRootView: View {
                 }
             }
 
-            if !watchFinishedActiveStrength {
+            if !watchBelongsToATHLTHStrength {
                 notifications.recordWatchWorkout(result)
             }
 
@@ -355,9 +370,10 @@ struct AppRootView: View {
                 )
                 notifications.syncGoalEvents(from: goals.goals)
 
-                if watchFinishedActiveStrength {
+                if watchBelongsToATHLTHStrength {
                     // The StrengthWorkoutStore completion pipeline handles
                     // progression, challenges, gear, sharing and review.
+                    // Watch metrics belong to that same ATHLTH strength log.
                     watchConnection.clearCompletedWorkout()
                     return
                 }
@@ -405,7 +421,8 @@ struct AppRootView: View {
             )
 
             Task {
-                if workout.healthMetrics.healthKitWorkoutUUID == nil,
+                if workout.captureDevice == .iPhone,
+                   workout.healthMetrics.healthKitWorkoutUUID == nil,
                    let endedAt = workout.endedAt {
                     _ = await health.saveManualStrengthWorkout(
                         startDate: workout.startedAt,
