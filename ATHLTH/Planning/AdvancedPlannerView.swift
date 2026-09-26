@@ -2941,6 +2941,149 @@ struct SessionEditorView: View {
         }
 
         if kind == .running || kind == .walking {
+            Section("Live Targets & Alerts") {
+                Toggle(
+                    "Heart-rate target",
+                    isOn: $heartRateTargetEnabled
+                )
+
+                if heartRateTargetEnabled {
+                    Picker(
+                        "Heart-rate target",
+                        selection: $heartRateTargetMode
+                    ) {
+                        ForEach(
+                            HeartRateTargetMode.allCases
+                        ) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if heartRateTargetMode == .zone {
+                        Picker(
+                            "Zone",
+                            selection: $heartRateTargetZone
+                        ) {
+                            ForEach(1...5, id: \.self) { zone in
+                                Text("Zone \(zone)")
+                                    .tag(zone)
+                            }
+                        }
+
+                        if let range =
+                                estimatedHeartRateRange(
+                                    for: heartRateTargetZone
+                                ) {
+                            LabeledContent(
+                                "Estimated range",
+                                value:
+                                    "\(range.lower)–\(range.upper) bpm"
+                            )
+
+                            Text(
+                                "ATHLTH estimates zones from your age in Health Profile. Choose Custom BPM if you use lab-tested or manually defined zones."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        } else {
+                            Text(
+                                "A date of birth is needed to estimate zones. Add it in Health Profile or choose Custom BPM."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        }
+                    } else {
+                        Stepper(
+                            "Minimum: \(customHeartRateMinBPM) bpm",
+                            value: $customHeartRateMinBPM,
+                            in: 60...230,
+                            step: 1
+                        )
+
+                        Stepper(
+                            "Maximum: \(customHeartRateMaxBPM) bpm",
+                            value: $customHeartRateMaxBPM,
+                            in: 70...240,
+                            step: 1
+                        )
+                    }
+                }
+
+                if kind == .running &&
+                    targetPaceEnabled {
+                    Toggle(
+                        "Alert outside pace target",
+                        isOn: $paceAlertsEnabled
+                    )
+
+                    if paceAlertsEnabled {
+                        Picker(
+                            "Pace tolerance",
+                            selection:
+                                $paceAlertToleranceSeconds
+                        ) {
+                            Text("± 5 sec /km").tag(5)
+                            Text("± 10 sec /km").tag(10)
+                            Text("± 15 sec /km").tag(15)
+                            Text("± 30 sec /km").tag(30)
+                        }
+                    }
+                }
+
+                if hasLiveTargetAlerts {
+                    Picker(
+                        "Wait before alert",
+                        selection:
+                            $targetAlertGraceSeconds
+                    ) {
+                        Text("Immediately").tag(0)
+                        Text("15 sec").tag(15)
+                        Text("30 sec").tag(30)
+                        Text("1 min").tag(60)
+                    }
+
+                    Picker(
+                        "Alert style",
+                        selection:
+                            $targetAlertDelivery
+                    ) {
+                        ForEach(
+                            WatchAlertDelivery.allCases,
+                            id: \.self
+                        ) { delivery in
+                            Text(delivery.title)
+                                .tag(delivery)
+                        }
+                    }
+
+                    Picker(
+                        "Repeat while outside target",
+                        selection:
+                            $targetAlertRepeatSeconds
+                    ) {
+                        Text("30 sec").tag(30)
+                        Text("1 min").tag(60)
+                        Text("2 min").tag(120)
+                        Text("5 min").tag(300)
+                    }
+
+                    Toggle(
+                        "Tell me when I'm back in target",
+                        isOn:
+                            $targetAlertAnnounceBackInTarget
+                    )
+                }
+
+                Text(
+                    "These targets apply only to this workout. Route-deviation alerts use your global Training settings."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+
+        if kind == .running || kind == .walking {
             Section("Audio Coach") {
                 Button {
                     showingAudioCoachEditor = true
