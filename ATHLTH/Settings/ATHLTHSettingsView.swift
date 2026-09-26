@@ -192,30 +192,60 @@ struct ATHLTHSettingsView: View {
 
                             SettingsDivider()
 
-                            NavigationLink {
-                                AppleCalendarSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "calendar",
-                                    iconTint: .red,
-                                    iconBackground: Color.red.opacity(0.09),
-                                    title: "Apple Calendar",
-                                    subtitle: appleCalendarConnectionSubtitle
-                                ) {
-                                    connectionTrailing(
-                                        calendarSync.isSyncing
-                                            ? "Syncing"
-                                            : calendarSync.isEnabled
-                                                ? "On"
-                                                : calendarSync.hasFullAccess
-                                                    ? "Ready"
-                                                    : "Connect",
-                                        showChevron: true,
-                                        loading: calendarSync.isSyncing
-                                    )
+                            if session.subscriptionAccess.hasPaidAccess {
+                                NavigationLink {
+                                    AppleCalendarSettingsView()
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "calendar",
+                                        iconTint: .red,
+                                        iconBackground: Color.red.opacity(0.09),
+                                        title: "Apple Calendar",
+                                        subtitle: appleCalendarConnectionSubtitle
+                                    ) {
+                                        connectionTrailing(
+                                            calendarSync.isSyncing
+                                                ? "Syncing"
+                                                : calendarSync.isEnabled
+                                                    ? "On"
+                                                    : calendarSync.hasFullAccess
+                                                        ? "Ready"
+                                                        : "Connect",
+                                            showChevron: true,
+                                            loading: calendarSync.isSyncing
+                                        )
+                                    }
                                 }
+                                .buttonStyle(.plain)
+                            } else {
+                                Button {
+                                    showingMembership = true
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "calendar",
+                                        iconTint: .red,
+                                        iconBackground: Color.red.opacity(0.09),
+                                        title: "Apple Calendar",
+                                        subtitle:
+                                            "ATHLTH+ · sync your training plan to Apple Calendar"
+                                    ) {
+                                        HStack(spacing: 7) {
+                                            Text("ATHLTH+")
+                                                .font(.caption2.weight(.bold))
+                                                .foregroundStyle(
+                                                    ATHLTHTheme.premiumGold
+                                                )
+
+                                            Image(systemName: "chevron.right")
+                                                .foregroundStyle(
+                                                    ATHLTHTheme.mutedText
+                                                        .opacity(0.72)
+                                                )
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
 
                             SettingsDivider()
 
@@ -976,6 +1006,7 @@ struct ATHLTHSettingsView: View {
 private struct AppleCalendarSettingsView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
 
     @State private var showingRemoveConfirmation = false
@@ -1083,6 +1114,36 @@ private struct AppleCalendarSettingsView: View {
 
                         SettingsDivider()
 
+                        HStack(spacing: 12) {
+                            Image(systemName: "clock")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 32)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Default workout time")
+                                    .font(.subheadline.weight(.medium))
+
+                                Text(
+                                    "Used only when the workout time is set to “–”."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+
+                            Spacer()
+
+                            DatePicker(
+                                "",
+                                selection: defaultCalendarTimeBinding,
+                                displayedComponents: .hourAndMinute
+                            )
+                            .labelsHidden()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+
+                        SettingsDivider()
+
                         Button {
                             Task {
                                 if calendarSync.hasFullAccess {
@@ -1173,7 +1234,7 @@ private struct AppleCalendarSettingsView: View {
                                 icon: "calendar.day.timeline.left",
                                 title: "No time set",
                                 text:
-                                    "A workout with “–” as its time appears as an all-day event."
+                                    "A workout with “–” uses your default Calendar time (18:00 initially). A time set on the workout always takes priority."
                             )
 
                             Divider()
@@ -1253,6 +1314,10 @@ private struct AppleCalendarSettingsView: View {
         .task {
             calendarSync.refreshAuthorizationStatus()
 
+            guard session.subscriptionAccess.hasPaidAccess else {
+                return
+            }
+
             if calendarSync.isEnabled {
                 await calendarSync.syncIfEnabled(
                     plan: session.activePlan
@@ -1301,12 +1366,43 @@ private struct AppleCalendarSettingsView: View {
         }
     }
 
+    private var defaultCalendarTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                calendarSync.defaultStartTime
+            },
+            set: { newTime in
+                guard session.subscriptionAccess.hasPaidAccess else {
+                    return
+                }
+
+                calendarSync.setDefaultStartTime(
+                    newTime
+                )
+
+                guard calendarSync.isEnabled else {
+                    return
+                }
+
+                Task {
+                    await calendarSync.sync(
+                        plan: session.activePlan
+                    )
+                }
+            }
+        )
+    }
+
     private var calendarSyncBinding: Binding<Bool> {
         Binding(
             get: {
                 calendarSync.isEnabled
             },
             set: { enabled in
+                guard session.subscriptionAccess.hasPaidAccess else {
+                    return
+                }
+
                 if enabled {
                     Task {
                         await calendarSync.enable(
