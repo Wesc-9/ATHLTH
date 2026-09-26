@@ -1919,7 +1919,13 @@ struct ATHLTHHomeView: View {
                     watchConnection.sendRunningWorkout(
                         WatchRunningWorkoutTransfer(
                             title: workout.title,
-                            steps: []
+                            steps: [],
+                            routeAlerts:
+                                settings
+                                    .routeAlertConfiguration,
+                            targetAlerts:
+                                workout
+                                    .targetAlertConfiguration
                         )
                     )
                 }
@@ -2012,7 +2018,11 @@ struct ATHLTHHomeView: View {
 
             return WatchRunningWorkoutTransfer(
                 title: workout.title,
-                steps: steps
+                steps: steps,
+                routeAlerts:
+                    settings.routeAlertConfiguration,
+                targetAlerts:
+                    workout.targetAlertConfiguration
             )
         }
 
@@ -2064,7 +2074,11 @@ struct ATHLTHHomeView: View {
 
         return WatchRunningWorkoutTransfer(
             title: workout.title,
-            steps: [fallback]
+            steps: [fallback],
+            routeAlerts:
+                settings.routeAlertConfiguration,
+            targetAlerts:
+                workout.targetAlertConfiguration
         )
     }
 
@@ -3601,16 +3615,24 @@ struct ATHLTHTrainView: View {
                 )
 
                 if let workout = configuration.workout {
-                    watchConnection.sendRunningWorkout(
+                    var watchTransfer =
                         watchRunningWorkoutTransfer(
                             from: workout
                         )
+                    watchTransfer.routeAlerts =
+                        settings
+                            .routeAlertConfiguration
+                    watchConnection.sendRunningWorkout(
+                        watchTransfer
                     )
                 } else {
                     watchConnection.sendRunningWorkout(
                         WatchRunningWorkoutTransfer(
                             title: "",
-                            steps: []
+                            steps: [],
+                            routeAlerts:
+                                settings
+                                    .routeAlertConfiguration
                         )
                     )
                 }
@@ -3638,7 +3660,9 @@ struct ATHLTHTrainView: View {
         watchConnection.sendRunningWorkout(
             WatchRunningWorkoutTransfer(
                 title: "",
-                steps: []
+                steps: [],
+                routeAlerts:
+                    settings.routeAlertConfiguration
             )
         )
 
@@ -3710,8 +3734,14 @@ struct ATHLTHTrainView: View {
                 try await watchConnection.startWorkoutOnWatch(.running)
                 gear.prepareNextWorkoutGear(gearIDs)
                 watchConnection.sendAudioCoachConfiguration(.disabled)
+                var watchTransfer =
+                    watchRunningWorkoutTransfer(
+                        from: workout
+                    )
+                watchTransfer.routeAlerts =
+                    settings.routeAlertConfiguration
                 watchConnection.sendRunningWorkout(
-                    watchRunningWorkoutTransfer(from: workout)
+                    watchTransfer
                 )
                 watchTransferMessage =
                     "\(workout.title) started on Apple Watch."
