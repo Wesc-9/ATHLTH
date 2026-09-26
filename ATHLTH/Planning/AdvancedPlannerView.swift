@@ -1961,6 +1961,7 @@ struct TrainingPlanCreationView: View {
     ) ?? Date()
     @State private var visibility: ProfileVisibility = .privateOnly
     @State private var selectedGoalIDs: Set<UUID> = []
+    @State private var creationError: String?
 
     private let quickDurations = [1, 3, 4, 8, 12, 16, 24]
 
@@ -2002,6 +2003,31 @@ struct TrainingPlanCreationView: View {
         }
     }
 
+    private var simpleEndDate: Date {
+        Calendar.current.date(
+            byAdding: .day,
+            value: max(simpleWeekCount * 7 - 1, 0),
+            to: Calendar.current.startOfDay(for: startDate)
+        ) ?? startDate
+    }
+
+    private var proposedEndDate: Date {
+        creationMode == .simple
+            ? simpleEndDate
+            : resolvedEndDate
+    }
+
+    private var conflictingPlan: TrainingPlan? {
+        guard creationMode != nil else {
+            return nil
+        }
+
+        return session.trainingPlanConflict(
+            startDate: startDate,
+            endDate: proposedEndDate
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -2036,11 +2062,27 @@ struct TrainingPlanCreationView: View {
                                 .trimmingCharacters(
                                     in: .whitespacesAndNewlines
                                 )
-                                .isEmpty
+                                .isEmpty ||
+                            conflictingPlan != nil
                         )
                     }
                 }
             }
+        }
+        .alert(
+            "Plan Conflict",
+            isPresented: Binding(
+                get: { creationError != nil },
+                set: { shown in
+                    if !shown {
+                        creationError = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(creationError ?? "")
         }
     }
 
@@ -2088,6 +2130,13 @@ struct TrainingPlanCreationView: View {
     ) -> some View {
         Button {
             creationMode = mode
+            let suggested = session.suggestedTrainingPlanStartDate
+            startDate = suggested
+            endDate = Calendar.current.date(
+                byAdding: .day,
+                value: 27,
+                to: suggested
+            ) ?? suggested
         } label: {
             HStack(alignment: .top, spacing: 15) {
                 Image(systemName: mode.icon)
@@ -2263,6 +2312,22 @@ struct TrainingPlanCreationView: View {
                 }
             }
 
+            if let conflict = conflictingPlan {
+                Section("Schedule Conflict") {
+                    Label(
+                        "Overlaps with \(conflict.title)",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(.orange)
+
+                    Text(
+                        "Choose a start date after the existing plan ends. ATHLTH allows only one active plan on any date."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
             Section {
                 Text(
                     "Simple creates a complete starting rhythm, not a locked template. Open Plan afterwards to add exercises, structured runs, routes, target distance, time and notes."
@@ -2405,6 +2470,22 @@ struct TrainingPlanCreationView: View {
                 }
             }
 
+            if let conflict = conflictingPlan {
+                Section("Schedule Conflict") {
+                    Label(
+                        "Overlaps with \(conflict.title)",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(.orange)
+
+                    Text(
+                        "Adjust the dates before creating this plan. ATHLTH keeps a maximum of one active plan for each date."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
             if !goalStore.goals.isEmpty {
                 Section("Connect Goals") {
                     ForEach(goalStore.goals) { goal in
@@ -2478,13 +2559,15 @@ struct TrainingPlanCreationView: View {
     private func createPlan(
         mode: TrainingPlanCreationMode
     ) {
+        let createdPlan: TrainingPlan?
+
         switch mode {
         case .simple:
             let autoSummary =
                 "\(simpleFocus.title) · " +
                 "\(simpleSessionsPerWeek) sessions per week"
 
-            session.createSimpleTrainingPlan(
+            createdPlan = session.createSimpleTrainingPlan(
                 title: title,
                 summary: autoSummary,
                 weekCount: simpleWeekCount,
@@ -2495,15 +2578,16 @@ struct TrainingPlanCreationView: View {
             )
 
         case .advanced:
-            session.createTrainingPlan(
+            createdPlan = session.createTrainingPlan(
                 title: title,
                 summary: summary,
                 weekCount: resolvedWeeks,
                 startDate: startDate,
+                endDate: resolvedEndDate,
                 visibility: visibility
             )
 
-            if let planID = session.activePlan?.id {
+            if let planID = createdPlan?.id {
                 goalStore.setLinkedPlan(
                     planID,
                     goalIDs: selectedGoalIDs
@@ -2511,8 +2595,21 @@ struct TrainingPlanCreationView: View {
             }
         }
 
+        guard createdPlan != nil else {
+            if let conflict = conflictingPlan {
+                creationError =
+                    "This period overlaps with \(conflict.title). " +
+                    "Adjust the dates so only one training plan is active at a time."
+            } else {
+                creationError =
+                    "ATHLTH could not create this plan. Check the dates and try again."
+            }
+            return
+        }
+
         dismiss()
     }
+
 }
 
 struct PlanMetadataEditorView: View {
