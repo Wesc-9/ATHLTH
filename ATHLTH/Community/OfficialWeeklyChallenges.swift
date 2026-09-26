@@ -13,9 +13,9 @@ enum OfficialRunningChallengeKind: String, Codable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .distance: return "Distance"
-        case .sessions: return "Runs"
-        case .minutes: return "Running time"
-        case .streak: return "Running days"
+        case .sessions: return "Run / walk sessions"
+        case .minutes: return "Run / walk time"
+        case .streak: return "Run / walk days"
         }
     }
 
@@ -46,9 +46,9 @@ enum OfficialRunningChallengeKind: String, Codable, CaseIterable, Identifiable {
     var targetLabel: String {
         switch self {
         case .distance: return "Target distance (km)"
-        case .sessions: return "Number of runs"
-        case .minutes: return "Running minutes"
-        case .streak: return "Running days"
+        case .sessions: return "Number of run / walk workouts"
+        case .minutes: return "Run / walk minutes"
+        case .streak: return "Run / walk days"
         }
     }
 }
@@ -95,11 +95,15 @@ struct OfficialWeeklyChallengeParticipant: Codable, Hashable {
     let challengeID: UUID
     let userID: UUID
     let joinedAt: Date
+    let completedAt: Date?
+    let completionValue: Double?
 
     enum CodingKeys: String, CodingKey {
         case challengeID = "challenge_id"
         case userID = "user_id"
         case joinedAt = "joined_at"
+        case completedAt = "completed_at"
+        case completionValue = "completion_value"
     }
 }
 
@@ -164,6 +168,16 @@ private struct OfficialWeeklyChallengeShiftParams: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case after = "p_after"
+    }
+}
+
+private struct OfficialWeeklyChallengeCompletionUpdate: Encodable {
+    let completedAt: Date
+    let completionValue: Double
+
+    enum CodingKeys: String, CodingKey {
+        case completedAt = "completed_at"
+        case completionValue = "completion_value"
     }
 }
 
@@ -246,6 +260,13 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         participants.filter { $0.challengeID == challengeID }.count
     }
 
+    func completedCount(for challengeID: UUID) -> Int {
+        participants.filter {
+            $0.challengeID == challengeID &&
+            $0.completedAt != nil
+        }.count
+    }
+
     func participantIDs(for challengeID: UUID) -> [UUID] {
         participants
             .filter { $0.challengeID == challengeID }
@@ -259,6 +280,68 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         return participants.contains {
             $0.challengeID == challengeID &&
             $0.userID == userID
+        }
+    }
+
+    func isCompleted(_ challengeID: UUID) -> Bool {
+        guard let userID = client.auth.currentUser?.id else { return false }
+
+        return participants.contains {
+            $0.challengeID == challengeID &&
+            $0.userID == userID &&
+            $0.completedAt != nil
+        }
+    }
+
+    func syncCompletionState(
+        workouts: [WorkoutSummary]
+    ) async {
+        guard let userID = client.auth.currentUser?.id else { return }
+
+        let joinedRows = participants.filter {
+            $0.userID == userID &&
+            $0.completedAt == nil
+        }
+
+        guard !joinedRows.isEmpty else { return }
+
+        var didUpdate = false
+
+        for row in joinedRows {
+            guard let challenge = challenges.first(
+                where: { $0.id == row.challengeID }
+            ) else {
+                continue
+            }
+
+            let value = OfficialWeeklyChallengeProgress.currentValue(
+                challenge: challenge,
+                workouts: workouts
+            )
+
+            guard value >= challenge.targetValue else { continue }
+
+            do {
+                try await client
+                    .from("official_weekly_challenge_participants")
+                    .update(
+                        OfficialWeeklyChallengeCompletionUpdate(
+                            completedAt: Date(),
+                            completionValue: value
+                        )
+                    )
+                    .eq("challenge_id", value: challenge.id)
+                    .eq("user_id", value: userID)
+                    .execute()
+
+                didUpdate = true
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+
+        if didUpdate {
+            await refresh()
         }
     }
 
@@ -466,28 +549,27 @@ enum OfficialWeeklyChallengeProgress {
         challenge: OfficialWeeklyChallenge,
         workouts: [WorkoutSummary]
     ) -> Double {
-        let runs = workouts.filter {
-            $0.activity == .running &&
-            $0.startDate >= challenge.startsAt &&
-            $0.startDate < challenge.endsAt
-        }
+        let workouts = countedWorkouts(
+            challenge: challenge,
+            workouts: workouts
+        )
 
         switch challenge.kind {
         case .distance:
-            return runs
+            return workouts
                 .compactMap(\.distanceMeters)
                 .reduce(0, +) / 1_000
 
         case .sessions:
-            return Double(runs.count)
+            return Double(workouts.count)
 
         case .minutes:
-            return runs.reduce(0) {
+            return workouts.reduce(0) {
                 $0 + ($1.duration / 60)
             }
 
         case .streak:
-            return Double(longestRunningStreak(runs))
+            return Double(longestActivityStreak(workouts))
         }
     }
 
@@ -537,16 +619,29 @@ enum OfficialWeeklyChallengeProgress {
         }
     }
 
-    private static func longestRunningStreak(
-        _ runs: [WorkoutSummary]
+    static func countedWorkouts(
+        challenge: OfficialWeeklyChallenge,
+        workouts: [WorkoutSummary]
+    ) -> [WorkoutSummary] {
+        workouts
+            .filter {
+                ($0.activity == .running || $0.activity == .walking) &&
+                $0.startDate >= challenge.startsAt &&
+                $0.startDate < challenge.endsAt
+            }
+            .sorted { $0.startDate > $1.startDate }
+    }
+
+    private static func longestActivityStreak(
+        _ workouts: [WorkoutSummary]
     ) -> Int {
-        guard !runs.isEmpty else { return 0 }
+        guard !workouts.isEmpty else { return 0 }
 
         var calendar = Calendar(identifier: .iso8601)
         calendar.timeZone = .current
 
         let days = Array(
-            Set(runs.map { calendar.startOfDay(for: $0.startDate) })
+            Set(workouts.map { calendar.startOfDay(for: $0.startDate) })
         )
         .sorted()
 
