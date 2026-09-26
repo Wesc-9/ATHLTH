@@ -152,7 +152,38 @@ struct ChallengeCompactRow: View {
 
 struct ChallengeHubView: View {
     @EnvironmentObject private var challenges: ChallengeStore
+    @EnvironmentObject private var officialChallenges: OfficialWeeklyChallengeStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var social: SocialStore
+
     @State private var showingCreate = false
+
+    private var invitations: [ATHLTHChallenge] {
+        challenges.visibleChallenges.filter {
+            $0.status == .invited
+        }
+    }
+
+    private var currentPersonal: [ATHLTHChallenge] {
+        challenges.visibleChallenges.filter {
+            $0.status != .completed &&
+            $0.status != .cancelled &&
+            $0.status != .invited
+        }
+    }
+
+    private var finishedPersonal: [ATHLTHChallenge] {
+        challenges.visibleChallenges.filter {
+            $0.status == .completed ||
+            $0.status == .cancelled
+        }
+    }
+
+    private var officialHistory: [OfficialWeeklyChallenge] {
+        officialChallenges.challenges
+            .filter { $0.endsAt <= Date() }
+            .sorted { $0.endsAt > $1.endsAt }
+    }
 
     var body: some View {
         ScrollView {
@@ -161,9 +192,12 @@ struct ChallengeHubView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("ATHLTH Challenges")
                             .font(.largeTitle.bold())
-                        Text("Head-to-head, groups, routes and strength.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+
+                        Text(
+                            "Weekly community goals, friend challenges and routes."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     }
 
                     Spacer()
@@ -174,63 +208,162 @@ struct ChallengeHubView: View {
                         Image(systemName: "plus")
                             .font(.headline)
                             .frame(width: 44, height: 44)
-                            .background(ATHLTHTheme.accent.opacity(0.12), in: Circle())
+                            .background(
+                                ATHLTHTheme.accent.opacity(0.12),
+                                in: Circle()
+                            )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Create challenge")
                 }
 
-                if challenges.visibleChallenges.isEmpty {
+                if let weekly = officialChallenges.activeChallenge {
+                    sectionTitle("ATHLTH Weekly")
+
+                    OfficialWeeklyChallengeCard(
+                        challenge: weekly,
+                        profiles:
+                            social.visibleProfiles +
+                            social.friends
+                    )
+                }
+
+                if !officialChallenges.upcomingChallenges.isEmpty {
+                    sectionTitle("Coming Up")
+
+                    VStack(spacing: 10) {
+                        ForEach(
+                            officialChallenges.upcomingChallenges.prefix(4)
+                        ) { challenge in
+                            NavigationLink {
+                                OfficialWeeklyChallengeDetailView(
+                                    challengeID: challenge.id
+                                )
+                            } label: {
+                                officialRow(
+                                    challenge,
+                                    status: "Upcoming"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if !invitations.isEmpty {
+                    sectionTitle("Invitations")
+
+                    ForEach(invitations) { challenge in
+                        NavigationLink {
+                            ChallengeDetailView(
+                                challengeID: challenge.id
+                            )
+                        } label: {
+                            ChallengeHeroCard(
+                                challenge: challenge
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if !currentPersonal.isEmpty {
+                    sectionTitle("Your Challenges")
+
+                    ForEach(currentPersonal) { challenge in
+                        NavigationLink {
+                            ChallengeDetailView(
+                                challengeID: challenge.id
+                            )
+                        } label: {
+                            ChallengeHeroCard(
+                                challenge: challenge
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if !officialHistory.isEmpty ||
+                    !finishedPersonal.isEmpty {
+                    sectionTitle("History")
+
+                    VStack(spacing: 10) {
+                        ForEach(officialHistory.prefix(8)) {
+                            challenge in
+                            NavigationLink {
+                                OfficialWeeklyChallengeDetailView(
+                                    challengeID: challenge.id
+                                )
+                            } label: {
+                                officialRow(
+                                    challenge,
+                                    status:
+                                        officialChallenges.isCompleted(
+                                            challenge.id
+                                        )
+                                        ? "Completed"
+                                        : "Finished"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        ForEach(finishedPersonal) { challenge in
+                            NavigationLink {
+                                ChallengeDetailView(
+                                    challengeID: challenge.id
+                                )
+                            } label: {
+                                ChallengeCompactRow(
+                                    challenge: challenge
+                                )
+                                .padding()
+                                .background(
+                                    Color(
+                                        .secondarySystemGroupedBackground
+                                    ),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 20
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if officialChallenges.challenges.isEmpty &&
+                    challenges.visibleChallenges.isEmpty {
                     ContentUnavailableView(
                         "No challenges yet",
                         systemImage: "figure.run.circle",
-                        description: Text("Create a running or strength challenge and invite one or more friends.")
+                        description: Text(
+                            "The next ATHLTH Weekly challenge will appear here. You can also create a challenge with friends."
+                        )
                     )
                     .padding(.vertical, 50)
-                } else {
-                    let current = challenges.visibleChallenges.filter {
-                        $0.status != .completed && $0.status != .cancelled
-                    }
-                    let finished = challenges.visibleChallenges.filter {
-                        $0.status == .completed || $0.status == .cancelled
-                    }
-
-                    if !current.isEmpty {
-                        sectionTitle("Current")
-                        ForEach(current) { challenge in
-                            NavigationLink {
-                                ChallengeDetailView(challengeID: challenge.id)
-                            } label: {
-                                ChallengeHeroCard(challenge: challenge)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    if !finished.isEmpty {
-                        sectionTitle("History")
-                        ForEach(finished) { challenge in
-                            NavigationLink {
-                                ChallengeDetailView(challengeID: challenge.id)
-                            } label: {
-                                ChallengeCompactRow(challenge: challenge)
-                                    .padding()
-                                    .background(
-                                        Color(.secondarySystemGroupedBackground),
-                                        in: RoundedRectangle(cornerRadius: 20)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
+        )
         .navigationTitle("Challenges")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             challenges.refreshStatuses()
+            await officialChallenges.refresh()
+            await officialChallenges.syncCompletionState(
+                workouts: health.workouts
+            )
+        }
+        .task(id: health.workouts.map(\.id)) {
+            await officialChallenges.syncCompletionState(
+                workouts: health.workouts
+            )
         }
         .sheet(isPresented: $showingCreate) {
             ChallengeCreationView()
@@ -242,6 +375,72 @@ struct ChallengeHubView: View {
             .font(.caption2.bold())
             .tracking(1.3)
             .foregroundStyle(.secondary)
+    }
+
+    private func officialRow(
+        _ challenge: OfficialWeeklyChallenge,
+        status: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: challenge.kind.icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.orange)
+                .frame(width: 42, height: 42)
+                .background(
+                    Color.orange.opacity(0.09),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(challenge.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(
+                    challenge.kind.targetText(
+                        challenge.targetValue
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(status)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        status == "Completed"
+                            ? Color.green
+                            : Color.orange
+                    )
+
+                Text(
+                    challenge.startsAt.formatted(
+                        .dateTime.month(.abbreviated).day()
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.bold())
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
     }
 }
 
