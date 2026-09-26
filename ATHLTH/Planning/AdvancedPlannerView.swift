@@ -282,7 +282,6 @@ struct AdvancedPlannerView: View {
                                         weight: .semibold
                                     )
                                 )
-                                .frame(width: 28, height: 28)
                         }
                         .buttonStyle(.bordered)
                         .buttonBorderShape(.circle)
