@@ -2218,39 +2218,6 @@ struct CommunityGroupCreateView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Group Image") {
-                    HStack {
-                        Spacer()
-                        groupImagePreview
-                        Spacer()
-                    }
-
-                    PhotosPicker(
-                        selection: $selectedPhoto,
-                        matching: .images
-                    ) {
-                        Label(
-                            selectedImageData == nil
-                                ? "Choose Image"
-                                : "Change Image",
-                            systemImage: "photo"
-                        )
-                    }
-
-                    if group.imageURL != nil {
-                        Button(
-                            "Remove Image",
-                            role: .destructive
-                        ) {
-                            Task {
-                                saving = true
-                                _ = await groups.removeGroupImage(group)
-                                saving = false
-                            }
-                        }
-                    }
-                }
-
                 Section("Group") {
                     TextField("Group name", text: $name)
                     TextField("Description", text: $summary, axis: .vertical)
@@ -2336,6 +2303,39 @@ struct CommunityGroupSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Group Image") {
+                    HStack {
+                        Spacer()
+                        groupImagePreview
+                        Spacer()
+                    }
+
+                    PhotosPicker(
+                        selection: $selectedPhoto,
+                        matching: .images
+                    ) {
+                        Label(
+                            selectedImageData == nil
+                                ? "Choose Image"
+                                : "Change Image",
+                            systemImage: "photo"
+                        )
+                    }
+
+                    if group.imageURL != nil {
+                        Button(
+                            "Remove Image",
+                            role: .destructive
+                        ) {
+                            Task {
+                                saving = true
+                                _ = await groups.removeGroupImage(group)
+                                saving = false
+                            }
+                        }
+                    }
+                }
+
                 Section("Group") {
                     TextField("Group name", text: $name)
                     TextField(
