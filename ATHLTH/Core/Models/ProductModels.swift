@@ -349,6 +349,14 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     // Optional so previously persisted plans decode without migration.
     var runningWorkouts: [RunningWorkoutTemplate]? = nil
 
+    // Optional planned gear selection. nil means legacy/default behavior;
+    // an empty array explicitly means no gear for this workout.
+    var gearIDs: [UUID]? = nil
+
+    // nil uses the current app default. A stored configuration is a
+    // per-workout Audio Coach override.
+    var audioCoachConfiguration: WatchAudioCoachConfiguration? = nil
+
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil
 
