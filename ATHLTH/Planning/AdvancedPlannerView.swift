@@ -10,6 +10,7 @@ struct AdvancedPlannerView: View {
     @State private var selectedWorkout: PlannedSession?
     @State private var showingSessionEditor = false
     @State private var showingPlanEditor = false
+    @State private var showingAllPlans = false
     @State private var showingProgramCreation = false
     @State private var weekPendingRemoval: TrainingPlanWeek?
 
@@ -41,6 +42,7 @@ struct AdvancedPlannerView: View {
             }
         }
         .onAppear {
+            session.refreshActivePlanForToday()
             syncSelection()
         }
         .onChange(of: session.activePlan?.id) { _, _ in
@@ -58,6 +60,9 @@ struct AdvancedPlannerView: View {
             if let plan = session.activePlan {
                 PlanMetadataEditorView(plan: plan)
             }
+        }
+        .sheet(isPresented: $showingAllPlans) {
+            AllTrainingPlansView()
         }
         .sheet(isPresented: $showingProgramCreation) {
             TrainingPlanCreationView()
@@ -151,16 +156,29 @@ struct AdvancedPlannerView: View {
 
                     Spacer()
 
-                    Button {
-                        showingPlanEditor = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(width: 38, height: 38)
+                    HStack(spacing: 8) {
+                        Button {
+                            showingAllPlans = true
+                        } label: {
+                            Image(systemName: "square.stack.3d.up")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(width: 38, height: 38)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.circle)
+                        .accessibilityLabel("All training plans")
+
+                        Button {
+                            showingPlanEditor = true
+                        } label: {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(width: 38, height: 38)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.circle)
+                        .accessibilityLabel("Edit training plan")
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.circle)
-                    .accessibilityLabel("Edit training plan")
                 }
 
                 LazyVGrid(
@@ -661,9 +679,9 @@ struct AdvancedPlannerView: View {
                     .tint(ATHLTHTheme.accent)
 
                     Button {
-                        onOpenPrograms()
+                        showingAllPlans = true
                     } label: {
-                        Label("Library", systemImage: "square.stack.3d.up")
+                        Label("All Plans", systemImage: "square.stack.3d.up")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
@@ -1211,6 +1229,338 @@ struct AdvancedPlannerView: View {
             : parts.joined(separator: " · ")
     }
 }
+
+struct AllTrainingPlansView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var goalStore: GoalStore
+
+    @State private var showingCreatePlan = false
+    @State private var editingPlan: TrainingPlan?
+    @State private var planPendingDeletion: TrainingPlan?
+
+    private var activePlans: [TrainingPlan] {
+        session.trainingPlans.filter {
+            session.trainingPlanStatus($0) == .active
+        }
+    }
+
+    private var upcomingPlans: [TrainingPlan] {
+        session.trainingPlans
+            .filter {
+                session.trainingPlanStatus($0) == .upcoming
+            }
+            .sorted {
+                ($0.startDate ?? .distantFuture) <
+                ($1.startDate ?? .distantFuture)
+            }
+    }
+
+    private var completedPlans: [TrainingPlan] {
+        session.trainingPlans
+            .filter {
+                session.trainingPlanStatus($0) == .completed
+            }
+            .sorted {
+                (session.trainingPlanEndDate($0) ?? .distantPast) >
+                (session.trainingPlanEndDate($1) ?? .distantPast)
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if session.trainingPlans.isEmpty {
+                        ContentUnavailableView {
+                            Label(
+                                "No training plans yet",
+                                systemImage: "calendar.badge.plus"
+                            )
+                        } description: {
+                            Text(
+                                "Create your first dated plan. ATHLTH keeps only the plan covering today active."
+                            )
+                        } actions: {
+                            Button("Create Plan") {
+                                showingCreatePlan = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(ATHLTHTheme.accent)
+                        }
+                        .padding(.top, 36)
+                    } else {
+                        planSection(
+                            "Active",
+                            plans: activePlans,
+                            status: .active
+                        )
+                        planSection(
+                            "Upcoming",
+                            plans: upcomingPlans,
+                            status: .upcoming
+                        )
+                        planSection(
+                            "Completed",
+                            plans: completedPlans,
+                            status: .completed
+                        )
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+            }
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: ATHLTHTheme.accent.opacity(0.45)
+                )
+            )
+            .navigationTitle("All Plans")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingCreatePlan = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Create training plan")
+                }
+            }
+            .sheet(isPresented: $showingCreatePlan) {
+                TrainingPlanCreationView()
+            }
+            .sheet(item: $editingPlan) { plan in
+                PlanMetadataEditorView(plan: plan)
+            }
+            .confirmationDialog(
+                planPendingDeletion.map {
+                    "Delete \($0.title)?"
+                } ?? "Delete training plan?",
+                isPresented: Binding(
+                    get: { planPendingDeletion != nil },
+                    set: { presented in
+                        if !presented {
+                            planPendingDeletion = nil
+                        }
+                    }
+                ),
+                titleVisibility: .visible
+            ) {
+                if let plan = planPendingDeletion {
+                    Button("Delete Plan", role: .destructive) {
+                        goalStore.setLinkedPlan(
+                            plan.id,
+                            goalIDs: []
+                        )
+                        session.deleteTrainingPlan(plan.id)
+                        planPendingDeletion = nil
+                    }
+                }
+
+                Button("Cancel", role: .cancel) {
+                    planPendingDeletion = nil
+                }
+            } message: {
+                Text(
+                    "This removes the plan and its future schedule. Completed workout history is kept."
+                )
+            }
+            .onAppear {
+                session.refreshActivePlanForToday()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func planSection(
+        _ title: String,
+        plans: [TrainingPlan],
+        status: TrainingPlanTimingStatus
+    ) -> some View {
+        if !plans.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                ForEach(plans) { plan in
+                    planCard(plan, status: status)
+                }
+            }
+        }
+    }
+
+    private func planCard(
+        _ plan: TrainingPlan,
+        status: TrainingPlanTimingStatus
+    ) -> some View {
+        ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: statusIcon(status))
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(statusTint(status))
+                    .frame(width: 42, height: 42)
+                    .background(
+                        statusTint(status).opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 7) {
+                        Text(plan.title)
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+
+                        Text(statusTitle(status))
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(statusTint(status))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                statusTint(status).opacity(0.10),
+                                in: Capsule()
+                            )
+                    }
+
+                    Text(planDateText(plan))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(
+                        plan.weeks.count == 1
+                            ? "1 week"
+                            : "\(plan.weeks.count) weeks"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                    if !plan.summary
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .isEmpty {
+                        Text(plan.summary)
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText.opacity(0.72)
+                            )
+                            .lineLimit(2)
+                            .padding(.top, 2)
+                    }
+                }
+
+                Spacer(minLength: 6)
+
+                Menu {
+                    Button {
+                        editingPlan = plan
+                    } label: {
+                        Label("Edit", systemImage: "slider.horizontal.3")
+                    }
+
+                    Button {
+                        _ = session.duplicateTrainingPlan(plan.id)
+                    } label: {
+                        Label("Duplicate", systemImage: "doc.on.doc")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        planPendingDeletion = plan
+                    } label: {
+                        Label("Delete Plan", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+            }
+
+            if status == .active {
+                Button {
+                    dismiss()
+                } label: {
+                    Label(
+                        "Open Current Plan",
+                        systemImage: "arrow.right"
+                    )
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHTheme.accent)
+                .padding(.top, 10)
+            }
+        }
+    }
+
+    private func planDateText(
+        _ plan: TrainingPlan
+    ) -> String {
+        guard let startDate = plan.startDate else {
+            return "No dates"
+        }
+
+        let start = startDate.formatted(
+            date: .abbreviated,
+            time: .omitted
+        )
+
+        guard let endDate = session.trainingPlanEndDate(plan) else {
+            return start
+        }
+
+        return "\(start) – " +
+            endDate.formatted(
+                date: .abbreviated,
+                time: .omitted
+            )
+    }
+
+    private func statusTitle(
+        _ status: TrainingPlanTimingStatus
+    ) -> String {
+        switch status {
+        case .active: return "ACTIVE"
+        case .upcoming: return "UPCOMING"
+        case .completed: return "COMPLETED"
+        case .unscheduled: return "UNSCHEDULED"
+        }
+    }
+
+    private func statusIcon(
+        _ status: TrainingPlanTimingStatus
+    ) -> String {
+        switch status {
+        case .active: return "play.circle.fill"
+        case .upcoming: return "calendar.badge.clock"
+        case .completed: return "checkmark.circle.fill"
+        case .unscheduled: return "calendar"
+        }
+    }
+
+    private func statusTint(
+        _ status: TrainingPlanTimingStatus
+    ) -> Color {
+        switch status {
+        case .active: return ATHLTHTheme.vitality
+        case .upcoming: return ATHLTHTheme.accent
+        case .completed: return ATHLTHTheme.mutedText
+        case .unscheduled: return .orange
+        }
+    }
+}
+
 
 struct TrainingPlanManagerView: View {
     @EnvironmentObject private var session: AppSessionStore
