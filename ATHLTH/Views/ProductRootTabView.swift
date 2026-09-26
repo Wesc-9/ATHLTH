@@ -254,7 +254,7 @@ struct ATHLTHHomeView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Profile")
                     }
-                    .padding(.top, 52)
+                    .padding(.top, 62)
                     .padding(.trailing, 12)
                 }
             } content: {
