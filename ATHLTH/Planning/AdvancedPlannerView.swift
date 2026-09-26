@@ -3,6 +3,7 @@ import SwiftUI
 struct AdvancedPlannerView: View {
     @EnvironmentObject private var session: AppSessionStore
 
+    let planID: UUID?
     let onOpenPrograms: () -> Void
 
     @State private var selectedWeekID: UUID?
@@ -14,13 +15,25 @@ struct AdvancedPlannerView: View {
     @State private var showingProgramCreation = false
     @State private var weekPendingRemoval: TrainingPlanWeek?
 
-    init(onOpenPrograms: @escaping () -> Void = {}) {
+    init(
+        planID: UUID? = nil,
+        onOpenPrograms: @escaping () -> Void = {}
+    ) {
+        self.planID = planID
         self.onOpenPrograms = onOpenPrograms
+    }
+
+    private var displayedPlan: TrainingPlan? {
+        if let planID {
+            return session.trainingPlan(withID: planID)
+        }
+
+        return session.activePlan
     }
 
     var body: some View {
         VStack(spacing: 16) {
-            if let plan = session.activePlan {
+            if let plan = displayedPlan {
                 planOverview(plan)
 
                 if let week = selectedWeek(in: plan) {
@@ -45,19 +58,23 @@ struct AdvancedPlannerView: View {
             session.refreshActivePlanForToday()
             syncSelection()
         }
-        .onChange(of: session.activePlan?.id) { _, _ in
+        .onChange(of: displayedPlan?.id) { _, _ in
             syncSelection()
         }
-        .onChange(of: session.activePlan?.version) { _, _ in
+        .onChange(of: displayedPlan?.version) { _, _ in
             reconcileSelection()
         }
         .sheet(isPresented: $showingSessionEditor) {
-            if let selectedDayID {
-                SessionEditorView(dayID: selectedDayID)
+            if let selectedDayID,
+               let plan = displayedPlan {
+                SessionEditorView(
+                    planID: plan.id,
+                    dayID: selectedDayID
+                )
             }
         }
         .sheet(isPresented: $showingPlanEditor) {
-            if let plan = session.activePlan {
+            if let plan = displayedPlan {
                 PlanMetadataEditorView(plan: plan)
             }
         }
@@ -68,7 +85,7 @@ struct AdvancedPlannerView: View {
             TrainingPlanCreationView()
         }
         .sheet(item: $selectedWorkout) { workout in
-            if let planID = session.activePlan?.id {
+            if let planID = displayedPlan?.id {
                 PlannedWorkoutDetailView(
                     planID: planID,
                     workout: workout,
@@ -96,7 +113,7 @@ struct AdvancedPlannerView: View {
                     "Remove W\(week.weekNumber)",
                     role: .destructive
                 ) {
-                    if let plan = session.activePlan {
+                    if let plan = displayedPlan {
                         removeWeek(week, from: plan)
                     }
                 }
@@ -231,7 +248,9 @@ struct AdvancedPlannerView: View {
 
                     HStack(spacing: 8) {
                         Button {
-                            session.addWeekToActivePlan()
+                            session.addWeekToTrainingPlan(
+                                planID: plan.id
+                            )
                         } label: {
                             Label("Add", systemImage: "plus")
                         }
@@ -694,7 +713,7 @@ struct AdvancedPlannerView: View {
         _ workout: PlannedSession,
         dayID: UUID
     ) -> some View {
-        let planID = session.activePlan?.id
+        let planID = displayedPlan?.id
         let completed =
             planID.map {
                 session.isPlanSessionManuallyCompleted(
@@ -813,10 +832,13 @@ struct AdvancedPlannerView: View {
                 Divider()
 
                 Button(role: .destructive) {
-                    session.removeSession(
-                        workout.id,
-                        fromDay: dayID
-                    )
+                    if let planID = displayedPlan?.id {
+                        session.removeSession(
+                            workout.id,
+                            fromDay: dayID,
+                            inPlan: planID
+                        )
+                    }
                 } label: {
                     Label("Delete Workout", systemImage: "trash")
                 }
@@ -1098,9 +1120,13 @@ struct AdvancedPlannerView: View {
             return
         }
 
-        session.removeWeekFromActivePlan(week.id)
+        session.removeWeekFromTrainingPlan(
+            planID: plan.id,
+            weekID: week.id
+        )
 
-        guard let updatedPlan = session.activePlan,
+        guard let updatedPlan =
+                session.trainingPlan(withID: plan.id),
               !updatedPlan.weeks.isEmpty
         else {
             syncSelection()
@@ -1145,7 +1171,7 @@ struct AdvancedPlannerView: View {
     }
 
     private func syncSelection() {
-        guard let plan = session.activePlan,
+        guard let plan = displayedPlan,
               let week = bestWeek(in: plan) ?? plan.weeks.first
         else {
             selectedWeekID = nil
@@ -1158,7 +1184,7 @@ struct AdvancedPlannerView: View {
     }
 
     private func reconcileSelection() {
-        guard let plan = session.activePlan else {
+        guard let plan = displayedPlan else {
             selectedWeekID = nil
             selectedDayID = nil
             return
