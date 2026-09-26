@@ -249,11 +249,13 @@ struct CommunityGroupActivityDraft {
                                     .map { $0 / 1_000 }
                         ),
                 route:
-                    selectedRoute.map {
-                        CommunityGroupRouteSnapshot(
-                            route: $0
-                        )
-                    },
+                    mode == .route
+                        ? selectedRoute.map {
+                            CommunityGroupRouteSnapshot(
+                                route: $0
+                            )
+                        }
+                        : nil,
                 runningWorkout:
                     activityType == "running" &&
                     mode == .workout
