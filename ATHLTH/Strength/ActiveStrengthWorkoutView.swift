@@ -9,10 +9,6 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
-    @State private var reps = 8
-    @State private var weightKilograms = 20.0
-    @State private var restSeconds = 90
-    @State private var rpe = 8.0
     @State private var showingFinishConfirmation = false
     @State private var finishInProgress = false
     @State private var showingExerciseLibrary = false
@@ -481,16 +477,16 @@ struct ActiveStrengthWorkoutView: View {
             HStack(spacing: 12) {
                 valueStepper(
                     title: "Weight",
-                    value: String(format: "%.1f kg", weightKilograms),
-                    minus: { weightKilograms = max(0, weightKilograms - 2.5) },
-                    plus: { weightKilograms += 2.5 }
+                    value: String(format: "%.1f kg", strength.draftWeightKilograms),
+                    minus: { strength.setDraft(weightKilograms: max(0, strength.draftWeightKilograms - 2.5)) },
+                    plus: { strength.setDraft(weightKilograms: strength.draftWeightKilograms + 2.5) }
                 )
 
                 valueStepper(
                     title: "Reps",
-                    value: "\(reps)",
-                    minus: { reps = max(0, reps - 1) },
-                    plus: { reps += 1 }
+                    value: "\(strength.draftReps)",
+                    minus: { strength.setDraft(reps: max(0, strength.draftReps - 1)) },
+                    plus: { strength.setDraft(reps: strength.draftReps + 1) }
                 )
             }
             .padding(.top, 12)
@@ -505,10 +501,7 @@ struct ActiveStrengthWorkoutView: View {
                 Spacer()
 
                 Button {
-                    restSeconds = max(
-                        0,
-                        restSeconds - 15
-                    )
+                    strength.setDraft(restSeconds: max(0, strength.draftRestSeconds - 15))
                 } label: {
                     Image(systemName: "minus")
                         .frame(width: 30, height: 30)
@@ -520,10 +513,7 @@ struct ActiveStrengthWorkoutView: View {
                     .frame(minWidth: 62)
 
                 Button {
-                    restSeconds = min(
-                        600,
-                        restSeconds + 15
-                    )
+                    strength.setDraft(restSeconds: min(600, strength.draftRestSeconds + 15))
                 } label: {
                     Image(systemName: "plus")
                         .frame(width: 30, height: 30)
@@ -535,20 +525,15 @@ struct ActiveStrengthWorkoutView: View {
             HStack {
                 Text("RPE")
                     .font(.subheadline.weight(.semibold))
-                Slider(value: $rpe, in: 1...10, step: 0.5)
-                Text("\(rpe, specifier: "%.1f")")
+                Slider(value: draftRPEBinding, in: 1...10, step: 0.5)
+                Text("\(strength.draftRPE, specifier: "%.1f")")
                     .font(.subheadline.monospacedDigit())
                     .frame(width: 32)
             }
             .padding(.top, 14)
 
             Button {
-                strength.completeCurrentSet(
-                    reps: reps,
-                    weightKilograms: weightKilograms,
-                    rpe: rpe,
-                    restSeconds: restSeconds
-                )
+                strength.completeCurrentDraftSet()
             } label: {
                 Label("Complete Set", systemImage: "checkmark.circle.fill")
                     .frame(maxWidth: .infinity)
@@ -560,7 +545,7 @@ struct ActiveStrengthWorkoutView: View {
 
             Button {
                 strength.completeCurrentSetWithoutDetails(
-                    restSeconds: restSeconds
+                    restSeconds: strength.draftRestSeconds
                 )
             } label: {
                 Text("Complete set without details")
@@ -679,17 +664,19 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     private func loadDefaultsFromCurrentSet() {
-        guard let set = strength.currentSet else { return }
-        reps = set.plannedReps ?? 8
-        weightKilograms = set.plannedWeightKilograms ?? max(weightKilograms, 20)
-        restSeconds = max(
-            set.restSeconds ?? 90,
-            0
+        strength.reloadDraftFromCurrentSet()
+    }
+
+    private var draftRPEBinding: Binding<Double> {
+        Binding(
+            get: { strength.draftRPE },
+            set: { strength.setDraft(rpe: $0) }
         )
-        rpe = 8
     }
 
     private var restDurationText: String {
+        let restSeconds = strength.draftRestSeconds
+
         if restSeconds == 0 {
             return "None"
         }
