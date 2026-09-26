@@ -3444,7 +3444,11 @@ struct CommunityGroupDetailView: View {
 
     private var nextGroupEvent: CommunityGroupEventRecord? {
         groups.events(in: group.id)
-            .filter { $0.startsAt >= Date() }
+            .filter {
+                $0.startsAt >= Date() &&
+                $0.status != "draft" &&
+                $0.status != "cancelled"
+            }
             .sorted { $0.startsAt < $1.startsAt }
             .first
     }
@@ -3453,7 +3457,11 @@ struct CommunityGroupDetailView: View {
         let now = Date()
 
         return groups.challenges(in: group.id)
-            .filter { $0.endsAt >= now }
+            .filter {
+                $0.endsAt >= now &&
+                $0.status != "draft" &&
+                $0.status != "cancelled"
+            }
             .sorted { lhs, rhs in
                 let lhsActive =
                     lhs.startsAt <= now && lhs.endsAt >= now
@@ -3492,8 +3500,11 @@ struct CommunityGroupDetailView: View {
             } else {
                 VStack(spacing: 0) {
                     if let event = nextGroupEvent {
-                        Button {
-                            selectedTab = .events
+                        NavigationLink {
+                            CommunityGroupEventDetailView(
+                                group: currentGroup,
+                                event: event
+                            )
                         } label: {
                             comingUpRow(
                                 icon: "calendar",
@@ -3513,8 +3524,11 @@ struct CommunityGroupDetailView: View {
                     }
 
                     if let challenge = nextGroupChallenge {
-                        Button {
-                            selectedTab = .challenges
+                        NavigationLink {
+                            CommunityGroupChallengeDetailView(
+                                group: currentGroup,
+                                challenge: challenge
+                            )
                         } label: {
                             comingUpRow(
                                 icon: "bolt.fill",
