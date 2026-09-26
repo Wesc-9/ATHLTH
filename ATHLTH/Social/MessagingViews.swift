@@ -823,6 +823,7 @@ struct DirectMessageThreadView: View {
     private func markLocalMessageNotificationsRead(conversationID: UUID) {
         for item in notifications.items
         where (item.socialEventKind == "message" ||
+               item.socialEventKind == "mention" ||
                item.socialEventKind == "message_request" ||
                item.socialEventKind == "message_request_accepted") &&
               item.socialEntityID == conversationID &&
