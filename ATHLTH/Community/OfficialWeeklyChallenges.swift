@@ -1166,11 +1166,11 @@ struct OfficialWeeklyChallengeAdminListView: View {
         isWorking = true
 
         Task {
-            if await store.delete(challenge),
-               let draft = await store.generateAI(
-                    startsAt: challenge.startsAt,
-                    endsAt: challenge.endsAt
-               ) {
+            if let draft = await store.generateAI(
+                startsAt: challenge.startsAt,
+                endsAt: challenge.endsAt
+            ),
+            await store.delete(challenge) {
                 editorSeed = .ai(
                     draft: draft,
                     startsAt: challenge.startsAt,
