@@ -883,6 +883,28 @@ final class AppSessionStore: ObservableObject {
         activePlan = plan
     }
 
+    func removeWeekFromActivePlan(_ weekID: UUID) {
+        guard var plan = activePlan,
+              plan.weeks.count > 1,
+              let index = plan.weeks.firstIndex(
+                where: { $0.id == weekID }
+              )
+        else {
+            return
+        }
+
+        plan.weeks.remove(at: index)
+
+        for weekIndex in plan.weeks.indices {
+            plan.weeks[weekIndex].weekNumber = weekIndex + 1
+            plan.weeks[weekIndex].title = "Week \(weekIndex + 1)"
+        }
+
+        plan.updatedAt = Date()
+        plan.version += 1
+        activePlan = plan
+    }
+
     func addSession(_ session: PlannedSession, toDay dayID: UUID) {
         guard var plan = activePlan else { return }
 
