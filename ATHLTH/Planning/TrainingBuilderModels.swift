@@ -266,6 +266,38 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
         guard values.count == blocks.count else { return nil }
         return values.reduce(0, +)
     }
+
+    var estimatedDurationSeconds: TimeInterval? {
+        let values = blocks.compactMap { block -> TimeInterval? in
+            guard block.work.measure == .time,
+                  let workDuration = block.work.durationSeconds
+            else {
+                return nil
+            }
+
+            let repetitions = max(block.repetitions, 1)
+            var total =
+                workDuration * Double(repetitions)
+
+            if repetitions > 1,
+               let recovery = block.recovery {
+                guard recovery.measure == .time,
+                      let recoveryDuration =
+                        recovery.durationSeconds
+                else {
+                    return nil
+                }
+
+                total +=
+                    recoveryDuration * Double(repetitions - 1)
+            }
+
+            return total
+        }
+
+        guard values.count == blocks.count else { return nil }
+        return values.reduce(0, +)
+    }
 }
 
 enum ExerciseLibrarySource: String, Codable, Hashable {
