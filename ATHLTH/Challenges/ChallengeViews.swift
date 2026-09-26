@@ -317,7 +317,18 @@ struct ChallengeCreationView: View {
     ) {
         self.preselectedFriends = preselectedFriends
         self.preselectedRouteID = preselectedRouteID
+
         _selectedRouteID = State(initialValue: preselectedRouteID)
+
+        if preselectedRouteID != nil {
+            _step = State(initialValue: 2)
+            _sport = State(initialValue: .running)
+            _scoring = State(initialValue: .fastestRoute)
+            _gpsRequired = State(initialValue: true)
+            _verificationPolicy = State(
+                initialValue: .verifiedRequired
+            )
+        }
     }
 
     @State private var step = 0
@@ -380,7 +391,11 @@ struct ChallengeCreationView: View {
                 footer
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Create Challenge")
+            .navigationTitle(
+                preselectedRouteID == nil
+                    ? "Create Challenge"
+                    : "Challenge Route"
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -613,6 +628,46 @@ struct ChallengeCreationView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Who are you challenging?")
                 .font(.title2.bold())
+
+            if let route = selectedRoute {
+                HStack(spacing: 10) {
+                    Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 10,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Route Challenge")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        Text(route.title)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Text(
+                        String(
+                            format: "%.1f km",
+                            route.distanceKilometers
+                        )
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                }
+                .padding()
+                .challengeCard()
+            }
 
             participantRow(
                 name: session.profile.displayName,
