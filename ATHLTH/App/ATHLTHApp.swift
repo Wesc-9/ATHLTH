@@ -6,7 +6,6 @@ struct ATHLTHApp: App {
     @UIApplicationDelegateAdaptor(ATHLTHAppDelegate.self)
     private var appDelegate
     @StateObject private var health = HealthKitManager.shared
-    @StateObject private var trainingPlan = TrainingPlanStore()
     @StateObject private var exerciseLibrary = ExerciseLibraryStore()
     @StateObject private var runningWorkoutLibrary = RunningWorkoutLibraryStore()
     @StateObject private var appSession = AppSessionStore()
@@ -38,7 +37,6 @@ struct ATHLTHApp: App {
         WindowGroup {
             AppRootView()
                 .environmentObject(health)
-                .environmentObject(trainingPlan)
                 .environmentObject(exerciseLibrary)
                 .environmentObject(runningWorkoutLibrary)
                 .environmentObject(appSession)
