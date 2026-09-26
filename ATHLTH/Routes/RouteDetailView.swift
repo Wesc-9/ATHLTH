@@ -996,6 +996,14 @@ struct RouteDetailView: View {
             try await watchConnection.startWorkoutOnWatch(
                 .running
             )
+            watchConnection.sendRunningWorkout(
+                WatchRunningWorkoutTransfer(
+                    title: currentRoute.title,
+                    steps: [],
+                    routeAlerts:
+                        settings.routeAlertConfiguration
+                )
+            )
             watchMessage =
                 "\(currentRoute.title) started on Apple Watch."
         } catch {
