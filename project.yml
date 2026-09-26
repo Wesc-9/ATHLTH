@@ -35,6 +35,8 @@ targets:
         NSHealthShareUsageDescription: "ATHLTH reads workouts, sleep, heart rate, activity and related Health data to provide your training history, recovery insights and workout metrics."
         NSHealthUpdateUsageDescription: "ATHLTH saves workouts and related training data to Apple Health so workouts recorded with ATHLTH and Apple Watch stay in sync."
         NSLocationWhenInUseUsageDescription: "ATHLTH uses location while Around You is open to center the map and find nearby routes and events, and during location-based workout features you choose to use."
+        NSCalendarsFullAccessUsageDescription: "ATHLTH creates a dedicated training calendar and keeps your planned workouts synchronized with Apple Calendar."
+        NSCalendarsUsageDescription: "ATHLTH uses calendar access to show your planned workouts in a dedicated ATHLTH calendar."
         ITSAppUsesNonExemptEncryption: false
         ATHLTHLegalOperatorName: "$(ATHLTH_LEGAL_OPERATOR_NAME)"
         ATHLTHPrivacyContactEmail: "$(ATHLTH_PRIVACY_CONTACT_EMAIL)"
