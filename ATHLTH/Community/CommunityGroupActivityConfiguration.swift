@@ -162,9 +162,14 @@ struct CommunityGroupActivityDraft {
     var mode: CommunityGroupActivityMode = .free
     var distanceText = "5"
     var selectedRoute: TrainingRoute?
-    var selectedRunningWorkout: RunningWorkoutTemplate?
+    var selectedRouteSnapshot:
+        CommunityGroupRouteSnapshot?
+    var selectedRunningWorkout:
+        RunningWorkoutTemplate?
     var strengthDurationText = ""
     var selectedExercises: [ExerciseLibraryEntry] = []
+    var selectedExerciseSnapshots:
+        [CommunityGroupStrengthExerciseSnapshot] = []
 
     var distanceKilometers: Double? {
         Double(
@@ -201,7 +206,9 @@ struct CommunityGroupActivityDraft {
                 }
 
             case .route:
-                guard selectedRoute != nil else {
+                guard selectedRoute != nil ||
+                        selectedRouteSnapshot != nil
+                else {
                     return "Choose a route."
                 }
 
@@ -240,8 +247,12 @@ struct CommunityGroupActivityDraft {
                         ? distanceKilometers
                         : (
                             mode == .route
-                                ? selectedRoute?
-                                    .distanceKilometers
+                                ? (
+                                    selectedRoute?
+                                        .distanceKilometers ??
+                                    selectedRouteSnapshot?
+                                        .distanceKilometers
+                                  )
                                 : selectedRunningWorkout
                                     .flatMap {
                                         $0.estimatedDistanceMeters
@@ -250,11 +261,14 @@ struct CommunityGroupActivityDraft {
                         ),
                 route:
                     mode == .route
-                        ? selectedRoute.map {
-                            CommunityGroupRouteSnapshot(
-                                route: $0
-                            )
-                        }
+                        ? (
+                            selectedRoute.map {
+                                CommunityGroupRouteSnapshot(
+                                    route: $0
+                                )
+                            } ??
+                            selectedRouteSnapshot
+                          )
                         : nil,
                 runningWorkout:
                     activityType == "running" &&
@@ -275,13 +289,10 @@ struct CommunityGroupActivityDraft {
                 strengthDurationMinutes:
                     strengthDurationMinutes,
                 strengthExercises:
-                    selectedExercises.isEmpty
+                    resolvedStrengthExerciseSnapshots
+                        .isEmpty
                         ? nil
-                        : selectedExercises.map {
-                            CommunityGroupStrengthExerciseSnapshot(
-                                entry: $0
-                            )
-                        }
+                        : resolvedStrengthExerciseSnapshots
             )
 
         default:
@@ -297,8 +308,64 @@ struct CommunityGroupActivityDraft {
         }
     }
 
+    private var resolvedStrengthExerciseSnapshots:
+        [CommunityGroupStrengthExerciseSnapshot] {
+        var snapshots =
+            selectedExerciseSnapshots
+
+        for entry in selectedExercises {
+            let snapshot =
+                CommunityGroupStrengthExerciseSnapshot(
+                    entry: entry
+                )
+
+            if !snapshots.contains(
+                where: { $0.id == snapshot.id }
+            ) {
+                snapshots.append(snapshot)
+            }
+        }
+
+        return snapshots
+    }
+
+    static func existing(
+        _ configuration:
+            CommunityGroupActivityConfiguration?
+    ) -> CommunityGroupActivityDraft {
+        guard let configuration else {
+            return CommunityGroupActivityDraft()
+        }
+
+        var draft =
+            CommunityGroupActivityDraft()
+        draft.activityType =
+            configuration.activityType
+        draft.mode = configuration.mode
+        draft.distanceText =
+            configuration.distanceKilometers.map {
+                String(
+                    format: "%.2f",
+                    $0
+                )
+            } ?? "5"
+        draft.selectedRouteSnapshot =
+            configuration.route
+        draft.selectedRunningWorkout =
+            configuration.runningWorkout
+        draft.strengthDurationText =
+            configuration.strengthDurationMinutes.map(
+                String.init
+            ) ?? ""
+        draft.selectedExerciseSnapshots =
+            configuration.strengthExercises ?? []
+
+        return draft
+    }
+
     mutating func normalizeForActivityChange() {
         selectedRoute = nil
+        selectedRouteSnapshot = nil
         selectedRunningWorkout = nil
 
         switch activityType {
@@ -359,6 +426,7 @@ struct CommunityGroupActivityEditor: View {
                     selectionTitle: "Choose Route"
                 ) { route in
                     draft.selectedRoute = route
+                    draft.selectedRouteSnapshot = nil
                     draft.mode = .route
                     showingRoutes = false
                 }
@@ -385,6 +453,9 @@ struct CommunityGroupActivityEditor: View {
                     selectionTitle: "Add Exercise"
                 ) { entry in
                     if !draft.selectedExercises.contains(
+                        where: { $0.id == entry.id }
+                    ) &&
+                    !draft.selectedExerciseSnapshots.contains(
                         where: { $0.id == entry.id }
                     ) {
                         draft.selectedExercises.append(entry)
@@ -442,13 +513,19 @@ struct CommunityGroupActivityEditor: View {
                     icon: "map.fill",
                     title:
                         draft.selectedRoute?.title ??
+                        draft.selectedRouteSnapshot?.title ??
                         "Choose Route",
                     subtitle:
-                        draft.selectedRoute.map {
+                        (
+                            draft.selectedRoute?
+                                .distanceKilometers ??
+                            draft.selectedRouteSnapshot?
+                                .distanceKilometers
+                        ).map {
                             String(
                                 format:
                                     "%.1f km",
-                                $0.distanceKilometers
+                                $0
                             )
                         }
                 )
@@ -497,6 +574,48 @@ struct CommunityGroupActivityEditor: View {
 
             Text("min")
                 .foregroundStyle(.secondary)
+        }
+
+        if !draft.selectedExerciseSnapshots.isEmpty {
+            ForEach(
+                draft.selectedExerciseSnapshots
+            ) { snapshot in
+                HStack(spacing: 10) {
+                    Image(systemName: "dumbbell.fill")
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(snapshot.name)
+                            .font(
+                                .subheadline
+                                    .weight(.semibold)
+                            )
+
+                        Text("Saved Exercise")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button(role: .destructive) {
+                        draft.selectedExerciseSnapshots
+                            .removeAll {
+                                $0.id == snapshot.id
+                            }
+                    } label: {
+                        Image(
+                            systemName: "minus.circle.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
 
         if !draft.selectedExercises.isEmpty {
