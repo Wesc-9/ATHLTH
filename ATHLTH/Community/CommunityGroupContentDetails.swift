@@ -1758,6 +1758,18 @@ struct CommunityGroupDiscussionSection: View {
                 .padding(.top, 8)
             }
 
+            if !mentionSuggestions.isEmpty {
+                ATHLTHMentionSuggestionList(
+                    suggestions: mentionSuggestions
+                ) { suggestion in
+                    draft =
+                        ATHLTHMentionSupport.inserting(
+                            suggestion,
+                            into: draft
+                        )
+                }
+            }
+
             HStack(alignment: .bottom, spacing: 8) {
                 TextField(
                     "Comment",
@@ -1897,6 +1909,20 @@ struct CommunityGroupDiscussionSection: View {
                 }
             }
         }
+    }
+
+    private var mentionSuggestions:
+        [ATHLTHMentionSuggestion] {
+        ATHLTHMentionSupport.suggestions(
+            in: draft,
+            candidates:
+                groups.mentionCandidates(
+                    in: group.id
+                ).filter {
+                    $0.userID !=
+                        session.profile.userID
+                }
+        )
     }
 
     private func submit() {
