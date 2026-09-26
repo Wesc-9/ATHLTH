@@ -118,11 +118,6 @@ final class SupabaseRouteDiscoveryService {
     }
 
     func publish(_ route: TrainingRoute) async throws {
-        guard route.visibility == .publicProfile else {
-            try await remove(routeID: route.id)
-            return
-        }
-
         guard let center = route.discoveryCenterCoordinate else {
             return
         }
@@ -202,8 +197,7 @@ final class RouteDiscoveryStore: ObservableObject {
         _ ownedRoutes: [TrainingRoute]
     ) async {
         do {
-            for route in ownedRoutes
-            where route.visibility == .publicProfile {
+            for route in ownedRoutes {
                 try await service.publish(route)
             }
 
