@@ -2530,6 +2530,7 @@ struct SessionEditorView: View {
 
                 if kind == .running {
                     runningBuilder
+                    routeBuilder
                 }
 
                 if kind == .walking {
@@ -2603,6 +2604,12 @@ struct SessionEditorView: View {
                 } else if newKind == .walking && title == "New Workout" {
                     title = "Walk"
                 }
+            }
+            .onChange(of: selectedRouteID) { oldRouteID, newRouteID in
+                syncMetricsFromRouteChange(
+                    previousRouteID: oldRouteID,
+                    routeID: newRouteID
+                )
             }
         }
     }
@@ -2811,6 +2818,16 @@ struct SessionEditorView: View {
         }
     }
 
+    private var selectedRoute: TrainingRoute? {
+        guard let selectedRouteID else {
+            return nil
+        }
+
+        return session.savedRoutes.first {
+            $0.id == selectedRouteID
+        }
+    }
+
     private var routeBuilder: some View {
         Section("Route") {
             Picker("Route", selection: $selectedRouteID) {
@@ -2823,6 +2840,31 @@ struct SessionEditorView: View {
                     )
                     .tag(route.id as UUID?)
                 }
+            }
+
+            if let selectedRoute {
+                HStack(spacing: 8) {
+                    Label(
+                        String(
+                            format: "%.1f km",
+                            selectedRoute.distanceKilometers
+                        ),
+                        systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+                    )
+
+                    if kind == .walking,
+                       let seconds =
+                            selectedRoute.expectedTravelTimeSeconds {
+                        Label(
+                            "\(max(Int((seconds / 60).rounded()), 1)) min",
+                            systemImage: "timer"
+                        )
+                    }
+
+                    Spacer()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             if session.savedRoutes.isEmpty {
@@ -2996,16 +3038,63 @@ struct SessionEditorView: View {
             selectedRunningWorkouts
                 .compactMap(\.estimatedDistanceMeters)
 
-        if distanceValues.count == selectedRunningWorkouts.count {
-            distanceKilometers =
-                distanceValues.reduce(0, +) / 1_000
-        }
-
         let durationValues =
             selectedRunningWorkouts
                 .compactMap(\.estimatedDurationSeconds)
 
-        if durationValues.count == selectedRunningWorkouts.count {
+        let hasCompleteDistance =
+            distanceValues.count == selectedRunningWorkouts.count
+        let hasCompleteDuration =
+            durationValues.count == selectedRunningWorkouts.count
+
+        if let selectedRoute {
+            // A selected route defines the actual planned distance.
+            distanceKilometers =
+                selectedRoute.distanceKilometers
+
+            if hasCompleteDuration {
+                let totalSeconds =
+                    durationValues.reduce(0, +)
+
+                if hasCompleteDistance {
+                    let totalMeters =
+                        distanceValues.reduce(0, +)
+
+                    if totalMeters > 0 {
+                        let secondsPerMeter =
+                            totalSeconds / totalMeters
+                        durationMinutes = max(
+                            5,
+                            Int(
+                                (
+                                    selectedRoute.distanceKilometers *
+                                    1_000 *
+                                    secondsPerMeter /
+                                    60
+                                )
+                                .rounded()
+                            )
+                        )
+                    }
+                } else {
+                    // Time-based structured workouts already define the
+                    // intended session duration even if distance is route-led.
+                    durationMinutes = max(
+                        5,
+                        Int((totalSeconds / 60).rounded())
+                    )
+                }
+            }
+
+            return
+        }
+
+        if hasCompleteDistance {
+            distanceKilometers =
+                distanceValues.reduce(0, +) / 1_000
+        }
+
+        if hasCompleteDuration {
             durationMinutes = max(
                 5,
                 Int(
@@ -3014,6 +3103,116 @@ struct SessionEditorView: View {
                 )
             )
         }
+    }
+
+    private func syncMetricsFromRouteChange(
+        previousRouteID: UUID?,
+        routeID: UUID?
+    ) {
+        guard let routeID else {
+            if kind == .running,
+               !selectedRunningWorkouts.isEmpty {
+                syncRunningMetricsFromSelection()
+            }
+            return
+        }
+
+        guard let route = session.savedRoutes.first(
+            where: { $0.id == routeID }
+        ) else {
+            return
+        }
+
+        let previousDistance = max(
+            distanceKilometers,
+            0.01
+        )
+        let previousDuration = max(
+            durationMinutes,
+            1
+        )
+
+        distanceKilometers = route.distanceKilometers
+
+        if kind == .walking {
+            if let seconds = route.expectedTravelTimeSeconds,
+               seconds > 0 {
+                durationMinutes = max(
+                    5,
+                    Int((seconds / 60).rounded())
+                )
+            }
+            return
+        }
+
+        guard kind == .running else {
+            return
+        }
+
+        let distanceValues =
+            selectedRunningWorkouts
+                .compactMap(\.estimatedDistanceMeters)
+        let durationValues =
+            selectedRunningWorkouts
+                .compactMap(\.estimatedDurationSeconds)
+
+        let hasCompleteDistance =
+            !selectedRunningWorkouts.isEmpty &&
+            distanceValues.count == selectedRunningWorkouts.count
+        let hasCompleteDuration =
+            !selectedRunningWorkouts.isEmpty &&
+            durationValues.count == selectedRunningWorkouts.count
+
+        if hasCompleteDuration {
+            let totalSeconds =
+                durationValues.reduce(0, +)
+
+            if hasCompleteDistance {
+                let totalMeters =
+                    distanceValues.reduce(0, +)
+
+                if totalMeters > 0 {
+                    durationMinutes = max(
+                        5,
+                        Int(
+                            (
+                                route.distanceKilometers *
+                                1_000 *
+                                totalSeconds /
+                                totalMeters /
+                                60
+                            )
+                            .rounded()
+                        )
+                    )
+                    return
+                }
+            }
+
+            durationMinutes = max(
+                5,
+                Int((totalSeconds / 60).rounded())
+            )
+            return
+        }
+
+        // No reliable running duration exists on the saved route itself
+        // (Apple Maps stores a walking estimate). Preserve the user's
+        // current implied pace when switching to a different run route.
+        let impliedMinutesPerKilometer =
+            Double(previousDuration) /
+            previousDistance
+
+        durationMinutes = max(
+            5,
+            Int(
+                (
+                    route.distanceKilometers *
+                    impliedMinutesPerKilometer
+                )
+                .rounded()
+            )
+        )
     }
 
     private func saveSession() {
