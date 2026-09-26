@@ -279,7 +279,9 @@ struct HomeActivitySection: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
     @State private var showingPublish = false
+    @State private var selectedPublishWorkoutID: UUID?
     @State private var workoutDetails: [UUID: WorkoutDetail] = [:]
+    @State private var publishedActivities: [UUID: SocialActivityRecord] = [:]
 
     private var ownWorkouts: [SocialPublishableWorkout] {
         let healthItems = health.workouts.map(SocialPublishableWorkout.init)
@@ -419,7 +421,7 @@ struct HomeActivitySection: View {
                             keyLifts: keyLifts(for: workout),
                             isPublished: isPublished(workout)
                         ) {
-                            showingPublish = true
+                            presentPublish(workout)
                         }
                     } else if isOutdoor(workout.activity) {
                         HomeActivityOutdoorCard(
@@ -428,14 +430,14 @@ struct HomeActivitySection: View {
                             isPublished: isPublished(workout),
                             caption: caption(for: workout)
                         ) {
-                            showingPublish = true
+                            presentPublish(workout)
                         }
                     } else {
                         HomeActivityGenericWorkoutCard(
                             workout: workout,
                             isPublished: isPublished(workout)
                         ) {
-                            showingPublish = true
+                            presentPublish(workout)
                         }
                     }
                 }
@@ -478,12 +480,23 @@ struct HomeActivitySection: View {
                 }
             }
         }
-        .sheet(isPresented: $showingPublish) {
-            WorkoutPublishView()
+        .sheet(
+            isPresented: $showingPublish,
+            onDismiss: {
+                selectedPublishWorkoutID = nil
+                Task {
+                    await loadPublishedActivityRecords()
+                }
+            }
+        ) {
+            WorkoutPublishView(
+                initialWorkoutID: selectedPublishWorkoutID
+            )
         }
         .task(id: detailLoadKey) {
             await social.refreshHomeFeed()
             await loadFeaturedWorkoutDetails()
+            await loadPublishedActivityRecords()
         }
     }
 
@@ -497,7 +510,11 @@ struct HomeActivitySection: View {
     }
 
     private func isPublished(_ workout: SocialPublishableWorkout) -> Bool {
-        social.feed.contains { item in
+        if publishedActivities[workout.id] != nil {
+            return true
+        }
+
+        return social.feed.contains { item in
             item.actor.userID == social.currentUserID &&
             item.activity.kind == "workout" &&
             item.activity.metadata?["workout_id"] == workout.id.uuidString
@@ -505,11 +522,36 @@ struct HomeActivitySection: View {
     }
 
     private func caption(for workout: SocialPublishableWorkout) -> String? {
-        social.feed.first {
+        if let caption = publishedActivities[workout.id]?
+            .metadata?["caption"] {
+            return caption
+        }
+
+        return social.feed.first {
             $0.actor.userID == social.currentUserID &&
             $0.activity.kind == "workout" &&
             $0.activity.metadata?["workout_id"] == workout.id.uuidString
         }?.activity.metadata?["caption"]
+    }
+
+    private func presentPublish(_ workout: SocialPublishableWorkout) {
+        selectedPublishWorkoutID = workout.id
+        showingPublish = true
+    }
+
+    @MainActor
+    private func loadPublishedActivityRecords() async {
+        var refreshed: [UUID: SocialActivityRecord] = [:]
+
+        for workout in featuredWorkouts {
+            if let activity = await social.workoutActivity(
+                for: workout.id
+            ) {
+                refreshed[workout.id] = activity
+            }
+        }
+
+        publishedActivities = refreshed
     }
 
     private func keyLifts(for workout: SocialPublishableWorkout) -> [String] {
@@ -1641,6 +1683,8 @@ private struct HomeActivityCommunityCard: View {
 }
 
 struct WorkoutPublishView: View {
+    let initialWorkoutID: UUID?
+
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -1653,6 +1697,10 @@ struct WorkoutPublishView: View {
     @State private var publishing = false
     @State private var selectedAlreadyPublished = false
     @State private var successMessage: String?
+
+    init(initialWorkoutID: UUID? = nil) {
+        self.initialWorkoutID = initialWorkoutID
+    }
 
     private var workouts: [SocialPublishableWorkout] {
         let healthItems = health.workouts.map(SocialPublishableWorkout.init)
@@ -1787,12 +1835,15 @@ struct WorkoutPublishView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Publish") {
+                    Button(
+                        selectedAlreadyPublished
+                            ? "Update"
+                            : "Publish"
+                    ) {
                         Task { await publish() }
                     }
                     .disabled(
                         selectedWorkout == nil ||
-                        selectedAlreadyPublished ||
                         publishing
                     )
                 }
@@ -1803,16 +1854,36 @@ struct WorkoutPublishView: View {
                 if health.hasRequestedAuthorization && health.workouts.isEmpty {
                     await health.refreshAll()
                 }
+
+                if selectedWorkoutID == nil,
+                   let initialWorkoutID,
+                   workouts.contains(where: { $0.id == initialWorkoutID }) {
+                    selectedWorkoutID = initialWorkoutID
+                }
             }
             .task(id: selectedWorkoutID) {
                 guard let selectedWorkoutID else {
                     selectedAlreadyPublished = false
+                    caption = ""
+                    visibility = settings.defaultActivityVisibility
                     return
                 }
 
-                selectedAlreadyPublished = await social.isWorkoutPublished(
-                    selectedWorkoutID
-                )
+                if let activity = await social.workoutActivity(
+                    for: selectedWorkoutID
+                ) {
+                    selectedAlreadyPublished = true
+                    caption = activity.metadata?["caption"] ?? ""
+                    visibility =
+                        ProfileVisibility(
+                            rawValue: activity.visibility
+                        ) ??
+                        settings.defaultActivityVisibility
+                } else {
+                    selectedAlreadyPublished = false
+                    caption = ""
+                    visibility = settings.defaultActivityVisibility
+                }
             }
         }
     }
@@ -1820,6 +1891,7 @@ struct WorkoutPublishView: View {
     private func publish() async {
         guard let workout = selectedWorkout else { return }
 
+        let wasPublished = selectedAlreadyPublished
         publishing = true
         defer { publishing = false }
 
@@ -1831,7 +1903,10 @@ struct WorkoutPublishView: View {
 
         if success {
             selectedAlreadyPublished = true
-            successMessage = "Workout published to Activity."
+            successMessage =
+                wasPublished
+                    ? "Workout updated in Activity."
+                    : "Workout published to Activity."
 
             try? await Task.sleep(for: .milliseconds(650))
             dismiss()
