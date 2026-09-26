@@ -224,6 +224,8 @@ struct ATHLTHTabHero: View {
     var alignment: Alignment = .leading
     var focalOffsetX: CGFloat = 18
     var focalOffsetY: CGFloat = 16
+    var titleFontSize: CGFloat = 30
+    var copyWidthFraction: CGFloat = 0.74
 
     // Extra artwork that sits behind the pinned content sheet. It does not
     // participate in layout, so the hero/content boundary stays exactly where
@@ -362,7 +364,12 @@ struct ATHLTHTabHero: View {
                     Spacer(minLength: 12)
 
                     Text(title)
-                        .font(.system(size: 30, weight: .bold))
+                        .font(
+                            .system(
+                                size: titleFontSize,
+                                weight: .bold
+                            )
+                        )
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
 
@@ -379,7 +386,10 @@ struct ATHLTHTabHero: View {
                 .padding(.top, 48)
                 .padding(.bottom, 16)
                 .frame(
-                    maxWidth: min(proxy.size.width * 0.74, 560),
+                    maxWidth: min(
+                        proxy.size.width * copyWidthFraction,
+                        600
+                    ),
                     maxHeight: .infinity,
                     alignment: .leading
                 )
@@ -392,10 +402,76 @@ struct ATHLTHTabHero: View {
 }
 
 
+private struct ATHLTHTopRoundedSheetShape: Shape {
+    let radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let r = min(
+            radius,
+            rect.width / 2,
+            rect.height / 2
+        )
+
+        var path = Path()
+        path.move(
+            to: CGPoint(
+                x: rect.minX,
+                y: rect.minY + r
+            )
+        )
+        path.addQuadCurve(
+            to: CGPoint(
+                x: rect.minX + r,
+                y: rect.minY
+            ),
+            control: CGPoint(
+                x: rect.minX,
+                y: rect.minY
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.maxX - r,
+                y: rect.minY
+            )
+        )
+        path.addQuadCurve(
+            to: CGPoint(
+                x: rect.maxX,
+                y: rect.minY + r
+            ),
+            control: CGPoint(
+                x: rect.maxX,
+                y: rect.minY
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.maxX,
+                y: rect.maxY
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.minX,
+                y: rect.maxY
+            )
+        )
+        path.closeSubpath()
+
+        return path
+    }
+}
+
 struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     let accent: Color
     private let hero: Hero
     private let content: Content
+
+    // Keep a small overlap so the content still feels attached to the hero,
+    // but leave more room for the hero copy than the previous 18 pt overlap.
+    private let sheetOverlap: CGFloat = 8
+    private let sheetCornerRadius: CGFloat = 30
 
     init(
         accent: Color,
@@ -411,53 +487,56 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         ZStack {
             ATHLTHPremiumCanvas(accent: accent)
 
-            // The hero is outside the ScrollView so it stays visually anchored.
-            // The rounded content surface overlaps it slightly and is the only
-            // area that scrolls/bounces, which gives the root tabs a sheet-like
-            // modern feel without touching their data or navigation logic.
-            VStack(spacing: -18) {
+            VStack(spacing: -sheetOverlap) {
                 hero
                     .zIndex(0)
 
                 ScrollView {
                     content
                         .frame(maxWidth: .infinity)
-                        .background {
-                            RoundedRectangle(
-                                cornerRadius: 30,
-                                style: .continuous
-                            )
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        ATHLTHTheme.canvasTop.opacity(0.99),
-                                        ATHLTHTheme.surfaceStone.opacity(0.98),
-                                        ATHLTHTheme.canvasBottom.opacity(0.96)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .overlay {
-                                RoundedRectangle(
-                                    cornerRadius: 30,
-                                    style: .continuous
-                                )
-                                .stroke(
-                                    Color.white.opacity(0.70),
-                                    lineWidth: 0.8
-                                )
-                            }
-                            .shadow(
-                                color: ATHLTHTheme.accentDeep.opacity(0.075),
-                                radius: 20,
-                                x: 0,
-                                y: -4
-                            )
-                        }
                 }
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
+                // The sheet surface belongs to the ScrollView itself rather
+                // than the scrolling content. This keeps the rounded top edge
+                // visually fixed when content moves underneath it.
+                .background {
+                    ATHLTHTopRoundedSheetShape(
+                        radius: sheetCornerRadius
+                    )
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.canvasTop.opacity(0.99),
+                                ATHLTHTheme.surfaceStone.opacity(0.98),
+                                ATHLTHTheme.canvasBottom.opacity(0.96)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+                .clipShape(
+                    ATHLTHTopRoundedSheetShape(
+                        radius: sheetCornerRadius
+                    )
+                )
+                .overlay {
+                    ATHLTHTopRoundedSheetShape(
+                        radius: sheetCornerRadius
+                    )
+                    .stroke(
+                        Color.white.opacity(0.70),
+                        lineWidth: 0.8
+                    )
+                    .allowsHitTesting(false)
+                }
+                .shadow(
+                    color: ATHLTHTheme.accentDeep.opacity(0.075),
+                    radius: 20,
+                    x: 0,
+                    y: -4
+                )
                 .zIndex(1)
             }
             .ignoresSafeArea(edges: .top)

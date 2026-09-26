@@ -141,7 +141,9 @@ struct ATHLTHHomeView: View {
                         height: 190,
                         alignment: .leading,
                         focalOffsetX: 18,
-                        focalOffsetY: 14
+                        focalOffsetY: 14,
+                        titleFontSize: 27,
+                        copyWidthFraction: 0.82
                     )
 
                     HStack(spacing: 8) {
