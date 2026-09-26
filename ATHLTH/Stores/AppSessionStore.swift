@@ -1788,6 +1788,14 @@ final class AppSessionStore: ObservableObject {
         defaults.set(data, forKey: "session.activeTrainingPlan")
     }
 
+    private func persistScheduledPlans() {
+        guard let data = try? JSONEncoder().encode(scheduledPlans) else {
+            return
+        }
+
+        defaults.set(data, forKey: "session.scheduledTrainingPlans")
+    }
+
     private func persistSavedRoutes() {
         guard let data = try? JSONEncoder().encode(savedRoutes) else {
             return
@@ -1874,6 +1882,23 @@ final class AppSessionStore: ObservableObject {
         }
 
         return try? JSONDecoder().decode(TrainingPlan.self, from: data)
+    }
+
+    private static func loadScheduledPlans(
+        from defaults: UserDefaults
+    ) -> [TrainingPlan] {
+        guard let data = defaults.data(
+            forKey: "session.scheduledTrainingPlans"
+        ),
+        let plans = try? JSONDecoder().decode(
+            [TrainingPlan].self,
+            from: data
+        )
+        else {
+            return []
+        }
+
+        return plans
     }
 
     private static func loadPlanTemplates(from defaults: UserDefaults) -> [TrainingPlan] {
