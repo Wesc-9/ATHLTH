@@ -35,7 +35,7 @@ enum OfficialRunningChallengeKind: String, Codable, CaseIterable, Identifiable {
                 ? "\(Int(target)) km"
                 : String(format: "%.1f km", target)
         case .sessions:
-            return "\(Int(target.rounded())) runs"
+            return "\(Int(target.rounded())) workouts"
         case .minutes:
             return "\(Int(target.rounded())) min"
         case .streak:
