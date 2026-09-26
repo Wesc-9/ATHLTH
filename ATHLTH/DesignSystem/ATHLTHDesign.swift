@@ -545,8 +545,12 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                 .background(Color.clear)
                 .zIndex(1)
             }
-            .ignoresSafeArea(edges: .top)
         }
+        // Apply safe-area expansion to the complete layout rather than only
+        // the inner stack. NavigationStack otherwise keeps the hero's layout
+        // origin below the status-bar safe area even though the canvas itself
+        // can paint behind it.
+        .ignoresSafeArea(edges: .top)
     }
 }
 
