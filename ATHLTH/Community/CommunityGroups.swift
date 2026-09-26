@@ -4913,33 +4913,30 @@ struct CommunityGroupNotificationSettingsView: View {
 
     let group: CommunityGroupRecord
 
-    @State private var mode = "important"
+    @State private var enabled = true
     @State private var saving = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Group notifications") {
-                    Picker(
-                        "Notify me about",
-                        selection: $mode
-                    ) {
-                        Text("All activity")
-                            .tag("all")
-                        Text("Important only")
-                            .tag("important")
-                        Text("Muted")
-                            .tag("muted")
-                    }
+                    Toggle(
+                        "Notifications",
+                        isOn: $enabled
+                    )
 
-                    Text(modeDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        enabled
+                            ? "Receive group chat, update, event and challenge notifications."
+                            : "Group activity notifications are off."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section {
                     Label(
-                        "Direct @mentions follow your global Mentions setting in Settings → Notifications, even when this group is muted.",
+                        "Direct @mentions use your global Mentions setting in Settings → Notifications. Turning this group off does not disable a direct mention.",
                         systemImage: "at"
                     )
                     .font(.caption)
@@ -4949,18 +4946,24 @@ struct CommunityGroupNotificationSettingsView: View {
             .navigationTitle("Notifications")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
                     Button("Done") {
                         dismiss()
                     }
                 }
             }
             .onAppear {
-                mode = groups.notificationMode(
-                    in: group.id
-                )
+                enabled =
+                    groups.notificationMode(
+                        in: group.id
+                    ) != "muted"
             }
-            .onChange(of: mode) { oldValue, newValue in
+            .onChange(of: enabled) {
+                oldValue,
+                newValue in
+
                 guard oldValue != newValue else {
                     return
                 }
@@ -4970,27 +4973,19 @@ struct CommunityGroupNotificationSettingsView: View {
                     let saved =
                         await groups.setGroupNotificationMode(
                             groupID: group.id,
-                            mode: newValue
+                            mode:
+                                newValue
+                                    ? "all"
+                                    : "muted"
                         )
                     saving = false
 
                     if !saved {
-                        mode = oldValue
+                        enabled = oldValue
                     }
                 }
             }
             .disabled(saving)
-        }
-    }
-
-    private var modeDescription: String {
-        switch mode {
-        case "all":
-            return "Receive alerts for new chat messages, official updates, events and challenges."
-        case "muted":
-            return "No ordinary group activity alerts. Direct @mentions can still alert you if Mentions are enabled globally."
-        default:
-            return "Receive official group updates, new events and challenges, but not ordinary group chat. Membership actions and direct @mentions can still alert separately when they need your attention."
         }
     }
 }
