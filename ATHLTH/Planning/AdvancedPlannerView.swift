@@ -2972,17 +2972,19 @@ struct SessionEditorView: View {
                         }
 
                         if let range =
-                                estimatedHeartRateRange(
+                                heartRateRange(
                                     for: heartRateTargetZone
                                 ) {
                             LabeledContent(
-                                "Estimated range",
+                                "Target range",
                                 value:
                                     "\(range.lower)–\(range.upper) bpm"
                             )
 
                             Text(
-                                "ATHLTH estimates zones from your age in Health Profile. Choose Custom BPM if you use lab-tested or manually defined zones."
+                                estimatedMaximumHeartRate != nil
+                                    ? "ATHLTH estimates zones from your age in Health Profile. Choose Custom BPM if you use lab-tested or manually defined zones."
+                                    : "Using the saved BPM range for this zone. Add a date of birth in Health Profile to recalculate estimated zones."
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -3252,6 +3254,35 @@ struct SessionEditorView: View {
         )
     }
 
+    private func heartRateRange(
+        for zone: Int
+    ) -> (lower: Int, upper: Int)? {
+        if let estimated =
+                estimatedHeartRateRange(
+                    for: zone
+                ) {
+            return estimated
+        }
+
+        guard let existing =
+                existingWorkout?
+                    .targetAlertConfiguration,
+              existing.heartRateEnabled,
+              existing.heartRateZone == zone,
+              let minimum =
+                existing.heartRateMinimumBPM,
+              let maximum =
+                existing.heartRateMaximumBPM
+        else {
+            return nil
+        }
+
+        return (
+            lower: Int(minimum.rounded()),
+            upper: Int(maximum.rounded())
+        )
+    }
+
     private var workoutTargetAlertConfigurationForSave:
         WatchWorkoutTargetAlertConfiguration? {
         let paceEnabled =
@@ -3272,7 +3303,7 @@ struct SessionEditorView: View {
             switch heartRateTargetMode {
             case .zone:
                 guard let range =
-                        estimatedHeartRateRange(
+                        heartRateRange(
                             for: heartRateTargetZone
                         )
                 else {
