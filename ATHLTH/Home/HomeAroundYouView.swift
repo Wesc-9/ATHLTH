@@ -713,7 +713,8 @@ struct AroundYouExploreView: View {
                 elevationGainMeters: route.elevationGainMeters,
                 coordinates: route.coordinates,
                 ownerID: route.ownerID,
-                isMine: route.ownerID == session.profile.userID
+                isMine: route.ownerID == session.profile.userID,
+                trainingRoute: route.trainingRoute
             )
         }
 
@@ -725,7 +726,8 @@ struct AroundYouExploreView: View {
                 elevationGainMeters: route.elevationGainMeters,
                 coordinates: route.coordinates,
                 ownerID: route.ownerID,
-                isMine: true
+                isMine: true,
+                trainingRoute: route
             )
         }
 
