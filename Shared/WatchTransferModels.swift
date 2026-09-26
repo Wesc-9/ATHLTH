@@ -150,6 +150,49 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var steps: [WatchRunningWorkoutStep]
 }
 
+struct WatchStrengthSessionSnapshot: Codable, Hashable {
+    var workoutID: UUID
+    var title: String
+    var exerciseIndex: Int
+    var exerciseCount: Int
+    var exerciseName: String?
+    var primaryMuscles: [String]
+    var setIndex: Int
+    var setCount: Int
+    var setNumber: Int?
+    var completedSets: Int
+    var totalSets: Int
+    var draftReps: Int
+    var draftWeightKilograms: Double
+    var draftRestSeconds: Int
+    var isResting: Bool
+    var restEndsAt: Date?
+    var currentExerciseComplete: Bool
+    var hasNextExercise: Bool
+    var allExercisesComplete: Bool
+    var updatedAt: Date
+}
+
+enum WatchStrengthCommandKind: String, Codable, Hashable {
+    case updateDraft
+    case completeSet
+    case completeSetWithoutDetails
+    case skipRest
+    case addRest
+    case nextExercise
+    case requestSnapshot
+}
+
+struct WatchStrengthCommand: Codable, Hashable {
+    var workoutID: UUID?
+    var kind: WatchStrengthCommandKind
+    var reps: Int?
+    var weightKilograms: Double?
+    var restSeconds: Int?
+    var addRestSeconds: Int?
+    var sentAt: Date
+}
+
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     let id: UUID
     var kind: WatchWorkoutKind
@@ -204,6 +247,8 @@ enum WatchTransferKind: String {
     case workoutRouteSelection
     case audioCoachConfiguration
     case runningWorkout
+    case strengthSnapshot
+    case strengthCommand
     case connectivityProbe
     case connectivityAck
 }
