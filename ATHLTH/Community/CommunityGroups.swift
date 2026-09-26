@@ -12,6 +12,8 @@ struct CommunityGroupRecord: Codable, Identifiable, Hashable {
     let locationName: String
     let visibility: String
     let imageURL: String?
+    let joinMode: String
+    let membersCanCreateContent: Bool
     let createdAt: Date
     let updatedAt: Date
 
@@ -23,6 +25,8 @@ struct CommunityGroupRecord: Codable, Identifiable, Hashable {
         case locationName = "location_name"
         case visibility
         case imageURL = "image_url"
+        case joinMode = "join_mode"
+        case membersCanCreateContent = "members_can_create_content"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -51,6 +55,7 @@ struct CommunityGroupAnnouncementRecord:
     let groupID: UUID
     let authorID: UUID
     let body: String
+    let pinnedAt: Date?
     let createdAt: Date
     let updatedAt: Date
 
@@ -59,6 +64,7 @@ struct CommunityGroupAnnouncementRecord:
         case groupID = "group_id"
         case authorID = "author_id"
         case body
+        case pinnedAt = "pinned_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -212,6 +218,72 @@ struct CommunityGroupChallengeWorkoutRecord: Codable, Hashable {
     }
 }
 
+struct CommunityGroupJoinRequestRecord: Codable, Hashable {
+    let groupID: UUID
+    let userID: UUID
+    let status: String
+    let createdAt: Date
+    let respondedAt: Date?
+    let respondedBy: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "group_id"
+        case userID = "user_id"
+        case status
+        case createdAt = "created_at"
+        case respondedAt = "responded_at"
+        case respondedBy = "responded_by"
+    }
+}
+
+struct CommunityGroupInviteRecord: Codable, Hashable {
+    let groupID: UUID
+    let userID: UUID
+    let invitedBy: UUID
+    let status: String
+    let createdAt: Date
+    let respondedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "group_id"
+        case userID = "user_id"
+        case invitedBy = "invited_by"
+        case status
+        case createdAt = "created_at"
+        case respondedAt = "responded_at"
+    }
+}
+
+struct CommunityGroupNotificationPreferenceRecord: Codable, Hashable {
+    let groupID: UUID
+    let userID: UUID
+    let mode: String
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "group_id"
+        case userID = "user_id"
+        case mode
+        case updatedAt = "updated_at"
+    }
+}
+
+struct CommunityGroupEventRSVPRecord: Codable, Hashable {
+    let groupID: UUID
+    let eventID: UUID
+    let userID: UUID
+    let status: String
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "group_id"
+        case eventID = "event_id"
+        case userID = "user_id"
+        case status
+        case updatedAt = "updated_at"
+    }
+}
+
 private struct CommunityGroupInsert: Encodable {
     let id: UUID
     let creatorID: UUID
@@ -219,6 +291,8 @@ private struct CommunityGroupInsert: Encodable {
     let summary: String
     let locationName: String
     let visibility: String
+    let joinMode: String
+    let membersCanCreateContent: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -227,6 +301,8 @@ private struct CommunityGroupInsert: Encodable {
         case summary
         case locationName = "location_name"
         case visibility
+        case joinMode = "join_mode"
+        case membersCanCreateContent = "members_can_create_content"
     }
 }
 
@@ -235,6 +311,8 @@ private struct CommunityGroupUpdate: Encodable {
     let summary: String
     let locationName: String
     let visibility: String
+    let joinMode: String
+    let membersCanCreateContent: Bool
     let updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -242,6 +320,8 @@ private struct CommunityGroupUpdate: Encodable {
         case summary
         case locationName = "location_name"
         case visibility
+        case joinMode = "join_mode"
+        case membersCanCreateContent = "members_can_create_content"
         case updatedAt = "updated_at"
     }
 }
@@ -358,6 +438,71 @@ private struct CommunityGroupChallengeWorkoutInsert: Encodable {
     }
 }
 
+private struct CommunityGroupAnnouncementPinUpdate: Encodable {
+    let pinnedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case pinnedAt = "pinned_at"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(
+            keyedBy: CodingKeys.self
+        )
+
+        if let pinnedAt {
+            try container.encode(
+                pinnedAt,
+                forKey: .pinnedAt
+            )
+        } else {
+            try container.encodeNil(
+                forKey: .pinnedAt
+            )
+        }
+    }
+}
+
+private struct CommunityGroupJoinParams: Encodable {
+    let groupID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+    }
+}
+
+private struct CommunityGroupJoinResponseParams: Encodable {
+    let groupID: UUID
+    let userID: UUID
+    let accept: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+        case userID = "p_user_id"
+        case accept = "p_accept"
+    }
+}
+
+private struct CommunityGroupInviteParams: Encodable {
+    let groupID: UUID
+    let userID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+        case userID = "p_user_id"
+    }
+}
+
+private struct CommunityGroupInviteResponseParams: Encodable {
+    let groupID: UUID
+    let accept: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+        case accept = "p_accept"
+    }
+}
+
 @MainActor
 final class CommunityGroupStore: ObservableObject {
     @Published private(set) var groups: [CommunityGroupRecord] = []
@@ -371,6 +516,11 @@ final class CommunityGroupStore: ObservableObject {
     @Published private(set) var eventsByGroup: [UUID: [CommunityGroupEventRecord]] = [:]
     @Published private(set) var challengesByGroup: [UUID: [CommunityGroupChallengeRecord]] = [:]
     @Published private(set) var challengeWorkouts: [CommunityGroupChallengeWorkoutRecord] = []
+    @Published private(set) var joinRequestsByGroup: [UUID: [CommunityGroupJoinRequestRecord]] = [:]
+    @Published private(set) var ownJoinRequests: [CommunityGroupJoinRequestRecord] = []
+    @Published private(set) var ownInvites: [CommunityGroupInviteRecord] = []
+    @Published private(set) var notificationPreferencesByGroup: [UUID: CommunityGroupNotificationPreferenceRecord] = [:]
+    @Published private(set) var eventRSVPsByGroup: [UUID: [CommunityGroupEventRSVPRecord]] = [:]
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
@@ -422,6 +572,30 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    func role(in group: CommunityGroupRecord) -> String? {
+        if isOwner(of: group) {
+            return "owner"
+        }
+
+        return ownMemberships.first {
+            $0.groupID == group.id
+        }?.role
+    }
+
+    func canCreateGroupContent(
+        _ group: CommunityGroupRecord
+    ) -> Bool {
+        switch role(in: group) {
+        case "owner", "admin":
+            return true
+        case "member":
+            return group.membersCanCreateContent
+        default:
+            // Contributor is intentionally update-only.
+            return false
+        }
+    }
+
     func profileCard(for userID: UUID) -> SocialProfileCard? {
         profileCardsByID[userID]
     }
@@ -458,6 +632,78 @@ final class CommunityGroupStore: ObservableObject {
         challengesByGroup[groupID] ?? []
     }
 
+    func joinRequests(
+        in groupID: UUID
+    ) -> [CommunityGroupJoinRequestRecord] {
+        joinRequestsByGroup[groupID] ?? []
+    }
+
+    func pendingJoinRequest(
+        for groupID: UUID
+    ) -> CommunityGroupJoinRequestRecord? {
+        ownJoinRequests.first {
+            $0.groupID == groupID &&
+            $0.status == "pending"
+        }
+    }
+
+    func pendingInvite(
+        for groupID: UUID
+    ) -> CommunityGroupInviteRecord? {
+        ownInvites.first {
+            $0.groupID == groupID &&
+            $0.status == "pending"
+        }
+    }
+
+    func notificationMode(in groupID: UUID) -> String {
+        notificationPreferencesByGroup[groupID]?.mode
+            ?? "important"
+    }
+
+    func pinnedAnnouncement(
+        in groupID: UUID
+    ) -> CommunityGroupAnnouncementRecord? {
+        announcements(in: groupID).first {
+            $0.pinnedAt != nil
+        }
+    }
+
+    func eventRSVP(
+        eventID: UUID
+    ) -> CommunityGroupEventRSVPRecord? {
+        for values in eventRSVPsByGroup.values {
+            if let value = values.first(where: {
+                $0.eventID == eventID &&
+                $0.userID == currentUserID
+            }) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    func eventRSVPCount(
+        eventID: UUID,
+        status: String
+    ) -> Int {
+        eventRSVPsByGroup.values
+            .flatMap { $0 }
+            .filter {
+                $0.eventID == eventID &&
+                $0.status == status
+            }
+            .count
+    }
+
+    func mentionCandidates(
+        in groupID: UUID
+    ) -> [SocialProfileCard] {
+        members(in: groupID).compactMap {
+            profileCardsByID[$0.userID]
+        }
+    }
+
     func challengeProgress(_ challenge: CommunityGroupChallengeRecord) -> Double {
         challengeWorkouts
             .filter { $0.challengeID == challenge.id }
@@ -468,6 +714,9 @@ final class CommunityGroupStore: ObservableObject {
         guard let userID = currentUserID else {
             groups = []
             ownMemberships = []
+            ownJoinRequests = []
+            ownInvites = []
+            notificationPreferencesByGroup = [:]
             return
         }
 
@@ -503,9 +752,44 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
                 .value
 
+            async let invitesQuery: [CommunityGroupInviteRecord] = client
+                .from("community_group_invites")
+                .select()
+                .eq("user_id", value: userID)
+                .eq("status", value: "pending")
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+
+            async let joinRequestsQuery: [CommunityGroupJoinRequestRecord] = client
+                .from("community_group_join_requests")
+                .select()
+                .eq("user_id", value: userID)
+                .execute()
+                .value
+
+            async let notificationPreferencesQuery:
+                [CommunityGroupNotificationPreferenceRecord] = client
+                    .from("community_group_notification_preferences")
+                    .select()
+                    .eq("user_id", value: userID)
+                    .execute()
+                    .value
+
             groups = try await groupsQuery
             ownMemberships = try await membershipsQuery
             communityActivity = try await activityQuery
+            ownInvites = try await invitesQuery
+            ownJoinRequests = try await joinRequestsQuery
+
+            let notificationPreferences =
+                try await notificationPreferencesQuery
+            notificationPreferencesByGroup = Dictionary(
+                uniqueKeysWithValues:
+                    notificationPreferences.map {
+                        ($0.groupID, $0)
+                    }
+            )
 
             let profiles = try await profilesQuery
             profileCardsByID = Dictionary(
@@ -579,6 +863,24 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
                 .value
 
+            async let joinRequestsQuery:
+                [CommunityGroupJoinRequestRecord] = client
+                    .from("community_group_join_requests")
+                    .select()
+                    .eq("group_id", value: groupID)
+                    .eq("status", value: "pending")
+                    .order("created_at", ascending: true)
+                    .execute()
+                    .value
+
+            async let eventRSVPsQuery:
+                [CommunityGroupEventRSVPRecord] = client
+                    .from("community_group_event_rsvps")
+                    .select()
+                    .eq("group_id", value: groupID)
+                    .execute()
+                    .value
+
             let loadedMembers = try await membersQuery
             let loadedMessages = try await messagesQuery
             let loadedEvents = try await eventsQuery
@@ -586,6 +888,8 @@ final class CommunityGroupStore: ObservableObject {
             let loadedAnnouncements = try await announcementsQuery
             let loadedActivity = try await activityQuery
             let loadedProfiles = try await profilesQuery
+            let loadedJoinRequests = try await joinRequestsQuery
+            let loadedEventRSVPs = try await eventRSVPsQuery
 
             membersByGroup[groupID] = loadedMembers
             messagesByGroup[groupID] = loadedMessages
@@ -593,6 +897,8 @@ final class CommunityGroupStore: ObservableObject {
             challengesByGroup[groupID] = loadedChallenges
             announcementsByGroup[groupID] = loadedAnnouncements
             activityByGroup[groupID] = loadedActivity
+            joinRequestsByGroup[groupID] = loadedJoinRequests
+            eventRSVPsByGroup[groupID] = loadedEventRSVPs
 
             for profile in loadedProfiles {
                 profileCardsByID[profile.userID] = profile
@@ -623,7 +929,9 @@ final class CommunityGroupStore: ObservableObject {
     func createGroup(
         name: String,
         summary: String,
-        visibility: String
+        visibility: String,
+        joinMode: String = "open",
+        membersCanCreateContent: Bool = true
     ) async -> Bool {
         guard let userID = currentUserID else { return false }
 
@@ -635,16 +943,31 @@ final class CommunityGroupStore: ObservableObject {
         }
 
         do {
+            let resolvedVisibility =
+                visibility == "private"
+                    ? "private"
+                    : "public"
+            let resolvedJoinMode =
+                resolvedVisibility == "private" &&
+                joinMode == "open"
+                    ? "approval"
+                    : (
+                        ["open", "approval", "invite_only"]
+                            .contains(joinMode)
+                            ? joinMode
+                            : "open"
+                    )
+
             let payload = CommunityGroupInsert(
                 id: UUID(),
                 creatorID: userID,
                 name: String(cleanName.prefix(80)),
                 summary: String(summary.prefix(800)),
                 locationName: "",
-                visibility:
-                    visibility == "private"
-                        ? "private"
-                        : "public"
+                visibility: resolvedVisibility,
+                joinMode: resolvedJoinMode,
+                membersCanCreateContent:
+                    membersCanCreateContent
             )
 
             try await client
@@ -665,7 +988,9 @@ final class CommunityGroupStore: ObservableObject {
         name: String,
         locationName: String,
         summary: String,
-        visibility: String
+        visibility: String,
+        joinMode: String? = nil,
+        membersCanCreateContent: Bool? = nil
     ) async -> Bool {
         guard canManage(group) else {
             return false
@@ -682,14 +1007,27 @@ final class CommunityGroupStore: ObservableObject {
         }
 
         do {
+            let resolvedVisibility =
+                visibility == "private"
+                    ? "private"
+                    : "public"
+            let requestedJoinMode =
+                joinMode ?? group.joinMode
+            let resolvedJoinMode =
+                resolvedVisibility == "private" &&
+                requestedJoinMode == "open"
+                    ? "approval"
+                    : requestedJoinMode
+
             let payload = CommunityGroupUpdate(
                 name: String(cleanName.prefix(80)),
                 summary: String(summary.prefix(800)),
                 locationName: String(cleanLocation.prefix(120)),
-                visibility:
-                    visibility == "private"
-                        ? "private"
-                        : "public",
+                visibility: resolvedVisibility,
+                joinMode: resolvedJoinMode,
+                membersCanCreateContent:
+                    membersCanCreateContent ??
+                    group.membersCanCreateContent,
                 updatedAt: Date()
             )
 
@@ -809,8 +1147,8 @@ final class CommunityGroupStore: ObservableObject {
     func deleteGroup(
         _ group: CommunityGroupRecord
     ) async -> Bool {
-        guard canManage(group) else {
-            errorMessage = "You do not have permission to delete this group."
+        guard isOwner(of: group) else {
+            errorMessage = "Only the group owner can delete this group."
             return false
         }
 
@@ -887,6 +1225,242 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    func pinAnnouncement(
+        groupID: UUID,
+        announcementID: UUID?
+    ) async -> Bool {
+        guard let group = group(for: groupID),
+              canManage(group)
+        else {
+            return false
+        }
+
+        do {
+            try await client
+                .from("community_group_announcements")
+                .update(
+                    CommunityGroupAnnouncementPinUpdate(
+                        pinnedAt: nil
+                    )
+                )
+                .eq("group_id", value: groupID)
+                .execute()
+
+            if let announcementID {
+                try await client
+                    .from("community_group_announcements")
+                    .update(
+                        CommunityGroupAnnouncementPinUpdate(
+                            pinnedAt: Date()
+                        )
+                    )
+                    .eq("id", value: announcementID)
+                    .eq("group_id", value: groupID)
+                    .execute()
+            }
+
+            await loadGroupContent(groupID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func requestJoin(
+        _ group: CommunityGroupRecord
+    ) async -> String {
+        guard currentUserID != nil else {
+            return "unavailable"
+        }
+
+        do {
+            let result: String = try await client
+                .rpc(
+                    "request_community_group_join",
+                    params: CommunityGroupJoinParams(
+                        groupID: group.id
+                    )
+                )
+                .execute()
+                .value
+
+            await refresh()
+
+            if result == "joined" {
+                await loadGroupContent(group.id)
+            }
+
+            return result
+        } catch {
+            errorMessage = error.localizedDescription
+            return "error"
+        }
+    }
+
+    func respondToJoinRequest(
+        groupID: UUID,
+        userID: UUID,
+        accept: Bool
+    ) async -> Bool {
+        guard let group = group(for: groupID),
+              canManage(group)
+        else {
+            return false
+        }
+
+        do {
+            try await client
+                .rpc(
+                    "respond_community_group_join_request",
+                    params: CommunityGroupJoinResponseParams(
+                        groupID: groupID,
+                        userID: userID,
+                        accept: accept
+                    )
+                )
+                .execute()
+
+            await refresh()
+            await loadGroupContent(groupID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func inviteMember(
+        groupID: UUID,
+        userID: UUID
+    ) async -> Bool {
+        guard let group = group(for: groupID),
+              canManage(group)
+        else {
+            return false
+        }
+
+        do {
+            try await client
+                .rpc(
+                    "invite_community_group_member",
+                    params: CommunityGroupInviteParams(
+                        groupID: groupID,
+                        userID: userID
+                    )
+                )
+                .execute()
+
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func respondToInvite(
+        groupID: UUID,
+        accept: Bool
+    ) async -> Bool {
+        do {
+            try await client
+                .rpc(
+                    "respond_community_group_invite",
+                    params: CommunityGroupInviteResponseParams(
+                        groupID: groupID,
+                        accept: accept
+                    )
+                )
+                .execute()
+
+            await refresh()
+
+            if accept {
+                await loadGroupContent(groupID)
+            }
+
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func setGroupNotificationMode(
+        groupID: UUID,
+        mode: String
+    ) async -> Bool {
+        guard let userID = currentUserID,
+              joinedGroupIDs.contains(groupID),
+              ["all", "important", "muted"].contains(mode)
+        else {
+            return false
+        }
+
+        let record =
+            CommunityGroupNotificationPreferenceRecord(
+                groupID: groupID,
+                userID: userID,
+                mode: mode,
+                updatedAt: Date()
+            )
+
+        do {
+            try await client
+                .from("community_group_notification_preferences")
+                .upsert(
+                    record,
+                    onConflict: "group_id,user_id"
+                )
+                .execute()
+
+            notificationPreferencesByGroup[groupID] =
+                record
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func setEventRSVP(
+        groupID: UUID,
+        eventID: UUID,
+        status: String
+    ) async -> Bool {
+        guard let userID = currentUserID,
+              joinedGroupIDs.contains(groupID),
+              ["going", "maybe", "not_going"]
+                .contains(status)
+        else {
+            return false
+        }
+
+        let record = CommunityGroupEventRSVPRecord(
+            groupID: groupID,
+            eventID: eventID,
+            userID: userID,
+            status: status,
+            updatedAt: Date()
+        )
+
+        do {
+            try await client
+                .from("community_group_event_rsvps")
+                .upsert(
+                    record,
+                    onConflict: "event_id,user_id"
+                )
+                .execute()
+
+            await loadGroupContent(groupID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func setMemberRole(
         groupID: UUID,
         userID: UUID,
@@ -917,27 +1491,7 @@ final class CommunityGroupStore: ObservableObject {
     }
 
     func join(_ group: CommunityGroupRecord) async {
-        guard let userID = currentUserID,
-              !joinedGroupIDs.contains(group.id)
-        else { return }
-
-        do {
-            try await client
-                .from("community_group_members")
-                .insert(
-                    CommunityGroupMemberInsert(
-                        groupID: group.id,
-                        userID: userID,
-                        role: "member"
-                    )
-                )
-                .execute()
-
-            await refresh()
-            await loadGroupContent(group.id)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        _ = await requestJoin(group)
     }
 
     func leave(_ group: CommunityGroupRecord) async {
@@ -960,6 +1514,9 @@ final class CommunityGroupStore: ObservableObject {
             messagesByGroup[group.id] = nil
             eventsByGroup[group.id] = nil
             challengesByGroup[group.id] = nil
+            joinRequestsByGroup[group.id] = nil
+            eventRSVPsByGroup[group.id] = nil
+            notificationPreferencesByGroup[group.id] = nil
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1028,7 +1585,14 @@ final class CommunityGroupStore: ObservableObject {
         startsAt: Date,
         meetingName: String
     ) async -> Bool {
-        guard let userID = currentUserID else { return false }
+        guard let userID = currentUserID,
+              let group = group(for: groupID),
+              canCreateGroupContent(group)
+        else {
+            errorMessage =
+                "You do not have permission to create group events."
+            return false
+        }
 
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanMeet = meetingName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1074,10 +1638,13 @@ final class CommunityGroupStore: ObservableObject {
         endsAt: Date
     ) async -> Bool {
         guard let userID = currentUserID,
+              let group = group(for: groupID),
+              canCreateGroupContent(group),
               targetValue > 0,
               endsAt > startsAt
         else {
-            errorMessage = "Check the challenge target and dates."
+            errorMessage =
+                "Check the challenge details and your group permissions."
             return false
         }
 
