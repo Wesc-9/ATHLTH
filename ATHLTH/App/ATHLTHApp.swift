@@ -543,6 +543,9 @@ struct AppRootView: View {
         .onChange(of: settings.messageNotificationsEnabled) { _, _ in
             Task { await syncPushPreferences() }
         }
+        .onChange(of: settings.mentionNotificationsEnabled) { _, _ in
+            Task { await syncPushPreferences() }
+        }
         .onChange(of: social.privacy) { _, privacy in
             guard appSession.signedIn, privacy != nil else { return }
 
@@ -905,7 +908,8 @@ struct AppRootView: View {
             workoutUpdates: settings.workoutRemindersEnabled,
             friendActivity: settings.friendActivityNotificationsEnabled,
             challenges: settings.challengeNotificationsEnabled,
-            messages: settings.messageNotificationsEnabled
+            messages: settings.messageNotificationsEnabled,
+            mentions: settings.mentionNotificationsEnabled
         )
     }
 
