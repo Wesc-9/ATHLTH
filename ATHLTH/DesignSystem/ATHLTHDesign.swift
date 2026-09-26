@@ -39,41 +39,47 @@ struct ATHLTHCard<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        content
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(
-                    cornerRadius: ATHLTHTheme.cornerRadius,
-                    style: .continuous
-                )
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.card,
-                            ATHLTHTheme.cardWarm.opacity(0.62)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            }
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: ATHLTHTheme.cornerRadius,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white.opacity(0.72),
-                    lineWidth: 0.8
-                )
-            }
-            .shadow(
-                color: ATHLTHTheme.accentDeep.opacity(0.075),
-                radius: 16,
-                x: 0,
-                y: 7
+        // Always render the card's ViewBuilder output inside one concrete
+        // container before applying the card chrome. Without this wrapper,
+        // multiple top-level children can each receive the background,
+        // border and shadow separately and look like stacked/nested cards.
+        VStack(alignment: .leading, spacing: 0) {
+            content
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(
+                cornerRadius: ATHLTHTheme.cornerRadius,
+                style: .continuous
             )
+            .fill(
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.card,
+                        ATHLTHTheme.cardWarm.opacity(0.62)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: ATHLTHTheme.cornerRadius,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.075),
+            radius: 16,
+            x: 0,
+            y: 7
+        )
     }
 }
 
