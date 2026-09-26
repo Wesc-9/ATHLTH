@@ -5491,6 +5491,203 @@ struct CommunityGroupMembersView: View {
     }
 }
 
+private struct CommunityContentCoverPicker: View {
+    @Binding var selectedPhoto: PhotosPickerItem?
+    @Binding var imageData: Data?
+
+    let placeholderIcon: String
+
+    @State private var imageError: String?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Group {
+                if let imageData,
+                   let image = UIImage(data: imageData) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    LinearGradient(
+                        colors: [
+                            Color.indigo.opacity(0.18),
+                            ATHLTHTheme.cardWarm,
+                            ATHLTHTheme.canvasTop
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay {
+                        Image(systemName: placeholderIcon)
+                            .font(
+                                .system(
+                                    size: 34,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                                    .opacity(0.70)
+                            )
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 150)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme.border,
+                    lineWidth: 1
+                )
+            }
+
+            HStack(spacing: 10) {
+                PhotosPicker(
+                    selection: $selectedPhoto,
+                    matching: .images
+                ) {
+                    Label(
+                        imageData == nil
+                            ? "Choose Photo"
+                            : "Change Photo",
+                        systemImage: "photo"
+                    )
+                }
+                .buttonStyle(.bordered)
+
+                if imageData != nil {
+                    Button(
+                        "Remove",
+                        role: .destructive
+                    ) {
+                        selectedPhoto = nil
+                        imageData = nil
+                        imageError = nil
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Spacer()
+            }
+
+            if let imageError {
+                Text(imageError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+            } else {
+                Text(
+                    "Optional. ATHLTH resizes the image before upload."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+            }
+        }
+        .onChange(of: selectedPhoto) { _, item in
+            guard let item else {
+                return
+            }
+
+            Task {
+                do {
+                    guard
+                        let data = try await item
+                            .loadTransferable(
+                                type: Data.self
+                            ),
+                        let jpeg =
+                            prepareCommunityCoverImageData(
+                                data
+                            )
+                    else {
+                        imageError =
+                            "ATHLTH could not prepare that image."
+                        return
+                    }
+
+                    imageData = jpeg
+                    imageError = nil
+                } catch {
+                    imageError =
+                        error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+private func prepareCommunityCoverImageData(
+    _ data: Data
+) -> Data? {
+    guard let image = UIImage(data: data) else {
+        return nil
+    }
+
+    let maxDimension: CGFloat = 1_800
+    let longest = max(
+        image.size.width,
+        image.size.height
+    )
+    let scale = min(
+        1,
+        maxDimension / max(longest, 1)
+    )
+    let targetSize = CGSize(
+        width: max(
+            1,
+            image.size.width * scale
+        ),
+        height: max(
+            1,
+            image.size.height * scale
+        )
+    )
+
+    let format =
+        UIGraphicsImageRendererFormat.default()
+    format.scale = 1
+
+    let resized = UIGraphicsImageRenderer(
+        size: targetSize,
+        format: format
+    ).image { _ in
+        image.draw(
+            in: CGRect(
+                origin: .zero,
+                size: targetSize
+            )
+        )
+    }
+
+    if let jpeg = resized.jpegData(
+        compressionQuality: 0.82
+    ),
+    jpeg.count <= 5_242_880 {
+        return jpeg
+    }
+
+    return resized.jpegData(
+        compressionQuality: 0.62
+    )
+}
+
 struct CommunityGroupEventCreateView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var groups: CommunityGroupStore
@@ -5500,38 +5697,65 @@ struct CommunityGroupEventCreateView: View {
     @State private var title = ""
     @State private var summary = ""
     @State private var activityType = "running"
-    @State private var startsAt = Date().addingTimeInterval(3600)
+    @State private var startsAt =
+        Date().addingTimeInterval(3600)
     @State private var meetingName = ""
+    @State private var selectedPhoto:
+        PhotosPickerItem?
+    @State private var imageData: Data?
     @State private var saving = false
+    @State private var creationError: String?
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Cover image") {
+                    CommunityContentCoverPicker(
+                        selectedPhoto: $selectedPhoto,
+                        imageData: $imageData,
+                        placeholderIcon:
+                            "calendar.badge.plus"
+                    )
+                }
+
                 Section("Event") {
                     TextField("Title", text: $title)
-                    TextField("Description", text: $summary, axis: .vertical)
-                        .lineLimit(2...5)
+                    TextField(
+                        "Description",
+                        text: $summary,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
 
-                    Picker("Activity", selection: $activityType) {
+                    Picker(
+                        "Activity",
+                        selection: $activityType
+                    ) {
                         Text("Run").tag("running")
                         Text("Walk").tag("walking")
                         Text("Strength").tag("strength")
                         Text("Cycling").tag("cycling")
                         Text("Hike").tag("hike")
-                        Text("Group workout").tag("group_workout")
+                        Text("Group workout")
+                            .tag("group_workout")
                         Text("Other").tag("other")
                     }
 
                     DatePicker(
                         "Starts",
                         selection: $startsAt,
-                        in: Date()...,
-                        displayedComponents: [.date, .hourAndMinute]
+                        displayedComponents: [
+                            .date,
+                            .hourAndMinute
+                        ]
                     )
                 }
 
                 Section("Meet") {
-                    TextField("Meeting point", text: $meetingName)
+                    TextField(
+                        "Meeting point (optional)",
+                        text: $meetingName
+                    )
                 }
 
                 Section {
@@ -5546,32 +5770,76 @@ struct CommunityGroupEventCreateView: View {
             .navigationTitle("Group Event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Creating…" : "Create") {
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        saving
+                            ? "Creating…"
+                            : "Create"
+                    ) {
                         Task {
                             saving = true
-                            let ok = await groups.createEvent(
-                                groupID: group.id,
-                                title: title,
-                                summary: summary,
-                                activityType: activityType,
-                                startsAt: startsAt,
-                                meetingName: meetingName
-                            )
+
+                            let ok =
+                                await groups.createEvent(
+                                    groupID: group.id,
+                                    title: title,
+                                    summary: summary,
+                                    activityType:
+                                        activityType,
+                                    startsAt: startsAt,
+                                    meetingName:
+                                        meetingName,
+                                    imageData: imageData
+                                )
+
                             saving = false
-                            if ok { dismiss() }
+
+                            if ok {
+                                dismiss()
+                            } else {
+                                creationError =
+                                    groups.errorMessage
+                                    ?? "ATHLTH could not create the event."
+                            }
                         }
                     }
                     .disabled(
-                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                        meetingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        title
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty ||
                         saving
                     )
                 }
+            }
+            .alert(
+                "Could Not Create Event",
+                isPresented: Binding(
+                    get: {
+                        creationError != nil
+                    },
+                    set: {
+                        if !$0 {
+                            creationError = nil
+                        }
+                    }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(creationError ?? "")
             }
         }
     }
@@ -5585,42 +5853,81 @@ struct CommunityGroupChallengeCreateView: View {
 
     @State private var title = ""
     @State private var summary = ""
-    @State private var metric: CommunityGroupChallengeMetric = .distanceKM
+    @State private var metric:
+        CommunityGroupChallengeMetric = .distanceKM
     @State private var target = "100"
     @State private var startsAt = Date()
-    @State private var endsAt = Calendar.current.date(
-        byAdding: .day,
-        value: 7,
-        to: Date()
-    ) ?? Date().addingTimeInterval(604800)
+    @State private var endsAt =
+        Calendar.current.date(
+            byAdding: .day,
+            value: 7,
+            to: Date()
+        ) ?? Date().addingTimeInterval(604800)
+    @State private var selectedPhoto:
+        PhotosPickerItem?
+    @State private var imageData: Data?
     @State private var saving = false
+    @State private var creationError: String?
 
     private var targetValue: Double? {
         Double(
             target
-                .replacingOccurrences(of: ",", with: ".")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(
+                    of: ",",
+                    with: "."
+                )
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
         )
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Challenge") {
-                    TextField("Title", text: $title)
-                    TextField("Description", text: $summary, axis: .vertical)
-                        .lineLimit(2...5)
+                Section("Cover image") {
+                    CommunityContentCoverPicker(
+                        selectedPhoto: $selectedPhoto,
+                        imageData: $imageData,
+                        placeholderIcon: "bolt.fill"
+                    )
+                }
 
-                    Picker("Metric", selection: $metric) {
-                        ForEach(CommunityGroupChallengeMetric.allCases) {
-                            Label($0.title, systemImage: $0.icon)
-                                .tag($0)
+                Section("Challenge") {
+                    TextField(
+                        "Title",
+                        text: $title
+                    )
+                    TextField(
+                        "Description",
+                        text: $summary,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+
+                    Picker(
+                        "Metric",
+                        selection: $metric
+                    ) {
+                        ForEach(
+                            CommunityGroupChallengeMetric
+                                .allCases
+                        ) {
+                            Label(
+                                $0.title,
+                                systemImage: $0.icon
+                            )
+                            .tag($0)
                         }
                     }
 
                     HStack {
-                        TextField("Target", text: $target)
-                            .keyboardType(.decimalPad)
+                        TextField(
+                            "Target",
+                            text: $target
+                        )
+                        .keyboardType(.decimalPad)
+
                         Text(metric.unit)
                             .foregroundStyle(.secondary)
                     }
@@ -5630,13 +5937,20 @@ struct CommunityGroupChallengeCreateView: View {
                     DatePicker(
                         "Starts",
                         selection: $startsAt,
-                        displayedComponents: [.date, .hourAndMinute]
+                        displayedComponents: [
+                            .date,
+                            .hourAndMinute
+                        ]
                     )
+
                     DatePicker(
                         "Ends",
                         selection: $endsAt,
                         in: startsAt...,
-                        displayedComponents: [.date, .hourAndMinute]
+                        displayedComponents: [
+                            .date,
+                            .hourAndMinute
+                        ]
                     )
                 }
 
@@ -5652,34 +5966,82 @@ struct CommunityGroupChallengeCreateView: View {
             .navigationTitle("Group Challenge")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Creating…" : "Create") {
-                        guard let targetValue else { return }
+
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        saving
+                            ? "Creating…"
+                            : "Create"
+                    ) {
+                        guard let targetValue else {
+                            return
+                        }
+
                         Task {
                             saving = true
-                            let ok = await groups.createChallenge(
-                                groupID: group.id,
-                                title: title,
-                                summary: summary,
-                                metric: metric,
-                                targetValue: targetValue,
-                                startsAt: startsAt,
-                                endsAt: endsAt
-                            )
+
+                            let ok =
+                                await groups.createChallenge(
+                                    groupID: group.id,
+                                    title: title,
+                                    summary: summary,
+                                    metric: metric,
+                                    targetValue:
+                                        targetValue,
+                                    startsAt: startsAt,
+                                    endsAt: endsAt,
+                                    imageData: imageData
+                                )
+
                             saving = false
-                            if ok { dismiss() }
+
+                            if ok {
+                                dismiss()
+                            } else {
+                                creationError =
+                                    groups.errorMessage
+                                    ?? "ATHLTH could not create the challenge."
+                            }
                         }
                     }
                     .disabled(
-                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        title
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty ||
                         (targetValue ?? 0) <= 0 ||
                         endsAt <= startsAt ||
                         saving
                     )
                 }
+            }
+            .alert(
+                "Could Not Create Challenge",
+                isPresented: Binding(
+                    get: {
+                        creationError != nil
+                    },
+                    set: {
+                        if !$0 {
+                            creationError = nil
+                        }
+                    }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(creationError ?? "")
             }
         }
     }
