@@ -3140,9 +3140,7 @@ struct CommunityGroupDetailView: View {
                         let sent = await groups.sendMessage(
                             groupID: group.id,
                             senderName:
-                                session.profile.username.isEmpty
-                                    ? session.profile.displayName
-                                    : "@\(session.profile.username)",
+                                session.profile.displayName,
                             body: body
                         )
                         if !sent {
