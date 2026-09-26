@@ -3192,6 +3192,8 @@ struct ATHLTHTrainView: View {
 
     @ViewBuilder
     private var libraryContent: some View {
+        exerciseLibraryShowcase
+
         TrainingPlanManagerView {
             selectedSection = 1
         }
@@ -3307,22 +3309,185 @@ struct ATHLTHTrainView: View {
                 }
                 .buttonStyle(.plain)
 
-                NavigationLink {
-                    ExerciseLibraryView()
-                } label: {
-                    libraryRow(
-                        title: "Exercise Library",
-                        subtitle: exerciseLibrary.repDBExercises.isEmpty
-                            ? "Strength exercises and your own custom movements"
-                            : "\(exerciseLibrary.repDBExercises.count) exercises · use them to build strength workouts",
-                        icon: "dumbbell.fill",
-                        tint: .purple
-                    )
-                }
-                .buttonStyle(.plain)
             }
             .padding(.top, 10)
         }
+    }
+
+    private var featuredExercises: [ExerciseLibraryEntry] {
+        Array(exerciseLibrary.allExercises.prefix(4))
+    }
+
+    private var exerciseMuscleFilters: [String] {
+        Array(exerciseLibrary.bodyParts.prefix(7))
+    }
+
+    private var exerciseLibraryShowcase: some View {
+        ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Exercises")
+                        .font(.title3.weight(.bold))
+
+                    Text(
+                        exerciseLibrary.allExercises.isEmpty
+                            ? "Browse strength exercises by muscle group and equipment."
+                            : "\(exerciseLibrary.allExercises.count) exercises available"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                NavigationLink {
+                    ExerciseLibraryView()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("See All")
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    NavigationLink {
+                        ExerciseLibraryView()
+                    } label: {
+                        exerciseFilterChip("All")
+                    }
+                    .buttonStyle(.plain)
+
+                    ForEach(exerciseMuscleFilters, id: \.self) { part in
+                        NavigationLink {
+                            ExerciseLibraryView(
+                                initialBodyPart: part
+                            )
+                        } label: {
+                            exerciseFilterChip(part)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.top, 12)
+
+            if exerciseLibrary.isLoading &&
+                exerciseLibrary.allExercises.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView("Loading exercises…")
+                        .controlSize(.small)
+                    Spacer()
+                }
+                .padding(.vertical, 24)
+            } else if featuredExercises.isEmpty {
+                NavigationLink {
+                    ExerciseLibraryView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "dumbbell.fill")
+                            .foregroundStyle(ATHLTHTheme.accent)
+
+                        Text("Open the exercise library")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.top, 12)
+                }
+                .buttonStyle(.plain)
+            } else {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    ForEach(featuredExercises) { entry in
+                        NavigationLink {
+                            ExerciseDetailView(
+                                entry: entry,
+                                selectionTitle: nil,
+                                onSelect: nil
+                            )
+                        } label: {
+                            exercisePreviewTile(entry)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 12)
+            }
+        }
+        .task {
+            await exerciseLibrary.refresh()
+        }
+    }
+
+    private func exerciseFilterChip(
+        _ title: String
+    ) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(
+                ATHLTHTheme.accentSoft.opacity(0.75),
+                in: Capsule()
+            )
+    }
+
+    private func exercisePreviewTile(
+        _ entry: ExerciseLibraryEntry
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ExerciseArtwork(
+                entry: entry,
+                size: 58
+            )
+
+            Text(entry.name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+
+            Text(
+                [
+                    entry.bodyPart,
+                    entry.exercise.equipment.first
+                ]
+                .compactMap { $0 }
+                .joined(separator: " · ")
+            )
+            .font(.system(size: 10.5))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 128,
+            alignment: .leading
+        )
+        .padding(12)
+        .background(
+            Color.primary.opacity(0.025),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
     }
 
     private func libraryRow(
