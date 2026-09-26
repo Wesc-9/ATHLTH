@@ -233,111 +233,236 @@ struct HomeGettingStartedCard: View {
     let hasPlan: Bool
     let hasGoal: Bool
     let hasEditedProfile: Bool
-    let onDismiss: () -> Void
 
+    @AppStorage("homeGettingStartedProfileTipDismissed")
+    private var profileTipDismissed = false
+    @AppStorage("homeGettingStartedPlanTipDismissed")
+    private var planTipDismissed = false
+    @AppStorage("homeGettingStartedGoalTipDismissed")
+    private var goalTipDismissed = false
+
+    private var allComplete: Bool {
+        hasEditedProfile && hasPlan && hasGoal
+    }
+
+    private var hasVisibleTips: Bool {
+        !profileTipDismissed ||
+        !planTipDismissed ||
+        !goalTipDismissed
+    }
+
+    @ViewBuilder
     var body: some View {
-        ATHLTHCard {
+        if !allComplete && hasVisibleTips {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Make ATHLTH Yours")
-                            .font(.title3.weight(.bold))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Getting started")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        Text(
-                            "A few quick ways to make ATHLTH feel more like yours."
+                    Text(
+                        "Complete a few essentials to make ATHLTH yours."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .padding(.horizontal, 4)
+
+                if !profileTipDismissed {
+                    gettingStartedTip(
+                        eyebrow: "PROFILE",
+                        title: "Edit your profile",
+                        detail:
+                            "Add your training identity, photo and bio.",
+                        icon: "person.crop.circle.badge.pencil",
+                        tint: ATHLTHTheme.accent,
+                        complete: hasEditedProfile,
+                        destination: AnyView(
+                            ATHLTHEditProfileView()
                         )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    ) {
+                        dismissProfileTip()
                     }
-
-                    Spacer()
-
-                    Button {
-                        onDismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .frame(width: 28, height: 28)
-                            .background(
-                                Color.primary.opacity(0.045),
-                                in: Circle()
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Dismiss setup tips")
                 }
 
-                VStack(spacing: 9) {
-                    setupRow(
-                        title: "Create a training plan",
+                if !planTipDismissed {
+                    gettingStartedTip(
+                        eyebrow: "TRAINING PLAN",
+                        title: "Build your training plan",
+                        detail:
+                            "Organize your week and plan your workouts ahead.",
+                        icon: "calendar.badge.clock",
+                        tint: ATHLTHTheme.accentDeep,
                         complete: hasPlan,
                         destination: AnyView(
-                            AdvancedPlannerView(onOpenPrograms: {})
+                            AdvancedPlannerView(
+                                onOpenPrograms: {}
+                            )
                         )
-                    )
+                    ) {
+                        dismissPlanTip()
+                    }
+                }
 
-                    setupRow(
+                if !goalTipDismissed {
+                    gettingStartedTip(
+                        eyebrow: "GOALS",
                         title: "Set your first goal",
+                        detail:
+                            "Set a target and let ATHLTH track your progress.",
+                        icon: "target",
+                        tint: .green,
                         complete: hasGoal,
-                        destination: AnyView(GoalsHubView())
-                    )
-
-                    setupRow(
-                        title: "Edit your profile",
-                        complete: hasEditedProfile,
-                        destination: AnyView(ATHLTHEditProfileView())
-                    )
+                        destination: AnyView(
+                            GoalCreationView()
+                        )
+                    ) {
+                        dismissGoalTip()
+                    }
                 }
             }
-        }
-    }
-
-    private func setupRow(
-        title: String,
-        complete: Bool,
-        destination: AnyView
-    ) -> some View {
-        NavigationLink {
-            destination
-        } label: {
-            HStack(spacing: 11) {
-                Image(
-                    systemName:
-                        complete
-                            ? "checkmark.circle.fill"
-                            : "circle"
+            .transition(
+                .opacity.combined(
+                    with: .move(edge: .top)
                 )
-                .foregroundStyle(
-                    complete
-                        ? ATHLTHTheme.vitality
-                        : ATHLTHTheme.mutedText
-                )
-
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                Spacer()
-
-                if !complete {
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 44)
-            .background(
-                Color.primary.opacity(0.028),
-                in: RoundedRectangle(cornerRadius: 13)
             )
         }
-        .buttonStyle(.plain)
-        .disabled(complete)
     }
 
+    private func gettingStartedTip(
+        eyebrow: String,
+        title: String,
+        detail: String,
+        icon: String,
+        tint: Color,
+        complete: Bool,
+        destination: AnyView,
+        onDismiss: @escaping () -> Void
+    ) -> some View {
+        ATHLTHCard {
+            ZStack(alignment: .topTrailing) {
+                NavigationLink {
+                    destination
+                } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: icon)
+                            .font(
+                                .system(
+                                    size: 20,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(tint)
+                            .frame(width: 48, height: 48)
+                            .background(
+                                tint.opacity(0.10),
+                                in: RoundedRectangle(
+                                    cornerRadius: 15,
+                                    style: .continuous
+                                )
+                            )
 
+                        VStack(
+                            alignment: .leading,
+                            spacing: 4
+                        ) {
+                            Text(eyebrow)
+                                .font(
+                                    .system(
+                                        size: 9,
+                                        weight: .bold
+                                    )
+                                )
+                                .tracking(1.2)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+
+                            Text(title)
+                                .font(.headline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(
+                                    .leading
+                                )
+                                .fixedSize(
+                                    horizontal: false,
+                                    vertical: true
+                                )
+                        }
+
+                        Spacer(minLength: 36)
+
+                        Image(
+                            systemName: complete
+                                ? "checkmark.circle.fill"
+                                : "plus.circle.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 22,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            complete
+                                ? ATHLTHTheme.vitality
+                                : tint
+                        )
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(title)
+
+                Button {
+                    withAnimation(
+                        .easeInOut(duration: 0.20)
+                    ) {
+                        onDismiss()
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(
+                            .system(
+                                size: 10,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .frame(width: 26, height: 26)
+                        .background(
+                            .ultraThinMaterial,
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .offset(x: 6, y: -6)
+                .accessibilityLabel(
+                    "Dismiss \(title) tip"
+                )
+            }
+        }
+    }
+
+    private func dismissProfileTip() {
+        profileTipDismissed = true
+    }
+
+    private func dismissPlanTip() {
+        planTipDismissed = true
+    }
+
+    private func dismissGoalTip() {
+        goalTipDismissed = true
+    }
 }
 
 struct HomeHappeningCard: View {
