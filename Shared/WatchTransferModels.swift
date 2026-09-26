@@ -143,6 +143,8 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
     var distanceMeters: Double?
     var durationSeconds: TimeInterval?
     var intensityText: String?
+    var targetPaceMinSecondsPerKilometer: Double? = nil
+    var targetPaceMaxSecondsPerKilometer: Double? = nil
 }
 
 struct WatchRunningWorkoutTransfer: Codable, Hashable {
