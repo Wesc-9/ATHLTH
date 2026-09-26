@@ -44,6 +44,12 @@ final class ATHLTHNotificationStore: ObservableObject {
                 return preferenceEnabled("settings.mentionNotifications")
             }
 
+            // Group events are only created by the backend when the
+            // per-group All / Important / Muted preference allows them.
+            if eventKind.hasPrefix("group_") {
+                return true
+            }
+
             if eventKind.contains("message") || eventKind.contains("dm") {
                 return preferenceEnabled("settings.messageNotifications")
             }
