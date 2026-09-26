@@ -230,6 +230,13 @@ struct RunningWorkoutLibraryView: View {
                     )
                 }
 
+                if let duration = workout.estimatedDurationSeconds {
+                    Label(
+                        "\(Int((duration / 60).rounded())) min",
+                        systemImage: "timer"
+                    )
+                }
+
                 Spacer()
 
                 Image(systemName: "chevron.right")
@@ -320,22 +327,6 @@ struct RunningWorkoutDetailView: View {
                     .tint(ATHLTHTheme.accent)
                 }
 
-                if let onSelect {
-                    Button {
-                        onSelect(workout)
-                        dismiss()
-                    } label: {
-                        Label(
-                            selectionTitle ?? "Use Workout",
-                            systemImage: "plus.circle.fill"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(ATHLTHTheme.accent)
-                }
-
                 if workout.isBuiltIn {
                     Button {
                         _ = library.duplicate(workout)
@@ -356,6 +347,34 @@ struct RunningWorkoutDetailView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Running Workout")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let onSelect {
+                VStack(spacing: 0) {
+                    Divider()
+                        .opacity(0.35)
+
+                    Button {
+                        onSelect(workout)
+                        dismiss()
+                    } label: {
+                        Label(
+                            selectionTitle ?? "Use Workout",
+                            systemImage: "plus.circle.fill"
+                        )
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 50)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(ATHLTHTheme.accent)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 8)
+                }
+                .background(.ultraThinMaterial)
+            }
+        }
         .confirmationDialog(
             "Delete this running workout?",
             isPresented: $showingDelete,
