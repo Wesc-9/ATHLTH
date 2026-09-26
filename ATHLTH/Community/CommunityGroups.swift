@@ -3838,6 +3838,23 @@ struct CommunityGroupDetailView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
 
+                                    if let configuration =
+                                        event.activityConfiguration {
+                                        Text(
+                                            configuration
+                                                .compactSummary
+                                        )
+                                        .font(
+                                            .caption
+                                                .weight(.semibold)
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .accentDeep
+                                        )
+                                        .lineLimit(2)
+                                    }
+
                                     if !event.summary.isEmpty {
                                         Text(event.summary)
                                             .font(.caption)
@@ -4164,6 +4181,15 @@ struct CommunityGroupDetailView: View {
                 )
                 .font(.caption.weight(.bold))
                 .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+
+            if let configuration =
+                challenge.activityConfiguration {
+                Text(configuration.compactSummary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
             }
 
             ProgressView(value: fraction)
