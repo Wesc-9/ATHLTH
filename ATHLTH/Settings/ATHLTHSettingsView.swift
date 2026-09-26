@@ -1161,7 +1161,7 @@ private struct AppleCalendarSettingsView: View {
                                 Label(
                                     calendarSync.hasFullAccess
                                         ? "Sync Now"
-                                        : "Connect Apple Calendar",
+                                        : "Connect Calendar",
                                     systemImage: calendarSync.hasFullAccess
                                         ? "arrow.triangle.2.circlepath"
                                         : "calendar.badge.plus"
