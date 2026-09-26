@@ -284,12 +284,25 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
     }
 
     func isCompleted(_ challengeID: UUID) -> Bool {
-        guard let userID = client.auth.currentUser?.id else { return false }
+        currentParticipant(for: challengeID)?.completedAt != nil
+    }
 
-        return participants.contains {
+    func completionValue(for challengeID: UUID) -> Double? {
+        currentParticipant(for: challengeID)?.completionValue
+    }
+
+    func completionDate(for challengeID: UUID) -> Date? {
+        currentParticipant(for: challengeID)?.completedAt
+    }
+
+    private func currentParticipant(
+        for challengeID: UUID
+    ) -> OfficialWeeklyChallengeParticipant? {
+        guard let userID = client.auth.currentUser?.id else { return nil }
+
+        return participants.first {
             $0.challengeID == challengeID &&
-            $0.userID == userID &&
-            $0.completedAt != nil
+            $0.userID == userID
         }
     }
 
@@ -681,9 +694,18 @@ struct OfficialWeeklyChallengeCard: View {
     }
 
     private var progress: Double {
-        OfficialWeeklyChallengeProgress.fraction(
-            challenge: challenge,
-            workouts: health.workouts
+        let localValue =
+            OfficialWeeklyChallengeProgress.currentValue(
+                challenge: challenge,
+                workouts: health.workouts
+            )
+        let storedValue =
+            store.completionValue(for: challenge.id) ?? 0
+
+        return min(
+            max(localValue, storedValue) /
+                max(challenge.targetValue, 0.0001),
+            1
         )
     }
 
@@ -969,17 +991,15 @@ struct OfficialWeeklyChallengeDetailView: View {
                                 .font(.headline)
 
                             ProgressView(
-                                value: OfficialWeeklyChallengeProgress.fraction(
-                                    challenge: challenge,
-                                    workouts: health.workouts
+                                value: resolvedProgress(
+                                    for: challenge
                                 )
                             )
                             .tint(ATHLTHTheme.vitality)
 
                             Text(
-                                OfficialWeeklyChallengeProgress.valueText(
-                                    challenge: challenge,
-                                    workouts: health.workouts
+                                resolvedProgressText(
+                                    for: challenge
                                 )
                             )
                             .font(.title3.bold())
@@ -1092,6 +1112,53 @@ struct OfficialWeeklyChallengeDetailView: View {
                     )
                 )
             }
+        }
+    }
+
+    private func resolvedProgress(
+        for challenge: OfficialWeeklyChallenge
+    ) -> Double {
+        let localValue =
+            OfficialWeeklyChallengeProgress.currentValue(
+                challenge: challenge,
+                workouts: health.workouts
+            )
+        let storedValue =
+            store.completionValue(for: challenge.id) ?? 0
+
+        return min(
+            max(localValue, storedValue) /
+                max(challenge.targetValue, 0.0001),
+            1
+        )
+    }
+
+    private func resolvedProgressText(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        let localValue =
+            OfficialWeeklyChallengeProgress.currentValue(
+                challenge: challenge,
+                workouts: health.workouts
+            )
+        let value = max(
+            localValue,
+            store.completionValue(for: challenge.id) ?? 0
+        )
+
+        switch challenge.kind {
+        case .distance:
+            return String(
+                format: "%.1f / %.0f km",
+                value,
+                challenge.targetValue
+            )
+        case .sessions:
+            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) workouts"
+        case .minutes:
+            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) min"
+        case .streak:
+            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) days"
         }
     }
 }
