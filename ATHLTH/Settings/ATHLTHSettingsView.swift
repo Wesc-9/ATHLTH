@@ -200,7 +200,7 @@ struct ATHLTHSettingsView: View {
                                         icon: "calendar",
                                         iconTint: .red,
                                         iconBackground: Color.red.opacity(0.09),
-                                        title: "Apple Calendar",
+                                        title: "Calendar",
                                         subtitle: appleCalendarConnectionSubtitle
                                     ) {
                                         connectionTrailing(
@@ -225,9 +225,9 @@ struct ATHLTHSettingsView: View {
                                         icon: "calendar",
                                         iconTint: .red,
                                         iconBackground: Color.red.opacity(0.09),
-                                        title: "Apple Calendar",
+                                        title: "Calendar",
                                         subtitle:
-                                            "ATHLTH+ · sync your training plan to Apple Calendar"
+                                            "ATHLTH+ · sync your training plan to Calendar"
                                     ) {
                                         HStack(spacing: 7) {
                                             Text("ATHLTH+")
@@ -911,7 +911,7 @@ struct ATHLTHSettingsView: View {
         }
 
         if calendarSync.hasFullAccess {
-            return "Apple Calendar connected · training plan sync is off"
+            return "Calendar connected · training plan sync is off"
         }
 
         return "Sync planned workouts to a dedicated ATHLTH calendar"
@@ -1015,7 +1015,7 @@ private struct AppleCalendarSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionTitle("APPLE CALENDAR")
+                    sectionTitle("CALENDAR")
 
                     PremiumSettingsCard {
                         HStack(spacing: 14) {
@@ -1072,7 +1072,7 @@ private struct AppleCalendarSettingsView: View {
                                     .font(.system(size: 16.5, weight: .medium))
                                     .foregroundStyle(ATHLTHTheme.primaryText)
 
-                                Text("Keep your active ATHLTH plan in Apple Calendar.")
+                                Text("Keep your active ATHLTH plan in Calendar.")
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                             }
@@ -1252,7 +1252,7 @@ private struct AppleCalendarSettingsView: View {
                                 icon: "arrow.right",
                                 title: "One-way sync",
                                 text:
-                                    "ATHLTH remains the source of truth. Changes made directly in Apple Calendar do not edit your training plan."
+                                    "ATHLTH remains the source of truth. Changes made directly in Calendar do not edit your training plan."
                             )
                         }
                     }
@@ -1283,7 +1283,7 @@ private struct AppleCalendarSettingsView: View {
                         }
 
                         Text(
-                            "Turning sync off keeps the calendar and its current events. Removing the calendar deletes the dedicated ATHLTH calendar from Apple Calendar."
+                            "Turning sync off keeps the calendar and its current events. Removing the calendar deletes the dedicated ATHLTH calendar."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1309,7 +1309,7 @@ private struct AppleCalendarSettingsView: View {
             )
             .ignoresSafeArea()
         )
-        .navigationTitle("Apple Calendar")
+        .navigationTitle("Calendar")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             calendarSync.refreshAuthorizationStatus()
@@ -1345,7 +1345,7 @@ private struct AppleCalendarSettingsView: View {
             )
         }
         .alert(
-            "Apple Calendar",
+            "Calendar",
             isPresented: Binding(
                 get: {
                     calendarSync.errorMessage != nil
@@ -1361,7 +1361,7 @@ private struct AppleCalendarSettingsView: View {
         } message: {
             Text(
                 calendarSync.errorMessage ??
-                "Apple Calendar could not be updated."
+                "Calendar could not be updated."
             )
         }
     }
