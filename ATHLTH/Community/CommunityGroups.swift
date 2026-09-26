@@ -4662,6 +4662,13 @@ struct CommunityGroupDetailView: View {
             return "\(Int(value.rounded())) workouts"
         case .activeMinutes:
             return "\(Int(value.rounded())) min"
+        case .fastestTime:
+            let seconds = max(Int(value.rounded()), 0)
+            return String(
+                format: "%d:%02d",
+                seconds / 60,
+                seconds % 60
+            )
         }
     }
 
@@ -4676,6 +4683,8 @@ struct CommunityGroupDetailView: View {
             return "\(Int(value.rounded())) workouts"
         case .activeMinutes:
             return "\(Int(value.rounded())) min"
+        case .fastestTime:
+            return "Fastest time"
         }
     }
 }
