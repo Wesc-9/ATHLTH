@@ -253,7 +253,7 @@ struct ATHLTHHomeView: View {
                         HomeGettingStartedCard(
                             hasPlan: session.activePlan != nil,
                             hasGoal: !goalStore.activeGoals.isEmpty,
-                            hasEditedProfile: hasEditedATHLTHProfile
+                            hasEditedProfile: hasCompletedProfileSetup
                         ) {
                             withAnimation(.easeInOut(duration: 0.22)) {
                                 homeGettingStartedDismissed = true
@@ -1144,6 +1144,16 @@ struct ATHLTHHomeView: View {
         return "\(days) days"
     }
 
+    private var hasCompletedProfileSetup: Bool {
+        let hasBio = !session.profile.bio
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+
+        return hasEditedATHLTHProfile ||
+            hasBio ||
+            session.profile.avatarURL != nil
+    }
+
     private var shouldShowGettingStarted: Bool {
         guard !homeGettingStartedDismissed else {
             return false
@@ -1152,7 +1162,7 @@ struct ATHLTHHomeView: View {
         let allSetupGoalsComplete =
             session.activePlan != nil &&
             !goalStore.activeGoals.isEmpty &&
-            hasEditedATHLTHProfile
+            hasCompletedProfileSetup
 
         return !allSetupGoalsComplete
     }
