@@ -130,6 +130,61 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     )
 }
 
+enum WatchAlertDelivery: String, Codable, CaseIterable, Hashable {
+    case haptic
+    case voice
+    case both
+
+    var title: String {
+        switch self {
+        case .haptic: return "Haptic"
+        case .voice: return "Voice"
+        case .both: return "Haptic + Voice"
+        }
+    }
+
+    var usesHaptics: Bool {
+        self == .haptic || self == .both
+    }
+
+    var usesVoice: Bool {
+        self == .voice || self == .both
+    }
+}
+
+struct WatchRouteAlertConfiguration: Codable, Hashable {
+    var enabled: Bool
+    var deviationMeters: Double
+    var graceSeconds: TimeInterval
+    var repeatSeconds: TimeInterval
+    var delivery: WatchAlertDelivery
+    var announceBackOnRoute: Bool
+
+    static let standard = WatchRouteAlertConfiguration(
+        enabled: true,
+        deviationMeters: 80,
+        graceSeconds: 10,
+        repeatSeconds: 120,
+        delivery: .both,
+        announceBackOnRoute: true
+    )
+}
+
+struct WatchWorkoutTargetAlertConfiguration: Codable, Hashable {
+    var heartRateEnabled: Bool
+    var heartRateZone: Int?
+    var heartRateMinimumBPM: Double?
+    var heartRateMaximumBPM: Double?
+
+    var paceAlertsEnabled: Bool
+    var paceToleranceSecondsPerKilometer: Double
+
+    var graceSeconds: TimeInterval
+    var repeatSeconds: TimeInterval
+    var delivery: WatchAlertDelivery
+    var announceBackInTarget: Bool
+}
+
 enum WatchRunningStepMeasure: String, Codable, Hashable {
     case distance
     case time
@@ -150,6 +205,8 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
 struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var title: String
     var steps: [WatchRunningWorkoutStep]
+    var routeAlerts: WatchRouteAlertConfiguration? = nil
+    var targetAlerts: WatchWorkoutTargetAlertConfiguration? = nil
 }
 
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
