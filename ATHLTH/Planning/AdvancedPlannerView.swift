@@ -1263,6 +1263,7 @@ struct AllTrainingPlansView: View {
 
     @State private var showingCreatePlan = false
     @State private var editingPlan: TrainingPlan?
+    @State private var planToOpen: TrainingPlan?
     @State private var planPendingDeletion: TrainingPlan?
 
     private var activePlans: [TrainingPlan] {
@@ -1365,6 +1366,23 @@ struct AllTrainingPlansView: View {
             }
             .sheet(item: $editingPlan) { plan in
                 PlanMetadataEditorView(plan: plan)
+            }
+            .sheet(item: $planToOpen) { plan in
+                NavigationStack {
+                    ScrollView {
+                        AdvancedPlannerView(
+                            planID: plan.id
+                        )
+                        .padding()
+                    }
+                    .background(
+                        ATHLTHPremiumCanvas(
+                            accent: ATHLTHTheme.accent.opacity(0.45)
+                        )
+                    )
+                    .navigationTitle(plan.title)
+                    .navigationBarTitleDisplayMode(.inline)
+                }
             }
             .confirmationDialog(
                 planPendingDeletion.map {
@@ -1513,20 +1531,24 @@ struct AllTrainingPlansView: View {
                 .buttonBorderShape(.circle)
             }
 
-            if status == .active {
-                Button {
+            Button {
+                if status == .active {
                     dismiss()
-                } label: {
-                    Label(
-                        "Open Current Plan",
-                        systemImage: "arrow.right"
-                    )
-                    .font(.caption.weight(.semibold))
+                } else {
+                    planToOpen = plan
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(ATHLTHTheme.accent)
-                .padding(.top, 10)
+            } label: {
+                Label(
+                    status == .active
+                        ? "Open Current Plan"
+                        : "Open Plan",
+                    systemImage: "arrow.right"
+                )
+                .font(.caption.weight(.semibold))
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(ATHLTHTheme.accent)
+            .padding(.top, 10)
         }
     }
 
