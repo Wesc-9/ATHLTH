@@ -359,6 +359,11 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     // per-workout Audio Coach override.
     var audioCoachConfiguration: WatchAudioCoachConfiguration? = nil
 
+    // Optional per-workout live target alerts. Route-deviation alerts stay
+    // global in Settings; heart-rate / pace targets belong to the workout.
+    var targetAlertConfiguration:
+        WatchWorkoutTargetAlertConfiguration? = nil
+
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil
 
