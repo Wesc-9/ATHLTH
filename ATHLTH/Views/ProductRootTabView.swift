@@ -4469,7 +4469,6 @@ struct ATHLTHRecoveryView: View {
                                 selectedRecoveryTool = tool
                             }
 
-                            baselineCard
                             recoveryMethodCard
                         } else {
                             recoveryUnavailableCard
@@ -4696,44 +4695,6 @@ struct ATHLTHRecoveryView: View {
         }
     }
 
-    private var baselineCard: some View {
-        ATHLTHCard {
-            ATHLTHSectionHeader(
-                title: "Baseline",
-                actionTitle: health.recovery.baselineDays > 0
-                    ? "\(health.recovery.baselineDays) days"
-                    : nil
-            )
-
-            HStack(alignment: .top, spacing: 0) {
-                baselineMetric(
-                    title: "Sleep",
-                    value: health.recovery.averageSleepDuration
-                        .map(\.shortDuration) ?? "—"
-                )
-
-                recoverySignalDivider
-
-                baselineMetric(
-                    title: "HRV",
-                    value: health.recovery.baselineHRVMilliseconds.map {
-                        "\(Int($0.rounded())) ms"
-                    } ?? "—"
-                )
-
-                recoverySignalDivider
-
-                baselineMetric(
-                    title: "Resting HR",
-                    value: health.recovery.baselineRestingHeartRate.map {
-                        "\(Int($0.rounded())) bpm"
-                    } ?? "—"
-                )
-            }
-            .padding(.top, 14)
-        }
-    }
-
     private var recoveryMethodCard: some View {
         ATHLTHCard {
             HStack(alignment: .top, spacing: 12) {
@@ -4827,27 +4788,6 @@ struct ATHLTHRecoveryView: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.78)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func baselineMetric(
-        title: String,
-        value: String
-    ) -> some View {
-        VStack(spacing: 5) {
-            Text(value)
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
