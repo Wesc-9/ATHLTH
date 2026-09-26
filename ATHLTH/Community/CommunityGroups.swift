@@ -2495,7 +2495,7 @@ struct CommunityGroupsView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .navigationTitle("Groups")
+        .navigationTitle("Clubs")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
