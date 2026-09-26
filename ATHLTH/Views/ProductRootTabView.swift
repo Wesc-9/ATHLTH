@@ -265,6 +265,8 @@ struct ATHLTHHomeView: View {
                 LazyVStack(spacing: 18) {
                     homeTodayCard
 
+                    HomeActivitySection()
+
                     HomeGettingStartedCard(
                         hasPlan: session.activePlan != nil,
                         hasGoal: !goalStore.activeGoals.isEmpty,
@@ -386,8 +388,6 @@ struct ATHLTHHomeView: View {
                     ) {
                         onSelectTab(3)
                     }
-
-                    HomeActivitySection()
 
                     HomeHappeningCard(
                         challenges: challenges.visibleChallenges,
