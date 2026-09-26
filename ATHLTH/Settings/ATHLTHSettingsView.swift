@@ -2275,6 +2275,7 @@ private struct ATHLTHNotificationSettingsView: View {
                 Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
                 Toggle("Challenges", isOn: $settings.challengeNotificationsEnabled)
                 Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
+                Toggle("Mentions", isOn: $settings.mentionNotificationsEnabled)
 
                 Text("These switches control system alerts. Events can still appear in the ATHLTH notification center so you do not lose your activity history.")
                     .font(.caption)
