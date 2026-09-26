@@ -130,10 +130,12 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     )
 }
 
-enum WatchAlertDelivery: String, Codable, CaseIterable, Hashable {
+enum WatchAlertDelivery: String, Codable, CaseIterable, Hashable, Identifiable {
     case haptic
     case voice
     case both
+
+    var id: String { rawValue }
 
     var title: String {
         switch self {
