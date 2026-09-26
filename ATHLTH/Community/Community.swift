@@ -516,6 +516,8 @@ struct ATHLTHCommunityView: View {
                         upcomingEvents: community.upcomingEvents.count
                     )
 
+                    CommunityGroupActivityPreviewCard()
+
                     CommunityLeaderboardCard(
                         currentUserID: session.profile.userID,
                         currentDisplayName: session.profile.displayName,
