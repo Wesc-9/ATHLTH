@@ -492,51 +492,57 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                     .zIndex(0)
 
                 ScrollView {
-                    content
-                        .frame(maxWidth: .infinity)
+                    // The rounded sheet is part of the scrolling content.
+                    // This lets its curved top edge move naturally with the
+                    // user's drag while the hero artwork remains behind it as
+                    // a back-layer. Keeping the ScrollView itself transparent
+                    // avoids the fixed rectangular cutoff seen previously.
+                    VStack(spacing: 0) {
+                        content
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .background {
+                        ATHLTHTopRoundedSheetShape(
+                            radius: sheetCornerRadius
+                        )
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTheme.canvasTop.opacity(0.99),
+                                    ATHLTHTheme.surfaceStone.opacity(0.98),
+                                    ATHLTHTheme.canvasBottom.opacity(0.96)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    }
+                    .clipShape(
+                        ATHLTHTopRoundedSheetShape(
+                            radius: sheetCornerRadius
+                        )
+                    )
+                    .overlay {
+                        ATHLTHTopRoundedSheetShape(
+                            radius: sheetCornerRadius
+                        )
+                        .stroke(
+                            Color.white.opacity(0.70),
+                            lineWidth: 0.8
+                        )
+                        .allowsHitTesting(false)
+                    }
+                    .shadow(
+                        color: ATHLTHTheme.accentDeep.opacity(0.075),
+                        radius: 20,
+                        x: 0,
+                        y: -4
+                    )
                 }
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
-                // The sheet surface belongs to the ScrollView itself rather
-                // than the scrolling content. This keeps the rounded top edge
-                // visually fixed when content moves underneath it.
-                .background {
-                    ATHLTHTopRoundedSheetShape(
-                        radius: sheetCornerRadius
-                    )
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                ATHLTHTheme.canvasTop.opacity(0.99),
-                                ATHLTHTheme.surfaceStone.opacity(0.98),
-                                ATHLTHTheme.canvasBottom.opacity(0.96)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                }
-                .clipShape(
-                    ATHLTHTopRoundedSheetShape(
-                        radius: sheetCornerRadius
-                    )
-                )
-                .overlay {
-                    ATHLTHTopRoundedSheetShape(
-                        radius: sheetCornerRadius
-                    )
-                    .stroke(
-                        Color.white.opacity(0.70),
-                        lineWidth: 0.8
-                    )
-                    .allowsHitTesting(false)
-                }
-                .shadow(
-                    color: ATHLTHTheme.accentDeep.opacity(0.075),
-                    radius: 20,
-                    x: 0,
-                    y: -4
-                )
+                .background(Color.clear)
                 .zIndex(1)
             }
             .ignoresSafeArea(edges: .top)
