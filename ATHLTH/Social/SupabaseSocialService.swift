@@ -573,7 +573,7 @@ final class SupabaseSocialService {
         let backendCheckIns: [BackendChallengeCheckIn] = try await client
             .from("social_challenge_checkins")
             .select()
-            .order("created_at", ascending: false)
+            .order("checked_in_at", ascending: false)
             .limit(1_000)
             .execute()
             .value
