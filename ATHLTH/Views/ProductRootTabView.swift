@@ -1984,7 +1984,11 @@ struct ATHLTHHomeView: View {
                 measure: .distance,
                 distanceMeters: distance * 1_000,
                 durationSeconds: nil,
-                intensityText: homePlannedPaceText(workout)
+                intensityText: homePlannedPaceText(workout),
+                targetPaceMinSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer,
+                targetPaceMaxSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer
             )
         } else if let minutes = workout.durationMinutes,
                   minutes > 0 {
@@ -1995,7 +1999,11 @@ struct ATHLTHHomeView: View {
                 distanceMeters: nil,
                 durationSeconds:
                     TimeInterval(minutes * 60),
-                intensityText: homePlannedPaceText(workout)
+                intensityText: homePlannedPaceText(workout),
+                targetPaceMinSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer,
+                targetPaceMaxSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer
             )
         } else {
             fallback = WatchRunningWorkoutStep(
@@ -2004,7 +2012,11 @@ struct ATHLTHHomeView: View {
                 measure: .open,
                 distanceMeters: nil,
                 durationSeconds: nil,
-                intensityText: homePlannedPaceText(workout)
+                intensityText: homePlannedPaceText(workout),
+                targetPaceMinSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer,
+                targetPaceMaxSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer
             )
         }
 
@@ -2071,7 +2083,11 @@ struct ATHLTHHomeView: View {
             intensityText:
                 homeRunningIntensityText(
                     target.intensity
-                )
+                ),
+            targetPaceMinSecondsPerKilometer:
+                target.intensity.paceMinSecondsPerKilometer,
+            targetPaceMaxSecondsPerKilometer:
+                target.intensity.paceMaxSecondsPerKilometer
         )
     }
 
