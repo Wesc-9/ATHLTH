@@ -15,6 +15,7 @@ on:
       - release/v1.3.8
       - release/v1.3.9
       - release/v1.4.0
+      - release/v1.4.1
     paths:
       - .github/build-trigger
   pull_request:
