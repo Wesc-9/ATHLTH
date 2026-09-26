@@ -181,73 +181,85 @@ struct HomeAroundYouSection: View {
                 }
             }
 
-            ZStack {
-                if let mapSnapshot {
-                    Image(uiImage: mapSnapshot)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.surfaceSage,
-                            ATHLTHTheme.cardWarm,
-                            ATHLTHTheme.canvasBottom
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-
-                    VStack(spacing: 9) {
-                        if snapshotLoading || locationStore.isUpdating {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "map.fill")
-                                .font(.title2)
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                        }
-
-                        Text(
-                            locationStore.canShowUserLocation
-                                ? "Preparing nearby preview"
-                                : "Location is needed for nearby discovery"
+            NavigationLink {
+                AroundYouExploreView(locationStore: locationStore)
+            } label: {
+                ZStack {
+                    if let mapSnapshot {
+                        Image(uiImage: mapSnapshot)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.surfaceSage,
+                                ATHLTHTheme.cardWarm,
+                                ATHLTHTheme.canvasBottom
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        VStack(spacing: 9) {
+                            if snapshotLoading || locationStore.isUpdating {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "map.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                            }
+
+                            Text(
+                                locationStore.canShowUserLocation
+                                    ? "Preparing nearby preview"
+                                    : "Location is needed for nearby discovery"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
                     }
                 }
-            }
-            .frame(height: 188)
-            .frame(maxWidth: .infinity)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
-                .stroke(Color.white.opacity(0.70), lineWidth: 1)
-            }
-            .overlay(alignment: .topLeading) {
-                HStack(spacing: 7) {
-                    Image(systemName: "location.fill")
-                    Text(
-                        locationStore.location == nil
-                            ? "Finding you…"
-                            : "You are here"
+                .frame(height: 188)
+                .frame(maxWidth: .infinity)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 20,
+                        style: .continuous
                     )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 20,
+                        style: .continuous
+                    )
+                    .stroke(Color.white.opacity(0.70), lineWidth: 1)
                 }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding(10)
+                .overlay(alignment: .topLeading) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "location.fill")
+                        Text(
+                            locationStore.location == nil
+                                ? "Finding you…"
+                                : "You are here"
+                        )
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(10)
+                }
+                .contentShape(
+                    RoundedRectangle(
+                        cornerRadius: 20,
+                        style: .continuous
+                    )
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open Around You map")
             .padding(.top, 12)
 
             HStack(spacing: 8) {
