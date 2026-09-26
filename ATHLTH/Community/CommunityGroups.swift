@@ -1006,7 +1006,12 @@ final class CommunityGroupStore: ObservableObject {
                 }
             )
             errorMessage = nil
+        } catch is CancellationError {
+            // A refresh can be cancelled when the Community view
+            // disappears or a new refresh supersedes the current one.
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
