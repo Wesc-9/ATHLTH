@@ -287,6 +287,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
     @Published var challengeNotificationsEnabled: Bool { didSet { persist() } }
     @Published var messageNotificationsEnabled: Bool { didSet { persist() } }
+    @Published var mentionNotificationsEnabled: Bool { didSet { persist() } }
 
     @Published var spotifyAutoplayLinkedPlaylists: Bool { didSet { persist() } }
 
@@ -495,6 +496,7 @@ final class AppSettingsStore: ObservableObject {
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
         challengeNotificationsEnabled = defaults.object(forKey: "settings.challengeNotifications") as? Bool ?? true
         messageNotificationsEnabled = defaults.object(forKey: "settings.messageNotifications") as? Bool ?? true
+        mentionNotificationsEnabled = defaults.object(forKey: "settings.mentionNotifications") as? Bool ?? true
 
         spotifyAutoplayLinkedPlaylists = false
         watchConnected = defaults.object(forKey: "settings.watchConnected") as? Bool ?? false
@@ -632,6 +634,7 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
         defaults.set(challengeNotificationsEnabled, forKey: "settings.challengeNotifications")
         defaults.set(messageNotificationsEnabled, forKey: "settings.messageNotifications")
+        defaults.set(mentionNotificationsEnabled, forKey: "settings.mentionNotifications")
 
         defaults.set(spotifyAutoplayLinkedPlaylists, forKey: "settings.spotifyAutoplayLinkedPlaylists")
         defaults.set(watchConnected, forKey: "settings.watchConnected")
