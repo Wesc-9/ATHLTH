@@ -525,10 +525,7 @@ struct CommunityRouteChallengeShowcaseCard: View {
                             .foregroundStyle(.secondary)
 
                             Text(
-                                "\(challenge.participants.filter {
-                                    $0.state == .creator ||
-                                    $0.state == .accepted
-                                }.count) participants"
+                                "\(participantCount(challenge)) participants"
                             )
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(
@@ -580,6 +577,15 @@ struct CommunityRouteChallengeShowcaseCard: View {
                 .padding(.top, 12)
             }
         }
+    }
+
+    private func participantCount(
+        _ challenge: ATHLTHChallenge
+    ) -> Int {
+        challenge.participants.filter {
+            $0.state == .creator ||
+            $0.state == .accepted
+        }.count
     }
 }
 
