@@ -374,13 +374,32 @@ final class CommunityEventStore: ObservableObject {
             return
         }
 
+        guard !isLoading else {
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 
         do {
-            events = try await service.loadEvents()
+            let loadedEvents = try await service.loadEvents()
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            events = loadedEvents
             errorMessage = nil
+        } catch is CancellationError {
+            // SwiftUI can legitimately cancel .task work when the view
+            // refreshes, disappears or another refresh supersedes it.
+            // This is not a user-facing Community error.
+            return
         } catch {
+            guard !Task.isCancelled else {
+                return
+            }
+
             errorMessage = error.localizedDescription
         }
     }
