@@ -19,6 +19,8 @@ struct ATHLTHEditProfileView: View {
     @State private var saving = false
     @State private var errorMessage: String?
     @State private var saved = false
+    @AppStorage("hasEditedATHLTHProfile")
+    private var hasEditedATHLTHProfile = false
 
     var body: some View {
         Form {
@@ -369,6 +371,7 @@ struct ATHLTHEditProfileView: View {
             }
 
             selectedAvatarData = nil
+            hasEditedATHLTHProfile = true
             saved = true
         } catch {
             errorMessage = error.localizedDescription
