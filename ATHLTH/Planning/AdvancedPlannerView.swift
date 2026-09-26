@@ -11,6 +11,7 @@ struct AdvancedPlannerView: View {
     @State private var showingSessionEditor = false
     @State private var showingPlanEditor = false
     @State private var showingProgramCreation = false
+    @State private var weekPendingRemoval: TrainingPlanWeek?
 
     init(onOpenPrograms: @escaping () -> Void = {}) {
         self.onOpenPrograms = onOpenPrograms
@@ -71,170 +72,255 @@ struct AdvancedPlannerView: View {
                 .environmentObject(session)
             }
         }
+        .confirmationDialog(
+            weekPendingRemoval.map {
+                "Remove W\($0.weekNumber)?"
+            } ?? "Remove week?",
+            isPresented: Binding(
+                get: { weekPendingRemoval != nil },
+                set: { presented in
+                    if !presented {
+                        weekPendingRemoval = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let week = weekPendingRemoval {
+                Button(
+                    "Remove W\(week.weekNumber)",
+                    role: .destructive
+                ) {
+                    if let plan = session.activePlan {
+                        removeWeek(week, from: plan)
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {
+                weekPendingRemoval = nil
+            }
+        } message: {
+            if let week = weekPendingRemoval {
+                let count = week.days.reduce(0) {
+                    $0 + $1.sessions.count
+                }
+
+                Text(
+                    count == 1
+                        ? "This week contains 1 planned workout. Removing the week will also remove that workout."
+                        : "This week contains \(count) planned workouts. Removing the week will also remove those workouts."
+                )
+            }
+        }
     }
 
     private func planOverview(_ plan: TrainingPlan) -> some View {
         ATHLTHCard {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.title2)
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 48, height: 48)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 15)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 48, height: 48)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 15)
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(plan.title)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(planTimelineText(plan))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if !plan.summary
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .isEmpty {
+                            Text(plan.summary)
+                                .font(.subheadline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText.opacity(0.78)
+                                )
+                                .padding(.top, 2)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showingPlanEditor = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(width: 38, height: 38)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+                    .accessibilityLabel("Edit training plan")
+                }
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.adaptive(minimum: 125), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    plannerMetric(
+                        title: "Sessions",
+                        value: "\(allSessions(in: plan).count)",
+                        icon: "figure.run"
                     )
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(plan.title)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    plannerMetric(
+                        title: "Training days",
+                        value: "\(trainingDayCount(in: plan))",
+                        icon: "calendar"
+                    )
 
-                    Text(planTimelineText(plan))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    plannerMetric(
+                        title: "Planned time",
+                        value: plannedDurationText(plan),
+                        icon: "timer"
+                    )
 
-                    if !plan.summary
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .isEmpty {
-                        Text(plan.summary)
-                            .font(.subheadline)
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText.opacity(0.78)
-                            )
-                            .padding(.top, 2)
-                    }
+                    plannerMetric(
+                        title: "Run / walk",
+                        value: plannedDistanceText(plan),
+                        icon: "point.topleft.down.to.point.bottomright.curvepath"
+                    )
                 }
-
-                Spacer()
-
-                Button {
-                    showingPlanEditor = true
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 38, height: 38)
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.circle)
-                .accessibilityLabel("Edit training plan")
             }
-
-            LazyVGrid(
-                columns: [
-                    GridItem(.adaptive(minimum: 125), spacing: 10)
-                ],
-                spacing: 10
-            ) {
-                plannerMetric(
-                    title: "Sessions",
-                    value: "\(allSessions(in: plan).count)",
-                    icon: "figure.run"
-                )
-
-                plannerMetric(
-                    title: "Training days",
-                    value: "\(trainingDayCount(in: plan))",
-                    icon: "calendar"
-                )
-
-                plannerMetric(
-                    title: "Planned time",
-                    value: plannedDurationText(plan),
-                    icon: "timer"
-                )
-
-                plannerMetric(
-                    title: "Run / walk",
-                    value: plannedDistanceText(plan),
-                    icon: "point.topleft.down.to.point.bottomright.curvepath"
-                )
-            }
-            .padding(.top, 14)
         }
     }
 
     private func weekSelector(_ plan: TrainingPlan) -> some View {
         ATHLTHCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Weeks")
-                        .font(.title3.weight(.bold))
-                    Text("Jump between weeks without leaving the planner.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Weeks")
+                            .font(.title3.weight(.bold))
+                        Text("Jump between weeks without leaving the planner.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
-                Spacer()
+                    Spacer()
 
-                Button {
-                    session.addWeekToActivePlan()
-                } label: {
-                    Label("Add", systemImage: "plus")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(plan.weeks.count >= 52)
-            }
-
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(plan.weeks) { week in
-                        let selected = selectedWeekID == week.id
-                        let count = week.days.reduce(0) {
-                            $0 + $1.sessions.count
-                        }
-
+                    HStack(spacing: 8) {
                         Button {
-                            selectedWeekID = week.id
-                            selectBestDay(in: week, plan: plan)
+                            session.addWeekToActivePlan()
                         } label: {
-                            VStack(spacing: 3) {
-                                Text("W\(week.weekNumber)")
-                                    .font(.subheadline.weight(.bold))
-
-                                Text(
-                                    count == 1
-                                        ? "1 session"
-                                        : "\(count) sessions"
-                                )
-                                .font(.system(size: 9, weight: .semibold))
-                                .opacity(0.78)
-                            }
-                            .foregroundStyle(
-                                selected ? Color.white : ATHLTHTheme.primaryText
-                            )
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 48)
-                            .background(
-                                selected
-                                    ? ATHLTHTheme.accent
-                                    : Color.primary.opacity(0.035),
-                                in: RoundedRectangle(
-                                    cornerRadius: 14,
-                                    style: .continuous
-                                )
-                            )
-                            .overlay {
-                                RoundedRectangle(
-                                    cornerRadius: 14,
-                                    style: .continuous
-                                )
-                                .stroke(
-                                    selected
-                                        ? Color.clear
-                                        : Color.black.opacity(0.045),
-                                    lineWidth: 1
-                                )
-                            }
+                            Label("Add", systemImage: "plus")
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(plan.weeks.count >= 52)
+
+                        Menu {
+                            if let week = selectedWeek(in: plan) {
+                                Button(role: .destructive) {
+                                    requestWeekRemoval(
+                                        week,
+                                        from: plan
+                                    )
+                                } label: {
+                                    Label(
+                                        "Remove W\(week.weekNumber)",
+                                        systemImage: "trash"
+                                    )
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(
+                                    .system(
+                                        size: 15,
+                                        weight: .semibold
+                                    )
+                                )
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.circle)
+                        .controlSize(.small)
+                        .disabled(plan.weeks.count <= 1)
+                        .accessibilityLabel("Week actions")
                     }
                 }
-                .padding(.vertical, 2)
+
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(plan.weeks) { week in
+                            let selected = selectedWeekID == week.id
+                            let count = week.days.reduce(0) {
+                                $0 + $1.sessions.count
+                            }
+
+                            Button {
+                                selectedWeekID = week.id
+                                selectBestDay(
+                                    in: week,
+                                    plan: plan
+                                )
+                            } label: {
+                                VStack(spacing: 3) {
+                                    Text("W\(week.weekNumber)")
+                                        .font(.subheadline.weight(.bold))
+
+                                    Text(
+                                        count == 1
+                                            ? "1 session"
+                                            : "\(count) sessions"
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 9,
+                                            weight: .semibold
+                                        )
+                                    )
+                                    .opacity(0.78)
+                                }
+                                .foregroundStyle(
+                                    selected
+                                        ? Color.white
+                                        : ATHLTHTheme.primaryText
+                                )
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 48)
+                                .background(
+                                    selected
+                                        ? ATHLTHTheme.accent
+                                        : Color.primary.opacity(0.035),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 14,
+                                        style: .continuous
+                                    )
+                                )
+                                .overlay {
+                                    RoundedRectangle(
+                                        cornerRadius: 14,
+                                        style: .continuous
+                                    )
+                                    .stroke(
+                                        selected
+                                            ? Color.clear
+                                            : Color.black.opacity(0.045),
+                                        lineWidth: 1
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
-            .padding(.top, 12)
         }
     }
 
@@ -331,80 +417,88 @@ struct AdvancedPlannerView: View {
         day: TrainingPlanDay
     ) -> some View {
         ATHLTHCard {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(
-                        displayDayTitle(
-                            day,
-                            week: week,
-                            plan: plan
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(
+                            displayDayTitle(
+                                day,
+                                week: week,
+                                plan: plan
+                            )
                         )
-                    )
-                    .font(.title3.weight(.bold))
+                        .font(.title3.weight(.bold))
 
-                    Text(daySubtitle(day, week: week, plan: plan))
+                        Text(
+                            daySubtitle(
+                                day,
+                                week: week,
+                                plan: plan
+                            )
+                        )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        selectedDayID = day.id
+                        showingSessionEditor = true
+                    } label: {
+                        Label("Add workout", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(ATHLTHTheme.accent)
                 }
 
-                Spacer()
+                if day.sessions.isEmpty {
+                    Button {
+                        selectedDayID = day.id
+                        showingSessionEditor = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(ATHLTHTheme.accent)
 
-                Button {
-                    selectedDayID = day.id
-                    showingSessionEditor = true
-                } label: {
-                    Label("Add workout", systemImage: "plus")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .tint(ATHLTHTheme.accent)
-            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Rest day — or add a workout")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
 
-            if day.sessions.isEmpty {
-                Button {
-                    selectedDayID = day.id
-                    showingSessionEditor = true
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(ATHLTHTheme.accent)
+                                Text(
+                                    "Strength, run, walk, mobility and recovery can all be planned here."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Rest day — or add a workout")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-
-                            Text(
-                                "Strength, run, walk, mobility and recovery can all be planned here."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            Spacer()
                         }
-
-                        Spacer()
-                    }
-                    .padding(14)
-                    .background(
-                        ATHLTHTheme.accentSoft.opacity(0.55),
-                        in: RoundedRectangle(
-                            cornerRadius: 16,
-                            style: .continuous
-                        )
-                    )
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 12)
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(day.sessions) { workout in
-                        sessionRow(
-                            workout,
-                            dayID: day.id
+                        .padding(14)
+                        .background(
+                            ATHLTHTheme.accentSoft.opacity(0.55),
+                            in: RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
                         )
                     }
+                    .buttonStyle(.plain)
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(day.sessions) { workout in
+                            sessionRow(
+                                workout,
+                                dayID: day.id
+                            )
+                        }
+                    }
                 }
-                .padding(.top, 12)
             }
         }
     }
@@ -414,104 +508,120 @@ struct AdvancedPlannerView: View {
         week: TrainingPlanWeek
     ) -> some View {
         ATHLTHCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Week at a glance")
-                        .font(.title3.weight(.bold))
-                    Text("Tap a day to edit its schedule.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Week at a glance")
+                            .font(.title3.weight(.bold))
+                        Text("Tap a day to edit its schedule.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Text(
+                        "\(week.days.reduce(0) { $0 + $1.sessions.count }) total"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accent)
                 }
 
-                Spacer()
-
-                Text(
-                    "\(week.days.reduce(0) { $0 + $1.sessions.count }) total"
-                )
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
-            }
-
-            VStack(spacing: 0) {
-                ForEach(Array(week.days.enumerated()), id: \.element.id) {
-                    index,
-                    day in
-                    Button {
-                        selectedDayID = day.id
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text(
-                                shortDayLabel(
-                                    day,
-                                    week: week,
-                                    plan: plan
+                VStack(spacing: 0) {
+                    ForEach(
+                        Array(week.days.enumerated()),
+                        id: \.element.id
+                    ) { index, day in
+                        Button {
+                            selectedDayID = day.id
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(
+                                    shortDayLabel(
+                                        day,
+                                        week: week,
+                                        plan: plan
+                                    )
                                 )
-                            )
-                            .font(.caption.weight(.bold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(
                                     selectedDayID == day.id
                                         ? ATHLTHTheme.accent
                                         : ATHLTHTheme.mutedText
                                 )
-                                .frame(width: 34, alignment: .leading)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(
-                                    day.sessions.isEmpty
-                                        ? "Rest"
-                                        : day.sessions
-                                            .map(\.title)
-                                            .joined(separator: " · ")
+                                .frame(
+                                    width: 34,
+                                    alignment: .leading
                                 )
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .lineLimit(1)
 
-                                if let date = date(
-                                    for: day,
-                                    in: week,
-                                    plan: plan
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
                                 ) {
                                     Text(
-                                        date.formatted(
-                                            .dateTime
-                                                .month(.abbreviated)
-                                                .day()
+                                        day.sessions.isEmpty
+                                            ? "Rest"
+                                            : day.sessions
+                                                .map(\.title)
+                                                .joined(
+                                                    separator: " · "
+                                                )
+                                    )
+                                    .font(
+                                        .subheadline.weight(.semibold)
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+                                    .lineLimit(1)
+
+                                    if let date = date(
+                                        for: day,
+                                        in: week,
+                                        plan: plan
+                                    ) {
+                                        Text(
+                                            date.formatted(
+                                                .dateTime
+                                                    .month(.abbreviated)
+                                                    .day()
+                                            )
                                         )
-                                    )
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    }
                                 }
+
+                                Spacer()
+
+                                if !day.sessions.isEmpty {
+                                    Text("\(day.sessions.count)")
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(
+                                            ATHLTHTheme.accent
+                                        )
+                                        .frame(width: 24, height: 24)
+                                        .background(
+                                            ATHLTHTheme.accentSoft,
+                                            in: Circle()
+                                        )
+                                }
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.tertiary)
                             }
-
-                            Spacer()
-
-                            if !day.sessions.isEmpty {
-                                Text("\(day.sessions.count)")
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .frame(width: 24, height: 24)
-                                    .background(
-                                        ATHLTHTheme.accentSoft,
-                                        in: Circle()
-                                    )
-                            }
-
-                            Image(systemName: "chevron.right")
-                                .font(.caption2.bold())
-                                .foregroundStyle(.tertiary)
+                            .padding(.vertical, 11)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.vertical, 11)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                        .buttonStyle(.plain)
 
-                    if index < week.days.count - 1 {
-                        Divider()
+                        if index < week.days.count - 1 {
+                            Divider()
+                        }
                     }
                 }
             }
-            .padding(.top, 8)
         }
     }
 
@@ -879,6 +989,56 @@ struct AdvancedPlannerView: View {
         return plan.weeks.first {
             $0.weekNumber == targetNumber
         } ?? plan.weeks.last
+    }
+
+    private func requestWeekRemoval(
+        _ week: TrainingPlanWeek,
+        from plan: TrainingPlan
+    ) {
+        let sessionCount = week.days.reduce(0) {
+            $0 + $1.sessions.count
+        }
+
+        if sessionCount == 0 {
+            removeWeek(week, from: plan)
+        } else {
+            weekPendingRemoval = week
+        }
+    }
+
+    private func removeWeek(
+        _ week: TrainingPlanWeek,
+        from plan: TrainingPlan
+    ) {
+        guard plan.weeks.count > 1,
+              let removedIndex = plan.weeks.firstIndex(
+                where: { $0.id == week.id }
+              )
+        else {
+            return
+        }
+
+        session.removeWeekFromActivePlan(week.id)
+
+        guard let updatedPlan = session.activePlan,
+              !updatedPlan.weeks.isEmpty
+        else {
+            syncSelection()
+            return
+        }
+
+        let targetIndex = min(
+            removedIndex,
+            updatedPlan.weeks.count - 1
+        )
+        let targetWeek = updatedPlan.weeks[targetIndex]
+
+        selectedWeekID = targetWeek.id
+        selectBestDay(
+            in: targetWeek,
+            plan: updatedPlan
+        )
+        weekPendingRemoval = nil
     }
 
     private func selectBestDay(
