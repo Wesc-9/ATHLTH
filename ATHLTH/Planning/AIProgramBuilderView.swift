@@ -488,16 +488,35 @@ struct AIProgramBuilderView: View {
 
         switch mode {
         case .generate:
-            session.replaceActivePlan(with: generated)
-        case .complete:
-            session.fillEmptyDaysFromGeneratedProgram(generated)
-        }
+            guard session.addTrainingPlan(generated) else {
+                if let endDate = session.trainingPlanEndDate(generated),
+                   let conflict = session.trainingPlanConflict(
+                       startDate: startDate,
+                       endDate: endDate
+                   ) {
+                    errorMessage =
+                        "This program overlaps with \(conflict.title). Adjust the dates so only one plan is active at a time."
+                } else {
+                    errorMessage =
+                        "ATHLTH could not add this program to your plan timeline."
+                }
+                return
+            }
 
-        if let planID = session.activePlan?.id {
             goalStore.setLinkedPlan(
-                planID,
+                generated.id,
                 goalIDs: selectedGoalIDs
             )
+
+        case .complete:
+            session.fillEmptyDaysFromGeneratedProgram(generated)
+
+            if let planID = session.activePlan?.id {
+                goalStore.setLinkedPlan(
+                    planID,
+                    goalIDs: selectedGoalIDs
+                )
+            }
         }
 
         dismiss()
@@ -507,6 +526,15 @@ struct AIProgramBuilderView: View {
     private func loadDefaultsIfNeeded() {
         guard !didLoadDefaults else { return }
         didLoadDefaults = true
+
+        if mode == .generate {
+            startDate = session.suggestedTrainingPlanStartDate
+            endDate = Calendar.current.date(
+                byAdding: .weekOfYear,
+                value: max(weekCount, 1),
+                to: startDate
+            ) ?? startDate
+        }
 
         if mode == .complete,
            let plan = session.activePlan {
