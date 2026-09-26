@@ -5329,15 +5329,16 @@ private struct ATHLTHProgressHero: View {
                             )
                             .rotationEffect(.degrees(-90))
 
-                        Text("78")
-                            .font(
-                                .system(
-                                    size: 14,
-                                    weight: .bold,
-                                    design: .rounded
-                                )
+                        Image(
+                            systemName: "chart.line.uptrend.xyaxis"
+                        )
+                        .font(
+                            .system(
+                                size: 13,
+                                weight: .bold
                             )
-                            .foregroundStyle(.white)
+                        )
+                        .foregroundStyle(.white)
                     }
                     .frame(width: 43, height: 43)
 
