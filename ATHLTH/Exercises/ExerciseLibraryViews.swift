@@ -322,25 +322,6 @@ struct ExerciseDetailView: View {
                         .font(.subheadline)
                 }
 
-                if !entry.exercise.primaryMuscles.isEmpty ||
-                    !entry.exercise.secondaryMuscles.isEmpty {
-                    detailCard("Muscles") {
-                        if !entry.exercise.primaryMuscles.isEmpty {
-                            LabeledContent(
-                                "Primary",
-                                value: entry.exercise.primaryMuscles.joined(separator: ", ")
-                            )
-                        }
-
-                        if !entry.exercise.secondaryMuscles.isEmpty {
-                            LabeledContent(
-                                "Secondary",
-                                value: entry.exercise.secondaryMuscles.joined(separator: ", ")
-                            )
-                        }
-                    }
-                }
-
                 if !entry.exercise.instructions.isEmpty {
                     detailCard("How to perform") {
                         ForEach(
@@ -393,22 +374,6 @@ struct ExerciseDetailView: View {
                     }
                 }
 
-                if let onSelect {
-                    Button {
-                        onSelect(entry)
-                        dismiss()
-                    } label: {
-                        Label(
-                            selectionTitle ?? "Add Exercise",
-                            systemImage: "plus.circle.fill"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(ATHLTHTheme.accent)
-                }
-
                 if entry.source == .custom {
                     Button("Delete Custom Exercise", role: .destructive) {
                         showingDelete = true
@@ -421,6 +386,34 @@ struct ExerciseDetailView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Exercise")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let onSelect {
+                VStack(spacing: 0) {
+                    Divider()
+                        .opacity(0.35)
+
+                    Button {
+                        onSelect(entry)
+                        dismiss()
+                    } label: {
+                        Label(
+                            selectionTitle ?? "Add Exercise",
+                            systemImage: "plus.circle.fill"
+                        )
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 50)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(ATHLTHTheme.accent)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 8)
+                }
+                .background(.ultraThinMaterial)
+            }
+        }
         .confirmationDialog(
             "Delete this custom exercise?",
             isPresented: $showingDelete,
