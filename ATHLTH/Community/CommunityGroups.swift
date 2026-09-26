@@ -6252,6 +6252,9 @@ struct CommunityGroupEventCreateView: View {
     @State private var meetingName = ""
     @State private var activityDraft =
         CommunityGroupActivityDraft()
+    @State private var advancedOptions =
+        CommunityGroupEventAdvancedOptions()
+    @State private var cohostIDs: Set<UUID> = []
     @State private var selectedPhoto:
         PhotosPickerItem?
     @State private var imageData: Data?
@@ -6303,6 +6306,17 @@ struct CommunityGroupEventCreateView: View {
                         text: $meetingName
                     )
                 }
+
+                CommunityGroupEventAdvancedEditor(
+                    group: group,
+                    options: $advancedOptions,
+                    cohostIDs: $cohostIDs,
+                    routeStart:
+                        activityDraft
+                            .selectedRoute?
+                            .coordinates
+                            .first
+                )
 
                 Section {
                     Label(
@@ -6393,7 +6407,11 @@ struct CommunityGroupEventCreateView: View {
                 meetingName: meetingName,
                 imageData: imageData,
                 activityConfiguration:
-                    configuration
+                    configuration,
+                advancedOptions:
+                    advancedOptions,
+                cohostIDs:
+                    Array(cohostIDs)
             )
 
             saving = false
@@ -6418,6 +6436,9 @@ struct CommunityGroupChallengeCreateView: View {
 
     @State private var title = ""
     @State private var summary = ""
+    @State private var goalPreset:
+        CommunityGroupChallengeGoalPreset =
+            .mostDistance
     @State private var metric:
         CommunityGroupChallengeMetric = .distanceKM
     @State private var target = "100"
@@ -6430,6 +6451,10 @@ struct CommunityGroupChallengeCreateView: View {
         ) ?? Date().addingTimeInterval(604800)
     @State private var activityDraft =
         CommunityGroupActivityDraft()
+    @State private var challengeOptions =
+        CommunityGroupChallengeAdvancedOptions()
+    @State private var challengeCohostIDs:
+        Set<UUID> = []
     @State private var selectedPhoto:
         PhotosPickerItem?
     @State private var imageData: Data?
@@ -6480,31 +6505,50 @@ struct CommunityGroupChallengeCreateView: View {
 
                 Section("Goal") {
                     Picker(
-                        "Metric",
-                        selection: $metric
+                        "Challenge goal",
+                        selection: $goalPreset
                     ) {
                         ForEach(
-                            CommunityGroupChallengeMetric
-                                .allCases
-                        ) {
-                            Label(
-                                $0.title,
-                                systemImage: $0.icon
-                            )
-                            .tag($0)
+                            suggestedGoalPresets
+                        ) { preset in
+                            Text(preset.title)
+                                .tag(preset)
                         }
                     }
-
-                    HStack {
-                        TextField(
-                            "Target",
-                            text: $target
-                        )
-                        .keyboardType(.decimalPad)
-
-                        Text(metric.unit)
-                            .foregroundStyle(.secondary)
+                    .onChange(
+                        of: goalPreset
+                    ) { _, preset in
+                        applyGoalPreset(preset)
                     }
+
+                    if goalNeedsTarget {
+                        HStack {
+                            TextField(
+                                "Target",
+                                text: $target
+                            )
+                            .keyboardType(
+                                .decimalPad
+                            )
+
+                            Text(metric.unit)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                        }
+                    } else {
+                        LabeledContent(
+                            "Scoring",
+                            value:
+                                challengeOptions
+                                    .scoringMode
+                                    .title
+                        )
+                    }
+
+                    Text(goalExplanation)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Window") {
@@ -6527,6 +6571,18 @@ struct CommunityGroupChallengeCreateView: View {
                         ]
                     )
                 }
+
+                CommunityGroupChallengeAdvancedEditor(
+                    group: group,
+                    options: $challengeOptions,
+                    cohostIDs:
+                        $challengeCohostIDs,
+                    routeSelected:
+                        activityDraft.mode ==
+                            .route &&
+                        activityDraft
+                            .selectedRoute != nil
+                )
 
                 Section {
                     Label(
@@ -6590,14 +6646,15 @@ struct CommunityGroupChallengeCreateView: View {
                 in: .whitespacesAndNewlines
             )
             .isEmpty &&
-        (targetValue ?? 0) > 0 &&
+        resolvedTargetValue > 0 &&
         endsAt > startsAt &&
         activityDraft.validationMessage == nil &&
         !saving
     }
 
     private func createChallenge() {
-        guard let targetValue else {
+        if goalNeedsTarget &&
+            (targetValue ?? 0) <= 0 {
             creationError =
                 "Choose a valid challenge target."
             return
@@ -6620,12 +6677,17 @@ struct CommunityGroupChallengeCreateView: View {
                 title: title,
                 summary: summary,
                 metric: metric,
-                targetValue: targetValue,
+                targetValue:
+                    resolvedTargetValue,
                 startsAt: startsAt,
                 endsAt: endsAt,
                 imageData: imageData,
                 activityConfiguration:
-                    configuration
+                    configuration,
+                advancedOptions:
+                    challengeOptions,
+                cohostIDs:
+                    Array(challengeCohostIDs)
             )
 
             saving = false
@@ -6639,4 +6701,74 @@ struct CommunityGroupChallengeCreateView: View {
             }
         }
     }
+
+    private var suggestedGoalPresets:
+        [CommunityGroupChallengeGoalPreset] {
+        switch activityDraft.activityType {
+        case "strength":
+            return [
+                .mostCompletions,
+                .mostActiveMinutes,
+                .completeTarget
+            ]
+        default:
+            return [
+                .fastestTime,
+                .mostDistance,
+                .mostCompletions,
+                .mostActiveMinutes,
+                .completeTarget
+            ]
+        }
+    }
+
+    private var goalNeedsTarget: Bool {
+        switch goalPreset {
+        case .mostDistance,
+             .mostActiveMinutes:
+            return true
+        case .fastestTime,
+             .mostCompletions,
+             .completeTarget:
+            return false
+        }
+    }
+
+    private var resolvedTargetValue: Double {
+        goalNeedsTarget
+            ? (targetValue ?? 0)
+            : 1
+    }
+
+    private var goalExplanation: String {
+        switch goalPreset {
+        case .fastestTime:
+            return "The fastest qualifying attempt wins. For a fixed distance ATHLTH can verify the fastest GPS segment."
+        case .mostDistance:
+            return "All qualifying distance is added during the challenge window."
+        case .mostCompletions:
+            return "Each qualifying workout counts as one completion."
+        case .mostActiveMinutes:
+            return "Active workout minutes are added across qualifying attempts."
+        case .completeTarget:
+            return "Participants complete the configured activity target. Progress stops at completion."
+        }
+    }
+
+    private func applyGoalPreset(
+        _ preset:
+            CommunityGroupChallengeGoalPreset
+    ) {
+        metric = preset.metric
+        challengeOptions.scoringMode =
+            preset.scoringMode
+
+        if !goalNeedsTarget {
+            target = "1"
+        } else if targetValue == nil ||
+                    (targetValue ?? 0) <= 0 {
+            target = "100"
+        }
+    }
+
 }
