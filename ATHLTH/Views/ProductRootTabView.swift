@@ -1238,18 +1238,6 @@ struct ATHLTHHomeView: View {
                 }
             }
 
-            if completion.total > 0 &&
-               completion.completed > 0 &&
-               completion.completed < completion.total {
-                Label(
-                    "\(completion.completed) of \(completion.total) completed today",
-                    systemImage: "checkmark.circle.fill"
-                )
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.vitality)
-                .padding(.top, 10)
-            }
-
             if workoutMirroring.hasActiveMirroredWorkout,
                let snapshot = workoutMirroring.snapshot {
                 HStack(spacing: 13) {
@@ -1422,58 +1410,67 @@ struct ATHLTHHomeView: View {
                 }
                 .padding(.top, 14)
 
-                HStack {
-                    if homeCanStartDirectly(workout) {
-                        Button {
-                            startHomeWorkout(workout)
-                        } label: {
-                            if homeDirectStartInProgress {
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                        .tint(.white)
+                if completion.total > 0 &&
+                   completion.completed > 0 &&
+                   completion.completed < completion.total {
+                    Label(
+                        "\(completion.completed) of \(completion.total) completed today",
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.vitality)
+                    .padding(.top, 10)
+                }
 
-                                    Text("Starting…")
-                                }
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 20)
-                                .frame(height: 42)
-                            } else {
-                                Label(
-                                    "Start Workout",
-                                    systemImage: "play.fill"
-                                )
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 20)
-                                .frame(height: 42)
+                if homeCanStartDirectly(workout) {
+                    Button {
+                        startHomeWorkout(workout)
+                    } label: {
+                        if homeDirectStartInProgress {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.white)
+
+                                Text("Starting…")
                             }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
-                        .disabled(homeDirectStartInProgress)
-                    } else {
-                        NavigationLink {
-                            PlannedWorkoutDetailView(
-                                planID: selection.planID,
-                                workout: workout,
-                                isHealthCompleted: false
-                            )
-                        } label: {
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                        } else {
                             Label(
-                                "Open Workout",
-                                systemImage: "arrow.right"
+                                "Start Workout",
+                                systemImage: "play.fill"
                             )
                             .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 20)
-                            .frame(height: 42)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
                     }
-
-                    Spacer()
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .disabled(homeDirectStartInProgress)
+                    .padding(.top, 10)
+                } else {
+                    NavigationLink {
+                        PlannedWorkoutDetailView(
+                            planID: selection.planID,
+                            workout: workout,
+                            isHealthCompleted: false
+                        )
+                    } label: {
+                        Label(
+                            "Open Workout",
+                            systemImage: "arrow.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .padding(.top, 10)
                 }
-                .padding(.top, 12)
             } else if completion.total > 0 &&
                         completion.completed == completion.total {
                 HStack(spacing: 13) {
