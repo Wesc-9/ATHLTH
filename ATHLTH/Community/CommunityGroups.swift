@@ -3359,6 +3359,11 @@ struct CommunityGroupDetailView: View {
                     image
                         .resizable()
                         .scaledToFill()
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
+                        .clipped()
                 default:
                     groupHeroFallback
                 }
@@ -5716,25 +5721,41 @@ struct CommunityGroupSettingsView: View {
                 groupImagePlaceholder
             }
         }
-        .frame(width: 112, height: 112)
+        .frame(maxWidth: .infinity)
+        .frame(height: 150)
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 28,
+                cornerRadius: 22,
                 style: .continuous
             )
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-            .stroke(ATHLTHTheme.border, lineWidth: 1)
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.66),
+                        ATHLTHTheme.cardWarm.opacity(0.34),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme.border,
+                    lineWidth: 1
+                )
+            }
         }
     }
 
     private var groupImagePlaceholder: some View {
         RoundedRectangle(
-            cornerRadius: 28,
+            cornerRadius: 22,
             style: .continuous
         )
         .fill(Color.indigo.opacity(0.10))
