@@ -225,15 +225,19 @@ struct ATHLTHTabHero: View {
     var focalOffsetX: CGFloat = 18
     var focalOffsetY: CGFloat = 16
 
-    // The visible hero still occupies 190 pt in layout, but the exact same
-    // image keeps rendering farther down behind the content surface. This
-    // preserves the current hero/content boundary while making pull-down
-    // reveal a continuous image instead of the app canvas.
+    // Extra artwork that sits behind the pinned content sheet. It does not
+    // participate in layout, so the hero/content boundary stays exactly where
+    // it is. The bleed only becomes visible while the ScrollView is pulled
+    // downward, preventing the light app canvas from flashing through.
     private let scrollRevealBleed: CGFloat = 180
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
+                // Continue the exact same artwork below the normal hero
+                // boundary without changing the visible 190 pt crop or moving
+                // any overlay text. This layer only supplies image bleed behind
+                // the fixed content surface / pull-down area.
                 Image(imageName)
                     .resizable()
                     .interpolation(.high)
@@ -242,6 +246,30 @@ struct ATHLTHTabHero: View {
                     .frame(
                         width: proxy.size.width,
                         height: proxy.size.height + scrollRevealBleed,
+                        alignment: alignment
+                    )
+                    .scaleEffect(
+                        proxy.size.width >= 700
+                            ? 1.04
+                            : 1.12
+                    )
+                    .offset(
+                        x: proxy.size.width >= 700
+                            ? focalOffsetX * 0.4
+                            : focalOffsetX,
+                        y: scrollRevealBleed / 2
+                    )
+                    .clipped()
+                    .allowsHitTesting(false)
+
+                Image(imageName)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFill()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height,
                         alignment: alignment
                     )
                     // Keep enough overscan on iPhone to move the focal subject
@@ -257,11 +285,10 @@ struct ATHLTHTabHero: View {
                             ? focalOffsetX * 0.4
                             : focalOffsetX,
                         y: proxy.size.width >= 700
-                            ? focalOffsetY * 0.35 + scrollRevealBleed / 2
-                            : focalOffsetY + scrollRevealBleed / 2
+                            ? focalOffsetY * 0.35
+                            : focalOffsetY
                     )
                     .clipped()
-                    .allowsHitTesting(false)
 
                 LinearGradient(
                     colors: [
