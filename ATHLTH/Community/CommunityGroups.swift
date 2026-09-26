@@ -1003,6 +1003,7 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
 
             await loadGroupContent(groupID)
+            await refresh()
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -1052,6 +1053,7 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
 
             await loadGroupContent(groupID)
+            await refresh()
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -1557,7 +1559,7 @@ struct CommunityGroupDetailView: View {
                     )
 
                     if isMember {
-                        Text("\(groups.members(in: group.id).count) members")
+                        Text(memberCountText)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                     }
@@ -1649,6 +1651,13 @@ struct CommunityGroupDetailView: View {
                     style: .continuous
                 )
             )
+    }
+
+    private var memberCountText: String {
+        let count = groups.members(in: group.id).count
+        return count == 1
+            ? "1 member"
+            : "\(count) members"
     }
 
     private var overview: some View {
@@ -1797,9 +1806,7 @@ struct CommunityGroupDetailView: View {
                         Text("Members")
                             .font(.headline)
                             .foregroundStyle(.primary)
-                        Text(
-                            "\(groups.members(in: group.id).count) in this group"
-                        )
+                        Text(memberCountText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     }
@@ -2313,7 +2320,6 @@ struct CommunityGroupSettingsView: View {
     let group: CommunityGroupRecord
 
     @State private var name: String
-    @State private var location: String
     @State private var summary: String
     @State private var visibility: String
     @State private var selectedPhoto: PhotosPickerItem?
@@ -2323,7 +2329,6 @@ struct CommunityGroupSettingsView: View {
     init(group: CommunityGroupRecord) {
         self.group = group
         _name = State(initialValue: group.name)
-        _location = State(initialValue: group.locationName)
         _summary = State(initialValue: group.summary)
         _visibility = State(initialValue: group.visibility)
     }
