@@ -8,6 +8,7 @@ struct CommunityGroupEventAdvancedEditor: View {
         AppSessionStore
 
     let group: CommunityGroupRecord
+    let eventStartsAt: Date
     @Binding var options:
         CommunityGroupEventAdvancedOptions
     @Binding var cohostIDs: Set<UUID>
@@ -275,8 +276,13 @@ struct CommunityGroupEventAdvancedEditor: View {
                     enabled
                         ? (
                             options.rsvpDeadline ??
-                            Date().addingTimeInterval(
-                                3_600
+                            min(
+                                eventStartsAt.addingTimeInterval(
+                                    -3_600
+                                ),
+                                Date().addingTimeInterval(
+                                    3_600
+                                )
                             )
                         )
                         : nil
@@ -295,8 +301,8 @@ struct CommunityGroupEventAdvancedEditor: View {
                     enabled
                         ? (
                             options.endsAt ??
-                            Date().addingTimeInterval(
-                                7_200
+                            eventStartsAt.addingTimeInterval(
+                                3_600
                             )
                         )
                         : nil
@@ -334,7 +340,7 @@ struct CommunityGroupEventAdvancedEditor: View {
                             Calendar.current.date(
                                 byAdding: .month,
                                 value: 3,
-                                to: Date()
+                                to: eventStartsAt
                             )
                         )
                         : nil
@@ -358,6 +364,7 @@ struct CommunityGroupChallengeAdvancedEditor:
     View
 {
     let group: CommunityGroupRecord
+    var rulesLocked: Bool = false
 
     @Binding var options:
         CommunityGroupChallengeAdvancedOptions
@@ -431,6 +438,7 @@ struct CommunityGroupChallengeAdvancedEditor:
                 )
             }
         }
+        .disabled(rulesLocked)
 
         Section("Verification") {
             Toggle(
@@ -463,7 +471,17 @@ struct CommunityGroupChallengeAdvancedEditor:
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
+
+            if rulesLocked {
+                Label(
+                    "Competition rules are locked because the challenge has started.",
+                    systemImage: "lock.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
+        .disabled(rulesLocked)
 
         Section("Publishing") {
             Picker(
