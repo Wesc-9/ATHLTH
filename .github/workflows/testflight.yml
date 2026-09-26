@@ -46,14 +46,35 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Verify committed app icons
+      - name: Verify approved app icons
         shell: bash
         run: |
           set -euo pipefail
-          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon.png
-          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png
-          test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png
-          test -s ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+          EXPECTED_ICON_BLOB="e4846875813cad789aaf6b694a30d861e1af1d5a"
+          ICONS=(
+            ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+            ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png
+            ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png
+            ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+          )
+
+          for icon in "${ICONS[@]}"; do
+            test -s "$icon"
+            ACTUAL_BLOB=$(git hash-object "$icon")
+            if [ "$ACTUAL_BLOB" != "$EXPECTED_ICON_BLOB" ]; then
+              echo "::error::Unexpected ATHLTH app icon at $icon ($ACTUAL_BLOB)"
+              exit 1
+            fi
+
+            WIDTH=$(sips -g pixelWidth "$icon" | awk '/pixelWidth/ {print $2}')
+            HEIGHT=$(sips -g pixelHeight "$icon" | awk '/pixelHeight/ {print $2}')
+            if [ "$WIDTH" != "1024" ] || [ "$HEIGHT" != "1024" ]; then
+              echo "::error::App icon must be 1024x1024: $icon is ${WIDTH}x${HEIGHT}"
+              exit 1
+            fi
+          done
+
+          echo "Approved flat ATHLTH icon verified for iPhone, dark, tinted and Watch assets."
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -90,8 +111,14 @@ jobs:
           WATCH_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/Watch/ATHLTH.app/Info.plist"
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$IOS_PLIST")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_PLIST")
+          INTERFACE_STYLE=$(/usr/libexec/PlistBuddy -c "Print :UIUserInterfaceStyle" "$IOS_PLIST")
           echo "iPhone CFBundleVersion: $IOS_BUILD"
           echo "Watch CFBundleVersion: $WATCH_BUILD"
+          echo "iPhone UIUserInterfaceStyle: $INTERFACE_STYLE"
+          if [ "$INTERFACE_STYLE" != "Light" ]; then
+            echo "::error::ATHLTH 1.4.2 must archive with UIUserInterfaceStyle=Light."
+            exit 1
+          fi
           if [ "$IOS_BUILD" -le 1 ] || [ "$WATCH_BUILD" -le 1 ]; then
             echo "::error::Both iPhone and Watch bundle versions must be greater than 1."
             exit 1
