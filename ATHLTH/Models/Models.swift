@@ -2,6 +2,27 @@ import CoreLocation
 import Foundation
 import HealthKit
 
+struct RoutePerformanceAnalysis: Hashable {
+    let workoutID: UUID
+    let activity: WorkoutActivity
+    let startedAt: Date
+    let durationSeconds: TimeInterval
+    let distanceMeters: Double
+    let routeMatchPercent: Double
+    let averageDeviationMeters: Double
+    let maxDeviationMeters: Double
+    let startDistanceMeters: Double
+    let endDistanceMeters: Double
+
+    var deviationPercent: Double {
+        max(0, 100 - routeMatchPercent)
+    }
+
+    var leaderboardEligible: Bool {
+        routeMatchPercent >= 85
+    }
+}
+
 struct WorkoutDetail {
     var route: [CLLocation] = []
     var workoutLocation: CLLocation?
