@@ -97,16 +97,28 @@ struct WatchActiveWorkoutView: View {
     @EnvironmentObject private var workoutManager: WatchWorkoutManager
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 10) {
-                if workoutManager.state == .completed {
-                    completedContent
-                } else {
-                    activeContent
+        Group {
+            if workoutManager.state == .completed {
+                ScrollView {
+                    VStack(spacing: 10) {
+                        completedContent
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 10)
+                }
+            } else if workoutManager.kind == .running ||
+                        workoutManager.kind == .walking {
+                WatchRunWalkWorkoutPager()
+                    .environmentObject(workoutManager)
+            } else {
+                ScrollView {
+                    VStack(spacing: 10) {
+                        activeContent
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 10)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 10)
         }
         .background(WatchTheme.canvas.ignoresSafeArea())
         .interactiveDismissDisabled(workoutManager.state != .completed)
@@ -888,6 +900,865 @@ private struct WatchStrengthRestView: View {
             format: "%02d:%02d",
             total / 60,
             total % 60
+        )
+    }
+}
+
+
+private struct WatchRunWalkWorkoutPager: View {
+    @EnvironmentObject private var workoutManager: WatchWorkoutManager
+
+    @State private var selectedPage = 0
+
+    var body: some View {
+        TabView(selection: $selectedPage) {
+            ScrollView {
+                livePage
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 10)
+            }
+            .tag(0)
+
+            ScrollView {
+                workoutRoutePage
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 10)
+            }
+            .tag(1)
+
+            ScrollView {
+                controlsPage
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 10)
+            }
+            .tag(2)
+        }
+        .tabViewStyle(.verticalPage)
+        .background(
+            WatchTheme.canvas
+                .ignoresSafeArea()
+        )
+    }
+
+    private var livePage: some View {
+        VStack(spacing: 10) {
+            pageHeader(
+                title: workoutManager.kind.title,
+                subtitle:
+                    workoutManager.state == .paused
+                        ? "Paused"
+                        : "Live",
+                icon: workoutManager.kind.systemImage
+            )
+
+            VStack(spacing: 2) {
+                Text("CURRENT PACE")
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(1.1)
+                    .foregroundStyle(WatchTheme.muted)
+
+                Text(
+                    paceText(
+                        workoutManager
+                            .currentPaceSecondsPerKilometer
+                    )
+                )
+                .font(
+                    .system(
+                        size: 34,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .minimumScaleFactor(0.72)
+
+                Text("/km")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+            .watchSurface(radius: 18)
+
+            HStack(spacing: 7) {
+                runMetric(
+                    title: "DISTANCE",
+                    value: String(
+                        format: "%.2f",
+                        workoutManager.distanceMeters / 1_000
+                    ),
+                    suffix: "km"
+                )
+
+                runMetric(
+                    title: "AVG PACE",
+                    value: paceText(
+                        workoutManager
+                            .averagePaceSecondsPerKilometer
+                    ),
+                    suffix: "/km"
+                )
+            }
+
+            HStack(spacing: 7) {
+                runMetric(
+                    title: "HEART RATE",
+                    value:
+                        workoutManager.heartRate > 0
+                            ? "\(Int(workoutManager.heartRate.rounded()))"
+                            : "—",
+                    suffix: "bpm"
+                )
+
+                runMetric(
+                    title: "TIME",
+                    value: durationText(
+                        workoutManager.elapsedTime
+                    ),
+                    suffix: ""
+                )
+            }
+
+            if workoutManager.lapCount > 0 {
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack {
+                        Label(
+                            "Lap \(workoutManager.lapCount + 1)",
+                            systemImage: "flag.fill"
+                        )
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(WatchTheme.green)
+
+                        Spacer()
+
+                        Text(
+                            durationText(
+                                workoutManager
+                                    .currentLapElapsedTime
+                            )
+                        )
+                        .font(.system(size: 10, weight: .semibold))
+                        .monospacedDigit()
+                    }
+
+                    HStack {
+                        Text(
+                            String(
+                                format: "%.2f km",
+                                workoutManager
+                                    .currentLapDistanceMeters /
+                                    1_000
+                            )
+                        )
+                        .font(.system(size: 10, weight: .semibold))
+
+                        Spacer()
+
+                        Text(
+                            paceText(
+                                workoutManager
+                                    .currentLapPaceSecondsPerKilometer
+                            ) + " /km"
+                        )
+                        .font(.system(size: 10, weight: .semibold))
+                    }
+                }
+                .padding(10)
+                .watchSurface()
+            }
+
+            pageHint(
+                "Swipe or use the Digital Crown for Workout & Route"
+            )
+        }
+    }
+
+    private var workoutRoutePage: some View {
+        VStack(spacing: 10) {
+            pageHeader(
+                title: "Workout & Route",
+                subtitle: routePageSubtitle,
+                icon: "map.fill"
+            )
+
+            if let workout =
+                    workoutManager.structuredRunningWorkout,
+               let step =
+                    workoutManager.currentStructuredRunningStep {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(workout.title)
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(WatchTheme.muted)
+                                .lineLimit(1)
+
+                            Text(step.title)
+                                .font(.system(size: 15, weight: .bold))
+                                .lineLimit(2)
+                        }
+
+                        Spacer()
+
+                        Text(
+                            "\(workoutManager.structuredStepIndex + 1)/\(workout.steps.count)"
+                        )
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(WatchTheme.green)
+                    }
+
+                    ProgressView(
+                        value: structuredStepProgress(
+                            step
+                        )
+                    )
+                    .tint(WatchTheme.green)
+
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("TARGET")
+                                .font(.system(size: 7, weight: .bold))
+                                .foregroundStyle(WatchTheme.muted)
+
+                            Text(
+                                structuredStepTargetText(
+                                    step
+                                ) ?? "Open"
+                            )
+                            .font(.system(size: 10, weight: .semibold))
+                        }
+
+                        Spacer()
+
+                        if step.targetPaceMinSecondsPerKilometer != nil ||
+                            step.targetPaceMaxSecondsPerKilometer != nil {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("ACTUAL")
+                                    .font(.system(size: 7, weight: .bold))
+                                    .foregroundStyle(WatchTheme.muted)
+
+                                Text(
+                                    paceText(
+                                        workoutManager
+                                            .currentPaceSecondsPerKilometer
+                                    ) + " /km"
+                                )
+                                .font(.system(size: 10, weight: .semibold))
+                            }
+                        }
+                    }
+
+                    if let status = paceTargetStatus(
+                        step
+                    ) {
+                        Label(
+                            status.text,
+                            systemImage: status.icon
+                        )
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(status.color)
+                    }
+
+                    if let next =
+                            workoutManager
+                                .nextStructuredRunningStep {
+                        Divider()
+
+                        HStack {
+                            Text("NEXT")
+                                .font(.system(size: 7, weight: .bold))
+                                .foregroundStyle(WatchTheme.muted)
+
+                            Spacer()
+
+                            Text(next.title)
+                                .font(.system(size: 9, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .padding(10)
+                .watchSurface()
+            } else {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label(
+                        "Free \(workoutManager.kind.title)",
+                        systemImage:
+                            workoutManager.kind.systemImage
+                    )
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(WatchTheme.green)
+
+                    Text(
+                        "No structured steps. Pace, distance and route tracking continue normally."
+                    )
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .watchSurface()
+            }
+
+            if let route =
+                    workoutManager.plannedRoute {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(route.title)
+                            .font(.system(size: 12, weight: .bold))
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        if let progress =
+                                workoutManager
+                                    .routeProgressPercent {
+                            Text(
+                                "\(Int(progress.rounded()))%"
+                            )
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(WatchTheme.green)
+                        }
+                    }
+
+                    if let progress =
+                            workoutManager
+                                .routeProgressPercent {
+                        ProgressView(
+                            value: progress,
+                            total: 100
+                        )
+                        .tint(WatchTheme.green)
+                    }
+
+                    HStack(spacing: 7) {
+                        runMetric(
+                            title: "REMAINING",
+                            value:
+                                routeRemainingText,
+                            suffix: ""
+                        )
+
+                        runMetric(
+                            title: "ROUTE",
+                            value:
+                                routeDeviationText,
+                            suffix: ""
+                        )
+                    }
+
+                    routeMap
+                }
+                .padding(10)
+                .watchSurface()
+            } else {
+                routeMap
+            }
+
+            pageHint(
+                "Swipe for controls"
+            )
+        }
+    }
+
+    private var controlsPage: some View {
+        VStack(spacing: 10) {
+            pageHeader(
+                title: "Controls",
+                subtitle:
+                    workoutManager.state == .paused
+                        ? "Workout paused"
+                        : "Workout running",
+                icon: "slider.horizontal.3"
+            )
+
+            Button {
+                if workoutManager.state == .paused {
+                    workoutManager.resume()
+                } else {
+                    workoutManager.pause()
+                }
+            } label: {
+                Label(
+                    workoutManager.state == .paused
+                        ? "Resume"
+                        : "Pause",
+                    systemImage:
+                        workoutManager.state == .paused
+                            ? "play.fill"
+                            : "pause.fill"
+                )
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(
+                workoutManager.state == .paused
+                    ? WatchTheme.green
+                    : .orange
+            )
+            .disabled(
+                workoutManager.state == .ending
+            )
+
+            Button {
+                workoutManager.markLap()
+            } label: {
+                HStack {
+                    Label(
+                        "Lap",
+                        systemImage: "flag.fill"
+                    )
+
+                    Spacer()
+
+                    Text(
+                        "#\(workoutManager.lapCount + 1)"
+                    )
+                    .font(.caption2.monospacedDigit())
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 34)
+            }
+            .buttonStyle(.bordered)
+            .disabled(
+                workoutManager.state != .running
+            )
+
+            if workoutManager.audioCoachConfigured {
+                Button {
+                    workoutManager.setAudioCoachEnabled(
+                        !workoutManager
+                            .audioCoachConfiguration
+                            .enabled
+                    )
+                } label: {
+                    HStack {
+                        Label(
+                            "Audio Coach",
+                            systemImage:
+                                workoutManager
+                                    .audioCoachConfiguration
+                                    .enabled
+                                    ? "speaker.wave.2.fill"
+                                    : "speaker.slash.fill"
+                        )
+
+                        Spacer()
+
+                        Text(
+                            workoutManager
+                                .audioCoachConfiguration
+                                .enabled
+                                ? "On"
+                                : "Muted"
+                        )
+                        .font(.caption2.weight(.bold))
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 34)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if let error =
+                    workoutManager.errorMessage {
+                Text(error)
+                    .font(.system(size: 8))
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 4)
+            }
+
+            Button(role: .destructive) {
+                workoutManager.end()
+            } label: {
+                Label(
+                    "Finish Workout",
+                    systemImage: "stop.fill"
+                )
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+            .disabled(
+                workoutManager.state == .ending
+            )
+
+            pageHint(
+                "Audio Coach runs on Apple Watch during the workout."
+            )
+        }
+    }
+
+    private var routePageSubtitle: String {
+        if workoutManager.plannedRoute != nil,
+           workoutManager.structuredRunningWorkout != nil {
+            return "Plan · Route"
+        }
+
+        if workoutManager.plannedRoute != nil {
+            return "Route"
+        }
+
+        if workoutManager.structuredRunningWorkout != nil {
+            return "Workout"
+        }
+
+        return "Free session"
+    }
+
+    private var routeRemainingText: String {
+        guard let meters =
+                workoutManager.routeRemainingMeters
+        else {
+            return "—"
+        }
+
+        if meters >= 1_000 {
+            return String(
+                format: "%.1f km",
+                meters / 1_000
+            )
+        }
+
+        return "\(Int(meters.rounded())) m"
+    }
+
+    private var routeDeviationText: String {
+        guard let meters =
+                workoutManager.routeDeviationMeters
+        else {
+            return "Locating"
+        }
+
+        if meters <= 80 {
+            return "On route"
+        }
+
+        return "\(Int(meters.rounded())) m off"
+    }
+
+    @ViewBuilder
+    private var routeMap: some View {
+        let planned =
+            workoutManager.plannedRoute?
+                .points
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocationCoordinate2D(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                } ?? []
+
+        let live =
+            workoutManager.routePoints
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocationCoordinate2D(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+
+        if planned.count >= 2 ||
+            live.count >= 2 {
+            Map {
+                if planned.count >= 2 {
+                    MapPolyline(
+                        coordinates: planned
+                    )
+                    .stroke(
+                        WatchTheme.muted.opacity(0.55),
+                        lineWidth: 3
+                    )
+                }
+
+                if live.count >= 2 {
+                    MapPolyline(
+                        coordinates: live
+                    )
+                    .stroke(
+                        WatchTheme.green,
+                        lineWidth: 4
+                    )
+                }
+            }
+            .frame(height: 116)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+            )
+        }
+    }
+
+    private func pageHeader(
+        title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(WatchTheme.green)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 12, weight: .bold))
+
+                Text(subtitle)
+                    .font(.system(size: 8))
+                    .foregroundStyle(WatchTheme.muted)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private func runMetric(
+        title: String,
+        value: String,
+        suffix: String
+    ) -> some View {
+        VStack(spacing: 2) {
+            Text(title)
+                .font(.system(size: 7, weight: .bold))
+                .foregroundStyle(WatchTheme.muted)
+                .lineLimit(1)
+
+            Text(value)
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+
+            if !suffix.isEmpty {
+                Text(suffix)
+                    .font(.system(size: 7, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 54)
+        .padding(.vertical, 6)
+        .watchSurface()
+    }
+
+    private func pageHint(
+        _ text: String
+    ) -> some View {
+        Text(text)
+            .font(.system(size: 7))
+            .foregroundStyle(WatchTheme.muted)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 8)
+    }
+
+    private func paceText(
+        _ pace: TimeInterval?
+    ) -> String {
+        guard let pace,
+              pace.isFinite,
+              pace > 0
+        else {
+            return "—"
+        }
+
+        let total =
+            max(
+                Int(pace.rounded()),
+                0
+            )
+
+        return String(
+            format: "%d:%02d",
+            total / 60,
+            total % 60
+        )
+    }
+
+    private func durationText(
+        _ duration: TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(duration.rounded(.down)),
+                0
+            )
+        let hours = total / 3_600
+        let minutes =
+            (total % 3_600) / 60
+        let seconds = total % 60
+
+        if hours > 0 {
+            return String(
+                format: "%d:%02d:%02d",
+                hours,
+                minutes,
+                seconds
+            )
+        }
+
+        return String(
+            format: "%02d:%02d",
+            minutes,
+            seconds
+        )
+    }
+
+    private func structuredStepProgress(
+        _ step: WatchRunningWorkoutStep
+    ) -> Double {
+        switch step.measure {
+        case .time:
+            guard let target =
+                    step.durationSeconds,
+                  target > 0
+            else {
+                return 0
+            }
+
+            return min(
+                workoutManager
+                    .currentStructuredStepElapsedTime /
+                    target,
+                1
+            )
+
+        case .distance:
+            guard let target =
+                    step.distanceMeters,
+                  target > 0
+            else {
+                return 0
+            }
+
+            return min(
+                workoutManager
+                    .currentStructuredStepDistanceMeters /
+                    target,
+                1
+            )
+
+        case .open:
+            return 0
+        }
+    }
+
+    private func structuredStepTargetText(
+        _ step: WatchRunningWorkoutStep
+    ) -> String? {
+        var parts: [String] = []
+
+        switch step.measure {
+        case .distance:
+            if let meters = step.distanceMeters {
+                parts.append(
+                    meters >= 1_000
+                        ? String(
+                            format: "%.1f km",
+                            meters / 1_000
+                        )
+                        : "\(Int(meters.rounded())) m"
+                )
+            }
+
+        case .time:
+            if let seconds =
+                    step.durationSeconds {
+                parts.append(
+                    durationText(seconds)
+                )
+            }
+
+        case .open:
+            parts.append("Open")
+        }
+
+        if let intensity = step.intensityText,
+           !intensity.isEmpty {
+            parts.append(intensity)
+        }
+
+        return parts.isEmpty
+            ? nil
+            : parts.joined(
+                separator: " · "
+            )
+    }
+
+    private func paceTargetStatus(
+        _ step: WatchRunningWorkoutStep
+    ) -> (
+        text: String,
+        icon: String,
+        color: Color
+    )? {
+        guard let actual =
+                workoutManager
+                    .currentPaceSecondsPerKilometer
+        else {
+            return nil
+        }
+
+        let first =
+            step.targetPaceMinSecondsPerKilometer
+        let second =
+            step.targetPaceMaxSecondsPerKilometer
+
+        guard first != nil || second != nil else {
+            return nil
+        }
+
+        let low = min(
+            first ?? second ?? actual,
+            second ?? first ?? actual
+        )
+        let high = max(
+            first ?? second ?? actual,
+            second ?? first ?? actual
+        )
+
+        if actual < low {
+            return (
+                "Faster than target",
+                "arrow.up.circle.fill",
+                .orange
+            )
+        }
+
+        if actual > high {
+            return (
+                "Slower than target",
+                "arrow.down.circle.fill",
+                .orange
+            )
+        }
+
+        return (
+            "On target",
+            "checkmark.circle.fill",
+            WatchTheme.green
         )
     }
 }
