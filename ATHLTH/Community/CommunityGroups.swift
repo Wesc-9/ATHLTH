@@ -588,10 +588,9 @@ final class CommunityGroupStore: ObservableObject {
         switch role(in: group) {
         case "owner", "admin":
             return true
-        case "member":
+        case "member", "contributor":
             return group.membersCanCreateContent
         default:
-            // Contributor is intentionally update-only.
             return false
         }
     }
@@ -1754,7 +1753,8 @@ struct CommunityGroupsView: View {
     private var matchingGroups: [CommunityGroupRecord] {
         let publicGroups = groups.groups.filter {
             $0.visibility == "public" &&
-            !groups.joinedGroupIDs.contains($0.id)
+            !groups.joinedGroupIDs.contains($0.id) &&
+            groups.pendingInvite(for: $0.id) == nil
         }
 
         let clean = query
@@ -1782,6 +1782,23 @@ struct CommunityGroupsView: View {
                 LazyVStack(alignment: .leading, spacing: 18) {
                     publicGroupSearchBar
                     introCard
+
+                    if !groups.ownInvites.isEmpty {
+                        sectionTitle("INVITATIONS")
+                        ForEach(
+                            groups.ownInvites,
+                            id: \.groupID
+                        ) { invite in
+                            if let group = groups.group(
+                                for: invite.groupID
+                            ) {
+                                invitationCard(
+                                    invite,
+                                    group: group
+                                )
+                            }
+                        }
+                    }
 
                     if !groups.joinedGroups.isEmpty {
                         sectionTitle("YOUR GROUPS")
@@ -1905,6 +1922,57 @@ struct CommunityGroupsView: View {
 
                 Spacer()
             }
+        }
+    }
+
+    private func invitationCard(
+        _ invite: CommunityGroupInviteRecord,
+        group: CommunityGroupRecord
+    ) -> some View {
+        ATHLTHCard {
+            HStack(spacing: 12) {
+                groupImage(
+                    group,
+                    size: 46,
+                    cornerRadius: 14
+                )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(group.name)
+                        .font(.subheadline.weight(.semibold))
+                    Text("You were invited to join")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 10) {
+                Button("Decline") {
+                    Task {
+                        _ = await groups.respondToInvite(
+                            groupID: invite.groupID,
+                            accept: false
+                        )
+                    }
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+
+                Button("Join") {
+                    Task {
+                        _ = await groups.respondToInvite(
+                            groupID: invite.groupID,
+                            accept: true
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.top, 10)
         }
     }
 
@@ -2045,6 +2113,7 @@ struct CommunityGroupDetailView: View {
     @State private var showingCreateEvent = false
     @State private var showingCreateChallenge = false
     @State private var showingGroupSettings = false
+    @State private var showingNotificationSettings = false
     @State private var updateDraft = ""
     @State private var postingUpdate = false
 
@@ -2087,22 +2156,7 @@ struct CommunityGroupDetailView: View {
                             challenges
                         }
                     } else {
-                        ATHLTHCard {
-                            Text("Join to unlock group chat, events and challenges.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-
-                            Button {
-                                Task { await groups.join(group) }
-                            } label: {
-                                Label("Join Group", systemImage: "person.badge.plus")
-                                    .font(.headline)
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(ATHLTHTheme.accentDeep)
-                            .padding(.top, 8)
-                        }
+                        membershipAccessCard
                     }
                 }
                 .padding()
@@ -2121,6 +2175,11 @@ struct CommunityGroupDetailView: View {
         .sheet(isPresented: $showingGroupSettings) {
             CommunityGroupSettingsView(group: currentGroup)
         }
+        .sheet(isPresented: $showingNotificationSettings) {
+            CommunityGroupNotificationSettingsView(
+                group: currentGroup
+            )
+        }
         .task {
             if groups.groups.isEmpty {
                 await groups.refresh()
@@ -2138,6 +2197,108 @@ struct CommunityGroupDetailView: View {
         .onChange(of: groups.groups.map(\.id)) { _, groupIDs in
             if !groupIDs.contains(group.id) {
                 dismiss()
+            }
+        }
+    }
+
+    private var membershipAccessCard: some View {
+        ATHLTHCard {
+            if groups.pendingInvite(
+                for: currentGroup.id
+            ) != nil {
+                Text("You have a group invitation")
+                    .font(.headline)
+                Text(
+                    "Accept the invitation to unlock chat, events and challenges."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 3)
+
+                HStack(spacing: 10) {
+                    Button("Decline") {
+                        Task {
+                            _ = await groups.respondToInvite(
+                                groupID: currentGroup.id,
+                                accept: false
+                            )
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+
+                    Button("Join Group") {
+                        Task {
+                            _ = await groups.respondToInvite(
+                                groupID: currentGroup.id,
+                                accept: true
+                            )
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.top, 12)
+            } else if groups.pendingJoinRequest(
+                for: currentGroup.id
+            ) != nil {
+                Label(
+                    "Membership request pending",
+                    systemImage: "clock.fill"
+                )
+                .font(.headline)
+
+                Text(
+                    "An Owner or Admin can approve your request."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+            } else if currentGroup.joinMode == "invite_only" {
+                Label(
+                    "Invitation required",
+                    systemImage: "envelope.badge"
+                )
+                .font(.headline)
+
+                Text(
+                    "This group only accepts members who have been invited by an Owner or Admin."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+            } else {
+                Text(
+                    currentGroup.joinMode == "approval"
+                        ? "Request membership to unlock group chat, events and challenges."
+                        : "Join to unlock group chat, events and challenges."
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+                Button {
+                    Task {
+                        _ = await groups.requestJoin(
+                            currentGroup
+                        )
+                    }
+                } label: {
+                    Label(
+                        currentGroup.joinMode == "approval"
+                            ? "Request to Join"
+                            : "Join Group",
+                        systemImage:
+                            currentGroup.joinMode == "approval"
+                                ? "person.badge.clock"
+                                : "person.badge.plus"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+                .padding(.top, 8)
             }
         }
     }
@@ -2251,6 +2412,15 @@ struct CommunityGroupDetailView: View {
                                     systemImage: "gearshape"
                                 )
                             }
+
+                            Button {
+                                showingNotificationSettings = true
+                            } label: {
+                                Label(
+                                    "Notifications",
+                                    systemImage: "bell"
+                                )
+                            }
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(.system(size: 16, weight: .bold))
@@ -2263,6 +2433,15 @@ struct CommunityGroupDetailView: View {
                         }
                     } else if isMember {
                         Menu {
+                            Button {
+                                showingNotificationSettings = true
+                            } label: {
+                                Label(
+                                    "Notifications",
+                                    systemImage: "bell"
+                                )
+                            }
+
                             Button(
                                 "Leave Group",
                                 role: .destructive
