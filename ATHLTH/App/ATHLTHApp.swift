@@ -269,6 +269,35 @@ struct AppRootView: View {
                 await submitLatestStoreProofIfPossible()
             }
         }
+        .onChange(of: watchConnection.lastStrengthCommand) { _, command in
+            guard let command else {
+                return
+            }
+
+            handleWatchStrengthCommand(command)
+            watchConnection.clearStrengthCommand()
+        }
+        .onChange(of: strengthWorkout.activeWorkout) { _, _ in
+            sendStrengthSnapshotIfNeeded()
+        }
+        .onChange(of: strengthWorkout.currentExerciseIndex) { _, _ in
+            sendStrengthSnapshotIfNeeded()
+        }
+        .onChange(of: strengthWorkout.currentSetIndex) { _, _ in
+            sendStrengthSnapshotIfNeeded()
+        }
+        .onChange(of: strengthWorkout.restEndsAt) { _, _ in
+            sendStrengthSnapshotIfNeeded()
+        }
+        .onChange(of: strengthWorkout.draftReps) { _, _ in
+            sendStrengthSnapshotIfNeeded()
+        }
+        .onChange(of: strengthWorkout.draftWeightKilograms) { _, _ in
+            sendStrengthSnapshotIfNeeded()
+        }
+        .onChange(of: strengthWorkout.draftRestSeconds) { _, _ in
+            sendStrengthSnapshotIfNeeded()
+        }
         .onChange(of: watchConnection.lastCompletedWorkout) { _, result in
             guard settings.trainingDeviceProvider == .appleWatch,
                   let result
@@ -588,6 +617,98 @@ struct AppRootView: View {
         } message: {
             Text(authCallbackError ?? "Authentication could not be completed.")
         }
+    }
+
+    @MainActor
+    private func handleWatchStrengthCommand(
+        _ command: WatchStrengthCommand
+    ) {
+        if command.kind == .requestSnapshot {
+            sendStrengthSnapshotIfNeeded()
+            return
+        }
+
+        guard let workout = strengthWorkout.activeWorkout,
+              workout.captureDevice == .appleWatch
+        else {
+            return
+        }
+
+        if let workoutID = command.workoutID,
+           workoutID != workout.id {
+            sendStrengthSnapshotIfNeeded()
+            return
+        }
+
+        switch command.kind {
+        case .updateDraft:
+            strengthWorkout.setDraft(
+                reps: command.reps,
+                weightKilograms:
+                    command.weightKilograms,
+                restSeconds:
+                    command.restSeconds
+            )
+
+        case .completeSet:
+            strengthWorkout.setDraft(
+                reps: command.reps,
+                weightKilograms:
+                    command.weightKilograms,
+                restSeconds:
+                    command.restSeconds
+            )
+            strengthWorkout.completeCurrentDraftSet()
+
+        case .completeSetWithoutDetails:
+            if let restSeconds =
+                    command.restSeconds {
+                strengthWorkout.setDraft(
+                    restSeconds: restSeconds
+                )
+            }
+            strengthWorkout
+                .completeCurrentSetWithoutDetails(
+                    restSeconds:
+                        strengthWorkout
+                            .draftRestSeconds
+                )
+
+        case .skipRest:
+            strengthWorkout.skipRest()
+
+        case .addRest:
+            strengthWorkout.addRest(
+                seconds:
+                    command.addRestSeconds ??
+                    30
+            )
+
+        case .nextExercise:
+            strengthWorkout.moveToNextExercise()
+
+        case .requestSnapshot:
+            break
+        }
+
+        sendStrengthSnapshotIfNeeded()
+    }
+
+    @MainActor
+    private func sendStrengthSnapshotIfNeeded() {
+        guard settings.trainingDeviceProvider == .appleWatch,
+              strengthWorkout
+                .activeWorkout?
+                .captureDevice == .appleWatch,
+              let snapshot =
+                strengthWorkout.watchSnapshot
+        else {
+            return
+        }
+
+        watchConnection.sendStrengthSnapshot(
+            snapshot
+        )
     }
 
     private func syncCalendarIfAllowed(
