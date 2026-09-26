@@ -24,7 +24,9 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
 
-            ATHLTHRecoveryView()
+            ATHLTHRecoveryView { tab in
+                selectedTab = tab
+            }
                 .tabItem { Label("Recovery", systemImage: "leaf.fill") }
                 .tag(2)
 
@@ -4418,6 +4420,8 @@ struct ATHLTHTrainView: View {
 }
 
 struct ATHLTHRecoveryView: View {
+    var onSelectTab: (Int) -> Void = { _ in }
+
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
@@ -4425,6 +4429,7 @@ struct ATHLTHRecoveryView: View {
     @StateObject private var sorenessStore = RecoverySorenessStore()
     @State private var recoverySnapshot = RecoveryTrendSnapshot.empty
     @State private var showingSorenessLog = false
+    @State private var showingRecoveryInfo = false
     @State private var selectedRecoveryTool: RecoveryTool?
 
     var body: some View {
@@ -4452,10 +4457,22 @@ struct ATHLTHRecoveryView: View {
                                 heart: health.heart
                             )
 
+                            if health.sleep.totalAsleep > 0 {
+                                RecoveryLastNightCard(
+                                    sleep: health.sleep
+                                )
+                            }
+
                             RecoveryTrendsCard(
                                 snapshot: recoverySnapshot,
                                 sleep: health.sleep
                             )
+
+                            RecoveryDailyCheckInCard(
+                                store: sorenessStore
+                            ) {
+                                showingSorenessLog = true
+                            }
 
                             todaysGuidanceCard
 
@@ -4468,10 +4485,16 @@ struct ATHLTHRecoveryView: View {
                             RecoveryToolsCard { tool in
                                 selectedRecoveryTool = tool
                             }
-
-                            recoveryMethodCard
                         } else {
                             recoveryUnavailableCard
+
+                            RecoveryDailyCheckInCard(
+                                store: sorenessStore
+                            ) {
+                                showingSorenessLog = true
+                            }
+
+                            todaysGuidanceCard
 
                             MuscleRecoveryCard(
                                 statuses: muscleRecoveryStatuses
@@ -4504,6 +4527,9 @@ struct ATHLTHRecoveryView: View {
                     store: sorenessStore
                 )
             }
+            .sheet(isPresented: $showingRecoveryInfo) {
+                RecoveryMethodInfoView()
+            }
             .sheet(item: $selectedRecoveryTool) { tool in
                 RecoveryGuidedToolView(tool: tool)
             }
@@ -4514,10 +4540,60 @@ struct ATHLTHRecoveryView: View {
     @ViewBuilder
     private var recoveryScoreCard: some View {
         ATHLTHCard {
-            ATHLTHSectionHeader(
-                title: "Readiness",
-                actionTitle: "Today"
-            )
+            HStack(spacing: 9) {
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.premiumGold,
+                                ATHLTHTheme.accent
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 3, height: 19)
+
+                Text("Readiness")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Spacer()
+
+                Text("Today")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep.opacity(0.78)
+                    )
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        ATHLTHTheme.champagneSoft,
+                        in: Capsule()
+                    )
+
+                Button {
+                    showingRecoveryInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(
+                            .system(
+                                size: 16,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "How ATHLTH calculates recovery"
+                )
+            }
 
             if let score = health.recovery.score {
                 HStack(alignment: .center, spacing: 18) {
@@ -4692,32 +4768,41 @@ struct ATHLTHRecoveryView: View {
                 Spacer(minLength: 0)
             }
             .padding(.top, 10)
-        }
-    }
 
-    private var recoveryMethodCard: some View {
-        ATHLTHCard {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .padding(.top, 1)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("How ATHLTH calculates recovery")
-                        .font(.subheadline.weight(.semibold))
-
-                    Text(
-                        "ATHLTH compares your recent sleep, HRV and resting heart rate with your own baseline. The score is a training-readiness signal, not a medical assessment."
+            HStack(spacing: 9) {
+                Button {
+                    onSelectTab(1)
+                } label: {
+                    Label(
+                        guidanceTrainActionTitle,
+                        systemImage: "dumbbell.fill"
                     )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+
+                Button {
+                    selectedRecoveryTool =
+                        recommendedRecoveryTool
+                } label: {
+                    Label(
+                        "Recovery session",
+                        systemImage: "leaf.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.accent)
             }
+            .padding(.top, 12)
         }
     }
+
 
     private var recoveryUnavailableCard: some View {
         ATHLTHCard {
@@ -4919,8 +5004,26 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var guidanceTitle: String {
+        if sorenessStore.todayOverallSoreness.map({
+            $0 >= 4
+        }) ?? false {
+            return "Your body is asking for less today"
+        }
+
         if sorenessStore.highestTodayLevel == .high {
             return "Protect sore muscle groups today"
+        }
+
+        if sorenessStore.todayEnergy.map({
+            $0 <= 2
+        }) ?? false {
+            return "Energy is low today"
+        }
+
+        if sorenessStore.todayStress.map({
+            $0 >= 4
+        }) ?? false {
+            return "Stress is elevated today"
         }
 
         if sorenessStore.highestTodayLevel == .moderate {
@@ -4954,8 +5057,26 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var guidanceDetail: String {
+        if sorenessStore.todayOverallSoreness.map({
+            $0 >= 4
+        }) ?? false {
+            return "Your Daily Check-in shows high overall soreness. Consider reducing load, changing muscle groups or choosing a gentle recovery session."
+        }
+
         if sorenessStore.highestTodayLevel == .high {
             return "Your body check-in shows high soreness. Keep those muscle groups out of heavy work and choose another area, mobility or easy recovery."
+        }
+
+        if sorenessStore.todayEnergy.map({
+            $0 <= 2
+        }) ?? false {
+            return "Your Daily Check-in shows low energy. Keep the session flexible and reduce volume or intensity if effort feels unusually high."
+        }
+
+        if sorenessStore.todayStress.map({
+            $0 >= 4
+        }) ?? false {
+            return "Your Daily Check-in shows elevated stress. A shorter session, easier intensity or a recovery tool may fit better today."
         }
 
         if sorenessStore.highestTodayLevel == .moderate {
@@ -4986,6 +5107,43 @@ struct ATHLTHRecoveryView: View {
                 return "Recovery scoring needs sleep, HRV and resting heart-rate data. Without a wearable, ATHLTH leaves the score unavailable instead of estimating or failing."
             }
         }
+    }
+
+    private var guidanceTrainActionTitle: String {
+        if sorenessStore.todayOverallSoreness.map({
+            $0 >= 4
+        }) ?? false ||
+            sorenessStore.todayEnergy.map({
+                $0 <= 2
+            }) ?? false ||
+            sorenessStore.todayStress.map({
+                $0 >= 4
+            }) ?? false ||
+            sorenessStore.highestTodayLevel == .high ||
+            health.recovery.state == .takeItEasy ||
+            health.recovery.state == .recover {
+            return "Adjust workout"
+        }
+
+        return "Open Train"
+    }
+
+    private var recommendedRecoveryTool: RecoveryTool {
+        if sorenessStore.todayStress.map({
+            $0 >= 4
+        }) ?? false {
+            return .breathing
+        }
+
+        if sorenessStore.todayOverallSoreness.map({
+            $0 >= 4
+        }) ?? false ||
+            sorenessStore.highestTodayLevel == .high ||
+            sorenessStore.highestTodayLevel == .moderate {
+            return .mobility
+        }
+
+        return .stretch
     }
 
     private var muscleRecoveryStatuses: [MuscleRecoveryStatus] {
