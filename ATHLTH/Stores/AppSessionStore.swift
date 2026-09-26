@@ -1093,57 +1093,14 @@ final class AppSessionStore: ObservableObject {
     }
 
     @discardableResult
-    func setTrainingPlanWeekCount(
-        planID: UUID,
-        weekCount: Int
-    ) -> Bool {
-        guard var plan = trainingPlan(withID: planID) else {
-            return false
-        }
-
-        let resolved = min(max(weekCount, 1), 52)
-        let current = plan.weeks.count
-
-        if resolved > current {
-            for number in (current + 1)...resolved {
-                plan.weeks.append(makeEmptyWeek(number: number))
-            }
-        } else if resolved < current {
-            plan.weeks = Array(plan.weeks.prefix(resolved))
-        }
-
-        if let startDate = plan.startDate {
-            let endDate = Calendar.current.date(
-                byAdding: .day,
-                value: max(resolved * 7 - 1, 0),
-                to: Calendar.current.startOfDay(for: startDate)
-            ) ?? startDate
-
-            if trainingPlanConflict(
-                startDate: startDate,
-                endDate: endDate,
-                excludingPlanID: plan.id
-            ) != nil {
-                return false
-            }
-
-            plan.endDate = endDate
-        }
-
-        plan.updatedAt = Date()
-        plan.version += 1
-        replaceTrainingPlan(plan)
-        return true
-    }
-
-    @discardableResult
-    func updateTrainingPlanMetadata(
+    func updateTrainingPlan(
         planID: UUID,
         title: String,
         summary: String,
         visibility: ProfileVisibility,
         tags: [String],
-        startDate: Date
+        startDate: Date,
+        weekCount: Int
     ) -> Bool {
         guard var plan = trainingPlan(withID: planID) else {
             return false
@@ -1156,10 +1113,23 @@ final class AppSessionStore: ObservableObject {
             return false
         }
 
+        let resolvedWeekCount = min(max(weekCount, 1), 52)
+        let currentWeekCount = plan.weeks.count
+
+        if resolvedWeekCount > currentWeekCount {
+            for number in (currentWeekCount + 1)...resolvedWeekCount {
+                plan.weeks.append(makeEmptyWeek(number: number))
+            }
+        } else if resolvedWeekCount < currentWeekCount {
+            plan.weeks = Array(
+                plan.weeks.prefix(resolvedWeekCount)
+            )
+        }
+
         let start = Calendar.current.startOfDay(for: startDate)
         let end = Calendar.current.date(
             byAdding: .day,
-            value: max(plan.weeks.count * 7 - 1, 0),
+            value: max(resolvedWeekCount * 7 - 1, 0),
             to: start
         ) ?? start
 
@@ -1191,6 +1161,52 @@ final class AppSessionStore: ObservableObject {
 
         replaceTrainingPlan(plan)
         return true
+    }
+
+    @discardableResult
+    func setTrainingPlanWeekCount(
+        planID: UUID,
+        weekCount: Int
+    ) -> Bool {
+        guard let plan = trainingPlan(withID: planID) else {
+            return false
+        }
+
+        return updateTrainingPlan(
+            planID: planID,
+            title: plan.title,
+            summary: plan.summary,
+            visibility: plan.visibility,
+            tags: plan.tags,
+            startDate:
+                plan.startDate ??
+                Calendar.current.startOfDay(for: Date()),
+            weekCount: weekCount
+        )
+    }
+
+    @discardableResult
+    func updateTrainingPlanMetadata(
+        planID: UUID,
+        title: String,
+        summary: String,
+        visibility: ProfileVisibility,
+        tags: [String],
+        startDate: Date
+    ) -> Bool {
+        guard let plan = trainingPlan(withID: planID) else {
+            return false
+        }
+
+        return updateTrainingPlan(
+            planID: planID,
+            title: title,
+            summary: summary,
+            visibility: visibility,
+            tags: tags,
+            startDate: startDate,
+            weekCount: plan.weeks.count
+        )
     }
 
     private func replaceTrainingPlan(
