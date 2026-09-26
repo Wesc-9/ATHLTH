@@ -824,6 +824,44 @@ final class AppSessionStore: ObservableObject {
             }
     }
 
+    var suggestedTrainingPlanStartDate: Date {
+        let calendar = Calendar.current
+        var cursor = calendar.startOfDay(for: Date())
+
+        let datedPlans = trainingPlans
+            .compactMap { plan -> (Date, Date)? in
+                guard let startDate = plan.startDate,
+                      let endDate = trainingPlanEndDate(plan)
+                else {
+                    return nil
+                }
+
+                return (
+                    calendar.startOfDay(for: startDate),
+                    calendar.startOfDay(for: endDate)
+                )
+            }
+            .sorted { $0.0 < $1.0 }
+
+        for (start, end) in datedPlans {
+            if end < cursor {
+                continue
+            }
+
+            if start > cursor {
+                break
+            }
+
+            cursor = calendar.date(
+                byAdding: .day,
+                value: 1,
+                to: end
+            ) ?? cursor
+        }
+
+        return cursor
+    }
+
     var nextTrainingPlan: TrainingPlan? {
         let today = Calendar.current.startOfDay(for: Date())
 
