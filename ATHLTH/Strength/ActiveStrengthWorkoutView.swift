@@ -5,11 +5,13 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     @State private var reps = 8
     @State private var weightKilograms = 20.0
+    @State private var restSeconds = 90
     @State private var rpe = 8.0
     @State private var showingFinishConfirmation = false
     @State private var finishInProgress = false
@@ -333,20 +335,90 @@ struct ActiveStrengthWorkoutView: View {
                     systemImage: workout.captureDevice == .appleWatch ? "applewatch" : "iphone"
                 )
                 Spacer()
-                Text("Running continuously")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
+                Text(
+                    strengthWatchSnapshot != nil
+                        ? "Live"
+                        : "Running continuously"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+            }
+
+            if let snapshot = strengthWatchSnapshot {
+                Divider()
+                    .padding(.vertical, 10)
+
+                HStack(spacing: 0) {
+                    strengthWatchMetric(
+                        icon: "heart.fill",
+                        value: snapshot.heartRate > 0
+                            ? "\(Int(snapshot.heartRate.rounded()))"
+                            : "—",
+                        label: "BPM"
+                    )
+
+                    Divider()
+                        .frame(height: 36)
+
+                    strengthWatchMetric(
+                        icon: "flame.fill",
+                        value: "\(Int(snapshot.activeCalories.rounded()))",
+                        label: "KCAL"
+                    )
+
+                    Divider()
+                        .frame(height: 36)
+
+                    strengthWatchMetric(
+                        icon: "clock.fill",
+                        value: snapshot.elapsedTime.clockDuration,
+                        label: "WATCH"
+                    )
+                }
             }
 
             Text(
                 workout.captureDevice == .appleWatch
-                    ? "Logging sets or resting in ATHLTH does not pause the Apple Watch workout. It runs continuously from Start until Finish."
+                    ? "Apple Watch records heart rate, calories and duration while ATHLTH keeps weight, reps, sets and rest on this screen."
                     : "A wearable is optional. The ATHLTH workout runs continuously on iPhone from Start until Finish."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
-            .padding(.top, 6)
+            .padding(.top, 10)
         }
+    }
+
+    private var strengthWatchSnapshot: WatchWorkoutLiveSnapshot? {
+        guard let snapshot = workoutMirroring.snapshot,
+              snapshot.kind == .strength ||
+              snapshot.kind == .functional
+        else {
+            return nil
+        }
+
+        return snapshot
+    }
+
+    @ViewBuilder
+    private func strengthWatchMetric(
+        icon: String,
+        value: String,
+        label: String
+    ) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+
+            Text(value)
+                .font(.subheadline.monospacedDigit().weight(.bold))
+                .lineLimit(1)
+
+            Text(label)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
@@ -423,6 +495,43 @@ struct ActiveStrengthWorkoutView: View {
             }
             .padding(.top, 12)
 
+            HStack(spacing: 12) {
+                Label(
+                    "Rest",
+                    systemImage: "timer"
+                )
+                .font(.subheadline.weight(.semibold))
+
+                Spacer()
+
+                Button {
+                    restSeconds = max(
+                        0,
+                        restSeconds - 15
+                    )
+                } label: {
+                    Image(systemName: "minus")
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.bordered)
+
+                Text(restDurationText)
+                    .font(.subheadline.monospacedDigit().weight(.semibold))
+                    .frame(minWidth: 62)
+
+                Button {
+                    restSeconds = min(
+                        600,
+                        restSeconds + 15
+                    )
+                } label: {
+                    Image(systemName: "plus")
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.top, 14)
+
             HStack {
                 Text("RPE")
                     .font(.subheadline.weight(.semibold))
@@ -437,7 +546,8 @@ struct ActiveStrengthWorkoutView: View {
                 strength.completeCurrentSet(
                     reps: reps,
                     weightKilograms: weightKilograms,
-                    rpe: rpe
+                    rpe: rpe,
+                    restSeconds: restSeconds
                 )
             } label: {
                 Label("Complete Set", systemImage: "checkmark.circle.fill")
@@ -449,7 +559,9 @@ struct ActiveStrengthWorkoutView: View {
             .padding(.top, 14)
 
             Button {
-                strength.completeCurrentSetWithoutDetails()
+                strength.completeCurrentSetWithoutDetails(
+                    restSeconds: restSeconds
+                )
             } label: {
                 Text("Complete set without details")
                     .frame(maxWidth: .infinity)
@@ -570,7 +682,24 @@ struct ActiveStrengthWorkoutView: View {
         guard let set = strength.currentSet else { return }
         reps = set.plannedReps ?? 8
         weightKilograms = set.plannedWeightKilograms ?? max(weightKilograms, 20)
+        restSeconds = max(
+            set.restSeconds ?? 90,
+            0
+        )
         rpe = 8
+    }
+
+    private var restDurationText: String {
+        if restSeconds == 0 {
+            return "None"
+        }
+
+        if restSeconds >= 60,
+           restSeconds % 60 == 0 {
+            return "\(restSeconds / 60) min"
+        }
+
+        return "\(restSeconds) sec"
     }
 }
 
