@@ -2515,6 +2515,7 @@ struct SessionEditorView: View {
 
     @State private var editorMode: SessionEditorMode = .basic
     @State private var selectedGearIDs: Set<UUID> = []
+    @State private var gearSelectionTouched = false
     @State private var audioCoachOverride:
         WatchAudioCoachConfiguration? = nil
     @State private var showingAudioCoachEditor = false
@@ -2955,6 +2956,8 @@ struct SessionEditorView: View {
                 }?.id
             },
             set: { newValue in
+                gearSelectionTouched = true
+
                 let shoeIDs = Set(
                     gear.items(in: .shoes).map(\.id)
                 )
@@ -2998,6 +3001,8 @@ struct SessionEditorView: View {
     }
 
     private func toggleGear(_ id: UUID) {
+        gearSelectionTouched = true
+
         if selectedGearIDs.contains(id) {
             selectedGearIDs.remove(id)
         } else {
@@ -3653,10 +3658,15 @@ struct SessionEditorView: View {
             runningWorkouts: kind == .running
                 ? selectedRunningWorkouts
                 : nil,
-            gearIDs: selectedGearIDs
-                .sorted {
-                    $0.uuidString < $1.uuidString
-                },
+            gearIDs:
+                selectedGearIDs.isEmpty &&
+                !gearSelectionTouched &&
+                existingWorkout?.gearIDs == nil
+                    ? nil
+                    : selectedGearIDs
+                        .sorted {
+                            $0.uuidString < $1.uuidString
+                        },
             audioCoachConfiguration:
                 (kind == .running || kind == .walking)
                     ? audioCoachOverride
