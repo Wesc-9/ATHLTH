@@ -219,19 +219,15 @@ struct ATHLTHTabHero: View {
     var focalOffsetX: CGFloat = 18
     var focalOffsetY: CGFloat = 16
 
-    // Extra artwork that sits behind the pinned content sheet. It does not
-    // participate in layout, so the hero/content boundary stays exactly where
-    // it is. The bleed only becomes visible while the ScrollView is pulled
-    // downward, preventing the light app canvas from flashing through.
+    // The visible hero still occupies 190 pt in layout, but the exact same
+    // image keeps rendering farther down behind the content surface. This
+    // preserves the current hero/content boundary while making pull-down
+    // reveal a continuous image instead of the app canvas.
     private let scrollRevealBleed: CGFloat = 180
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                // Soft continuation of the hero below its normal 190 pt layout
-                // height. The regular hero image below still owns the visible
-                // crop, text and focal positioning; this layer is only a
-                // scroll-reveal backdrop.
                 Image(imageName)
                     .resizable()
                     .interpolation(.high)
@@ -240,41 +236,6 @@ struct ATHLTHTabHero: View {
                     .frame(
                         width: proxy.size.width,
                         height: proxy.size.height + scrollRevealBleed,
-                        alignment: alignment
-                    )
-                    .scaleEffect(
-                        proxy.size.width >= 700
-                            ? 1.04
-                            : 1.12
-                    )
-                    .offset(
-                        x: proxy.size.width >= 700
-                            ? focalOffsetX * 0.4
-                            : focalOffsetX,
-                        y: scrollRevealBleed / 2
-                    )
-                    .clipped()
-                    .blur(radius: 7)
-                    .overlay {
-                        LinearGradient(
-                            colors: [
-                                Color.black.opacity(0.05),
-                                Color.black.opacity(0.22)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-                    .allowsHitTesting(false)
-
-                Image(imageName)
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height,
                         alignment: alignment
                     )
                     // Keep enough overscan on iPhone to move the focal subject
@@ -290,10 +251,11 @@ struct ATHLTHTabHero: View {
                             ? focalOffsetX * 0.4
                             : focalOffsetX,
                         y: proxy.size.width >= 700
-                            ? focalOffsetY * 0.35
-                            : focalOffsetY
+                            ? focalOffsetY * 0.35 + scrollRevealBleed / 2
+                            : focalOffsetY + scrollRevealBleed / 2
                     )
                     .clipped()
+                    .allowsHitTesting(false)
 
                 LinearGradient(
                     colors: [
@@ -460,23 +422,6 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                                 y: -4
                             )
                         }
-                }
-                // During elastic pull-down the content surface temporarily
-                // moves away from the top of the ScrollView. Keep that reveal
-                // dark/translucent so the hero artwork beneath remains visible
-                // instead of exposing the light premium canvas.
-                .background(alignment: .top) {
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.accentDeep.opacity(0.48),
-                            accent.opacity(0.22),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 220)
-                    .allowsHitTesting(false)
                 }
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
