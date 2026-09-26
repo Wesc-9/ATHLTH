@@ -952,8 +952,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartElapsedTime = elapsedTime
         structuredStepStartDistanceMeters = distanceMeters
 
+        targetViolationStartedAt = nil
+        lastTargetAlertAt = nil
+        targetWasOutside = false
+
         publish {
             self.structuredStepIndex = nextIndex
+            self.liveTargetStatus = nil
         }
 
         WKInterfaceDevice.current().play(.notification)
