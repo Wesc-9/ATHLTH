@@ -1165,7 +1165,7 @@ struct SocialPrivacySettingsView: View {
                         Text("Public").tag("public")
                     }
 
-                    Toggle("Appear in username search", isOn: binding.discoverable)
+                    Toggle("Appear in search", isOn: binding.discoverable)
                     Toggle("Allow friend requests", isOn: binding.allowFriendRequests)
                 }
 

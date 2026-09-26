@@ -379,9 +379,10 @@ struct ATHLTHProfileSetupView: View {
             performanceVisibility != .privateOnly
 
         privacy.profileVisibility = broadestProfileVisibility.rawValue
-        privacy.discoverable =
-            broadestProfileVisibility == .publicProfile
 
+        // Search discoverability is independent from profile-section
+        // visibility. Keep an existing user's explicit choice, while the
+        // fallback / database default makes new profiles discoverable.
         await social.updatePrivacy(privacy)
 
         if let message = social.errorMessage, !message.isEmpty {

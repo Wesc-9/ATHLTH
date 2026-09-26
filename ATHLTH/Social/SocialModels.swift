@@ -160,7 +160,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
         SocialPrivacySettings(
             userID: userID,
             profileVisibility: "private",
-            discoverable: false,
+            discoverable: true,
             allowFriendRequests: true,
             allowDirectMessages: "requests",
             trainingFocusVisibility: "private",
