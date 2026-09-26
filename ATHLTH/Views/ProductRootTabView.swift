@@ -1823,11 +1823,14 @@ struct ATHLTHHomeView: View {
                 try await watchConnection
                     .startWorkoutOnWatch(watchKind)
 
-                // Planned workouts start immediately from Home. Gear can
-                // still be managed afterwards; no setup sheet is required.
-                gear.prepareNextWorkoutGear(
-                    Set<UUID>()
-                )
+                if let plannedGearIDs = workout.gearIDs {
+                    gear.prepareNextWorkoutGear(
+                        Set(plannedGearIDs)
+                    )
+                } else {
+                    // Legacy plans keep the normal default-gear fallback.
+                    gear.clearPreparedWorkoutGear()
+                }
 
                 let routeDistanceMeters =
                     selectedRoute.map {
@@ -1837,13 +1840,17 @@ struct ATHLTHHomeView: View {
                         $0 * 1_000
                     }
 
-                watchConnection.sendAudioCoachConfiguration(
+                var coachConfiguration =
+                    workout.audioCoachConfiguration ??
                     settings.audioCoachConfiguration(
                         enabled:
-                            settings.audioCoachEnabledByDefault,
-                        routeDistanceMeters:
-                            routeDistanceMeters
+                            settings.audioCoachEnabledByDefault
                     )
+                coachConfiguration.routeDistanceMeters =
+                    routeDistanceMeters
+
+                watchConnection.sendAudioCoachConfiguration(
+                    coachConfiguration
                 )
 
                 if workout.kind == .running {
@@ -1893,6 +1900,14 @@ struct ATHLTHHomeView: View {
 
         homeDirectStartInProgress = true
         homeWatchTransferError = nil
+
+        if let plannedGearIDs = workout.gearIDs {
+            gear.prepareNextWorkoutGear(
+                Set(plannedGearIDs)
+            )
+        } else {
+            gear.clearPreparedWorkoutGear()
+        }
 
         if useAppleWatch {
             Task { @MainActor in
