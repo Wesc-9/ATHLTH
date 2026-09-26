@@ -4316,27 +4316,419 @@ private struct CommunityGroupActivityRow: View {
     }
 }
 
+struct CommunityGroupNotificationSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var groups: CommunityGroupStore
+
+    let group: CommunityGroupRecord
+
+    @State private var mode = "important"
+    @State private var saving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Group notifications") {
+                    Picker(
+                        "Notify me about",
+                        selection: $mode
+                    ) {
+                        Text("All activity")
+                            .tag("all")
+                        Text("Important only")
+                            .tag("important")
+                        Text("Muted")
+                            .tag("muted")
+                    }
+
+                    Text(modeDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Label(
+                        "Direct @mentions follow your global Mentions setting in Settings → Notifications, even when this group is muted.",
+                        systemImage: "at"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Notifications")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                mode = groups.notificationMode(
+                    in: group.id
+                )
+            }
+            .onChange(of: mode) { oldValue, newValue in
+                guard oldValue != newValue else {
+                    return
+                }
+
+                Task {
+                    saving = true
+                    let saved =
+                        await groups.setGroupNotificationMode(
+                            groupID: group.id,
+                            mode: newValue
+                        )
+                    saving = false
+
+                    if !saved {
+                        mode = oldValue
+                    }
+                }
+            }
+            .disabled(saving)
+        }
+    }
+
+    private var modeDescription: String {
+        switch mode {
+        case "all":
+            return "Receive alerts for new chat messages, official updates, events and challenges."
+        case "muted":
+            return "No ordinary group activity alerts. Direct @mentions can still alert you if Mentions are enabled globally."
+        default:
+            return "Receive official group updates, events and challenges, but not every chat message."
+        }
+    }
+}
+
+struct CommunityGroupInviteMemberView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var groups: CommunityGroupStore
+    @EnvironmentObject private var social: SocialStore
+
+    let group: CommunityGroupRecord
+
+    @State private var query = ""
+    @State private var sendingIDs: Set<UUID> = []
+    @State private var invitedIDs: Set<UUID> = []
+
+    private var existingMemberIDs: Set<UUID> {
+        Set(
+            groups.members(in: group.id).map(\.userID)
+        )
+    }
+
+    private var candidates: [SocialProfileCard] {
+        let clean = query
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let source =
+            clean.isEmpty
+                ? social.visibleProfiles
+                : social.discoverResults
+
+        return source
+            .filter {
+                !existingMemberIDs.contains($0.userID) &&
+                $0.userID != social.currentUserID
+            }
+            .sorted {
+                $0.resolvedName
+                    .localizedCaseInsensitiveCompare(
+                        $1.resolvedName
+                    ) == .orderedAscending
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if candidates.isEmpty {
+                    ContentUnavailableView(
+                        query.isEmpty
+                            ? "Find people to invite"
+                            : "No matching users",
+                        systemImage: "person.badge.plus",
+                        description: Text(
+                            query.isEmpty
+                                ? "Search by username or name."
+                                : "Try another search."
+                        )
+                    )
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(candidates) { profile in
+                        HStack(spacing: 12) {
+                            CommunityGroupProfileAvatar(
+                                profile: profile,
+                                size: 42
+                            )
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 2
+                            ) {
+                                Text(profile.resolvedName)
+                                    .font(
+                                        .subheadline
+                                            .weight(.semibold)
+                                    )
+
+                                if !profile.usernameLabel.isEmpty {
+                                    Text(profile.usernameLabel)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            if invitedIDs.contains(
+                                profile.userID
+                            ) {
+                                Label(
+                                    "Invited",
+                                    systemImage: "checkmark"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                )
+                            } else {
+                                Button("Invite") {
+                                    Task {
+                                        sendingIDs.insert(
+                                            profile.userID
+                                        )
+
+                                        let sent =
+                                            await groups.inviteMember(
+                                                groupID: group.id,
+                                                userID:
+                                                    profile.userID
+                                            )
+
+                                        sendingIDs.remove(
+                                            profile.userID
+                                        )
+
+                                        if sent {
+                                            invitedIDs.insert(
+                                                profile.userID
+                                            )
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(
+                                    sendingIDs.contains(
+                                        profile.userID
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            .searchable(
+                text: $query,
+                prompt: "Search username or name"
+            )
+            .navigationTitle("Invite Members")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .task(id: query) {
+                let clean = query
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+
+                guard clean.count >= 2 else {
+                    social.clearSearch()
+                    return
+                }
+
+                try? await Task.sleep(
+                    for: .milliseconds(250)
+                )
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                await social.search(clean)
+            }
+            .onDisappear {
+                social.clearSearch()
+            }
+        }
+    }
+}
+
 struct CommunityGroupMembersView: View {
     @EnvironmentObject private var groups: CommunityGroupStore
 
     let group: CommunityGroupRecord
 
-    private var sortedMembers: [CommunityGroupMemberRecord] {
+    @State private var showingInvite = false
+
+    private var sortedMembers:
+        [CommunityGroupMemberRecord] {
         groups.members(in: group.id).sorted {
             roleRank($0.role) < roleRank($1.role)
         }
     }
 
+    private var currentGroup: CommunityGroupRecord {
+        groups.group(for: group.id) ?? group
+    }
+
     var body: some View {
         List {
-            ForEach(sortedMembers, id: \.userID) { member in
-                memberRow(member)
+            if groups.canManage(currentGroup) &&
+                !groups.joinRequests(
+                    in: group.id
+                ).isEmpty {
+                Section("Membership Requests") {
+                    ForEach(
+                        groups.joinRequests(
+                            in: group.id
+                        ),
+                        id: \.userID
+                    ) { request in
+                        joinRequestRow(request)
+                    }
+                }
+            }
+
+            Section("Members") {
+                ForEach(
+                    sortedMembers,
+                    id: \.userID
+                ) { member in
+                    memberRow(member)
+                }
             }
         }
         .navigationTitle("Members")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if groups.canManage(currentGroup) {
+                ToolbarItem(
+                    placement: .topBarTrailing
+                ) {
+                    Button {
+                        showingInvite = true
+                    } label: {
+                        Image(
+                            systemName:
+                                "person.badge.plus"
+                        )
+                    }
+                    .accessibilityLabel(
+                        "Invite group member"
+                    )
+                }
+            }
+        }
+        .sheet(isPresented: $showingInvite) {
+            CommunityGroupInviteMemberView(
+                group: currentGroup
+            )
+        }
         .task {
-            await groups.loadGroupContent(group.id)
+            await groups.loadGroupContent(
+                group.id
+            )
+        }
+    }
+
+    private func joinRequestRow(
+        _ request: CommunityGroupJoinRequestRecord
+    ) -> some View {
+        HStack(spacing: 12) {
+            if let profile = groups.profileCard(
+                for: request.userID
+            ) {
+                CommunityGroupProfileAvatar(
+                    profile: profile,
+                    size: 42
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(profile.resolvedName)
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+
+                    if !profile.usernameLabel.isEmpty {
+                        Text(profile.usernameLabel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Image(
+                    systemName:
+                        "person.crop.circle.fill"
+                )
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+
+                Text("ATHLTH member")
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+            }
+
+            Spacer()
+
+            Button {
+                Task {
+                    _ = await groups
+                        .respondToJoinRequest(
+                            groupID: group.id,
+                            userID: request.userID,
+                            accept: false
+                        )
+                }
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.bordered)
+            .tint(.secondary)
+
+            Button {
+                Task {
+                    _ = await groups
+                        .respondToJoinRequest(
+                            groupID: group.id,
+                            userID: request.userID,
+                            accept: true
+                        )
+                }
+            } label: {
+                Image(systemName: "checkmark")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
         }
     }
 
@@ -4353,105 +4745,117 @@ struct CommunityGroupMembersView: View {
                     size: 42
                 )
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
                     Text(profile.resolvedName)
-                        .font(.subheadline.weight(.semibold))
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
 
-                    if let username = profile.username {
+                    if let username =
+                        profile.username {
                         Text("@\(username)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
             } else {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.secondary)
+                Image(
+                    systemName:
+                        "person.crop.circle.fill"
+                )
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
 
                 Text("Group member")
-                    .font(.subheadline.weight(.semibold))
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
             }
 
             Spacer()
 
             Text(roleTitle(member.role))
                 .font(.caption2.weight(.bold))
-                .foregroundStyle(roleTint(member.role))
+                .foregroundStyle(
+                    roleTint(member.role)
+                )
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
-                    Color(.secondarySystemGroupedBackground),
+                    Color(
+                        .secondarySystemGroupedBackground
+                    ),
                     in: Capsule()
                 )
 
-            if groups.canManage(group) &&
+            if groups.canManage(currentGroup) &&
                 member.role != "owner" {
                 Menu {
-                    Button {
-                        Task {
-                            _ = await groups.setMemberRole(
-                                groupID: group.id,
-                                userID: member.userID,
-                                role: "admin"
-                            )
-                        }
-                    } label: {
-                        Label(
-                            "Admin",
-                            systemImage:
-                                member.role == "admin"
-                                    ? "checkmark"
-                                    : "shield.fill"
-                        )
-                    }
-                    .disabled(member.role == "admin")
+                    roleButton(
+                        member,
+                        role: "admin",
+                        title: "Admin",
+                        icon: "shield.fill"
+                    )
 
-                    Button {
-                        Task {
-                            _ = await groups.setMemberRole(
-                                groupID: group.id,
-                                userID: member.userID,
-                                role: "contributor"
-                            )
-                        }
-                    } label: {
-                        Label(
-                            "Contributor",
-                            systemImage:
-                                member.role == "contributor"
-                                    ? "checkmark"
-                                    : "megaphone.fill"
-                        )
-                    }
-                    .disabled(member.role == "contributor")
+                    roleButton(
+                        member,
+                        role: "contributor",
+                        title: "Contributor",
+                        icon: "megaphone.fill"
+                    )
 
-                    Button {
-                        Task {
-                            _ = await groups.setMemberRole(
-                                groupID: group.id,
-                                userID: member.userID,
-                                role: "member"
-                            )
-                        }
-                    } label: {
-                        Label(
-                            "Member",
-                            systemImage:
-                                member.role == "member"
-                                    ? "checkmark"
-                                    : "person.fill"
-                        )
-                    }
-                    .disabled(member.role == "member")
+                    roleButton(
+                        member,
+                        role: "member",
+                        title: "Member",
+                        icon: "person.fill"
+                    )
                 } label: {
                     Image(systemName: "ellipsis")
-                        .frame(width: 30, height: 30)
+                        .frame(
+                            width: 30,
+                            height: 30
+                        )
                 }
             }
         }
     }
 
-    private func roleRank(_ role: String) -> Int {
+    private func roleButton(
+        _ member: CommunityGroupMemberRecord,
+        role: String,
+        title: String,
+        icon: String
+    ) -> some View {
+        Button {
+            Task {
+                _ = await groups.setMemberRole(
+                    groupID: group.id,
+                    userID: member.userID,
+                    role: role
+                )
+            }
+        } label: {
+            Label(
+                title,
+                systemImage:
+                    member.role == role
+                        ? "checkmark"
+                        : icon
+            )
+        }
+        .disabled(member.role == role)
+    }
+
+    private func roleRank(
+        _ role: String
+    ) -> Int {
         switch role {
         case "owner": return 0
         case "admin": return 1
@@ -4460,15 +4864,20 @@ struct CommunityGroupMembersView: View {
         }
     }
 
-    private func roleTitle(_ role: String) -> String {
+    private func roleTitle(
+        _ role: String
+    ) -> String {
         switch role {
-        case "owner", "admin": return "Admin"
+        case "owner": return "Owner"
+        case "admin": return "Admin"
         case "contributor": return "Contributor"
         default: return "Member"
         }
     }
 
-    private func roleTint(_ role: String) -> Color {
+    private func roleTint(
+        _ role: String
+    ) -> Color {
         switch role {
         case "owner":
             return ATHLTHTheme.premiumGold
