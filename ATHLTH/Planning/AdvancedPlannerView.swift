@@ -3635,7 +3635,13 @@ struct SessionEditorView: View {
                     ? distanceKilometers
                     : nil,
             targetPaceSecondsPerKilometer:
-                existingWorkout?.targetPaceSecondsPerKilometer,
+                (kind == .running || kind == .walking) &&
+                targetPaceEnabled
+                    ? Double(
+                        targetPaceMinutes * 60 +
+                        targetPaceSeconds
+                    )
+                    : nil,
             routeID: selectedRouteID,
             exercises: kind == .strength
                 ? plannedExercises
@@ -3646,7 +3652,15 @@ struct SessionEditorView: View {
                 : nil,
             runningWorkouts: kind == .running
                 ? selectedRunningWorkouts
-                : nil
+                : nil,
+            gearIDs: selectedGearIDs
+                .sorted {
+                    $0.uuidString < $1.uuidString
+                },
+            audioCoachConfiguration:
+                (kind == .running || kind == .walking)
+                    ? audioCoachOverride
+                    : nil
         )
 
         if existingWorkout != nil,
@@ -3694,6 +3708,316 @@ struct SessionEditorView: View {
         }
 
         return parts.joined(separator: " · ")
+    }
+}
+
+private struct PlannedAudioCoachEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @Binding var configuration:
+        WatchAudioCoachConfiguration?
+
+    let defaultConfiguration:
+        WatchAudioCoachConfiguration
+
+    @State private var usesCustomSettings: Bool
+    @State private var draft:
+        WatchAudioCoachConfiguration
+
+    init(
+        configuration:
+            Binding<WatchAudioCoachConfiguration?>,
+        defaultConfiguration:
+            WatchAudioCoachConfiguration
+    ) {
+        _configuration = configuration
+        self.defaultConfiguration =
+            defaultConfiguration
+
+        let existing =
+            configuration.wrappedValue
+
+        _usesCustomSettings = State(
+            initialValue: existing != nil
+        )
+        _draft = State(
+            initialValue:
+                existing ??
+                defaultConfiguration
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Toggle(
+                        "Customize for this workout",
+                        isOn: $usesCustomSettings
+                    )
+
+                    Text(
+                        usesCustomSettings
+                            ? "These settings apply only to this planned workout."
+                            : "ATHLTH will use your Audio Coach defaults from Settings."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                if usesCustomSettings {
+                    Section("Audio Coach") {
+                        Toggle(
+                            "Audio Coach",
+                            isOn: $draft.enabled
+                        )
+
+                        Picker(
+                            "Language",
+                            selection: $draft.language
+                        ) {
+                            ForEach(
+                                WatchAudioCoachLanguage
+                                    .allCases,
+                                id: \.self
+                            ) { language in
+                                Text(language.title)
+                                    .tag(language)
+                            }
+                        }
+                    }
+
+                    if draft.enabled {
+                        Section("When to speak") {
+                            Toggle(
+                                "Distance interval",
+                                isOn:
+                                    distanceTriggerBinding
+                            )
+
+                            if draft
+                                .distanceIntervalMeters != nil {
+                                Stepper(
+                                    distanceIntervalLabel,
+                                    value:
+                                        distanceIntervalBinding,
+                                    in: 250...10_000,
+                                    step: 250
+                                )
+                            }
+
+                            Toggle(
+                                "Time interval",
+                                isOn: timeTriggerBinding
+                            )
+
+                            if draft
+                                .timeIntervalSeconds != nil {
+                                Stepper(
+                                    timeIntervalLabel,
+                                    value:
+                                        timeIntervalBinding,
+                                    in: 60...3_600,
+                                    step: 60
+                                )
+                            }
+                        }
+
+                        Section("Announcements") {
+                            Toggle(
+                                "Distance",
+                                isOn:
+                                    $draft
+                                        .announceDistance
+                            )
+                            Toggle(
+                                "Elapsed time",
+                                isOn:
+                                    $draft
+                                        .announceElapsedTime
+                            )
+                            Toggle(
+                                "Average pace",
+                                isOn:
+                                    $draft
+                                        .announceAveragePace
+                            )
+                            Toggle(
+                                "Clock time",
+                                isOn:
+                                    $draft
+                                        .announceClockTime
+                            )
+                            Toggle(
+                                "Heart rate",
+                                isOn:
+                                    $draft
+                                        .announceHeartRate
+                            )
+                            Toggle(
+                                "Remaining route distance",
+                                isOn:
+                                    $draft
+                                        .announceRemainingRouteDistance
+                            )
+                            Toggle(
+                                "Estimated route time left",
+                                isOn:
+                                    $draft
+                                        .announceEstimatedRemainingRouteTime
+                            )
+                            Toggle(
+                                "Current workout step",
+                                isOn:
+                                    $draft
+                                        .announceCurrentWorkoutStep
+                            )
+                            Toggle(
+                                "Remaining step time",
+                                isOn:
+                                    $draft
+                                        .announceRemainingStepTime
+                            )
+                            Toggle(
+                                "Remaining step distance",
+                                isOn:
+                                    $draft
+                                        .announceRemainingStepDistance
+                            )
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Audio Coach")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button("Save") {
+                        if usesCustomSettings {
+                            var saved = draft
+                            saved.routeDistanceMeters = nil
+                            configuration = saved
+                        } else {
+                            configuration = nil
+                        }
+
+                        dismiss()
+                    }
+                }
+            }
+            .onChange(
+                of: usesCustomSettings
+            ) { _, enabled in
+                if enabled &&
+                    configuration == nil {
+                    draft = defaultConfiguration
+                }
+            }
+        }
+    }
+
+    private var distanceTriggerBinding:
+        Binding<Bool> {
+        Binding(
+            get: {
+                draft.distanceIntervalMeters != nil
+            },
+            set: { enabled in
+                draft.distanceIntervalMeters =
+                    enabled
+                        ? (
+                            draft
+                                .distanceIntervalMeters ??
+                            defaultConfiguration
+                                .distanceIntervalMeters ??
+                            1_000
+                        )
+                        : nil
+            }
+        )
+    }
+
+    private var timeTriggerBinding:
+        Binding<Bool> {
+        Binding(
+            get: {
+                draft.timeIntervalSeconds != nil
+            },
+            set: { enabled in
+                draft.timeIntervalSeconds =
+                    enabled
+                        ? (
+                            draft
+                                .timeIntervalSeconds ??
+                            defaultConfiguration
+                                .timeIntervalSeconds ??
+                            600
+                        )
+                        : nil
+            }
+        )
+    }
+
+    private var distanceIntervalBinding:
+        Binding<Double> {
+        Binding(
+            get: {
+                draft.distanceIntervalMeters ??
+                1_000
+            },
+            set: {
+                draft.distanceIntervalMeters = $0
+            }
+        )
+    }
+
+    private var timeIntervalBinding:
+        Binding<Double> {
+        Binding(
+            get: {
+                draft.timeIntervalSeconds ??
+                600
+            },
+            set: {
+                draft.timeIntervalSeconds = $0
+            }
+        )
+    }
+
+    private var distanceIntervalLabel: String {
+        let meters =
+            draft.distanceIntervalMeters ??
+            1_000
+
+        if meters >= 1_000 {
+            return String(
+                format:
+                    "Every %.2g km",
+                meters / 1_000
+            )
+        }
+
+        return
+            "Every \(Int(meters.rounded())) m"
+    }
+
+    private var timeIntervalLabel: String {
+        let seconds =
+            draft.timeIntervalSeconds ??
+            600
+
+        return
+            "Every \(max(Int((seconds / 60).rounded()), 1)) min"
     }
 }
 
