@@ -1160,20 +1160,70 @@ struct ATHLTHHomeView: View {
         planID: UUID,
         workout: PlannedSession
     )? {
-        guard let plan = session.activePlan else { return nil }
+        guard let plan = session.activePlan else {
+            return nil
+        }
 
-        let sessions = homeTodaySessions(in: plan)
+        let workout = homeTodaySessions(in: plan)
+            .first {
+                !homeIsPlanSessionCompleted(
+                    planID: plan.id,
+                    workout: $0
+                )
+            }
 
-        guard let workout = sessions.first else {
+        guard let workout else {
             return nil
         }
 
         return (plan.id, workout)
     }
 
+    private var homeTodayCompletion: (
+        completed: Int,
+        total: Int
+    ) {
+        guard let plan = session.activePlan else {
+            return (0, 0)
+        }
+
+        let workouts = homeTodaySessions(in: plan)
+        let completed = workouts.filter {
+            homeIsPlanSessionCompleted(
+                planID: plan.id,
+                workout: $0
+            )
+        }
+        .count
+
+        return (
+            completed,
+            workouts.count
+        )
+    }
+
+    private func homeIsPlanSessionCompleted(
+        planID: UUID,
+        workout: PlannedSession
+    ) -> Bool {
+        if session.isPlanSessionManuallyCompleted(
+            planID: planID,
+            sessionID: workout.id
+        ) {
+            return true
+        }
+
+        return strengthWorkout.workoutHistory.contains {
+            $0.isFinished &&
+            $0.plannedSessionID == workout.id
+        }
+    }
+
     @ViewBuilder
     private var homeTodayCard: some View {
-        ATHLTHCard {
+        let completion = homeTodayCompletion
+
+        return ATHLTHCard {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Today")
@@ -1197,6 +1247,18 @@ struct ATHLTHHomeView: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                     .buttonStyle(.plain)
                 }
+            }
+
+            if completion.total > 0 &&
+               completion.completed > 0 &&
+               completion.completed < completion.total {
+                Label(
+                    "\(completion.completed) of \(completion.total) completed today",
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.vitality)
+                .padding(.top, 10)
             }
 
             if workoutMirroring.hasActiveMirroredWorkout,
@@ -1236,16 +1298,23 @@ struct ATHLTHHomeView: View {
                 }
                 .padding(.top, 14)
 
-                Button {
-                    workoutMirroring.isPresentationRequested = true
-                } label: {
-                    Label("Continue Workout", systemImage: "applewatch")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
+                HStack {
+                    Button {
+                        workoutMirroring.isPresentationRequested = true
+                    } label: {
+                        Label(
+                            "Continue Workout",
+                            systemImage: "applewatch"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 18)
+                        .frame(height: 42)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+
+                    Spacer()
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
                 .padding(.top, 12)
             } else if let active = strengthWorkout.activeWorkout {
                 HStack(spacing: 13) {
@@ -1278,16 +1347,23 @@ struct ATHLTHHomeView: View {
                 }
                 .padding(.top, 14)
 
-                Button {
-                    showingHomeStrengthWorkout = true
-                } label: {
-                    Label("Continue Workout", systemImage: "play.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
+                HStack {
+                    Button {
+                        showingHomeStrengthWorkout = true
+                    } label: {
+                        Label(
+                            "Continue Workout",
+                            systemImage: "play.fill"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 18)
+                        .frame(height: 42)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+
+                    Spacer()
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
                 .padding(.top, 12)
             } else if let selection = homeTodayPlanWorkout {
                 let workout = selection.workout
@@ -1303,7 +1379,7 @@ struct ATHLTHHomeView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("TODAY'S WORKOUT")
+                        Text("NEXT WORKOUT")
                             .font(.system(size: 9, weight: .bold))
                             .tracking(1.2)
                             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1320,38 +1396,115 @@ struct ATHLTHHomeView: View {
                     }
 
                     Spacer()
+
+                    Menu {
+                        Button {
+                            session.setPlanSessionManuallyCompleted(
+                                planID: selection.planID,
+                                sessionID: workout.id,
+                                completed: true
+                            )
+                        } label: {
+                            Label(
+                                "Mark as Completed",
+                                systemImage: "checkmark.circle"
+                            )
+                        }
+
+                        NavigationLink {
+                            PlannedWorkoutDetailView(
+                                planID: selection.planID,
+                                workout: workout,
+                                isHealthCompleted: false
+                            )
+                        } label: {
+                            Label(
+                                "View Details",
+                                systemImage: "info.circle"
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 34, height: 34)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Workout actions")
                 }
                 .padding(.top, 14)
 
-                if homeCanStartDirectly(workout) {
-                    Button {
-                        startHomeWorkout(workout)
-                    } label: {
-                        Label("Start Workout", systemImage: "play.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
+                HStack {
+                    if homeCanStartDirectly(workout) {
+                        Button {
+                            startHomeWorkout(workout)
+                        } label: {
+                            Label(
+                                "Start Workout",
+                                systemImage: "play.fill"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 20)
+                            .frame(height: 42)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                    } else {
+                        NavigationLink {
+                            PlannedWorkoutDetailView(
+                                planID: selection.planID,
+                                workout: workout,
+                                isHealthCompleted: false
+                            )
+                        } label: {
+                            Label(
+                                "Open Workout",
+                                systemImage: "arrow.right"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 20)
+                            .frame(height: 42)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-                    .padding(.top, 12)
-                } else {
-                    NavigationLink {
-                        PlannedWorkoutDetailView(
-                            planID: selection.planID,
-                            workout: workout,
-                            isHealthCompleted: false
-                        )
-                    } label: {
-                        Label("Open Workout", systemImage: "arrow.right")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-                    .padding(.top, 12)
+
+                    Spacer()
                 }
+                .padding(.top, 12)
+            } else if completion.total > 0 &&
+                        completion.completed == completion.total {
+                HStack(spacing: 13) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            ATHLTHTheme.vitalitySoft,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("TODAY COMPLETE")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Text("All planned workouts completed")
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(
+                            completion.total == 1
+                                ? "1 workout completed today."
+                                : "\(completion.total) workouts completed today."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 14)
             } else {
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
@@ -1395,9 +1548,6 @@ struct ATHLTHHomeView: View {
                             pendingHomePlanSession = nil
                             pendingHomeQuickStartKind = .running
                         } else {
-                            // Direct outdoor quick start is currently a Watch
-                            // capability. Route no-watch users to Train instead
-                            // of presenting a disabled start sheet.
                             onSelectTab(1)
                         }
                     }
