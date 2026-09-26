@@ -610,126 +610,137 @@ struct AroundYouExploreView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
-            Map(position: $mapPosition) {
-                if locationStore.canShowUserLocation {
-                    UserAnnotation()
-                }
+            MapReader { proxy in
+                Map(position: $mapPosition) {
+                    if locationStore.canShowUserLocation {
+                        UserAnnotation()
+                    }
 
-                if filter != .events {
-                    ForEach(nearbyRoutes.prefix(25)) { route in
-                        let isSelected =
-                            selectedRoute?.id == route.id
+                    if filter != .events {
+                        ForEach(nearbyRoutes.prefix(25)) { route in
+                            let isSelected =
+                                selectedRoute?.id == route.id
 
-                        MapPolyline(
-                            coordinates:
-                                route.coordinates.map(\.coordinate)
-                        )
-                        .stroke(
-                            route.isMine
-                                ? ATHLTHTheme.premiumGold
-                                : ATHLTHTheme.accent,
-                            lineWidth: isSelected
-                                ? 7
-                                : (route.isMine ? 5 : 4)
-                        )
+                            MapPolyline(
+                                coordinates:
+                                    route.coordinates.map(\.coordinate)
+                            )
+                            .stroke(
+                                route.isMine
+                                    ? ATHLTHTheme.premiumGold
+                                    : ATHLTHTheme.accent,
+                                lineWidth: isSelected
+                                    ? 7
+                                    : (route.isMine ? 5 : 4)
+                            )
 
-                        if let center = route.centerCoordinate {
-                            Annotation(
-                                route.title,
-                                coordinate: center
-                            ) {
-                                Button {
-                                    withAnimation(
-                                        .spring(
-                                            response: 0.34,
-                                            dampingFraction: 0.86
-                                        )
-                                    ) {
-                                        selectedRoute =
+                            if let center = route.centerCoordinate {
+                                Annotation(
+                                    route.title,
+                                    coordinate: center
+                                ) {
+                                    Button {
+                                        selectRoute(
                                             route.trainingRoute
-                                    }
-                                } label: {
-                                    Image(
-                                        systemName:
+                                        )
+                                    } label: {
+                                        Image(
+                                            systemName:
+                                                isSelected
+                                                    ? "figure.run.circle.fill"
+                                                    : "figure.run.circle"
+                                        )
+                                        .font(
                                             isSelected
-                                                ? "figure.run.circle.fill"
-                                                : "figure.run.circle"
-                                    )
-                                    .font(
-                                        isSelected
-                                            ? .title2
-                                            : .title3
-                                    )
-                                    .foregroundStyle(
-                                        route.isMine
-                                            ? ATHLTHTheme.premiumGold
-                                            : ATHLTHTheme.accentDeep
-                                    )
-                                    .background(
-                                        .white,
-                                        in: Circle()
-                                    )
-                                    .shadow(
-                                        color: .black.opacity(
-                                            isSelected ? 0.16 : 0.08
-                                        ),
-                                        radius: isSelected ? 7 : 3,
-                                        y: 2
+                                                ? .title2
+                                                : .title3
+                                        )
+                                        .foregroundStyle(
+                                            route.isMine
+                                                ? ATHLTHTheme.premiumGold
+                                                : ATHLTHTheme.accentDeep
+                                        )
+                                        .background(
+                                            .white,
+                                            in: Circle()
+                                        )
+                                        .shadow(
+                                            color: .black.opacity(
+                                                isSelected
+                                                    ? 0.16
+                                                    : 0.08
+                                            ),
+                                            radius:
+                                                isSelected ? 7 : 3,
+                                            y: 2
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(
+                                        "Preview \(route.title)"
                                     )
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(
-                                    "Preview \(route.title)"
+                            }
+                        }
+                    }
+
+                    if filter != .routes {
+                        ForEach(nearbyEvents.prefix(30)) { item in
+                            if let coordinate =
+                                eventCoordinate(item) {
+                                Marker(
+                                    item.event.title,
+                                    systemImage:
+                                        item.event
+                                            .activityType
+                                            .systemImage,
+                                    coordinate: coordinate
                                 )
+                                .tint(.purple)
                             }
                         }
                     }
                 }
+                .mapStyle(
+                    .standard(elevation: .realistic)
+                )
+                .mapControls {
+                    MapCompass()
+                    MapScaleView()
+                    MapUserLocationButton()
+                }
+                .onTapGesture { point in
+                    guard let coordinate = proxy.convert(
+                        point,
+                        from: .local
+                    ) else {
+                        return
+                    }
 
-                if filter != .routes {
-                    ForEach(nearbyEvents.prefix(30)) { item in
-                        if let coordinate =
-                            eventCoordinate(item) {
-                            Marker(
-                                item.event.title,
-                                systemImage:
-                                    item.event
-                                        .activityType
-                                        .systemImage,
-                                coordinate: coordinate
+                    selectRoute(
+                        nearestTo: coordinate
+                    )
+                }
+                .overlay(alignment: .bottom) {
+                    if let route = selectedRoute {
+                        routePreviewCard(route)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 12)
+                            .transition(
+                                .move(edge: .bottom)
+                                    .combined(with: .opacity)
                             )
-                            .tint(.purple)
-                        }
+                            .zIndex(10)
                     }
                 }
+                .animation(
+                    .spring(
+                        response: 0.34,
+                        dampingFraction: 0.86
+                    ),
+                    value: selectedRoute?.id
+                )
             }
-            .mapStyle(
-                .standard(elevation: .realistic)
-            )
-            .mapControls {
-                MapCompass()
-                MapScaleView()
-                MapUserLocationButton()
-            }
-            .overlay(alignment: .bottom) {
-                if let route = selectedRoute {
-                    routePreviewCard(route)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-                        .transition(
-                            .move(edge: .bottom)
-                                .combined(with: .opacity)
-                        )
-                        .zIndex(10)
-                }
-            }
-            .animation(
-                .spring(
-                    response: 0.34,
-                    dampingFraction: 0.86
-                ),
-                value: selectedRoute?.id
-            )
         }
         .background(ATHLTHPremiumCanvas())
         .navigationTitle("Around You")
@@ -807,6 +818,96 @@ struct AroundYouExploreView: View {
                 routeActionMessage ??
                 ""
             )
+        }
+    }
+
+    private func selectRoute(
+        _ route: TrainingRoute
+    ) {
+        withAnimation(
+            .spring(
+                response: 0.34,
+                dampingFraction: 0.86
+            )
+        ) {
+            selectedRoute = route
+        }
+    }
+
+    private func selectRoute(
+        nearestTo coordinate: CLLocationCoordinate2D
+    ) {
+        guard filter != .events else {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                selectedRoute = nil
+            }
+            return
+        }
+
+        let tapLocation = CLLocation(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
+        )
+
+        let candidate = nearbyRoutes
+            .prefix(25)
+            .compactMap {
+                route ->
+                    (TrainingRoute, CLLocationDistance)?
+                in
+                guard !route.coordinates.isEmpty
+                else {
+                    return nil
+                }
+
+                let strideValue = max(
+                    route.coordinates.count / 140,
+                    1
+                )
+
+                let sampled = route.coordinates
+                    .enumerated()
+                    .compactMap {
+                        index,
+                        point -> CLLocation? in
+                        guard
+                            index % strideValue == 0 ||
+                            index ==
+                                route.coordinates.count - 1
+                        else {
+                            return nil
+                        }
+
+                        return CLLocation(
+                            latitude: point.latitude,
+                            longitude: point.longitude
+                        )
+                    }
+
+                guard let nearest = sampled
+                    .lazy
+                    .map({
+                        tapLocation.distance(from: $0)
+                    })
+                    .min(),
+                    nearest <= 240
+                else {
+                    return nil
+                }
+
+                return (
+                    route.trainingRoute,
+                    nearest
+                )
+            }
+            .min { $0.1 < $1.1 }
+
+        if let route = candidate?.0 {
+            selectRoute(route)
+        } else {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                selectedRoute = nil
+            }
         }
     }
 
