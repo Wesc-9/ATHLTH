@@ -1223,7 +1223,7 @@ struct ATHLTHHomeView: View {
     private var homeTodayCard: some View {
         let completion = homeTodayCompletion
 
-        return ATHLTHCard {
+        ATHLTHCard {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Today")
