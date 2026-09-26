@@ -588,10 +588,8 @@ final class CommunityGroupStore: ObservableObject {
         switch role(in: group) {
         case "owner", "admin":
             return true
-        case "member":
+        case "member", "contributor":
             return group.membersCanCreateContent
-        case "contributor":
-            return false
         default:
             return false
         }
