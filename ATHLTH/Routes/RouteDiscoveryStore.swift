@@ -107,10 +107,11 @@ final class SupabaseRouteDiscoveryService {
     }
 
     func loadDiscoverableRoutes() async throws -> [CommunityRouteRecord] {
+        // RLS decides which routes the signed-in user may see:
+        // public, friends-only where a friendship exists, plus own routes.
         try await client
             .from("community_routes")
             .select()
-            .eq("visibility", value: ProfileVisibility.publicProfile.rawValue)
             .order("created_at", ascending: false)
             .limit(250)
             .execute()
