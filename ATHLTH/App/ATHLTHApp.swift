@@ -116,6 +116,10 @@ struct AppRootView: View {
     @State private var queuedWorkoutReviewIDs: Set<UUID> = []
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
     @State private var processedStrengthCommandIDs: Set<UUID> = []
+    @State private var lastFullLifecycleRefreshAt: Date?
+
+    private let minimumLifecycleRefreshInterval:
+        TimeInterval = 90
 
     private var lifecycleContent: some View {
         Group {
@@ -181,6 +185,7 @@ struct AppRootView: View {
             )
             await refreshTrophiesAndNotifications()
             await syncSocialOwnedData()
+            lastFullLifecycleRefreshAt = Date()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -190,6 +195,14 @@ struct AppRootView: View {
             if settings.trainingDeviceProvider == .appleWatch {
                 watchConnection.connect()
             }
+
+            let now = Date()
+            if let lastFullLifecycleRefreshAt,
+               now.timeIntervalSince(lastFullLifecycleRefreshAt) <
+                    minimumLifecycleRefreshInterval {
+                return
+            }
+            lastFullLifecycleRefreshAt = now
 
             Task {
                 if appSession.signedIn {

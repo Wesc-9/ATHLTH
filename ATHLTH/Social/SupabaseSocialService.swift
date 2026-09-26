@@ -36,6 +36,8 @@ final class SupabaseSocialService {
         try await client
             .from("social_profile_cards")
             .select()
+            .order("updated_at", ascending: false)
+            .limit(500)
             .execute()
             .value
     }
@@ -403,6 +405,8 @@ final class SupabaseSocialService {
         let reactions: [SocialActivityReactionRecord] = try await client
             .from("social_activity_reactions")
             .select()
+            .order("created_at", ascending: false)
+            .limit(1_000)
             .execute()
             .value
 
@@ -544,6 +548,8 @@ final class SupabaseSocialService {
         let backendChallenges: [BackendSocialChallenge] = try await client
             .from("social_challenges")
             .select()
+            .order("created_at", ascending: false)
+            .limit(150)
             .execute()
             .value
 
@@ -552,18 +558,23 @@ final class SupabaseSocialService {
         let backendParticipants: [BackendChallengeParticipant] = try await client
             .from("social_challenge_participants")
             .select()
+            .limit(1_000)
             .execute()
             .value
 
         let backendAttempts: [BackendChallengeAttempt] = try await client
             .from("social_challenge_attempts")
             .select()
+            .order("submitted_at", ascending: false)
+            .limit(1_000)
             .execute()
             .value
 
         let backendCheckIns: [BackendChallengeCheckIn] = try await client
             .from("social_challenge_checkins")
             .select()
+            .order("created_at", ascending: false)
+            .limit(1_000)
             .execute()
             .value
 

@@ -106,14 +106,18 @@ final class SupabaseRouteDiscoveryService {
         self.client = client
     }
 
-    func loadDiscoverableRoutes() async throws -> [CommunityRouteRecord] {
-        // RLS decides which routes the signed-in user may see:
-        // public, friends-only where a friendship exists, plus own routes.
+    func loadDiscoverableRoutes(
+        limit: Int = 48
+    ) async throws -> [CommunityRouteRecord] {
+        // Community surfaces only need a bounded discovery window. Keeping
+        // hundreds of full GPS polylines resident at once creates avoidable
+        // JSON, memory and MapKit pressure. Full owned routes remain stored
+        // separately in AppSessionStore.
         try await client
             .from("community_routes")
             .select()
             .order("created_at", ascending: false)
-            .limit(250)
+            .limit(min(max(limit, 12), 80))
             .execute()
             .value
     }

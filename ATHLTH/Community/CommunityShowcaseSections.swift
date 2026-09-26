@@ -1,5 +1,6 @@
 import MapKit
 import SwiftUI
+import UIKit
 
 struct CommunityShowcaseShortcutStrip: View {
     let clubsCount: Int
@@ -1362,40 +1363,211 @@ private struct CommunityRouteMapPreview: View {
     let coordinates: [RouteCoordinate]
     let tint: Color
 
+    @State private var snapshotImage: UIImage?
+
     var body: some View {
-        Map(
-            initialPosition: .region(
-                region
+        ZStack {
+            RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
             )
-        ) {
-            if coordinates.count >= 2 {
-                MapPolyline(
-                    coordinates:
-                        coordinates.map(\.coordinate)
-                )
-                .stroke(
-                    tint,
-                    style: StrokeStyle(
-                        lineWidth: 4,
-                        lineCap: .round,
-                        lineJoin: .round
-                    )
-                )
+            .fill(Color(.secondarySystemBackground))
+
+            if let snapshotImage {
+                Image(uiImage: snapshotImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "map")
+                    .font(.title2)
+                    .foregroundStyle(.secondary.opacity(0.55))
             }
         }
-        .mapStyle(.standard(elevation: .flat))
-        .allowsHitTesting(false)
+        .clipped()
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 14,
                 style: .continuous
             )
         )
+        .task(id: snapshotKey) {
+            snapshotImage =
+                await CommunityRouteSnapshotRenderer.shared.image(
+                    for: coordinates,
+                    tint: UIColor(tint)
+                )
+        }
     }
 
-    private var region: MKCoordinateRegion {
-        let values = coordinates.map(\.coordinate)
+    private var snapshotKey: String {
+        CommunityRouteSnapshotRenderer.cacheKey(
+            for: coordinates
+        )
+    }
+}
 
+@MainActor
+private final class CommunityRouteSnapshotRenderer {
+    static let shared = CommunityRouteSnapshotRenderer()
+
+    private let cache = NSCache<NSString, UIImage>()
+
+    private init() {
+        // Keep the Community dashboard lightweight even after scrolling
+        // through many routes.
+        cache.countLimit = 24
+        cache.totalCostLimit = 24 * 1_024 * 1_024
+    }
+
+    static func cacheKey(
+        for coordinates: [RouteCoordinate]
+    ) -> String {
+        guard !coordinates.isEmpty else {
+            return "empty-route"
+        }
+
+        let sampled = sampledCoordinates(
+            coordinates,
+            maximumCount: 12
+        )
+
+        return sampled.map {
+            String(
+                format: "%.5f,%.5f",
+                $0.latitude,
+                $0.longitude
+            )
+        }
+        .joined(separator: "|")
+    }
+
+    func image(
+        for coordinates: [RouteCoordinate],
+        tint: UIColor
+    ) async -> UIImage? {
+        let key = Self.cacheKey(for: coordinates) as NSString
+
+        if let cached = cache.object(forKey: key) {
+            return cached
+        }
+
+        let values = Self.sampledCoordinates(
+            coordinates,
+            maximumCount: 160
+        )
+        guard !values.isEmpty else {
+            return nil
+        }
+
+        let options = MKMapSnapshotter.Options()
+        options.region = Self.region(for: values)
+        options.size = CGSize(width: 420, height: 220)
+        options.scale = 2
+        options.mapType = .mutedStandard
+        options.pointOfInterestFilter = .excludingAll
+        options.traitCollection =
+            UITraitCollection(userInterfaceStyle: .light)
+
+        do {
+            let snapshot =
+                try await MKMapSnapshotter(
+                    options: options
+                )
+                .start()
+
+            let renderer = UIGraphicsImageRenderer(
+                size: options.size
+            )
+
+            let rendered = renderer.image { _ in
+                snapshot.image.draw(
+                    in: CGRect(
+                        origin: .zero,
+                        size: options.size
+                    )
+                )
+
+                guard values.count >= 2 else {
+                    return
+                }
+
+                let path = UIBezierPath()
+                path.lineWidth = 4
+                path.lineCapStyle = .round
+                path.lineJoinStyle = .round
+
+                for (index, value) in values.enumerated() {
+                    let point = snapshot.point(
+                        for: CLLocationCoordinate2D(
+                            latitude: value.latitude,
+                            longitude: value.longitude
+                        )
+                    )
+
+                    if index == 0 {
+                        path.move(to: point)
+                    } else {
+                        path.addLine(to: point)
+                    }
+                }
+
+                UIColor.white
+                    .withAlphaComponent(0.88)
+                    .setStroke()
+                path.lineWidth = 7
+                path.stroke()
+
+                tint.setStroke()
+                path.lineWidth = 4
+                path.stroke()
+            }
+
+            cache.setObject(
+                rendered,
+                forKey: key,
+                cost:
+                    Int(
+                        rendered.size.width *
+                        rendered.size.height *
+                        rendered.scale *
+                        rendered.scale *
+                        4
+                    )
+            )
+            return rendered
+        } catch {
+            return nil
+        }
+    }
+
+    nonisolated static func sampledCoordinates(
+        _ values: [RouteCoordinate],
+        maximumCount: Int
+    ) -> [RouteCoordinate] {
+        guard values.count > maximumCount,
+              maximumCount > 2
+        else {
+            return values
+        }
+
+        let lastIndex = values.count - 1
+        let step =
+            Double(lastIndex) /
+            Double(maximumCount - 1)
+
+        return (0..<maximumCount).map { index in
+            values[
+                min(
+                    Int((Double(index) * step).rounded()),
+                    lastIndex
+                )
+            ]
+        }
+    }
+
+    nonisolated static func region(
+        for values: [RouteCoordinate]
+    ) -> MKCoordinateRegion {
         guard let first = values.first else {
             return MKCoordinateRegion(
                 center: CLLocationCoordinate2D(
@@ -1409,13 +1581,17 @@ private struct CommunityRouteMapPreview: View {
             )
         }
 
-        let latitudes = values.map(\.latitude)
-        let longitudes = values.map(\.longitude)
+        var minLatitude = first.latitude
+        var maxLatitude = first.latitude
+        var minLongitude = first.longitude
+        var maxLongitude = first.longitude
 
-        let minLatitude = latitudes.min() ?? first.latitude
-        let maxLatitude = latitudes.max() ?? first.latitude
-        let minLongitude = longitudes.min() ?? first.longitude
-        let maxLongitude = longitudes.max() ?? first.longitude
+        for value in values.dropFirst() {
+            minLatitude = min(minLatitude, value.latitude)
+            maxLatitude = max(maxLatitude, value.latitude)
+            minLongitude = min(minLongitude, value.longitude)
+            maxLongitude = max(maxLongitude, value.longitude)
+        }
 
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(

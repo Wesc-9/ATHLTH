@@ -936,6 +936,7 @@ final class CommunityGroupStore: ObservableObject {
                 .from("community_groups")
                 .select()
                 .order("created_at", ascending: false)
+                .limit(150)
                 .execute()
                 .value
 
@@ -957,6 +958,8 @@ final class CommunityGroupStore: ObservableObject {
             async let profilesQuery: [SocialProfileCard] = client
                 .from("social_profile_cards")
                 .select()
+                .order("updated_at", ascending: false)
+                .limit(500)
                 .execute()
                 .value
 
@@ -1041,6 +1044,7 @@ final class CommunityGroupStore: ObservableObject {
                 .select()
                 .eq("group_id", value: groupID)
                 .order("starts_at", ascending: true)
+                .limit(100)
                 .execute()
                 .value
 
@@ -1049,6 +1053,7 @@ final class CommunityGroupStore: ObservableObject {
                 .select()
                 .eq("group_id", value: groupID)
                 .order("starts_at", ascending: false)
+                .limit(100)
                 .execute()
                 .value
 
@@ -1073,6 +1078,8 @@ final class CommunityGroupStore: ObservableObject {
             async let profilesQuery: [SocialProfileCard] = client
                 .from("social_profile_cards")
                 .select()
+                .order("updated_at", ascending: false)
+                .limit(500)
                 .execute()
                 .value
 
@@ -1121,6 +1128,8 @@ final class CommunityGroupStore: ObservableObject {
                 try await client
                     .from("community_group_challenge_workouts")
                     .select()
+                    .order("created_at", ascending: false)
+                    .limit(1_000)
                     .execute()
                     .value
 

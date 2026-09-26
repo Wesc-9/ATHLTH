@@ -76,6 +76,10 @@ jobs:
 
           echo "Approved flat ATHLTH icon verified for iPhone, dark, tinted and Watch assets."
 
+      - name: Optimize hero assets for runtime memory
+        shell: bash
+        run: bash scripts/optimize_hero_assets.sh
+
       - name: Generate Xcode project
         run: xcodegen generate
 
