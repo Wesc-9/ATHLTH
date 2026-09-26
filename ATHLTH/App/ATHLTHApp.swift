@@ -105,6 +105,7 @@ struct AppRootView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
     @EnvironmentObject private var challengeStore: ChallengeStore
+    @EnvironmentObject private var officialWeeklyChallenges: OfficialWeeklyChallengeStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var communityGroups: CommunityGroupStore
@@ -151,6 +152,7 @@ struct AppRootView: View {
                 await messaging.refresh()
                 await gear.refresh()
                 await communityGroups.refresh()
+                await officialWeeklyChallenges.refresh()
                 await syncCalendarIfAllowed()
             }
 
@@ -172,6 +174,9 @@ struct AppRootView: View {
                 allowed: settings.backgroundHealthSyncEnabled
             )
             await health.refreshAll()
+            await officialWeeklyChallenges.syncCompletionState(
+                workouts: health.workouts
+            )
             syncAppleHealthProfileDetailsIfNeeded()
             await goals.refreshAutomaticMilestones(
                 health: health,
@@ -208,6 +213,7 @@ struct AppRootView: View {
                 if appSession.signedIn {
                     await refreshSocialCore()
                     await messaging.refresh()
+                    await officialWeeklyChallenges.refresh()
                     await syncCalendarIfAllowed()
                 }
 
@@ -218,6 +224,9 @@ struct AppRootView: View {
                 }
 
                 await health.refreshAll()
+                await officialWeeklyChallenges.syncCompletionState(
+                    workouts: health.workouts
+                )
                 syncAppleHealthProfileDetailsIfNeeded()
                 await goals.refreshAutomaticMilestones(
                     health: health,
@@ -231,6 +240,15 @@ struct AppRootView: View {
                 )
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
+            }
+        }
+        .onChange(of: health.workouts.map(\.id)) { _, _ in
+            guard appSession.signedIn else { return }
+
+            Task {
+                await officialWeeklyChallenges.syncCompletionState(
+                    workouts: health.workouts
+                )
             }
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
