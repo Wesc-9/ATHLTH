@@ -409,6 +409,7 @@ struct TrainingPlan: Identifiable, Codable, Hashable {
     var createdAt: Date
     var updatedAt: Date
     var startDate: Date? = nil
+    var endDate: Date? = nil
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourcePlanID: UUID? = nil
     var sharedSourceVersion: Int? = nil
