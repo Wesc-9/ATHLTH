@@ -35,10 +35,12 @@ enum ATHLTHChallengeScoring: String, CaseIterable, Identifiable, Codable, Hashab
 
     var title: String {
         switch self {
-        case .fastestDistance: return "Fastest Distance"
-        case .farthestInTime: return "Farthest in Time"
-        case .mostDistance: return "Most Distance"
-        case .fastestRoute: return "Fastest Route"
+        case .fastestDistance, .fastestRoute:
+            return "Fastest"
+        case .farthestInTime:
+            return "Farthest in Time"
+        case .mostDistance:
+            return "Most Distance"
         case .heaviestWeight: return "Heaviest Weight"
         case .mostReps: return "Most Reps"
         case .exerciseVolume: return "Exercise Volume"

@@ -522,7 +522,7 @@ struct ChallengeCreationView: View {
         if preselectedRouteID != nil {
             _step = State(initialValue: 0)
             _sport = State(initialValue: .running)
-            _scoring = State(initialValue: .fastestRoute)
+            _scoring = State(initialValue: .fastestDistance)
             _usesSpecificRoute = State(initialValue: true)
             _gpsRequired = State(initialValue: true)
             _verificationPolicy = State(
@@ -632,9 +632,9 @@ struct ChallengeCreationView: View {
 
                 verificationPolicy = .verifiedRequired
 
-                if newScoring == .fastestRoute {
-                    usesSpecificRoute = true
-                    gpsRequired = true
+                if newScoring != .fastestDistance {
+                    usesSpecificRoute = false
+                    selectedRouteID = nil
                 }
             }
             .onChange(of: usesSpecificRoute) { _, enabled in
@@ -796,11 +796,50 @@ struct ChallengeCreationView: View {
     private var runningRules: some View {
         VStack(alignment: .leading, spacing: 14) {
             if scoring == .fastestDistance {
-                numberField(
-                    title: "Distance",
-                    suffix: "km",
-                    value: $targetDistanceKm
-                )
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("Course")
+                        .font(.headline)
+
+                    HStack(spacing: 12) {
+                        routeRequirementButton(
+                            title: "Run Anywhere",
+                            subtitle: "Choose a distance",
+                            icon: "figure.run",
+                            selected: !usesSpecificRoute,
+                            disabled: false
+                        ) {
+                            usesSpecificRoute = false
+                        }
+
+                        routeRequirementButton(
+                            title: "Specific Route",
+                            subtitle: "Same course",
+                            icon:
+                                "point.topleft.down.to.point.bottomright.curvepath",
+                            selected: usesSpecificRoute,
+                            disabled: false
+                        ) {
+                            usesSpecificRoute = true
+                        }
+                    }
+
+                    Text(
+                        usesSpecificRoute
+                            ? "Everyone competes on the same saved route."
+                            : "Everyone runs the same distance, but may choose their own course."
+                    )
+                    .challengeHint()
+                }
+
+                if usesSpecificRoute {
+                    routeSelectionCard
+                } else {
+                    numberField(
+                        title: "Distance",
+                        suffix: "km",
+                        value: $targetDistanceKm
+                    )
+                }
             }
 
             if scoring == .farthestInTime {
@@ -811,47 +850,8 @@ struct ChallengeCreationView: View {
                 )
             }
 
-            VStack(alignment: .leading, spacing: 9) {
-                Text("Route")
-                    .font(.headline)
-
-                HStack(spacing: 12) {
-                    routeRequirementButton(
-                        title: "Any Route",
-                        subtitle: "Run anywhere",
-                        icon: "location.fill",
-                        selected: !usesSpecificRoute,
-                        disabled:
-                            scoring == .fastestRoute
-                    ) {
-                        usesSpecificRoute = false
-                    }
-
-                    routeRequirementButton(
-                        title: "Specific Route",
-                        subtitle: "Same course",
-                        icon:
-                            "point.topleft.down.to.point.bottomright.curvepath",
-                        selected: usesSpecificRoute,
-                        disabled: false
-                    ) {
-                        usesSpecificRoute = true
-                    }
-                }
-
-                if scoring == .fastestRoute {
-                    Text(
-                        "Fastest Route compares everyone on the same course, so a specific route is required."
-                    )
-                    .challengeHint()
-                }
-            }
-
-            if usesSpecificRoute {
-                routeSelectionCard
-            }
-
-            if usesSpecificRoute {
+            if scoring == .fastestDistance &&
+                usesSpecificRoute {
                 HStack(spacing: 10) {
                     Image(systemName: "location.fill")
                         .foregroundStyle(.green)
@@ -860,7 +860,7 @@ struct ChallengeCreationView: View {
                         Text("GPS verification required")
                             .font(.subheadline.weight(.semibold))
                         Text(
-                            "Route challenges must include GPS data."
+                            "Specific-route challenges must include GPS data."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -901,8 +901,7 @@ struct ChallengeCreationView: View {
             .challengeCard()
 
             if advancedRules {
-                if scoring == .fastestDistance ||
-                    scoring == .fastestRoute {
+                if scoring == .fastestDistance {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Timing")
                             .font(.headline)
@@ -932,7 +931,8 @@ struct ChallengeCreationView: View {
                     .challengeCard()
                 }
 
-                if usesSpecificRoute {
+                if scoring == .fastestDistance &&
+                    usesSpecificRoute {
                     VStack(alignment: .leading, spacing: 9) {
                         HStack {
                             Text("Allowed route deviation")
@@ -964,201 +964,6 @@ struct ChallengeCreationView: View {
                 }
             }
         }
-    }
-
-    @ViewBuilder
-    private var routeSelectionCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let route = selectedRoute {
-                if route.coordinates.count >= 2 {
-                    Map(
-                        initialPosition: .region(
-                            challengeRegion(for: route)
-                        )
-                    ) {
-                        MapPolyline(
-                            coordinates:
-                                route.coordinates.map(\.coordinate)
-                        )
-                        .stroke(
-                            ATHLTHTheme.accent,
-                            style: StrokeStyle(
-                                lineWidth: 5,
-                                lineCap: .round,
-                                lineJoin: .round
-                            )
-                        )
-
-                        if let first =
-                            route.coordinates.first {
-                            Marker(
-                                route.startName ?? "Start",
-                                coordinate: first.coordinate
-                            )
-                            .tint(ATHLTHTheme.accent)
-                        }
-
-                        if let last =
-                            route.coordinates.last {
-                            Marker(
-                                route.endName ?? "Finish",
-                                coordinate: last.coordinate
-                            )
-                            .tint(.red)
-                        }
-                    }
-                    .allowsHitTesting(false)
-                    .frame(height: 170)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(route.title)
-                        .font(.headline)
-
-                    if let start = route.startName,
-                       let end = route.endName {
-                        Text("\(start) → \(end)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    HStack(spacing: 12) {
-                        Label(
-                            String(
-                                format:
-                                    "%.1f km",
-                                route.distanceKilometers
-                            ),
-                            systemImage: "figure.run"
-                        )
-
-                        if let elevation =
-                            route.elevationGainMeters {
-                            Label(
-                                "\(Int(elevation.rounded())) m",
-                                systemImage: "mountain.2.fill"
-                            )
-                        }
-
-                        Label(
-                            "\(route.coordinates.count) points",
-                            systemImage: "point.3.connected.trianglepath.dotted"
-                        )
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
-
-                HStack(spacing: 10) {
-                    NavigationLink {
-                        ChallengeRouteSelectionView(
-                            selectedRouteID:
-                                $selectedRouteID
-                        )
-                    } label: {
-                        Label(
-                            "Change Route",
-                            systemImage: "map"
-                        )
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-
-                    NavigationLink {
-                        RunRouteBuilderView()
-                    } label: {
-                        Label(
-                            "New Route",
-                            systemImage: "plus"
-                        )
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                }
-            } else {
-                HStack(spacing: 12) {
-                    Image(systemName: "map.fill")
-                        .font(.title2)
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 50, height: 50)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 14,
-                                style: .continuous
-                            )
-                        )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Choose a route")
-                            .font(.headline)
-                        Text(
-                            session.savedRoutes.isEmpty
-                                ? "You do not have any saved routes yet."
-                                : "Select one of your saved routes or create a new one."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-                }
-
-                HStack(spacing: 10) {
-                    if !session.savedRoutes.isEmpty {
-                        NavigationLink {
-                            ChallengeRouteSelectionView(
-                                selectedRouteID:
-                                    $selectedRouteID
-                            )
-                        } label: {
-                            Label(
-                                "My Routes",
-                                systemImage: "map"
-                            )
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accent)
-                    }
-
-                    if session.savedRoutes.isEmpty {
-                        NavigationLink {
-                            RunRouteBuilderView()
-                        } label: {
-                            Label(
-                                "Create New",
-                                systemImage: "plus"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accent)
-                    } else {
-                        NavigationLink {
-                            RunRouteBuilderView()
-                        } label: {
-                            Label(
-                                "Create New",
-                                systemImage: "plus"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accent)
-                    }
-                }
-            }
-        }
-        .padding()
-        .challengeCard()
     }
 
     private var strengthRules: some View {
@@ -1463,7 +1268,7 @@ struct ChallengeCreationView: View {
             ChallengeReviewCard(
                 title: resolvedTitle,
                 sport: sport,
-                scoring: scoring,
+                scoring: effectiveScoring,
                 verification: verificationPolicy
             )
 
@@ -1483,14 +1288,30 @@ struct ChallengeCreationView: View {
                 allowMultipleAttempts ? "Multiple · best counts" : "One"
             )
 
-            if let route = selectedRoute {
-                reviewRow("Route", route.title)
-                reviewRow(
-                    "Allowed deviation",
-                    "\(Int(allowedRouteDeviationPercent))%"
-                )
-            } else if sport == .running {
-                reviewRow("Route", "Any Route")
+            if sport == .running &&
+                scoring == .fastestDistance {
+                if let route = selectedRoute,
+                   usesSpecificRoute {
+                    reviewRow("Course", "Specific Route")
+                    reviewRow("Route", route.title)
+
+                    if advancedRules {
+                        reviewRow(
+                            "Allowed deviation",
+                            "\(Int(allowedRouteDeviationPercent))%"
+                        )
+                    }
+                } else {
+                    reviewRow("Course", "Run Anywhere")
+                    reviewRow(
+                        "Distance",
+                        String(
+                            format:
+                                "%.1f km",
+                            targetDistanceKm
+                        )
+                    )
+                }
             }
 
             if sport == .running {
@@ -1550,7 +1371,7 @@ struct ChallengeCreationView: View {
     private var scoringOptions: [ATHLTHChallengeScoring] {
         switch sport {
         case .running:
-            return [.fastestDistance, .farthestInTime, .mostDistance, .fastestRoute]
+            return [.fastestDistance, .farthestInTime, .mostDistance]
         case .strength:
             return [.heaviestWeight, .mostReps, .exerciseVolume, .workoutVolume]
         }
@@ -1570,16 +1391,19 @@ struct ChallengeCreationView: View {
                 .isEmpty
         case 1:
             if sport == .running {
-                if scoring == .fastestDistance && targetDistanceKm <= 0 { return false }
-                if scoring == .farthestInTime && targetDurationMinutes <= 0 { return false }
-                if usesSpecificRoute &&
-                    selectedRouteID == nil {
+                if scoring == .fastestDistance {
+                    if usesSpecificRoute {
+                        return selectedRouteID != nil
+                    }
+
+                    return targetDistanceKm > 0
+                }
+
+                if scoring == .farthestInTime &&
+                    targetDurationMinutes <= 0 {
                     return false
                 }
-                if scoring == .fastestRoute &&
-                    !usesSpecificRoute {
-                    return false
-                }
+
                 return true
             }
 
@@ -1606,6 +1430,16 @@ struct ChallengeCreationView: View {
     private var selectedRoute: TrainingRoute? {
         guard let selectedRouteID else { return nil }
         return session.savedRoutes.first { $0.id == selectedRouteID }
+    }
+
+    private var effectiveScoring: ATHLTHChallengeScoring {
+        if sport == .running &&
+            scoring == .fastestDistance &&
+            usesSpecificRoute {
+            return .fastestRoute
+        }
+
+        return scoring
     }
 
     private var resolvedTitle: String {
@@ -1669,9 +1503,11 @@ struct ChallengeCreationView: View {
                 sport == .running
                     ? .verifiedRequired
                     : verificationPolicy,
-            targetDistanceMeters: scoring == .fastestDistance
-                ? targetDistanceKm * 1_000
-                : nil,
+            targetDistanceMeters:
+                scoring == .fastestDistance &&
+                !usesSpecificRoute
+                    ? targetDistanceKm * 1_000
+                    : nil,
             targetDurationSeconds: scoring == .farthestInTime
                 ? targetDurationMinutes * 60
                 : nil,
@@ -1906,13 +1742,13 @@ struct ChallengeCreationView: View {
     private func scoringSubtitle(_ scoring: ATHLTHChallengeScoring) -> String {
         switch scoring {
         case .fastestDistance:
-            return "Choose a distance. Fastest qualifying time wins."
+            return "Fastest qualifying time wins. Choose your course setup in the next step."
         case .farthestInTime:
             return "Choose a time window. Furthest verified distance wins."
         case .mostDistance:
             return "Every qualifying run adds to the total."
         case .fastestRoute:
-            return "Everyone completes the same saved route."
+            return "Fastest qualifying time on a specific route."
         case .heaviestWeight:
             return "Highest qualifying completed set wins."
         case .mostReps:
