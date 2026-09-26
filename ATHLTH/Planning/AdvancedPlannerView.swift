@@ -2981,6 +2981,15 @@ struct SessionEditorView: View {
 
     init(
         planID: UUID,
+        dayID: UUID
+    ) {
+        self.dayID = dayID
+        self.planID = planID
+        self.existingWorkout = nil
+    }
+
+    init(
+        planID: UUID,
         workout: PlannedSession
     ) {
         self.dayID = nil
@@ -4570,10 +4579,18 @@ struct SessionEditorView: View {
                 inPlan: planID
             )
         } else if let dayID {
-            session.addSession(
-                workout,
-                toDay: dayID
-            )
+            if let planID {
+                session.addSession(
+                    workout,
+                    toDay: dayID,
+                    inPlan: planID
+                )
+            } else {
+                session.addSession(
+                    workout,
+                    toDay: dayID
+                )
+            }
         }
 
         dismiss()
