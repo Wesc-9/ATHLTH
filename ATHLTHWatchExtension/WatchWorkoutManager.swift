@@ -2001,6 +2001,18 @@ extension WatchWorkoutManager: CLLocationManagerDelegate {
             }
         }
 
+        if let latest =
+                filtered.max(
+                    by: {
+                        $0.timestamp <
+                        $1.timestamp
+                    }
+                ) {
+            updateOutdoorMetrics(
+                using: latest
+            )
+        }
+
         publish {
             let startIndex = self.routePoints.count
             self.routePoints.append(
