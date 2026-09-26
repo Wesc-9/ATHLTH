@@ -1265,7 +1265,7 @@ final class CommunityGroupStore: ObservableObject {
                             options: FileOptions(
                                 cacheControl: "3600",
                                 contentType: "image/jpeg",
-                                upsert: false
+                                upsert: true
                             )
                         )
 
@@ -1412,7 +1412,7 @@ final class CommunityGroupStore: ObservableObject {
         }
 
         guard jpegData.count <= 5_242_880 else {
-            errorMessage = "Group image must be smaller than 5 MB."
+            errorMessage = "Club image must be smaller than 5 MB."
             return false
         }
 
@@ -6469,6 +6469,7 @@ struct CommunityGroupMembersView: View {
         }
         .navigationTitle("Members")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .toolbar {
             if groups.canManage(currentGroup) {
                 ToolbarItem(
