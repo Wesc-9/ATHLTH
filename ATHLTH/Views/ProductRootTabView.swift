@@ -108,8 +108,6 @@ struct ATHLTHHomeView: View {
     @State private var showingHomeStrengthWorkout = false
     @State private var homeWatchTransferMessage: String?
     @State private var homeWatchTransferError: String?
-    @AppStorage("homeGettingStartedDismissed")
-    private var homeGettingStartedDismissed = false
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
 
@@ -249,25 +247,14 @@ struct ATHLTHHomeView: View {
                 LazyVStack(spacing: 18) {
                     homeTodayCard
 
-                    if shouldShowGettingStarted {
-                        HomeGettingStartedCard(
-                            hasPlan: session.activePlan != nil,
-                            hasGoal: !goalStore.activeGoals.isEmpty,
-                            hasEditedProfile: hasCompletedProfileSetup
-                        ) {
-                            withAnimation(.easeInOut(duration: 0.22)) {
-                                homeGettingStartedDismissed = true
-                            }
-                        }
-                        .transition(
-                            .opacity.combined(with: .move(edge: .top))
-                        )
-                    }
+                    HomeGettingStartedCard(
+                        hasPlan: session.activePlan != nil,
+                        hasGoal: !goalStore.activeGoals.isEmpty,
+                        hasEditedProfile: hasCompletedProfileSetup
+                    )
 
                     if let goal = homeActiveGoal {
                         homeActiveGoalCard(goal)
-                    } else {
-                        homeCreateFirstGoalCard
                     }
 
                     if health.hasRequestedAuthorization {
@@ -1152,19 +1139,6 @@ struct ATHLTHHomeView: View {
         return hasEditedATHLTHProfile ||
             hasBio ||
             session.profile.avatarURL != nil
-    }
-
-    private var shouldShowGettingStarted: Bool {
-        guard !homeGettingStartedDismissed else {
-            return false
-        }
-
-        let allSetupGoalsComplete =
-            session.activePlan != nil &&
-            !goalStore.activeGoals.isEmpty &&
-            hasCompletedProfileSetup
-
-        return !allSetupGoalsComplete
     }
 
     private var readinessTint: Color {
