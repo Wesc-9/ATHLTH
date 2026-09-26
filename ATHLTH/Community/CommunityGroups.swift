@@ -447,19 +447,15 @@ final class CommunityGroupStore: ObservableObject {
 
     func createGroup(
         name: String,
-        locationName: String,
         summary: String,
         visibility: String
     ) async -> Bool {
         guard let userID = currentUserID else { return false }
 
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanLocation = locationName.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard cleanName.count >= 2,
-              cleanLocation.count >= 2
-        else {
-            errorMessage = "Add a group name and area or city."
+        guard cleanName.count >= 2 else {
+            errorMessage = "Add a group name."
             return false
         }
 
@@ -469,7 +465,7 @@ final class CommunityGroupStore: ObservableObject {
                 creatorID: userID,
                 name: String(cleanName.prefix(80)),
                 summary: String(summary.prefix(800)),
-                locationName: String(cleanLocation.prefix(120)),
+                locationName: "",
                 visibility:
                     visibility == "private"
                         ? "private"
@@ -987,12 +983,18 @@ struct CommunityGroupsView: View {
                     Text(group.name)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                    Label(
-                        group.locationName,
-                        systemImage: "location.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    if !group.locationName
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        .isEmpty {
+                        Label(
+                            group.locationName,
+                            systemImage: "location.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
 
                     Label(
                         group.visibility == "private"
@@ -1153,12 +1155,18 @@ struct CommunityGroupDetailView: View {
                     Text(currentGroup.name)
                         .font(.title3.weight(.bold))
 
-                    Label(
-                        currentGroup.locationName,
-                        systemImage: "location.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    if !currentGroup.locationName
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        .isEmpty {
+                        Label(
+                            currentGroup.locationName,
+                            systemImage: "location.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
 
                     Label(
                         currentGroup.visibility == "private"
@@ -1623,7 +1631,6 @@ struct CommunityGroupCreateView: View {
     @EnvironmentObject private var groups: CommunityGroupStore
 
     @State private var name = ""
-    @State private var location = ""
     @State private var summary = ""
     @State private var visibility = "public"
     @State private var saving = false
@@ -1633,7 +1640,6 @@ struct CommunityGroupCreateView: View {
             Form {
                 Section("Group") {
                     TextField("Group name", text: $name)
-                    TextField("Area or city", text: $location)
                     TextField("Description", text: $summary, axis: .vertical)
                         .lineLimit(2...5)
                 }
@@ -1677,7 +1683,6 @@ struct CommunityGroupCreateView: View {
                             saving = true
                             let ok = await groups.createGroup(
                                 name: name,
-                                locationName: location,
                                 summary: summary,
                                 visibility: visibility
                             )
@@ -1687,7 +1692,6 @@ struct CommunityGroupCreateView: View {
                     }
                     .disabled(
                         name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 ||
-                        location.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 ||
                         saving
                     )
                 }
