@@ -120,6 +120,7 @@ private struct AroundYouRouteItem: Identifiable {
     let coordinates: [RouteCoordinate]
     let ownerID: UUID
     let isMine: Bool
+    let trainingRoute: TrainingRoute
 
     var centerCoordinate: CLLocationCoordinate2D? {
         guard !coordinates.isEmpty else { return nil }
@@ -357,7 +358,8 @@ struct HomeAroundYouSection: View {
                 elevationGainMeters: route.elevationGainMeters,
                 coordinates: route.coordinates,
                 ownerID: route.ownerID,
-                isMine: route.ownerID == session.profile.userID
+                isMine: route.ownerID == session.profile.userID,
+                trainingRoute: route.trainingRoute
             )
         }
 
@@ -369,7 +371,8 @@ struct HomeAroundYouSection: View {
                 elevationGainMeters: route.elevationGainMeters,
                 coordinates: route.coordinates,
                 ownerID: route.ownerID,
-                isMine: true
+                isMine: true,
+                trainingRoute: route
             )
         }
 
@@ -586,6 +589,7 @@ struct AroundYouExploreView: View {
     @State private var filter: AroundYouFilter = .all
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var hasCenteredOnUser = false
+    @State private var selectedRoute: TrainingRoute?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -617,14 +621,22 @@ struct AroundYouExploreView: View {
 
                         if let center = route.centerCoordinate {
                             Annotation(route.title, coordinate: center) {
-                                Image(systemName: "figure.run.circle.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(
-                                        route.isMine
-                                            ? ATHLTHTheme.premiumGold
-                                            : ATHLTHTheme.accentDeep
-                                    )
-                                    .background(.white, in: Circle())
+                                Button {
+                                    selectedRoute = route.trainingRoute
+                                } label: {
+                                    Image(systemName: "figure.run.circle.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(
+                                            route.isMine
+                                                ? ATHLTHTheme.premiumGold
+                                                : ATHLTHTheme.accentDeep
+                                        )
+                                        .background(.white, in: Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(
+                                    "Open \(route.title)"
+                                )
                             }
                         }
                     }
@@ -670,6 +682,11 @@ struct AroundYouExploreView: View {
                 routeDiscovery.refresh()
             async let eventsRefresh: Void = community.refresh()
             _ = await (routesRefresh, eventsRefresh)
+        }
+        .sheet(item: $selectedRoute) { route in
+            NavigationStack {
+                RouteDetailView(route: route)
+            }
         }
         .onAppear {
             locationStore.start()
