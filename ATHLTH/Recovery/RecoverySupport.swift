@@ -87,6 +87,10 @@ enum RecoverySorenessLevel: Int, Codable, CaseIterable, Identifiable {
 struct RecoverySorenessEntry: Codable, Hashable {
     let date: Date
     var ratings: [String: RecoverySorenessLevel]
+    var energy: Int?
+    var stress: Int?
+    var overallSoreness: Int?
+    var motivation: Int?
 }
 
 final class RecoverySorenessStore: ObservableObject {
@@ -123,12 +127,39 @@ final class RecoverySorenessStore: ObservableObject {
         trimAndPersistIfNeeded()
     }
 
-    var todayRatings: [String: RecoverySorenessLevel] {
+    private var todayEntry: RecoverySorenessEntry? {
         let calendar = Calendar.current
-
         return entries.first {
             calendar.isDateInToday($0.date)
-        }?.ratings ?? [:]
+        }
+    }
+
+    var todayRatings: [String: RecoverySorenessLevel] {
+        todayEntry?.ratings ?? [:]
+    }
+
+    var todayEnergy: Int? {
+        todayEntry?.energy
+    }
+
+    var todayStress: Int? {
+        todayEntry?.stress
+    }
+
+    var todayOverallSoreness: Int? {
+        todayEntry?.overallSoreness
+    }
+
+    var todayMotivation: Int? {
+        todayEntry?.motivation
+    }
+
+    var hasTodayCheckIn: Bool {
+        todayEnergy != nil ||
+        todayStress != nil ||
+        todayOverallSoreness != nil ||
+        todayMotivation != nil ||
+        !todayRatings.isEmpty
     }
 
     var highestTodayLevel: RecoverySorenessLevel {
@@ -141,29 +172,76 @@ final class RecoverySorenessStore: ObservableObject {
         todayRatings[muscleGroup] ?? .none
     }
 
+    func setEnergy(_ value: Int) {
+        updateTodayEntry {
+            $0.energy = Self.normalizedCheckInValue(value)
+        }
+    }
+
+    func setStress(_ value: Int) {
+        updateTodayEntry {
+            $0.stress = Self.normalizedCheckInValue(value)
+        }
+    }
+
+    func setOverallSoreness(_ value: Int) {
+        updateTodayEntry {
+            $0.overallSoreness =
+                Self.normalizedCheckInValue(value)
+        }
+    }
+
+    func setMotivation(_ value: Int) {
+        updateTodayEntry {
+            $0.motivation = Self.normalizedCheckInValue(value)
+        }
+    }
+
     func set(
         _ level: RecoverySorenessLevel,
         for muscleGroup: String
+    ) {
+        updateTodayEntry {
+            $0.ratings[muscleGroup] = level
+        }
+    }
+
+    private func updateTodayEntry(
+        _ update: (inout RecoverySorenessEntry) -> Void
     ) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
         if let index = entries.firstIndex(
-            where: { calendar.isDate($0.date, inSameDayAs: today) }
+            where: {
+                calendar.isDate(
+                    $0.date,
+                    inSameDayAs: today
+                )
+            }
         ) {
-            entries[index].ratings[muscleGroup] = level
+            update(&entries[index])
         } else {
-            entries.insert(
-                RecoverySorenessEntry(
-                    date: today,
-                    ratings: [muscleGroup: level]
-                ),
-                at: 0
+            var entry = RecoverySorenessEntry(
+                date: today,
+                ratings: [:],
+                energy: nil,
+                stress: nil,
+                overallSoreness: nil,
+                motivation: nil
             )
+            update(&entry)
+            entries.insert(entry, at: 0)
         }
 
         trimAndPersistIfNeeded()
         objectWillChange.send()
+    }
+
+    private static func normalizedCheckInValue(
+        _ value: Int
+    ) -> Int {
+        min(max(value, 1), 5)
     }
 
     private func trimAndPersistIfNeeded() {
@@ -888,6 +966,290 @@ struct RecoveryTrendsCard: View {
     }
 }
 
+struct RecoveryLastNightCard: View {
+    let sleep: SleepSummary
+
+    var body: some View {
+        ATHLTHCard {
+            ATHLTHSectionHeader(
+                title: "Last night",
+                actionTitle: nightLabel
+            )
+
+            HStack(alignment: .firstTextBaseline) {
+                Text(sleep.totalAsleep.shortDuration)
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text("asleep")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if let start = sleep.sleepStart,
+                   let end = sleep.sleepEnd {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(
+                            "\(start.formatted(date: .omitted, time: .shortened))–\(end.formatted(date: .omitted, time: .shortened))"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text("Bed → wake")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.top, 12)
+
+            HStack(spacing: 8) {
+                stageTile(
+                    "Deep",
+                    value: sleep.deep,
+                    icon: "moon.zzz.fill"
+                )
+                stageTile(
+                    "REM",
+                    value: sleep.rem,
+                    icon: "brain.head.profile"
+                )
+                stageTile(
+                    "Core",
+                    value: sleep.core,
+                    icon: "moon.fill"
+                )
+                stageTile(
+                    "Awake",
+                    value: sleep.awake,
+                    icon: "eye.fill"
+                )
+            }
+            .padding(.top, 12)
+
+            Text(sleepQualityText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 10)
+        }
+    }
+
+    private func stageTile(
+        _ title: String,
+        value: TimeInterval,
+        icon: String
+    ) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+
+            Text(value > 0 ? value.shortDuration : "—")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+
+            Text(title)
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(
+            Color.primary.opacity(0.025),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
+    }
+
+    private var nightLabel: String? {
+        guard let end = sleep.sleepEnd else {
+            return nil
+        }
+
+        if Calendar.current.isDateInToday(end) {
+            return "Today"
+        }
+
+        return end.formatted(
+            .dateTime.weekday(.abbreviated)
+        )
+    }
+
+    private var sleepQualityText: String {
+        let durationHours = sleep.totalAsleep / 3_600
+        let stageTotal = sleep.core + sleep.deep + sleep.rem
+        let restorativeRatio = stageTotal > 0
+            ? (sleep.deep + sleep.rem) / stageTotal
+            : nil
+        let awakeRatio =
+            (sleep.totalAsleep + sleep.awake) > 0
+                ? sleep.awake /
+                    (sleep.totalAsleep + sleep.awake)
+                : 0
+
+        if durationHours >= 7,
+           durationHours <= 9.5,
+           restorativeRatio.map({ $0 >= 0.25 }) ?? true,
+           awakeRatio < 0.18 {
+            return "Good sleep quality from duration and available sleep stages."
+        }
+
+        if durationHours >= 6,
+           awakeRatio < 0.25 {
+            return "Fair sleep quality. Recovery also considers HRV and resting heart rate."
+        }
+
+        return "Sleep was below your usual recovery-friendly range."
+    }
+}
+
+struct RecoveryDailyCheckInCard: View {
+    @ObservedObject var store: RecoverySorenessStore
+    let onCheckIn: () -> Void
+
+    var body: some View {
+        ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Daily check-in")
+                        .font(.title3.weight(.bold))
+
+                    Text(
+                        "How you feel can refine today's guidance without changing your wearable score."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button(
+                    store.hasTodayCheckIn
+                        ? "Update"
+                        : "Check in"
+                ) {
+                    onCheckIn()
+                }
+                .font(.caption.weight(.semibold))
+            }
+
+            if store.hasTodayCheckIn {
+                HStack(spacing: 8) {
+                    checkInMetric(
+                        title: "Energy",
+                        value: store.todayEnergy,
+                        icon: "bolt.fill",
+                        inverted: false
+                    )
+                    checkInMetric(
+                        title: "Stress",
+                        value: store.todayStress,
+                        icon: "waveform.path.ecg",
+                        inverted: true
+                    )
+                    checkInMetric(
+                        title: "Soreness",
+                        value: store.todayOverallSoreness,
+                        icon: "figure.walk.motion",
+                        inverted: true
+                    )
+                    checkInMetric(
+                        title: "Motivation",
+                        value: store.todayMotivation,
+                        icon: "flame.fill",
+                        inverted: false
+                    )
+                }
+                .padding(.top, 12)
+            } else {
+                Button {
+                    onCheckIn()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "list.clipboard.fill")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 12
+                                )
+                            )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Add today's context")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                            Text(
+                                "Energy, stress, soreness and motivation."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.top, 12)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func checkInMetric(
+        title: String,
+        value: Int?,
+        icon: String,
+        inverted: Bool
+    ) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+
+            Text(value.map { "\($0)/5" } ?? "—")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Text(title)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity)
+        .background(
+            Color.primary.opacity(0.025),
+            in: RoundedRectangle(
+                cornerRadius: 13,
+                style: .continuous
+            )
+        )
+        .accessibilityLabel(
+            "\(title), \(value.map(String.init) ?? "not logged") out of 5"
+        )
+    }
+}
+
 struct MuscleRecoveryCard: View {
     let statuses: [MuscleRecoveryStatus]
     let onLogSoreness: () -> Void
@@ -905,7 +1267,7 @@ struct MuscleRecoveryCard: View {
 
                 Spacer()
 
-                Button("Log soreness") {
+                Button("Check in") {
                     onLogSoreness()
                 }
                 .font(.caption.weight(.semibold))
@@ -1074,51 +1436,102 @@ struct RecoverySorenessLogView: View {
             List {
                 Section {
                     Text(
-                        "How do these areas feel today? This feedback influences the Recovery recommendation, but does not change your wearable readiness score."
+                        "Your check-in can influence Today's Guidance and muscle-recovery suggestions. It never changes the wearable Readiness score."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
 
-                ForEach(
-                    RecoverySorenessStore.muscleGroups,
-                    id: \.self
-                ) { group in
-                    VStack(alignment: .leading, spacing: 9) {
-                        Text(group)
-                            .font(.headline)
+                Section("How you feel") {
+                    checkInScale(
+                        title: "Energy",
+                        subtitle: "Low → high",
+                        icon: "bolt.fill",
+                        value: store.todayEnergy,
+                        onSelect: store.setEnergy
+                    )
 
-                        HStack(spacing: 6) {
-                            ForEach(RecoverySorenessLevel.allCases) { level in
-                                Button {
-                                    store.set(level, for: group)
-                                } label: {
-                                    Text(level.title)
-                                        .font(.caption2.weight(.semibold))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
-                                        .foregroundStyle(
-                                            store.level(for: group) == level
-                                                ? Color.white
-                                                : ATHLTHTheme.primaryText
+                    checkInScale(
+                        title: "Stress",
+                        subtitle: "Low → high",
+                        icon: "waveform.path.ecg",
+                        value: store.todayStress,
+                        onSelect: store.setStress
+                    )
+
+                    checkInScale(
+                        title: "Overall soreness",
+                        subtitle: "None → very sore",
+                        icon: "figure.walk.motion",
+                        value: store.todayOverallSoreness,
+                        onSelect: store.setOverallSoreness
+                    )
+
+                    checkInScale(
+                        title: "Motivation",
+                        subtitle: "Low → high",
+                        icon: "flame.fill",
+                        value: store.todayMotivation,
+                        onSelect: store.setMotivation
+                    )
+                }
+
+                Section("Muscle soreness") {
+                    ForEach(
+                        RecoverySorenessStore.muscleGroups,
+                        id: \.self
+                    ) { group in
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text(group)
+                                .font(.headline)
+
+                            HStack(spacing: 6) {
+                                ForEach(
+                                    RecoverySorenessLevel.allCases
+                                ) { level in
+                                    Button {
+                                        store.set(
+                                            level,
+                                            for: group
                                         )
-                                        .background(
-                                            store.level(for: group) == level
-                                                ? ATHLTHTheme.accent
-                                                : Color.primary.opacity(0.05),
-                                            in: RoundedRectangle(
-                                                cornerRadius: 10
+                                    } label: {
+                                        Text(level.title)
+                                            .font(
+                                                .caption2
+                                                    .weight(.semibold)
                                             )
-                                        )
+                                            .frame(
+                                                maxWidth: .infinity
+                                            )
+                                            .padding(.vertical, 8)
+                                            .foregroundStyle(
+                                                store.level(
+                                                    for: group
+                                                ) == level
+                                                    ? Color.white
+                                                    : ATHLTHTheme.primaryText
+                                            )
+                                            .background(
+                                                store.level(
+                                                    for: group
+                                                ) == level
+                                                    ? ATHLTHTheme.accent
+                                                    : Color.primary
+                                                        .opacity(0.05),
+                                                in: RoundedRectangle(
+                                                    cornerRadius: 10
+                                                )
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
                 }
             }
-            .navigationTitle("Body Check-in")
+            .navigationTitle("Daily Check-in")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -1127,6 +1540,168 @@ struct RecoverySorenessLogView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func checkInScale(
+        title: String,
+        subtitle: String,
+        icon: String,
+        value: Int?,
+        onSelect: @escaping (Int) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label(title, systemImage: icon)
+                    .font(.subheadline.weight(.semibold))
+
+                Spacer()
+
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 7) {
+                ForEach(1...5, id: \.self) { score in
+                    Button {
+                        onSelect(score)
+                    } label: {
+                        Text("\(score)")
+                            .font(.caption.weight(.bold))
+                            .frame(
+                                maxWidth: .infinity,
+                                minHeight: 34
+                            )
+                            .foregroundStyle(
+                                value == score
+                                    ? Color.white
+                                    : ATHLTHTheme.primaryText
+                            )
+                            .background(
+                                value == score
+                                    ? ATHLTHTheme.accent
+                                    : Color.primary.opacity(0.05),
+                                in: RoundedRectangle(
+                                    cornerRadius: 10,
+                                    style: .continuous
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct RecoveryMethodInfoView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    ATHLTHCard {
+                        ATHLTHSectionHeader(
+                            title: "Readiness score",
+                            actionTitle: "0–100"
+                        )
+
+                        Text(
+                            "ATHLTH compares your latest sleep, HRV and resting heart rate with your own recent baseline."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 10)
+
+                        VStack(spacing: 10) {
+                            methodRow(
+                                "Sleep",
+                                weight: "45%",
+                                icon: "moon.fill"
+                            )
+                            methodRow(
+                                "HRV",
+                                weight: "35%",
+                                icon: "waveform.path.ecg"
+                            )
+                            methodRow(
+                                "Resting HR",
+                                weight: "20%",
+                                icon: "heart.fill"
+                            )
+                        }
+                        .padding(.top, 12)
+                    }
+
+                    ATHLTHCard {
+                        Text("Your baseline")
+                            .font(.headline)
+
+                        Text(
+                            "The baseline uses usable days from the recent 14-day window where Sleep, HRV and Resting HR are all available. At least five usable days are required before ATHLTH shows a readiness score."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 5)
+                    }
+
+                    ATHLTHCard {
+                        Label(
+                            "Training guidance, not a medical assessment",
+                            systemImage: "info.circle.fill"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+
+                        Text(
+                            "Daily Check-in responses may refine Today's Guidance, but they do not alter the wearable readiness score."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 5)
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle("How Recovery Works")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func methodRow(
+        _ title: String,
+        weight: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .foregroundStyle(ATHLTHTheme.accent)
+                .frame(width: 30, height: 30)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 9
+                    )
+                )
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+
+            Spacer()
+
+            Text(weight)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
         }
     }
 }
