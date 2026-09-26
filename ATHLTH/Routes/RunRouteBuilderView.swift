@@ -10,12 +10,17 @@ struct RunRouteBuilderView: View {
 
     @StateObject private var startSearch = RunRouteLocationSearchModel()
     @StateObject private var endSearch = RunRouteLocationSearchModel()
+    @StateObject private var viaSearch = RunRouteLocationSearchModel()
 
     @State private var startItem: MKMapItem?
     @State private var endItem: MKMapItem?
+    @State private var viaPoints: [RunRouteViaPoint] = []
+    @State private var showingViaSearch = false
+    @State private var shapeRouteMode = false
     @State private var alternatives: [RunRouteAlternative] = []
     @State private var selectedAlternativeID: UUID?
     @State private var mapPosition: MapCameraPosition = .automatic
+    @State private var lastCalculatedSignature = ""
 
     @State private var title = ""
     @State private var visibility: ProfileVisibility = .privateOnly
@@ -87,39 +92,83 @@ struct RunRouteBuilderView: View {
             )
 
             ATHLTHMarkShape()
-                .fill(.white.opacity(0.10))
-                .frame(width: 190, height: 140)
+                .fill(.white.opacity(0.075))
+                .frame(width: 165, height: 122)
                 .rotationEffect(.degrees(-12))
-                .offset(x: 185, y: -38)
+                .offset(x: 205, y: -30)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 7) {
                 Text("ATHLTH ROUTE BUILDER")
                     .font(.caption2.bold())
-                    .tracking(1.4)
-                    .foregroundStyle(.white.opacity(0.72))
+                    .tracking(1.5)
+                    .foregroundStyle(.white.opacity(0.68))
 
-                Text("Plan A → B")
-                    .font(.system(size: 31, weight: .bold))
-                    .foregroundStyle(.white)
+                HStack(spacing: 9) {
+                    Text("Build your route")
+                        .font(
+                            .system(
+                                size: 24,
+                                weight: .semibold,
+                                design: .rounded
+                            )
+                        )
+
+                    Text("A → B")
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(
+                            .white.opacity(0.12),
+                            in: Capsule()
+                        )
+                }
+                .foregroundStyle(.white)
 
                 Text(routeBuilderSubtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.76))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.74))
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(20)
         }
-        .frame(height: 205)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .frame(height: 168)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
     }
 
     private var endpointsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Route")
-                .font(.title3.bold())
+            HStack {
+                Text("Route")
+                    .font(.title3.bold())
+
+                Spacer()
+
+                Button {
+                    showingViaSearch.toggle()
+                    if !showingViaSearch {
+                        viaSearch.clear()
+                    }
+                } label: {
+                    Label(
+                        showingViaSearch ? "Done" : "Via",
+                        systemImage: showingViaSearch
+                            ? "checkmark"
+                            : "plus"
+                    )
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
 
             RunRouteSearchField(
                 title: "From",
                 icon: "circle.fill",
+                tint: ATHLTHTheme.accent,
                 model: startSearch,
                 selectedItem: startItem
             ) { item in
@@ -129,29 +178,59 @@ struct RunRouteBuilderView: View {
                 Task { await calculateRoutesIfReady() }
             }
 
-            HStack {
-                Rectangle()
-                    .fill(.secondary.opacity(0.25))
-                    .frame(width: 2, height: 24)
-                    .padding(.leading, 12)
+            routeConnector
 
+            ForEach(
+                Array(viaPoints.enumerated()),
+                id: \.element.id
+            ) { index, point in
+                viaPointRow(
+                    point,
+                    index: index
+                )
+
+                routeConnector
+            }
+
+            if showingViaSearch {
+                RunRouteSearchField(
+                    title: "Via",
+                    icon: "mappin.and.ellipse",
+                    tint: ATHLTHTheme.premiumGold,
+                    model: viaSearch,
+                    selectedItem: nil
+                ) { item in
+                    addViaPoint(item)
+                }
+
+                routeConnector
+            }
+
+            HStack {
                 Spacer()
 
                 Button {
                     let oldStart = startItem
                     startItem = endItem
                     endItem = oldStart
+                    viaPoints.reverse()
                     inferTitle()
-                    Task { await calculateRoutesIfReady() }
+                    Task {
+                        await calculateRoutesIfReady(force: true)
+                    }
                 } label: {
-                    Label("Swap", systemImage: "arrow.up.arrow.down")
-                        .font(.caption.weight(.semibold))
+                    Label(
+                        "Swap",
+                        systemImage: "arrow.up.arrow.down"
+                    )
+                    .font(.caption.weight(.semibold))
                 }
             }
 
             RunRouteSearchField(
                 title: "To",
                 icon: "mappin.circle.fill",
+                tint: .red,
                 model: endSearch,
                 selectedItem: endItem
             ) { item in
@@ -162,18 +241,29 @@ struct RunRouteBuilderView: View {
             }
 
             Button {
-                Task { await calculateRoutesIfReady(force: true) }
+                Task {
+                    await calculateRoutesIfReady(force: true)
+                }
             } label: {
-                Label("Build Route", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-                    .frame(maxWidth: .infinity)
+                Label(
+                    "Build Route",
+                    systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(ATHLTHTheme.accent)
-            .disabled(startItem == nil || endItem == nil || isCalculating)
+            .disabled(
+                startItem == nil ||
+                endItem == nil ||
+                isCalculating
+            )
 
-            Text("ATHLTH uses Apple Maps walking directions as the route network for running. You choose the final route before saving it.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                "Add Via points by search, or use Shape on the map and tap where you want the route to pass."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding()
         .routeBuilderCard()
@@ -182,38 +272,146 @@ struct RunRouteBuilderView: View {
     private var routeMap: some View {
         Group {
             if let selectedAlternative {
-                Map(position: $mapPosition) {
-                    if let startItem {
-                        Marker(
-                            startItem.name ?? "Start",
-                            coordinate: startItem.placemark.coordinate
-                        )
-                        .tint(ATHLTHTheme.accent)
-                    }
+                MapReader { proxy in
+                    Map(position: $mapPosition) {
+                        if let startItem {
+                            Marker(
+                                startItem.name ?? "Start",
+                                coordinate:
+                                    startItem.placemark.coordinate
+                            )
+                            .tint(ATHLTHTheme.accent)
+                        }
 
-                    if let endItem {
-                        Marker(
-                            endItem.name ?? "Finish",
-                            coordinate: endItem.placemark.coordinate
-                        )
-                        .tint(.red)
-                    }
+                        ForEach(
+                            Array(viaPoints.enumerated()),
+                            id: \.element.id
+                        ) { index, point in
+                            Annotation(
+                                "Via \(index + 1)",
+                                coordinate:
+                                    point.item.placemark.coordinate
+                            ) {
+                                Text("\(index + 1)")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.white)
+                                    .frame(width: 26, height: 26)
+                                    .background(
+                                        ATHLTHTheme.premiumGold,
+                                        in: Circle()
+                                    )
+                                    .overlay {
+                                        Circle()
+                                            .stroke(
+                                                .white.opacity(0.9),
+                                                lineWidth: 2
+                                            )
+                                    }
+                            }
+                        }
 
-                    MapPolyline(coordinates: selectedAlternative.coordinates)
-                        .stroke(ATHLTHTheme.accent, lineWidth: 6)
+                        if let endItem {
+                            Marker(
+                                endItem.name ?? "Finish",
+                                coordinate:
+                                    endItem.placemark.coordinate
+                            )
+                            .tint(.red)
+                        }
+
+                        MapPolyline(
+                            coordinates:
+                                selectedAlternative.coordinates
+                        )
+                        .stroke(
+                            ATHLTHTheme.accent,
+                            lineWidth: 6
+                        )
+                    }
+                    .onTapGesture { point in
+                        guard shapeRouteMode,
+                              let coordinate = proxy.convert(
+                                point,
+                                from: .local
+                              )
+                        else {
+                            return
+                        }
+
+                        addViaPoint(at: coordinate)
+                    }
                 }
                 .frame(height: 310)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 24,
+                        style: .continuous
+                    )
+                )
                 .overlay(alignment: .topLeading) {
                     Label(
-                        String(format: "%.2f km", selectedAlternative.distanceMeters / 1_000),
+                        String(
+                            format: "%.2f km",
+                            selectedAlternative.distanceMeters /
+                            1_000
+                        ),
                         systemImage: "figure.run"
                     )
                     .font(.caption.bold())
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .background(
+                        .ultraThinMaterial,
+                        in: Capsule()
+                    )
                     .padding(12)
+                }
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        shapeRouteMode.toggle()
+                    } label: {
+                        Label(
+                            shapeRouteMode ? "Done" : "Shape",
+                            systemImage: shapeRouteMode
+                                ? "checkmark"
+                                : "point.3.connected.trianglepath.dotted"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(
+                            shapeRouteMode
+                                ? ATHLTHTheme.accent
+                                : Color.clear
+                        )
+                        .foregroundStyle(
+                            shapeRouteMode
+                                ? Color.white
+                                : ATHLTHTheme.primaryText
+                        )
+                        .background(
+                            .ultraThinMaterial,
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(12)
+                }
+                .overlay(alignment: .bottom) {
+                    if shapeRouteMode {
+                        Text("Tap the map to add a Via point")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                .ultraThinMaterial,
+                                in: Capsule()
+                            )
+                            .padding(.bottom, 12)
+                    }
                 }
             }
         }
@@ -303,6 +501,16 @@ struct RunRouteBuilderView: View {
                     title: "Finish",
                     value: endDisplayName
                 )
+
+                if !viaPoints.isEmpty {
+                    routeDetailRow(
+                        icon: "point.3.connected.trianglepath.dotted",
+                        title: "Via",
+                        value: viaPoints.count == 1
+                            ? viaDisplayName(viaPoints[0])
+                            : "\(viaPoints.count) points"
+                    )
+                }
 
                 routeDetailRow(
                     icon: settings.trainingDeviceProvider.systemImage,
@@ -398,13 +606,20 @@ struct RunRouteBuilderView: View {
     }
 
     @MainActor
-    private func calculateRoutesIfReady(force: Bool = false) async {
-        guard let startItem, let endItem else { return }
+    private func calculateRoutesIfReady(
+        force: Bool = false
+    ) async {
+        guard let startItem,
+              let endItem
+        else {
+            return
+        }
+
+        let signature = routeSignature
 
         if !force,
            !alternatives.isEmpty,
-           alternatives.first?.startCoordinate.latitude == startItem.placemark.coordinate.latitude,
-           alternatives.first?.endCoordinate.latitude == endItem.placemark.coordinate.latitude {
+           signature == lastCalculatedSignature {
             return
         }
 
@@ -413,30 +628,52 @@ struct RunRouteBuilderView: View {
         defer { isCalculating = false }
 
         do {
-            let request = MKDirections.Request()
-            request.source = startItem
-            request.destination = endItem
-            request.transportType = .walking
-            request.requestsAlternateRoutes = true
+            let mapped: [RunRouteAlternative]
 
-            let response = try await MKDirections(request: request).calculate()
+            if viaPoints.isEmpty {
+                let request = MKDirections.Request()
+                request.source = startItem
+                request.destination = endItem
+                request.transportType = .walking
+                request.requestsAlternateRoutes = true
 
-            let mapped = response.routes
-                .prefix(3)
-                .enumerated()
-                .map { index, route in
-                    RunRouteAlternative(
-                        name: route.name.isEmpty
-                            ? "Route \(index + 1)"
-                            : route.name,
-                        distanceMeters: route.distance,
-                        expectedTravelTime: route.expectedTravelTime,
-                        coordinates: route.polyline.routeBuilderCoordinates,
-                        startCoordinate: startItem.placemark.coordinate,
-                        endCoordinate: endItem.placemark.coordinate
+                let response =
+                    try await MKDirections(
+                        request: request
                     )
-                }
-                .filter { $0.coordinates.count >= 2 }
+                    .calculate()
+
+                mapped = response.routes
+                    .prefix(3)
+                    .enumerated()
+                    .map { index, route in
+                        RunRouteAlternative(
+                            name: route.name.isEmpty
+                                ? "Route \(index + 1)"
+                                : route.name,
+                            distanceMeters: route.distance,
+                            expectedTravelTime:
+                                route.expectedTravelTime,
+                            coordinates:
+                                route.polyline
+                                    .routeBuilderCoordinates,
+                            startCoordinate:
+                                startItem.placemark.coordinate,
+                            endCoordinate:
+                                endItem.placemark.coordinate
+                        )
+                    }
+                    .filter {
+                        $0.coordinates.count >= 2
+                    }
+            } else {
+                mapped = [
+                    try await calculateRouteThroughViaPoints(
+                        start: startItem,
+                        finish: endItem
+                    )
+                ]
+            }
 
             guard !mapped.isEmpty else {
                 throw RunRouteBuilderError.noRoute
@@ -444,6 +681,7 @@ struct RunRouteBuilderView: View {
 
             alternatives = mapped
             selectedAlternativeID = mapped.first?.id
+            lastCalculatedSignature = signature
 
             if let first = mapped.first {
                 updateMapRegion(for: first)
@@ -451,6 +689,234 @@ struct RunRouteBuilderView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private var routeConnector: some View {
+        Rectangle()
+            .fill(.secondary.opacity(0.22))
+            .frame(width: 2, height: 18)
+            .padding(.leading, 20)
+    }
+
+    private func viaPointRow(
+        _ point: RunRouteViaPoint,
+        index: Int
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text("\(index + 1)")
+                .font(.caption2.bold())
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(
+                    ATHLTHTheme.premiumGold,
+                    in: Circle()
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Via \(index + 1)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(viaDisplayName(point))
+                    .font(.subheadline)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if viaPoints.count > 1 {
+                Button {
+                    moveViaPoint(
+                        from: index,
+                        offset: -1
+                    )
+                } label: {
+                    Image(systemName: "chevron.up")
+                }
+                .disabled(index == 0)
+
+                Button {
+                    moveViaPoint(
+                        from: index,
+                        offset: 1
+                    )
+                } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .disabled(
+                    index == viaPoints.count - 1
+                )
+            }
+
+            Button(role: .destructive) {
+                removeViaPoint(point.id)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(12)
+        .background(
+            Color(.tertiarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 15)
+        )
+    }
+
+    private func addViaPoint(
+        _ item: MKMapItem
+    ) {
+        viaPoints.append(
+            RunRouteViaPoint(item: item)
+        )
+        viaSearch.clear()
+        showingViaSearch = false
+
+        Task {
+            await calculateRoutesIfReady(force: true)
+        }
+    }
+
+    private func addViaPoint(
+        at coordinate: CLLocationCoordinate2D
+    ) {
+        let placemark = MKPlacemark(
+            coordinate: coordinate
+        )
+        let item = MKMapItem(placemark: placemark)
+        item.name = "Map point \(viaPoints.count + 1)"
+        addViaPoint(item)
+    }
+
+    private func removeViaPoint(
+        _ id: UUID
+    ) {
+        viaPoints.removeAll { $0.id == id }
+
+        Task {
+            await calculateRoutesIfReady(force: true)
+        }
+    }
+
+    private func moveViaPoint(
+        from index: Int,
+        offset: Int
+    ) {
+        let destination = index + offset
+
+        guard viaPoints.indices.contains(index),
+              viaPoints.indices.contains(destination)
+        else {
+            return
+        }
+
+        viaPoints.swapAt(index, destination)
+
+        Task {
+            await calculateRoutesIfReady(force: true)
+        }
+    }
+
+    private func viaDisplayName(
+        _ point: RunRouteViaPoint
+    ) -> String {
+        RunRouteLocationSearchModel.displayName(
+            for: point.item
+        )
+    }
+
+    private var routeSignature: String {
+        var items: [MKMapItem] = []
+
+        if let startItem {
+            items.append(startItem)
+        }
+
+        items.append(contentsOf: viaPoints.map(\.item))
+
+        if let endItem {
+            items.append(endItem)
+        }
+
+        return items
+            .map { item in
+                let coordinate =
+                    item.placemark.coordinate
+                return String(
+                    format: "%.6f,%.6f",
+                    coordinate.latitude,
+                    coordinate.longitude
+                )
+            }
+            .joined(separator: "|")
+    }
+
+    @MainActor
+    private func calculateRouteThroughViaPoints(
+        start: MKMapItem,
+        finish: MKMapItem
+    ) async throws -> RunRouteAlternative {
+        let points =
+            [start] +
+            viaPoints.map(\.item) +
+            [finish]
+
+        var coordinates:
+            [CLLocationCoordinate2D] = []
+        var distance: CLLocationDistance = 0
+        var travelTime: TimeInterval = 0
+
+        for index in 0..<(points.count - 1) {
+            let request = MKDirections.Request()
+            request.source = points[index]
+            request.destination = points[index + 1]
+            request.transportType = .walking
+            request.requestsAlternateRoutes = false
+
+            let response =
+                try await MKDirections(
+                    request: request
+                )
+                .calculate()
+
+            guard let route = response.routes.first
+            else {
+                throw RunRouteBuilderError.noRoute
+            }
+
+            let segment =
+                route.polyline.routeBuilderCoordinates
+
+            guard segment.count >= 2 else {
+                throw RunRouteBuilderError.noRoute
+            }
+
+            if coordinates.isEmpty {
+                coordinates.append(
+                    contentsOf: segment
+                )
+            } else {
+                coordinates.append(
+                    contentsOf: segment.dropFirst()
+                )
+            }
+
+            distance += route.distance
+            travelTime += route.expectedTravelTime
+        }
+
+        return RunRouteAlternative(
+            name: viaPoints.count == 1
+                ? "Via route"
+                : "Via route · \(viaPoints.count) points",
+            distanceMeters: distance,
+            expectedTravelTime: travelTime,
+            coordinates: coordinates,
+            startCoordinate:
+                start.placemark.coordinate,
+            endCoordinate:
+                finish.placemark.coordinate
+        )
     }
 
     private func inferTitle() {
@@ -549,11 +1015,11 @@ struct RunRouteBuilderView: View {
     private var routeBuilderSubtitle: String {
         switch settings.trainingDeviceProvider {
         case .appleWatch:
-            return "Search two places, choose a route, save it and optionally send it to Apple Watch."
+            return "Choose your path, shape it with Via points, then save or send it to Apple Watch."
         case .garmin:
-            return "Search two places, choose a route and save it. Garmin route sync is prepared for later authorization."
+            return "Choose your path, shape it with Via points and save it for your run."
         case .none:
-            return "Search two places, choose a route and keep it available in ATHLTH on iPhone."
+            return "Choose your path, shape it with Via points and save it to ATHLTH."
         }
     }
 
@@ -594,6 +1060,7 @@ struct RunRouteBuilderView: View {
 private struct RunRouteSearchField: View {
     let title: String
     let icon: String
+    let tint: Color
     @ObservedObject var model: RunRouteLocationSearchModel
     let selectedItem: MKMapItem?
     let onSelect: (MKMapItem) -> Void
@@ -602,7 +1069,7 @@ private struct RunRouteSearchField: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .foregroundStyle(title == "From" ? ATHLTHTheme.accent : .red)
+                    .foregroundStyle(tint)
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -754,6 +1221,11 @@ struct RunRouteLocationSuggestion: Identifiable {
     let completion: MKLocalSearchCompletion
     let title: String
     let subtitle: String
+}
+
+private struct RunRouteViaPoint: Identifiable {
+    let id = UUID()
+    let item: MKMapItem
 }
 
 private struct RunRouteAlternative: Identifiable {
