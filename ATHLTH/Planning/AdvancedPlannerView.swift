@@ -2761,20 +2761,7 @@ struct SessionEditorView: View {
                     Array(selectedRunningWorkouts.enumerated()),
                     id: \.element.id
                 ) { index, workout in
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(
-                                Array(workout.blocks.enumerated()),
-                                id: \.element.id
-                            ) { blockIndex, block in
-                                RunningWorkoutBlockRow(
-                                    index: blockIndex + 1,
-                                    block: block
-                                )
-                            }
-                        }
-                        .padding(.top, 8)
-                    } label: {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 10) {
                             Image(systemName: workout.type.systemImage)
                                 .foregroundStyle(ATHLTHTheme.accent)
@@ -2802,6 +2789,22 @@ struct SessionEditorView: View {
                                 "Remove \(workout.title)"
                             )
                         }
+
+                        DisclosureGroup("Workout structure") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(
+                                    Array(workout.blocks.enumerated()),
+                                    id: \.element.id
+                                ) { blockIndex, block in
+                                    RunningWorkoutBlockRow(
+                                        index: blockIndex + 1,
+                                        block: block
+                                    )
+                                }
+                            }
+                            .padding(.top, 8)
+                        }
+                        .font(.caption.weight(.semibold))
                     }
                 }
             }
