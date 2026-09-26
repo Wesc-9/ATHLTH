@@ -1269,7 +1269,10 @@ struct ChallengeCreationView: View {
                 title: resolvedTitle,
                 sport: sport,
                 scoring: effectiveScoring,
-                verification: verificationPolicy
+                verification:
+                    sport == .running
+                        ? .verifiedRequired
+                        : verificationPolicy
             )
 
             reviewRow("Starts", startsAt.formatted(date: .abbreviated, time: .shortened))
@@ -1498,7 +1501,7 @@ struct ChallengeCreationView: View {
         }
 
         let rules = ATHLTHChallengeRules(
-            scoring: scoring,
+            scoring: effectiveScoring,
             verificationPolicy:
                 sport == .running
                     ? .verifiedRequired
