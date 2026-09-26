@@ -2308,47 +2308,66 @@ struct CommunityGroupDetailView: View {
                 accent: Color.indigo.opacity(0.30)
             )
 
-            ScrollView {
-                LazyVStack(spacing: 16) {
+            if isMember && selectedTab == .chat {
+                VStack(spacing: 12) {
                     groupHeader
+                    groupAreaPicker
 
-                    if isMember {
-                        Picker("Group area", selection: $selectedTab) {
-                            ForEach(CommunityGroupsTab.allCases) {
-                                Text($0.rawValue).tag($0)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-
-                        switch selectedTab {
-                        case .overview:
-                            overview
-                        case .chat:
-                            chat
-                        case .events:
-                            events
-                        case .challenges:
-                            challenges
-                        }
-                    } else {
-                        membershipAccessCard
-                    }
+                    chat
+                        .frame(maxHeight: .infinity)
                 }
-                .padding()
-                .frame(maxWidth: 760)
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal)
+                .padding(.top)
+                .padding(.bottom, 8)
+                .frame(maxWidth: 760, maxHeight: .infinity)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        groupHeader
+
+                        if isMember {
+                            groupAreaPicker
+
+                            switch selectedTab {
+                            case .overview:
+                                overview
+                            case .chat:
+                                EmptyView()
+                            case .events:
+                                events
+                            case .challenges:
+                                challenges
+                            }
+                        } else {
+                            membershipAccessCard
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
         .navigationTitle(currentGroup.name)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingCreateEvent) {
-            CommunityGroupEventCreateView(group: currentGroup)
+            CommunityGroupEventCreateView(
+                group: currentGroup
+            )
         }
         .sheet(isPresented: $showingCreateChallenge) {
-            CommunityGroupChallengeCreateView(group: currentGroup)
+            CommunityGroupChallengeCreateView(
+                group: currentGroup
+            )
         }
         .sheet(isPresented: $showingGroupSettings) {
-            CommunityGroupSettingsView(group: currentGroup)
+            CommunityGroupSettingsView(
+                group: currentGroup
+            )
         }
         .sheet(isPresented: $showingNotificationSettings) {
             CommunityGroupNotificationSettingsView(
@@ -2360,20 +2379,31 @@ struct CommunityGroupDetailView: View {
                 await groups.refresh()
             }
             if isMember {
-                await groups.loadGroupContent(group.id)
+                await groups.loadGroupContent(
+                    group.id
+                )
             }
         }
-        .refreshable {
-            await groups.refresh()
-            if isMember {
-                await groups.loadGroupContent(group.id)
-            }
-        }
-        .onChange(of: groups.groups.map(\.id)) { _, groupIDs in
+        .onChange(
+            of: groups.groups.map(\.id)
+        ) { _, groupIDs in
             if !groupIDs.contains(group.id) {
                 dismiss()
             }
         }
+    }
+
+    private var groupAreaPicker: some View {
+        Picker(
+            "Group area",
+            selection: $selectedTab
+        ) {
+            ForEach(CommunityGroupsTab.allCases) {
+                Text($0.rawValue)
+                    .tag($0)
+            }
+        }
+        .pickerStyle(.segmented)
     }
 
     private var membershipAccessCard: some View {
@@ -3407,31 +3437,84 @@ struct CommunityGroupDetailView: View {
     }
 
     private var chat: some View {
-        VStack(spacing: 12) {
-            ATHLTHCard {
-                if groups.messages(in: group.id).isEmpty {
-                    ContentUnavailableView(
-                        "No messages yet",
-                        systemImage: "bubble.left.and.bubble.right",
-                        description: Text(
-                            "Start the group conversation."
-                        )
-                    )
-                    .padding(.vertical, 24)
-                } else {
-                    VStack(spacing: 12) {
-                        ForEach(
-                            groups.messages(in: group.id)
-                        ) { message in
-                            messageRow(message)
+        VStack(spacing: 10) {
+            let messages = groups.messages(
+                in: group.id
+            )
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        if messages.isEmpty {
+                            ContentUnavailableView(
+                                "No messages yet",
+                                systemImage:
+                                    "bubble.left.and.bubble.right",
+                                description: Text(
+                                    "Start the group conversation."
+                                )
+                            )
+                            .padding(.top, 54)
+                        } else {
+                            ForEach(messages) { message in
+                                messageRow(message)
+                                    .id(message.id)
+                            }
                         }
                     }
+                    .padding(12)
+                }
+                .defaultScrollAnchor(.bottom)
+                .background(
+                    ATHLTHTheme.card,
+                    in: RoundedRectangle(
+                        cornerRadius: 22,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 22,
+                        style: .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme.border,
+                        lineWidth: 1
+                    )
+                }
+                .frame(maxHeight: .infinity)
+                .onChange(
+                    of: messages.count
+                ) { _, _ in
+                    guard let last = messages.last else {
+                        return
+                    }
+
+                    withAnimation(
+                        .easeOut(duration: 0.18)
+                    ) {
+                        proxy.scrollTo(
+                            last.id,
+                            anchor: .bottom
+                        )
+                    }
+                }
+                .task {
+                    guard let last = messages.last else {
+                        return
+                    }
+
+                    proxy.scrollTo(
+                        last.id,
+                        anchor: .bottom
+                    )
                 }
             }
 
             if !groupMentionSuggestions.isEmpty {
                 ATHLTHMentionSuggestionList(
-                    suggestions: groupMentionSuggestions
+                    suggestions:
+                        groupMentionSuggestions
                 ) { suggestion in
                     messageDraft =
                         ATHLTHMentionSupport.inserting(
@@ -3441,40 +3524,51 @@ struct CommunityGroupDetailView: View {
                 }
             }
 
-            HStack(spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 TextField(
                     "Message group",
                     text: $messageDraft,
                     axis: .vertical
                 )
                 .lineLimit(1...4)
+                .submitLabel(.send)
+                .onSubmit {
+                    Task {
+                        await sendGroupMessage()
+                    }
+                }
                 .padding(.horizontal, 14)
-                .frame(minHeight: 46)
+                .padding(.vertical, 10)
                 .background(
                     ATHLTHTheme.card,
                     in: RoundedRectangle(
-                        cornerRadius: 16,
+                        cornerRadius: 17,
                         style: .continuous
                     )
                 )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme.border,
+                        lineWidth: 1
+                    )
+                }
 
                 Button {
-                    let body = messageDraft
-                    messageDraft = ""
                     Task {
-                        let sent = await groups.sendMessage(
-                            groupID: group.id,
-                            senderName:
-                                session.profile.displayName,
-                            body: body
-                        )
-                        if !sent {
-                            messageDraft = body
-                        }
+                        await sendGroupMessage()
                     }
                 } label: {
                     Image(systemName: "arrow.up")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(
+                            .system(
+                                size: 16,
+                                weight: .bold
+                            )
+                        )
                         .foregroundStyle(.white)
                         .frame(width: 46, height: 46)
                         .background(
@@ -3483,18 +3577,54 @@ struct CommunityGroupDetailView: View {
                         )
                 }
                 .disabled(
-                    messageDraft.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty
+                    messageDraft
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        .isEmpty
                 )
             }
         }
+        .frame(maxHeight: .infinity)
         .task(id: selectedTab) {
-            guard selectedTab == .chat else { return }
-            while !Task.isCancelled {
-                await groups.refreshMessages(group.id)
-                try? await Task.sleep(for: .seconds(5))
+            guard selectedTab == .chat else {
+                return
             }
+
+            while !Task.isCancelled {
+                await groups.refreshMessages(
+                    group.id
+                )
+                try? await Task.sleep(
+                    for: .seconds(5)
+                )
+            }
+        }
+    }
+
+    private func sendGroupMessage() async {
+        let body = messageDraft
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !body.isEmpty else {
+            return
+        }
+
+        messageDraft = ""
+
+        let sent = await groups.sendMessage(
+            groupID: group.id,
+            senderName:
+                session.profile.username.isEmpty
+                    ? session.profile.displayName
+                    : "@\(session.profile.username)",
+            body: body
+        )
+
+        if !sent {
+            messageDraft = body
         }
     }
 
@@ -3793,27 +3923,59 @@ struct CommunityGroupDetailView: View {
     private func messageRow(
         _ message: CommunityGroupMessageRecord
     ) -> some View {
-        let mine = message.senderID == session.profile.userID
+        let mine =
+            message.senderID ==
+            session.profile.userID
+        let profile = groups.profileCard(
+            for: message.senderID
+        )
 
-        return HStack {
-            if mine { Spacer(minLength: 40) }
+        return HStack(
+            alignment: .bottom,
+            spacing: 8
+        ) {
+            if !mine {
+                groupMessageAvatar(
+                    userID: message.senderID,
+                    profile: profile
+                )
+            } else {
+                Spacer(minLength: 44)
+            }
 
-            VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
-                Text(mine ? "You" : message.senderName)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+            VStack(
+                alignment:
+                    mine ? .trailing : .leading,
+                spacing: 4
+            ) {
+                Text(
+                    mine
+                        ? "You"
+                        : (
+                            profile?.usernameLabel
+                                .isEmpty == false
+                                ? profile!.usernameLabel
+                                : message.senderName
+                        )
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
 
                 Text(message.body)
                     .font(.subheadline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(
+                        mine
+                            ? Color.white
+                            : ATHLTHTheme.primaryText
+                    )
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
                     .background(
                         mine
-                            ? ATHLTHTheme.accentSoft
-                            : Color.primary.opacity(0.045),
+                            ? ATHLTHTheme.accentDeep
+                            : Color.white,
                         in: RoundedRectangle(
-                            cornerRadius: 14,
+                            cornerRadius: 15,
                             style: .continuous
                         )
                     )
@@ -3828,8 +3990,44 @@ struct CommunityGroupDetailView: View {
                 .foregroundStyle(.tertiary)
             }
 
-            if !mine { Spacer(minLength: 40) }
+            if mine {
+                groupMessageAvatar(
+                    userID: message.senderID,
+                    profile: profile
+                )
+            } else {
+                Spacer(minLength: 44)
+            }
         }
+    }
+
+    @ViewBuilder
+    private func groupMessageAvatar(
+        userID: UUID,
+        profile: SocialProfileCard?
+    ) -> some View {
+        NavigationLink {
+            FriendProfileView(userID: userID)
+        } label: {
+            if let profile {
+                CommunityGroupProfileAvatar(
+                    profile: profile,
+                    size: 32
+                )
+            } else {
+                Image(
+                    systemName:
+                        "person.crop.circle.fill"
+                )
+                .font(.system(size: 31))
+                .foregroundStyle(.secondary)
+                .frame(width: 32, height: 32)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "Open sender profile"
+        )
     }
 
     private func groupChallengeCard(
