@@ -2532,7 +2532,6 @@ struct CommunityGroupDetailView: View {
                             }
                         }
                     }
-                    }
                 }
             }
             .padding(18)
