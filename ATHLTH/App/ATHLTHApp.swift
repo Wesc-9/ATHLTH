@@ -279,19 +279,42 @@ struct AppRootView: View {
                 return
             }
 
+            let watchFinishedActiveStrength =
+                result.kind == .strength &&
+                strengthWorkout.activeWorkout?.captureDevice == .appleWatch
+
             if result.kind == .strength {
-                strengthWorkout.attachHealthMetrics(
-                    LinkedHealthWorkoutMetrics(
-                        healthKitWorkoutUUID: result.healthKitWorkoutUUID,
-                        duration: result.duration,
-                        activeCalories: result.activeCalories,
-                        averageHeartRate: result.averageHeartRate,
-                        maxHeartRate: result.maxHeartRate
-                    )
+                let metrics = LinkedHealthWorkoutMetrics(
+                    healthKitWorkoutUUID: result.healthKitWorkoutUUID,
+                    duration: result.duration,
+                    activeCalories: result.activeCalories,
+                    averageHeartRate: result.averageHeartRate,
+                    maxHeartRate: result.maxHeartRate
                 )
+
+                if watchFinishedActiveStrength {
+                    // Finishing from Apple Watch closes the same ATHLTH
+                    // strength log instead of creating a second workout.
+                    strengthWorkout.finish(
+                        healthKitWorkoutUUID: metrics.healthKitWorkoutUUID,
+                        duration: metrics.duration,
+                        activeCalories: metrics.activeCalories,
+                        averageHeartRate: metrics.averageHeartRate,
+                        maxHeartRate: metrics.maxHeartRate
+                    )
+                    appSession.endTrainingStatus()
+                } else {
+                    // If iPhone already finished the ATHLTH log, attach the
+                    // final Watch metrics to that completed session.
+                    strengthWorkout.attachHealthMetrics(
+                        metrics
+                    )
+                }
             }
 
-            notifications.recordWatchWorkout(result)
+            if !watchFinishedActiveStrength {
+                notifications.recordWatchWorkout(result)
+            }
 
             Task {
                 await health.refreshAll()
@@ -301,6 +324,14 @@ struct AppRootView: View {
                     strength: strengthWorkout
                 )
                 notifications.syncGoalEvents(from: goals.goals)
+
+                if watchFinishedActiveStrength {
+                    // The StrengthWorkoutStore completion pipeline handles
+                    // progression, challenges, gear, sharing and review.
+                    watchConnection.clearCompletedWorkout()
+                    return
+                }
+
                 await challengeStore.ingestWatchWorkout(
                     result,
                     health: health,
