@@ -317,6 +317,7 @@ final class AppSessionStore: ObservableObject {
                 healthSex: nil,
                 weightKilograms: nil,
                 heightCentimeters: nil,
+                maximumHeartRateBPM: nil,
                 personalDetailsSource: .none,
                 trainingFocus: focus,
                 currentGoal: nil,
@@ -338,6 +339,7 @@ final class AppSessionStore: ObservableObject {
                 healthSex: basics.healthSex,
                 weightKilograms: basics.weightKilograms,
                 heightCentimeters: basics.heightCentimeters,
+                maximumHeartRateBPM: basics.maximumHeartRateBPM,
                 personalDetailsSource: source,
                 trainingFocus: existing?.trainingFocus,
                 currentGoal: existing?.currentGoal,
@@ -360,7 +362,10 @@ final class AppSessionStore: ObservableObject {
             weightKilograms:
                 healthBasics.weightKilograms ?? existing?.weightKilograms,
             heightCentimeters:
-                healthBasics.heightCentimeters ?? existing?.heightCentimeters
+                healthBasics.heightCentimeters ?? existing?.heightCentimeters,
+            maximumHeartRateBPM:
+                existing?.maximumHeartRateBPM ??
+                healthBasics.maximumHeartRateBPM
         )
 
         let usesManualFallback =
@@ -369,7 +374,8 @@ final class AppSessionStore: ObservableObject {
             (healthBasics.weightKilograms == nil &&
                 existing?.weightKilograms != nil) ||
             (healthBasics.heightCentimeters == nil &&
-                existing?.heightCentimeters != nil)
+                existing?.heightCentimeters != nil) ||
+            existing?.maximumHeartRateBPM != nil
 
         updatePersonalDetails(
             merged,
