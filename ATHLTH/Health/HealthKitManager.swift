@@ -1507,6 +1507,110 @@ final class HealthKitManager: ObservableObject {
         await workoutDetail(for: summary.id)
     }
 
+    func routePerformance(
+        for summary: WorkoutSummary,
+        against route: TrainingRoute
+    ) async -> RoutePerformanceAnalysis? {
+        guard summary.activity == .running ||
+                summary.activity == .walking,
+              route.coordinates.count >= 2
+        else {
+            return nil
+        }
+
+        let detail = await workoutDetail(for: summary)
+
+        let actual = detail.route
+            .filter {
+                $0.horizontalAccuracy >= 0 &&
+                $0.horizontalAccuracy <= 65
+            }
+            .sorted { $0.timestamp < $1.timestamp }
+
+        guard actual.count >= 2 else {
+            return nil
+        }
+
+        let reference = route.coordinates.map {
+            CLLocation(
+                latitude: $0.latitude,
+                longitude: $0.longitude
+            )
+        }
+
+        guard reference.count >= 2 else {
+            return nil
+        }
+
+        let sampleStep = max(reference.count / 120, 1)
+        let referenceSamples = stride(
+            from: 0,
+            to: reference.count,
+            by: sampleStep
+        )
+        .map { reference[$0] }
+
+        guard !referenceSamples.isEmpty else {
+            return nil
+        }
+
+        let nearestDistances = referenceSamples.map { point in
+            actual.lazy
+                .map { $0.distance(from: point) }
+                .min() ?? .greatestFiniteMagnitude
+        }
+
+        let toleranceMeters = 80.0
+        let matchedCount = nearestDistances.filter {
+            $0 <= toleranceMeters
+        }.count
+
+        let routeMatchPercent =
+            Double(matchedCount) /
+            Double(referenceSamples.count) *
+            100
+
+        let finiteDeviations = nearestDistances.filter(\.isFinite)
+        guard !finiteDeviations.isEmpty else {
+            return nil
+        }
+
+        let averageDeviation =
+            finiteDeviations.reduce(0, +) /
+            Double(finiteDeviations.count)
+        let maxDeviation =
+            finiteDeviations.max() ?? 0
+
+        let actualStart = actual.first!
+        let actualEnd = actual.last!
+        let referenceStart = reference.first!
+        let referenceEnd = reference.last!
+
+        let forwardStart = actualStart.distance(from: referenceStart)
+        let forwardEnd = actualEnd.distance(from: referenceEnd)
+        let reverseStart = actualStart.distance(from: referenceEnd)
+        let reverseEnd = actualEnd.distance(from: referenceStart)
+
+        let useReverse =
+            (reverseStart + reverseEnd) <
+            (forwardStart + forwardEnd)
+
+        return RoutePerformanceAnalysis(
+            workoutID: summary.id,
+            activity: summary.activity,
+            startedAt: summary.startDate,
+            durationSeconds: summary.duration,
+            distanceMeters: summary.distanceMeters ?? 0,
+            routeMatchPercent: min(max(routeMatchPercent, 0), 100),
+            averageDeviationMeters: max(averageDeviation, 0),
+            maxDeviationMeters: max(maxDeviation, 0),
+            startDistanceMeters:
+                useReverse ? reverseStart : forwardStart,
+            endDistanceMeters:
+                useReverse ? reverseEnd : forwardEnd
+        )
+    }
+
     func workoutDetail(for workoutID: UUID) async -> WorkoutDetail {
         let workout: HKWorkout?
 
