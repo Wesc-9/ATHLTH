@@ -14,7 +14,6 @@ struct CommunityGroupEventDetailView: View {
     let event: CommunityGroupEventRecord
 
     @State private var showingEdit = false
-    @State private var showingManualStrengthResult = false
     @State private var actionMessage: String?
 
     private var current:
@@ -873,6 +872,7 @@ struct CommunityGroupChallengeDetailView: View {
     let challenge: CommunityGroupChallengeRecord
 
     @State private var showingEdit = false
+    @State private var showingManualStrengthResult = false
     @State private var actionMessage: String?
 
     private var current:
