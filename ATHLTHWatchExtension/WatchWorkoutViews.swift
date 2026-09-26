@@ -154,10 +154,12 @@ struct WatchActiveWorkoutView: View {
             .padding(11)
             .watchSurface(radius: 18)
 
-            if let structured =
-                    workoutManager.structuredRunningWorkout,
-               let step =
-                    workoutManager.currentStructuredRunningStep {
+            if workoutManager.kind == .strength {
+                strengthTrackingContent
+            } else if let structured =
+                        workoutManager.structuredRunningWorkout,
+                      let step =
+                        workoutManager.currentStructuredRunningStep {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(structured.title)
@@ -285,6 +287,305 @@ struct WatchActiveWorkoutView: View {
                 .disabled(workoutManager.state == .ending)
             }
         }
+    }
+
+    @ViewBuilder
+    private var strengthTrackingContent: some View {
+        if let snapshot = workoutManager.strengthSession {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(
+                        snapshot.exerciseName ??
+                        "Strength"
+                    )
+                    .font(.system(size: 15, weight: .bold))
+                    .lineLimit(2)
+
+                    Spacer()
+
+                    if snapshot.exerciseCount > 0 {
+                        Text(
+                            "\(snapshot.exerciseIndex + 1)/\(snapshot.exerciseCount)"
+                        )
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(WatchTheme.green)
+                    }
+                }
+
+                if !snapshot.primaryMuscles.isEmpty {
+                    Text(
+                        snapshot.primaryMuscles
+                            .prefix(2)
+                            .joined(separator: " · ")
+                    )
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.muted)
+                    .lineLimit(1)
+                }
+
+                if let setNumber = snapshot.setNumber,
+                   snapshot.setCount > 0 {
+                    Text(
+                        "Set \(setNumber) of \(snapshot.setCount) · \(snapshot.completedSets)/\(snapshot.totalSets) total"
+                    )
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+                }
+            }
+            .padding(10)
+            .watchSurface()
+
+            if snapshot.isResting,
+               let restEndsAt = snapshot.restEndsAt {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let remaining = max(
+                        restEndsAt.timeIntervalSince(
+                            context.date
+                        ),
+                        0
+                    )
+
+                    VStack(spacing: 8) {
+                        Text("REST")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(WatchTheme.muted)
+
+                        Text(
+                            durationText(remaining)
+                        )
+                        .font(
+                            .system(
+                                size: 34,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .monospacedDigit()
+
+                        HStack(spacing: 7) {
+                            Button("+30") {
+                                workoutManager
+                                    .addStrengthRest(
+                                        seconds: 30
+                                    )
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button("Skip") {
+                                workoutManager
+                                    .skipStrengthRest()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(WatchTheme.green)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(10)
+                    .watchSurface()
+                }
+            } else if snapshot.currentExerciseComplete {
+                VStack(spacing: 8) {
+                    Image(
+                        systemName:
+                            snapshot.allExercisesComplete
+                                ? "checkmark.circle.fill"
+                                : "checkmark.seal.fill"
+                    )
+                    .font(.system(size: 24))
+                    .foregroundStyle(WatchTheme.green)
+
+                    Text(
+                        snapshot.allExercisesComplete
+                            ? "Workout exercises complete"
+                            : "Exercise complete"
+                    )
+                    .font(.system(size: 12, weight: .bold))
+                    .multilineTextAlignment(.center)
+
+                    if snapshot.hasNextExercise {
+                        Button {
+                            workoutManager
+                                .moveToNextStrengthExercise()
+                        } label: {
+                            Label(
+                                "Next Exercise",
+                                systemImage: "arrow.right"
+                            )
+                            .font(.system(size: 12, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(WatchTheme.green)
+                    } else {
+                        Text(
+                            "Use the red stop button below when you're finished."
+                        )
+                        .font(.system(size: 8))
+                        .foregroundStyle(WatchTheme.muted)
+                        .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(10)
+                .watchSurface()
+            } else if snapshot.exerciseName != nil {
+                WatchStrengthCrownControl(
+                    title: "Weight",
+                    valueText: String(
+                        format: "%.1f kg",
+                        snapshot.draftWeightKilograms
+                    ),
+                    value: strengthWeightBinding,
+                    range: 0...500,
+                    step: 0.5,
+                    icon: "scalemass.fill"
+                )
+
+                WatchStrengthCrownControl(
+                    title: "Reps",
+                    valueText: "\(snapshot.draftReps)",
+                    value: strengthRepsBinding,
+                    range: 0...100,
+                    step: 1,
+                    icon: "repeat"
+                )
+
+                WatchStrengthCrownControl(
+                    title: "Rest",
+                    valueText:
+                        strengthRestText(
+                            snapshot.draftRestSeconds
+                        ),
+                    value: strengthRestBinding,
+                    range: 0...600,
+                    step: 15,
+                    icon: "timer"
+                )
+
+                Button {
+                    workoutManager.completeStrengthSet()
+                } label: {
+                    Label(
+                        "Complete Set",
+                        systemImage:
+                            "checkmark.circle.fill"
+                    )
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(WatchTheme.green)
+            } else {
+                VStack(spacing: 7) {
+                    Image(systemName: "iphone")
+                        .font(.title3)
+                        .foregroundStyle(WatchTheme.green)
+
+                    Text("Add an exercise on iPhone")
+                        .font(.system(size: 11, weight: .bold))
+                        .multilineTextAlignment(.center)
+
+                    Text(
+                        "The Watch will update automatically."
+                    )
+                    .font(.system(size: 8))
+                    .foregroundStyle(WatchTheme.muted)
+                    .multilineTextAlignment(.center)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity)
+                .watchSurface()
+            }
+        } else {
+            VStack(spacing: 8) {
+                ProgressView()
+                    .tint(WatchTheme.green)
+
+                Text("Syncing strength workout…")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+                    .multilineTextAlignment(.center)
+
+                Button("Sync") {
+                    workoutManager
+                        .requestStrengthSnapshot()
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity)
+            .watchSurface()
+        }
+    }
+
+    private var strengthWeightBinding: Binding<Double> {
+        Binding(
+            get: {
+                workoutManager
+                    .strengthSession?
+                    .draftWeightKilograms ?? 0
+            },
+            set: {
+                workoutManager.updateStrengthDraft(
+                    weightKilograms: $0
+                )
+            }
+        )
+    }
+
+    private var strengthRepsBinding: Binding<Double> {
+        Binding(
+            get: {
+                Double(
+                    workoutManager
+                        .strengthSession?
+                        .draftReps ?? 0
+                )
+            },
+            set: {
+                workoutManager.updateStrengthDraft(
+                    reps: max(Int($0.rounded()), 0)
+                )
+            }
+        )
+    }
+
+    private var strengthRestBinding: Binding<Double> {
+        Binding(
+            get: {
+                Double(
+                    workoutManager
+                        .strengthSession?
+                        .draftRestSeconds ?? 0
+                )
+            },
+            set: {
+                let rounded = Int(
+                    ($0 / 15).rounded()
+                ) * 15
+
+                workoutManager.updateStrengthDraft(
+                    restSeconds:
+                        min(max(rounded, 0), 600)
+                )
+            }
+        )
+    }
+
+    private func strengthRestText(
+        _ seconds: Int
+    ) -> String {
+        if seconds == 0 {
+            return "None"
+        }
+
+        if seconds >= 60,
+           seconds % 60 == 0 {
+            return "\(seconds / 60) min"
+        }
+
+        return "\(seconds) sec"
     }
 
     private func structuredStepTargetText(
@@ -473,5 +774,69 @@ struct WatchActiveWorkoutView: View {
         }
 
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+
+
+private struct WatchStrengthCrownControl: View {
+    let title: String
+    let valueText: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let icon: String
+
+    @FocusState private var crownFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(WatchTheme.green)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+
+                Text(valueText)
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+            }
+
+            Spacer()
+
+            Image(systemName: "digitalcrown.horizontal.arrow.clockwise")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(
+                    crownFocused
+                        ? WatchTheme.green
+                        : WatchTheme.muted
+                )
+        }
+        .padding(9)
+        .watchSurface()
+        .contentShape(Rectangle())
+        .focusable()
+        .focused($crownFocused)
+        .digitalCrownRotation(
+            $value,
+            from: range.lowerBound,
+            through: range.upperBound,
+            by: step,
+            sensitivity: .medium,
+            isContinuous: false,
+            isHapticFeedbackEnabled: true
+        )
+        .onTapGesture {
+            crownFocused = true
+        }
     }
 }
