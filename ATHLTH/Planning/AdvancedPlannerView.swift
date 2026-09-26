@@ -2809,6 +2809,214 @@ struct SessionEditorView: View {
         }
     }
 
+    @ViewBuilder
+    private var advancedOptions: some View {
+        if kind == .running || kind == .walking {
+            Section("Performance") {
+                Toggle(
+                    "Target pace",
+                    isOn: $targetPaceEnabled
+                )
+
+                if targetPaceEnabled {
+                    HStack {
+                        Label(
+                            "Pace",
+                            systemImage: "speedometer"
+                        )
+
+                        Spacer()
+
+                        Stepper(
+                            value: $targetPaceMinutes,
+                            in: 2...15
+                        ) {
+                            Text(
+                                "\(targetPaceMinutes):\(String(format: "%02d", targetPaceSeconds)) /km"
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+
+                    Stepper(
+                        "Pace seconds: \(targetPaceSeconds)",
+                        value: $targetPaceSeconds,
+                        in: 0...55,
+                        step: 5
+                    )
+                }
+            }
+
+            Section("Audio Coach") {
+                Button {
+                    showingAudioCoachEditor = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "waveform.and.person.filled")
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .frame(width: 28)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Audio Coach")
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+
+                            Text(audioCoachStatusText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Text(
+                    "Use the app default or customize cues for this workout only."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+
+        Section("Additional Gear") {
+            if additionalGearItems.isEmpty {
+                Text(
+                    "No additional active gear is available. Add watches, headphones or other gear in My Gear."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                ForEach(additionalGearItems) { item in
+                    Button {
+                        toggleGear(item.id)
+                    } label: {
+                        HStack(spacing: 11) {
+                            Image(
+                                systemName: item.category.systemImage
+                            )
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.name)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+
+                                Text(item.category.shortTitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    selectedGearIDs.contains(item.id)
+                                        ? "checkmark.circle.fill"
+                                        : "circle"
+                            )
+                            .foregroundStyle(
+                                selectedGearIDs.contains(item.id)
+                                    ? ATHLTHTheme.vitality
+                                    : ATHLTHTheme.mutedText
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Text(
+                "Selected gear is linked automatically when the workout is completed."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var activeRunningShoes: [ProfileGearItem] {
+        gear.items(in: .shoes).filter {
+            gear.isActive($0)
+        }
+    }
+
+    private var runningShoeSelection: Binding<UUID?> {
+        Binding(
+            get: {
+                activeRunningShoes.first {
+                    selectedGearIDs.contains($0.id)
+                }?.id
+            },
+            set: { newValue in
+                let shoeIDs = Set(
+                    gear.items(in: .shoes).map(\.id)
+                )
+
+                selectedGearIDs.subtract(shoeIDs)
+
+                if let newValue {
+                    selectedGearIDs.insert(newValue)
+                }
+            }
+        )
+    }
+
+    private var additionalGearItems: [ProfileGearItem] {
+        gear.items.filter {
+            gear.isActive($0) &&
+            $0.category != .shoes
+        }
+        .sorted {
+            if $0.category != $1.category {
+                return $0.category.rawValue <
+                    $1.category.rawValue
+            }
+
+            return $0.name.localizedCaseInsensitiveCompare(
+                $1.name
+            ) == .orderedAscending
+        }
+    }
+
+    private var audioCoachStatusText: String {
+        if let configuration = audioCoachOverride {
+            return configuration.enabled
+                ? "Custom · On"
+                : "Custom · Off"
+        }
+
+        return settings.audioCoachEnabledByDefault
+            ? "App default · On"
+            : "App default · Off"
+    }
+
+    private func toggleGear(_ id: UUID) {
+        if selectedGearIDs.contains(id) {
+            selectedGearIDs.remove(id)
+        } else {
+            selectedGearIDs.insert(id)
+        }
+    }
+
+    private func applyDefaultRunningShoeIfNeeded() {
+        guard kind == .running,
+              existingWorkout == nil,
+              runningShoeSelection.wrappedValue == nil,
+              let defaultShoe = gear.defaultRunningShoe
+        else {
+            return
+        }
+
+        selectedGearIDs.insert(defaultShoe.id)
+    }
+
     private var strengthBuilder: some View {
         Section("Strength Exercises") {
             if plannedExercises.isEmpty {
