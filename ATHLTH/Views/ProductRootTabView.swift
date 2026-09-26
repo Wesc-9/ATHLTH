@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 
 struct ProductRootTabView: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var selectedTab = 0
@@ -61,8 +62,21 @@ struct ProductRootTabView: View {
         .sheet(
             isPresented: Binding(
                 get: {
-                    settings.trainingDeviceProvider == .appleWatch &&
-                    workoutMirroring.isPresentationRequested
+                    guard settings.trainingDeviceProvider == .appleWatch,
+                          workoutMirroring.isPresentationRequested
+                    else {
+                        return false
+                    }
+
+                    if let kind = workoutMirroring.snapshot?.kind,
+                       kind == .strength || kind == .functional {
+                        // Strength uses the ATHLTH set logger on iPhone.
+                        // Watch mirroring remains a sensor/data companion and
+                        // must never replace the reps/weight/rest interface.
+                        return false
+                    }
+
+                    return true
                 },
                 set: { presented in
                     if !presented &&
@@ -1239,7 +1253,9 @@ struct ATHLTHHomeView: View {
             }
 
             if workoutMirroring.hasActiveMirroredWorkout,
-               let snapshot = workoutMirroring.snapshot {
+               let snapshot = workoutMirroring.snapshot,
+               snapshot.kind != .strength,
+               snapshot.kind != .functional {
                 HStack(spacing: 13) {
                     Image(systemName: snapshot.kind.systemImage)
                         .font(.system(size: 20, weight: .semibold))
