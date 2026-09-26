@@ -349,38 +349,22 @@ final class CommunityGroupAdvancedStore: ObservableObject {
     ) async -> Bool {
         do {
             try await client
-                .from(
-                    "community_group_content_hosts"
-                )
-                .delete()
-                .eq(
-                    "content_type",
-                    value: contentType
-                )
-                .eq(
-                    "content_id",
-                    value: contentID
+                .rpc(
+                    "set_community_group_content_hosts",
+                    params:
+                        CommunityGroupSetHostsParams(
+                            groupID: groupID,
+                            contentType:
+                                contentType,
+                            contentID:
+                                contentID,
+                            userIDs:
+                                Array(
+                                    Set(userIDs)
+                                )
+                        )
                 )
                 .execute()
-
-            let payload = Array(Set(userIDs))
-                .map {
-                    CommunityGroupContentHostInsert(
-                        groupID: groupID,
-                        contentType: contentType,
-                        contentID: contentID,
-                        userID: $0
-                    )
-                }
-
-            if !payload.isEmpty {
-                try await client
-                    .from(
-                        "community_group_content_hosts"
-                    )
-                    .insert(payload)
-                    .execute()
-            }
 
             hosts = try await client
                 .from(
@@ -796,6 +780,22 @@ private struct CommunityGroupDuplicateChallengeParams:
         case activityConfiguration =
             "p_activity_config"
         case options = "p_options"
+    }
+}
+
+private struct CommunityGroupSetHostsParams:
+    Encodable
+{
+    let groupID: UUID
+    let contentType: String
+    let contentID: UUID
+    let userIDs: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+        case contentType = "p_content_type"
+        case contentID = "p_content_id"
+        case userIDs = "p_user_ids"
     }
 }
 
