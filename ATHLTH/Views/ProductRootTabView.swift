@@ -4434,7 +4434,7 @@ struct ATHLTHRecoveryView: View {
     @State private var recoveryAIError: String?
     @State private var showingSorenessLog = false
     @State private var showingRecoveryInfo = false
-    @State private var showingRecoverySense = false
+    @State private var showingRecoveryCoach = false
     @State private var selectedRecoveryTool: RecoveryTool?
 
     var body: some View {
@@ -4466,7 +4466,7 @@ struct ATHLTHRecoveryView: View {
                                     onSelectTab(1)
                                 },
                                 onAskATHLTH: {
-                                    showingRecoverySense = true
+                                    showingRecoveryCoach = true
                                 }
                             )
 
@@ -4563,8 +4563,8 @@ struct ATHLTHRecoveryView: View {
             .sheet(item: $selectedRecoveryTool) { tool in
                 RecoveryGuidedToolView(tool: tool)
             }
-            .sheet(isPresented: $showingRecoverySense) {
-                RecoverySenseView(
+            .sheet(isPresented: $showingRecoveryCoach) {
+                RecoveryCoachView(
                     context: recoveryAIContext,
                     insight: recoveryAIInsight ?? fallbackRecoveryAIInsight
                 )

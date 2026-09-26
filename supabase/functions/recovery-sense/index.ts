@@ -204,7 +204,7 @@ async function verifyPlus(
       ok: false,
       response: json(
         {
-          error: "ATHLTH Sense requires an active ATHLTH+ plan or trial.",
+          error: "ATHLTH Coach requires an active ATHLTH+ plan or trial.",
           code: "PREMIUM_REQUIRED",
         },
         403,
@@ -285,7 +285,7 @@ function sanitizeContext(input: RecoveryContext | undefined) {
 }
 
 const sharedInstructions = `
-You are ATHLTH Sense, the recovery interpretation layer inside a fitness app.
+You are ATHLTH Coach, the recovery interpretation layer inside a fitness app.
 Use only the data supplied in the request.
 
 Important:
@@ -340,18 +340,18 @@ Deno.serve(async (req: Request) => {
 
     if (!response.ok) {
       const failure = await response.text();
-      console.error("ATHLTH Sense ask failed", {
+      console.error("ATHLTH Coach ask failed", {
         userID: access.userID,
         status: response.status,
         body: failure.slice(0, 1500),
       });
-      return json({ error: "ATHLTH Sense is temporarily unavailable." }, 502);
+      return json({ error: "ATHLTH Coach is temporarily unavailable." }, 502);
     }
 
     const payload = await response.json();
     const answer = extractOutputText(payload)?.trim();
     if (!answer) {
-      return json({ error: "ATHLTH Sense returned an empty answer." }, 502);
+      return json({ error: "ATHLTH Coach returned an empty answer." }, 502);
     }
 
     return json({ answer: answer.slice(0, 1800) });
@@ -390,27 +390,27 @@ Create today's Recovery insight.
 
   if (!response.ok) {
     const failure = await response.text();
-    console.error("ATHLTH Sense insight failed", {
+    console.error("ATHLTH Coach insight failed", {
       userID: access.userID,
       status: response.status,
       body: failure.slice(0, 1500),
     });
-    return json({ error: "ATHLTH Sense is temporarily unavailable." }, 502);
+    return json({ error: "ATHLTH Coach is temporarily unavailable." }, 502);
   }
 
   const payload = await response.json();
   const outputText = extractOutputText(payload);
   if (!outputText) {
-    return json({ error: "ATHLTH Sense returned an empty insight." }, 502);
+    return json({ error: "ATHLTH Coach returned an empty insight." }, 502);
   }
 
   try {
     return json(JSON.parse(outputText));
   } catch {
-    console.error("Unable to parse ATHLTH Sense insight", {
+    console.error("Unable to parse ATHLTH Coach insight", {
       userID: access.userID,
       output: outputText.slice(0, 1500),
     });
-    return json({ error: "ATHLTH Sense returned an invalid insight." }, 502);
+    return json({ error: "ATHLTH Coach returned an invalid insight." }, 502);
   }
 });

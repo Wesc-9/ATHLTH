@@ -414,7 +414,7 @@ struct RecoverySuggestedTodayCard: View {
     }
 }
 
-struct RecoverySenseView: View {
+struct RecoveryCoachView: View {
     @Environment(\.dismiss) private var dismiss
 
     let context: RecoveryAIContext
@@ -433,7 +433,7 @@ struct RecoverySenseView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     ATHLTHCard {
                         Label(
-                            "ATHLTH Sense",
+                            "ATHLTH Coach",
                             systemImage: "sparkles"
                         )
                         .font(.title3.weight(.bold))
@@ -562,7 +562,7 @@ struct RecoverySenseView: View {
                 .padding(.vertical, 10)
                 .background(.ultraThinMaterial)
             }
-            .navigationTitle("ATHLTH Sense")
+            .navigationTitle("ATHLTH Coach")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
