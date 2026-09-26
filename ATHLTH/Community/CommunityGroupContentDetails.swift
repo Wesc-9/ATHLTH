@@ -24,7 +24,11 @@ struct CommunityGroupEventDetailView: View {
     private var canManageContent: Bool {
         groups.canManage(group) ||
         current.creatorID ==
-            session.profile.userID
+            session.profile.userID ||
+        advanced.hosts.contains {
+            $0.userID ==
+                session.profile.userID
+        }
     }
 
     private var myRSVP: String? {
@@ -69,13 +73,15 @@ struct CommunityGroupEventDetailView: View {
                     placement: .topBarTrailing
                 ) {
                     Menu {
-                        Button {
-                            showingEdit = true
-                        } label: {
-                            Label(
-                                "Edit Event",
-                                systemImage: "pencil"
-                            )
+                        if current.status != "cancelled" {
+                            Button {
+                                showingEdit = true
+                            } label: {
+                                Label(
+                                    "Edit Event",
+                                    systemImage: "pencil"
+                                )
+                            }
                         }
 
                         Button {
@@ -134,9 +140,7 @@ struct CommunityGroupEventDetailView: View {
                 event: current,
                 existingHostIDs:
                     Set(
-                        advanced.hosts.map(
-                            .userID
-                        )
+                        advanced.hosts.map(\.userID)
                     )
             ) {
                 Task {
@@ -627,7 +631,7 @@ struct CommunityGroupEventDetailView: View {
                     HStack(spacing: -6) {
                         ForEach(
                             going.prefix(10),
-                            id: .userID
+                            id: \.userID
                         ) { rsvp in
                             if let profile =
                                 groups.profileCard(
@@ -880,7 +884,11 @@ struct CommunityGroupChallengeDetailView: View {
     private var canManageContent: Bool {
         groups.canManage(group) ||
         current.creatorID ==
-            session.profile.userID
+            session.profile.userID ||
+        advanced.hosts.contains {
+            $0.userID ==
+                session.profile.userID
+        }
     }
 
     private var isJoined: Bool {
@@ -926,13 +934,15 @@ struct CommunityGroupChallengeDetailView: View {
                     placement: .topBarTrailing
                 ) {
                     Menu {
-                        Button {
-                            showingEdit = true
-                        } label: {
-                            Label(
-                                "Edit Challenge",
-                                systemImage: "pencil"
-                            )
+                        if current.status != "cancelled" {
+                            Button {
+                                showingEdit = true
+                            } label: {
+                                Label(
+                                    "Edit Challenge",
+                                    systemImage: "pencil"
+                                )
+                            }
                         }
 
                         Button {
@@ -993,9 +1003,7 @@ struct CommunityGroupChallengeDetailView: View {
                 challenge: current,
                 existingHostIDs:
                     Set(
-                        advanced.hosts.map(
-                            .userID
-                        )
+                        advanced.hosts.map(\.userID)
                     )
             ) {
                 Task {
@@ -1361,13 +1369,15 @@ struct CommunityGroupChallengeDetailView: View {
                             }
                         }
                     }
-                    .buttonStyle(
-                        isJoined
-                            ? .bordered
-                            : .borderedProminent
-                    )
+                    .buttonStyle(.bordered)
                     .tint(
                         ATHLTHTheme.accentDeep
+                    )
+                    .controlSize(.regular)
+                    .fontWeight(
+                        isJoined
+                            ? .regular
+                            : .semibold
                     )
                 }
             }
