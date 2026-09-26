@@ -3443,13 +3443,24 @@ struct CommunityGroupDetailView: View {
     }
 
     private var nextGroupEvent: CommunityGroupEventRecord? {
-        groups.events(in: group.id)
+        let now = Date()
+
+        return groups.events(in: group.id)
             .filter {
-                $0.startsAt >= Date() &&
                 $0.status != "draft" &&
-                $0.status != "cancelled"
+                $0.status != "cancelled" &&
+                $0.nextOccurrenceStart(
+                    relativeTo: now
+                ) != nil
             }
-            .sorted { $0.startsAt < $1.startsAt }
+            .sorted {
+                ($0.nextOccurrenceStart(
+                    relativeTo: now
+                ) ?? .distantFuture) <
+                ($1.nextOccurrenceStart(
+                    relativeTo: now
+                ) ?? .distantFuture)
+            }
             .first
     }
 
@@ -3551,8 +3562,12 @@ struct CommunityGroupDetailView: View {
     private func comingUpEventDetail(
         _ event: CommunityGroupEventRecord
     ) -> String {
+        let nextStart =
+            event.nextOccurrenceStart()
+            ?? event.startsAt
+
         var parts = [
-            event.startsAt.formatted(
+            nextStart.formatted(
                 date: .abbreviated,
                 time: .shortened
             ),
