@@ -44,6 +44,7 @@ enum AppleWatchWorkoutLaunchError: LocalizedError {
 final class AppleWatchConnectionStore: NSObject, ObservableObject {
     @Published private(set) var state: AppleWatchConnectionState = .checking
     @Published private(set) var lastCompletedWorkout: WatchWorkoutResult?
+    @Published private(set) var lastStrengthCommand: WatchStrengthCommand?
     @Published private(set) var workoutLaunchInProgress = false
     @Published private(set) var workoutLaunchError: String?
 
@@ -256,6 +257,21 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
             workout,
             kind: .runningWorkout
         )
+    }
+
+    func sendStrengthSnapshot(
+        _ snapshot: WatchStrengthSessionSnapshot
+    ) {
+        sendWatchPayload(
+            snapshot,
+            kind: .strengthSnapshot
+        )
+    }
+
+    func clearStrengthCommand() {
+        DispatchQueue.main.async { [weak self] in
+            self?.lastStrengthCommand = nil
+        }
     }
 
     private func sendWatchPayload<T: Encodable>(
@@ -471,6 +487,29 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    private func receiveStrengthCommand(
+        from payload: [String: Any]
+    ) -> Bool {
+        guard
+            payload[WatchTransferMetadataKey.kind] as? String
+                == WatchTransferKind.strengthCommand.rawValue,
+            let data =
+                payload[WatchTransferMetadataKey.payload] as? Data,
+            let command = try? JSONDecoder().decode(
+                WatchStrengthCommand.self,
+                from: data
+            )
+        else {
+            return false
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.lastStrengthCommand = command
+        }
+
+        return true
+    }
+
     private func receiveWorkoutResult(
         from userInfo: [String: Any]
     ) {
@@ -495,6 +534,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         if payload[WatchTransferMetadataKey.kind] as? String
             == WatchTransferKind.connectivityAck.rawValue {
             handleConnectivityAck(payload)
+            return
+        }
+
+        if receiveStrengthCommand(from: payload) {
             return
         }
 
