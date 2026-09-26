@@ -460,6 +460,7 @@ final class CommunityEventStore: ObservableObject {
 
 struct ATHLTHCommunityView: View {
     @EnvironmentObject private var community: CommunityEventStore
+    @EnvironmentObject private var officialChallenges: OfficialWeeklyChallengeStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
@@ -505,29 +506,62 @@ struct ATHLTHCommunityView: View {
             ATHLTHPinnedHeroLayout(
                 accent: Color.purple.opacity(0.42)
             ) {
-                ATHLTHTabHero(
-                    imageName: "CommunityHero",
-                    title: "Community",
-                    subtitle: "Train together. Go further.",
-                    height: 190,
-                    alignment: .leading,
-                    focalOffsetX: -18,
-                    focalOffsetY: 18
-                )
+                ZStack(alignment: .topTrailing) {
+                    ATHLTHTabHero(
+                        imageName: "CommunityHero",
+                        title: "Community",
+                        subtitle: "Train together. Go further.",
+                        height: 190,
+                        alignment: .leading,
+                        focalOffsetX: -18,
+                        focalOffsetY: 18
+                    )
+
+                    if session.currentRole.canAccessControlCenter {
+                        NavigationLink {
+                            OfficialWeeklyChallengeAdminListView()
+                        } label: {
+                            Image(systemName: "list.bullet.rectangle")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 40, height: 40)
+                                .background(
+                                    Color.black.opacity(0.28),
+                                    in: Circle()
+                                )
+                                .overlay {
+                                    Circle()
+                                        .stroke(
+                                            Color.white.opacity(0.45),
+                                            lineWidth: 0.8
+                                        )
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 48)
+                        .padding(.trailing, 16)
+                        .accessibilityLabel("Manage weekly challenges")
+                    }
+                }
             } content: {
                 LazyVStack(spacing: 16) {
                     CommunityShowcaseShortcutStrip(
                         clubsCount: groups.joinedGroups.count,
-                        challengeCount: activeChallenges.count,
+                        challengeCount:
+                            activeChallenges.count +
+                            (officialChallenges.activeChallenge == nil ? 0 : 1),
                         eventCount: community.upcomingEvents.count
                     )
 
-                    CommunityChallengeSpotlightCard(
-                        challenge: featuredChallenge,
-                        currentUserID: session.profile.userID,
-                        profiles: social.visibleProfiles + social.friends
-                    ) {
-                        showingCreateChallenge = true
+                    if let weekly =
+                        officialChallenges.activeChallenge ??
+                        officialChallenges.upcomingChallenges.first {
+                        OfficialWeeklyChallengeCard(
+                            challenge: weekly,
+                            profiles:
+                                social.visibleProfiles +
+                                social.friends
+                        )
                     }
 
                     CommunityRouteChallengeShowcaseCard(
@@ -580,12 +614,14 @@ struct ATHLTHCommunityView: View {
                 isPresented: Binding(
                     get: {
                         community.errorMessage != nil ||
-                        routeDiscovery.errorMessage != nil
+                        routeDiscovery.errorMessage != nil ||
+                        officialChallenges.errorMessage != nil
                     },
                     set: { shown in
                         if !shown {
                             community.errorMessage = nil
                             routeDiscovery.errorMessage = nil
+                            officialChallenges.errorMessage = nil
                         }
                     }
                 )
@@ -595,6 +631,7 @@ struct ATHLTHCommunityView: View {
                 Text(
                     community.errorMessage ??
                     routeDiscovery.errorMessage ??
+                    officialChallenges.errorMessage ??
                     ""
                 )
             }
@@ -609,12 +646,15 @@ struct ATHLTHCommunityView: View {
             social.refresh(challengeStore: challenges)
         async let groupRefresh: Void = groups.refresh()
         async let routeRefresh: Void = routeDiscovery.refresh()
+        async let officialChallengeRefresh: Void =
+            officialChallenges.refresh()
 
         _ = await (
             eventRefresh,
             socialRefresh,
             groupRefresh,
-            routeRefresh
+            routeRefresh,
+            officialChallengeRefresh
         )
 
         challenges.refreshStatuses()
