@@ -262,10 +262,33 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
     func sendStrengthSnapshot(
         _ snapshot: WatchStrengthSessionSnapshot
     ) {
-        sendWatchPayload(
-            snapshot,
-            kind: .strengthSnapshot
+        guard
+            let session,
+            session.activationState == .activated,
+            let data = try? JSONEncoder().encode(snapshot)
+        else {
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.strengthSnapshot.rawValue,
+            WatchTransferMetadataKey.payload: data
+        ]
+
+        // applicationContext keeps only the newest strength state, which is
+        // exactly what reconnect needs. Avoid queueing stale set snapshots.
+        try? session.updateApplicationContext(
+            payload
         )
+
+        if session.isReachable {
+            session.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler: nil
+            )
+        }
     }
 
     func clearStrengthCommand() {
