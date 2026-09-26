@@ -653,7 +653,7 @@ struct OfficialWeeklyChallengeCard: View {
                         ForEach(
                             visibleParticipantProfiles.prefix(4)
                         ) { profile in
-                            CommunityShowcaseAvatar(
+                            OfficialChallengeAvatar(
                                 url: profile.avatarURL.flatMap(URL.init(string:)),
                                 fallback: profile.resolvedName,
                                 size: 31
@@ -1430,5 +1430,53 @@ struct OfficialWeeklyChallengeEditorView: View {
                 source = "ai"
             }
         }
+    }
+}
+
+
+private struct OfficialChallengeAvatar: View {
+    let url: URL?
+    let fallback: String
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let url {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        fallbackAvatar
+                    }
+                }
+            } else {
+                fallbackAvatar
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+
+    private var fallbackAvatar: some View {
+        ZStack {
+            Circle()
+                .fill(ATHLTHTheme.accentSoft)
+
+            Text(initials)
+                .font(.system(size: size * 0.32, weight: .bold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+        }
+    }
+
+    private var initials: String {
+        let words = fallback
+            .split(separator: " ")
+            .prefix(2)
+
+        let value = words.compactMap(\.first).map(String.init).joined()
+        return value.isEmpty ? "A" : value.uppercased()
     }
 }
