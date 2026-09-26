@@ -172,6 +172,9 @@ enum CommunityGroupChallengeMetric: String, Codable, CaseIterable, Identifiable 
     case workouts
     case activeMinutes = "active_minutes"
     case fastestTime = "fastest_time_seconds"
+    case strengthVolume = "strength_volume_kg"
+    case heaviestWeight = "heaviest_weight_kg"
+    case strengthReps = "strength_reps"
 
     var id: String { rawValue }
 
@@ -181,6 +184,9 @@ enum CommunityGroupChallengeMetric: String, Codable, CaseIterable, Identifiable 
         case .workouts: return "Workouts"
         case .activeMinutes: return "Active Minutes"
         case .fastestTime: return "Fastest Time"
+        case .strengthVolume: return "Total Volume"
+        case .heaviestWeight: return "Heaviest Weight"
+        case .strengthReps: return "Total Reps"
         }
     }
 
@@ -190,6 +196,9 @@ enum CommunityGroupChallengeMetric: String, Codable, CaseIterable, Identifiable 
         case .workouts: return "workouts"
         case .activeMinutes: return "min"
         case .fastestTime: return "time"
+        case .strengthVolume: return "kg"
+        case .heaviestWeight: return "kg"
+        case .strengthReps: return "reps"
         }
     }
 
@@ -199,6 +208,9 @@ enum CommunityGroupChallengeMetric: String, Codable, CaseIterable, Identifiable 
         case .workouts: return "checkmark.circle.fill"
         case .activeMinutes: return "clock.fill"
         case .fastestTime: return "timer"
+        case .strengthVolume: return "sum"
+        case .heaviestWeight: return "dumbbell.fill"
+        case .strengthReps: return "repeat"
         }
     }
 }
@@ -263,6 +275,8 @@ struct CommunityGroupChallengeWorkoutRecord: Codable, Hashable {
     let contribution: Double
     let routeMatchPercent: Double?
     let verificationStatus: String
+    let isManual: Bool
+    let manualNote: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -272,6 +286,8 @@ struct CommunityGroupChallengeWorkoutRecord: Codable, Hashable {
         case contribution
         case routeMatchPercent = "route_match_percent"
         case verificationStatus = "verification_status"
+        case isManual = "is_manual"
+        case manualNote = "manual_note"
         case createdAt = "created_at"
     }
 }
@@ -2267,6 +2283,26 @@ final class CommunityGroupStore: ObservableObject {
                     } else {
                         continue
                     }
+               
+
+                case .strengthVolume:
+                    contribution =
+                        workout
+                            .strengthTotalVolumeKilograms
+                            ?? 0
+
+                case .heaviestWeight:
+                    contribution =
+                        workout
+                            .strengthHeaviestWeightKilograms
+                            ?? 0
+
+                case .strengthReps:
+                    contribution =
+                        Double(
+                            workout.strengthTotalReps
+                            ?? 0
+                        )
                 }
 
                 guard contribution > 0 else {
@@ -4790,6 +4826,12 @@ struct CommunityGroupDetailView: View {
                 seconds / 60,
                 seconds % 60
             )
+        case .strengthVolume:
+            return String(format: "%.0f kg", value)
+        case .heaviestWeight:
+            return String(format: "%.1f kg", value)
+        case .strengthReps:
+            return "\(Int(value.rounded())) reps"
         }
     }
 
@@ -4806,6 +4848,12 @@ struct CommunityGroupDetailView: View {
             return "\(Int(value.rounded())) min"
         case .fastestTime:
             return "Fastest time"
+        case .strengthVolume:
+            return String(format: "%.0f kg", value)
+        case .heaviestWeight:
+            return String(format: "%.1f kg", value)
+        case .strengthReps:
+            return "\(Int(value.rounded())) reps"
         }
     }
 }
