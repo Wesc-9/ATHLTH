@@ -427,26 +427,128 @@ struct CommunityGroupLeaderboardEntry:
 }
 
 extension CommunityGroupEventRecord {
-    var resolvedStatus: CommunityGroupContentStatus {
+    private var occurrenceDuration:
+        TimeInterval {
+        max(
+            endsAt?.timeIntervalSince(
+                startsAt
+            ) ?? 3_600,
+            60
+        )
+    }
+
+    func nextOccurrenceStart(
+        relativeTo reference: Date = Date()
+    ) -> Date? {
+        guard repeatRule == "weekly" else {
+            return reference <=
+                startsAt.addingTimeInterval(
+                    occurrenceDuration
+                )
+                ? startsAt
+                : nil
+        }
+
+        let interval:
+            TimeInterval = 7 * 24 * 3_600
+
+        if reference <= startsAt {
+            return occurrenceIsAllowed(
+                startsAt
+            )
+                ? startsAt
+                : nil
+        }
+
+        let elapsed =
+            reference.timeIntervalSince(
+                startsAt
+            )
+        let completedWeeks =
+            floor(elapsed / interval)
+        let currentStart =
+            startsAt.addingTimeInterval(
+                completedWeeks * interval
+            )
+        let currentEnd =
+            currentStart.addingTimeInterval(
+                occurrenceDuration
+            )
+
+        if reference <= currentEnd,
+           occurrenceIsAllowed(
+               currentStart
+           ) {
+            return currentStart
+        }
+
+        let next =
+            currentStart.addingTimeInterval(
+                interval
+            )
+
+        return occurrenceIsAllowed(next)
+            ? next
+            : nil
+    }
+
+    func occurrenceEnd(
+        for occurrenceStart: Date
+    ) -> Date {
+        occurrenceStart.addingTimeInterval(
+            occurrenceDuration
+        )
+    }
+
+    var resolvedStatus:
+        CommunityGroupContentStatus {
         if status == "cancelled" {
             return .cancelled
         }
+
         if status == "draft" {
             return .draft
         }
 
         let now = Date()
 
-        if let endsAt,
-           now > endsAt {
+        guard let occurrence =
+            nextOccurrenceStart(
+                relativeTo: now
+            )
+        else {
             return .completed
         }
 
-        if now >= startsAt {
+        if now < occurrence {
+            return .upcoming
+        }
+
+        if now <= occurrenceEnd(
+            for: occurrence
+        ) {
             return .live
         }
 
         return .upcoming
+    }
+
+    private func occurrenceIsAllowed(
+        _ occurrenceStart: Date
+    ) -> Bool {
+        guard let repeatUntil else {
+            return true
+        }
+
+        return occurrenceStart <=
+            Calendar.current
+                .date(
+                    bySettingHour: 23,
+                    minute: 59,
+                    second: 59,
+                    of: repeatUntil
+                )
+                ?? repeatUntil
     }
 }
 
