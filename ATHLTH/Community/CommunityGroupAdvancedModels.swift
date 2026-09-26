@@ -437,6 +437,7 @@ struct CommunityGroupLeaderboardEntry:
     let avatarURL: String?
     let score: Double
     let attemptCount: Int
+    let manualAttemptCount: Int
     let rank: Int
 
     var id: UUID { userID }
