@@ -2109,6 +2109,78 @@ private struct ATHLTHTrainingSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Route alerts") {
+                Toggle(
+                    "Off-route alerts",
+                    isOn: $settings.routeAlertsEnabled
+                )
+
+                if settings.routeAlertsEnabled {
+                    Picker(
+                        "Alert when off route",
+                        selection:
+                            $settings.routeAlertDeviationMeters
+                    ) {
+                        Text("25 m").tag(25.0)
+                        Text("50 m").tag(50.0)
+                        Text("80 m").tag(80.0)
+                        Text("100 m").tag(100.0)
+                        Text("150 m").tag(150.0)
+                        Text("250 m").tag(250.0)
+                    }
+
+                    Picker(
+                        "Wait before alert",
+                        selection:
+                            $settings.routeAlertGraceSeconds
+                    ) {
+                        Text("Immediately").tag(0)
+                        Text("5 sec").tag(5)
+                        Text("10 sec").tag(10)
+                        Text("20 sec").tag(20)
+                        Text("30 sec").tag(30)
+                    }
+
+                    Picker(
+                        "Alert style",
+                        selection:
+                            $settings.routeAlertDelivery
+                    ) {
+                        ForEach(
+                            WatchAlertDelivery.allCases,
+                            id: .self
+                        ) { delivery in
+                            Text(delivery.title)
+                                .tag(delivery)
+                        }
+                    }
+
+                    Picker(
+                        "Repeat while off route",
+                        selection:
+                            $settings.routeAlertRepeatSeconds
+                    ) {
+                        Text("30 sec").tag(30)
+                        Text("1 min").tag(60)
+                        Text("2 min").tag(120)
+                        Text("5 min").tag(300)
+                    }
+
+                    Toggle(
+                        "Tell me when I'm back on route",
+                        isOn:
+                            $settings
+                                .routeAlertAnnounceBackOnRoute
+                    )
+                }
+
+                Text(
+                    "These are your defaults for every planned ATHLTH route. The Watch ignores short GPS jumps until the selected distance and delay are exceeded."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             Section("Activity sharing") {
                 Toggle(
                     "Publish completed workouts automatically",
