@@ -153,11 +153,13 @@ final class SupabaseRouteAttemptService {
 @MainActor
 final class RouteAttemptStore: ObservableObject {
     @Published private(set) var attempts: [RouteAttemptRecord] = []
+    @Published private(set) var loadedRouteID: UUID?
     @Published private(set) var isLoading = false
     @Published private(set) var isSyncingHealth = false
     @Published var errorMessage: String?
 
     private let service: SupabaseRouteAttemptService
+    private var latestRefreshRequestID = UUID()
 
     init(
         service: SupabaseRouteAttemptService =
@@ -167,16 +169,30 @@ final class RouteAttemptStore: ObservableObject {
     }
 
     func refresh(routeID: UUID) async {
-        guard !isLoading else { return }
+        let requestID = UUID()
+        latestRefreshRequestID = requestID
 
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
 
         do {
-            attempts = try await service.load(routeID: routeID)
+            let loaded = try await service.load(routeID: routeID)
+
+            guard latestRefreshRequestID == requestID else {
+                return
+            }
+
+            attempts = loaded
+            loadedRouteID = routeID
+            isLoading = false
         } catch {
+            guard latestRefreshRequestID == requestID else {
+                return
+            }
+
             errorMessage = error.localizedDescription
+            loadedRouteID = routeID
+            isLoading = false
         }
     }
 
