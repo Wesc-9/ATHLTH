@@ -1162,6 +1162,206 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         return parts.joined(separator: ". ")
     }
 
+    var currentLapPaceSecondsPerKilometer: TimeInterval? {
+        guard currentLapDistanceMeters >= 50,
+              currentLapElapsedTime > 0
+        else {
+            return nil
+        }
+
+        return currentLapElapsedTime /
+            (currentLapDistanceMeters / 1_000)
+    }
+
+    private func cachePlannedRouteGeometry(
+        _ route: WatchRouteTransfer?
+    ) {
+        guard let route,
+              route.points.count >= 2
+        else {
+            plannedRouteLocations = []
+            plannedRouteCumulativeMeters = []
+            plannedRouteGeometryMeters = 0
+            return
+        }
+
+        let locations =
+            route.points
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocation(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+
+        var cumulative: [Double] = [0]
+        cumulative.reserveCapacity(
+            locations.count
+        )
+
+        var total: Double = 0
+
+        for index in 1..<locations.count {
+            total += locations[index]
+                .distance(
+                    from:
+                        locations[index - 1]
+                )
+            cumulative.append(total)
+        }
+
+        plannedRouteLocations = locations
+        plannedRouteCumulativeMeters = cumulative
+        plannedRouteGeometryMeters = total
+    }
+
+    private func updateOutdoorMetrics(
+        using location: CLLocation
+    ) {
+        guard kind == .running ||
+                kind == .walking
+        else {
+            return
+        }
+
+        if location.speed >= 0.35 {
+            let rawPace =
+                1_000 / location.speed
+
+            if rawPace >= 120,
+               rawPace <= 1_800 {
+                let smoothed: TimeInterval
+
+                if let existing =
+                        currentPaceSecondsPerKilometer {
+                    smoothed =
+                        existing * 0.72 +
+                        rawPace * 0.28
+                } else {
+                    smoothed = rawPace
+                }
+
+                publish {
+                    self.currentPaceSecondsPerKilometer =
+                        smoothed
+                }
+            }
+        }
+
+        updateRouteNavigation(
+            using: location
+        )
+    }
+
+    private func updateRouteNavigation(
+        using location: CLLocation
+    ) {
+        guard plannedRouteLocations.count >= 2,
+              plannedRouteCumulativeMeters.count ==
+                plannedRouteLocations.count
+        else {
+            return
+        }
+
+        var nearestIndex = 0
+        var nearestDistance =
+            Double.greatestFiniteMagnitude
+
+        for (
+            index,
+            point
+        ) in plannedRouteLocations.enumerated() {
+            let distance =
+                location.distance(
+                    from: point
+                )
+
+            if distance < nearestDistance {
+                nearestDistance = distance
+                nearestIndex = index
+            }
+        }
+
+        let geometryTotal =
+            max(
+                plannedRouteGeometryMeters,
+                1
+            )
+        let traveledAlongRoute =
+            plannedRouteCumulativeMeters[
+                nearestIndex
+            ]
+        let progress =
+            min(
+                max(
+                    traveledAlongRoute /
+                    geometryTotal,
+                    0
+                ),
+                1
+            )
+        let routeTotal =
+            max(
+                plannedRoute?
+                    .distanceKilometers
+                    ?? 0,
+                0
+            ) * 1_000
+        let effectiveTotal =
+            routeTotal > 0
+                ? routeTotal
+                : geometryTotal
+        let remaining =
+            max(
+                effectiveTotal *
+                    (1 - progress),
+                0
+            )
+
+        publish {
+            self.routeProgressPercent =
+                progress * 100
+            self.routeRemainingMeters =
+                remaining
+            self.routeDeviationMeters =
+                nearestDistance
+        }
+
+        guard nearestDistance > 80,
+              location.horizontalAccuracy <= 35
+        else {
+            return
+        }
+
+        let now = Date()
+
+        if let lastOffRouteHapticAt,
+           now.timeIntervalSince(
+                lastOffRouteHapticAt
+           ) < 120 {
+            return
+        }
+
+        lastOffRouteHapticAt = now
+        WKInterfaceDevice.current()
+            .play(.directionDown)
+
+        if audioCoachConfiguration.enabled {
+            speak(
+                coachPhrase(
+                    english: "You are off route",
+                    norwegian: "Du er utenfor ruten"
+                ) + ". " +
+                spokenDistance(
+                    nearestDistance
+                )
+            )
+        }
+    }
+
     private func spokenDistance(
         _ meters: Double
     ) -> String {
