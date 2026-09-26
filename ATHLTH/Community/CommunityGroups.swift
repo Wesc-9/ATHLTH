@@ -3701,6 +3701,14 @@ struct CommunityGroupDetailView: View {
                             alignment: .leading,
                             spacing: 10
                         ) {
+                            if let imageURL = event.imageURL,
+                               !imageURL.isEmpty {
+                                communityContentCover(
+                                    imageURL,
+                                    height: 140
+                                )
+                            }
+
                             HStack(spacing: 12) {
                                 Image(
                                     systemName:
@@ -3727,12 +3735,7 @@ struct CommunityGroupDetailView: View {
                                                 .weight(.semibold)
                                         )
                                     Text(
-                                        event.startsAt.formatted(
-                                            date: .abbreviated,
-                                            time: .shortened
-                                        ) +
-                                        " · " +
-                                        event.meetingName
+                                        eventDetailText(event)
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -4037,6 +4040,14 @@ struct CommunityGroupDetailView: View {
         let fraction = min(max(progress / challenge.targetValue, 0), 1)
 
         return VStack(alignment: .leading, spacing: 9) {
+            if let imageURL = challenge.imageURL,
+               !imageURL.isEmpty {
+                communityContentCover(
+                    imageURL,
+                    height: 140
+                )
+            }
+
             HStack {
                 Label(
                     challenge.title,
@@ -4088,6 +4099,63 @@ struct CommunityGroupDetailView: View {
             ATHLTHTheme.cardWarm.opacity(0.70),
             in: RoundedRectangle(cornerRadius: 15)
         )
+    }
+
+    @ViewBuilder
+    private func communityContentCover(
+        _ value: String,
+        height: CGFloat
+    ) -> some View {
+        if let url = URL(string: value) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    LinearGradient(
+                        colors: [
+                            Color.indigo.opacity(0.12),
+                            ATHLTHTheme.cardWarm,
+                            ATHLTHTheme.canvasTop
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+            )
+        }
+    }
+
+    private func eventDetailText(
+        _ event: CommunityGroupEventRecord
+    ) -> String {
+        var parts = [
+            event.startsAt.formatted(
+                date: .abbreviated,
+                time: .shortened
+            )
+        ]
+
+        let meeting = event.meetingName
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        if !meeting.isEmpty {
+            parts.append(meeting)
+        }
+
+        return parts.joined(separator: " · ")
     }
 
     private func eventIcon(_ activity: String) -> String {
