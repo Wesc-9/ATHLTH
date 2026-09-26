@@ -4530,11 +4530,13 @@ struct ATHLTHRecoveryView: View {
                             Text("\(score)")
                                 .font(
                                     .system(
-                                        size: 58,
+                                        size: 52,
                                         weight: .bold,
                                         design: .rounded
                                     )
                                 )
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.90)
                                 .foregroundStyle(
                                     ATHLTHTheme.primaryText
                                 )
