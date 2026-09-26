@@ -115,6 +115,7 @@ struct AppRootView: View {
     @State private var pendingWorkoutReview: SocialPublishableWorkout?
     @State private var queuedWorkoutReviewIDs: Set<UUID> = []
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
+    @State private var processedStrengthCommandIDs: Set<UUID> = []
 
     private var lifecycleContent: some View {
         Group {
@@ -623,6 +624,16 @@ struct AppRootView: View {
     private func handleWatchStrengthCommand(
         _ command: WatchStrengthCommand
     ) {
+        guard !processedStrengthCommandIDs.contains(command.id) else {
+            return
+        }
+
+        processedStrengthCommandIDs.insert(command.id)
+        if processedStrengthCommandIDs.count > 200 {
+            processedStrengthCommandIDs =
+                Set(processedStrengthCommandIDs.suffix(100))
+        }
+
         if command.kind == .requestSnapshot {
             sendStrengthSnapshotIfNeeded()
             return
