@@ -125,6 +125,8 @@ struct CommunityGroupEventRecord: Codable, Identifiable, Hashable {
     let endsAt: Date?
     let meetingName: String
     let imageURL: String?
+    let activityConfiguration:
+        CommunityGroupActivityConfiguration?
     let createdAt: Date
     let updatedAt: Date
 
@@ -139,6 +141,7 @@ struct CommunityGroupEventRecord: Codable, Identifiable, Hashable {
         case endsAt = "ends_at"
         case meetingName = "meeting_name"
         case imageURL = "image_url"
+        case activityConfiguration = "activity_config"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -187,6 +190,8 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
     let startsAt: Date
     let endsAt: Date
     let imageURL: String?
+    let activityConfiguration:
+        CommunityGroupActivityConfiguration?
     let createdAt: Date
     let updatedAt: Date
 
@@ -201,6 +206,7 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
         case startsAt = "starts_at"
         case endsAt = "ends_at"
         case imageURL = "image_url"
+        case activityConfiguration = "activity_config"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -429,6 +435,60 @@ private struct CommunityGroupChallengeInsert: Encodable {
         case startsAt = "starts_at"
         case endsAt = "ends_at"
         case imageURL = "image_url"
+    }
+}
+
+private struct CommunityGroupEventCreateParams: Encodable {
+    let id: UUID
+    let groupID: UUID
+    let title: String
+    let summary: String
+    let activityType: String
+    let startsAt: Date
+    let meetingName: String
+    let imageURL: String?
+    let activityConfiguration:
+        CommunityGroupActivityConfiguration?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
+        case groupID = "p_group_id"
+        case title = "p_title"
+        case summary = "p_summary"
+        case activityType = "p_activity_type"
+        case startsAt = "p_starts_at"
+        case meetingName = "p_meeting_name"
+        case imageURL = "p_image_url"
+        case activityConfiguration =
+            "p_activity_config"
+    }
+}
+
+private struct CommunityGroupChallengeCreateParams: Encodable {
+    let id: UUID
+    let groupID: UUID
+    let title: String
+    let summary: String
+    let metric: String
+    let targetValue: Double
+    let startsAt: Date
+    let endsAt: Date
+    let imageURL: String?
+    let activityConfiguration:
+        CommunityGroupActivityConfiguration?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
+        case groupID = "p_group_id"
+        case title = "p_title"
+        case summary = "p_summary"
+        case metric = "p_metric"
+        case targetValue = "p_target_value"
+        case startsAt = "p_starts_at"
+        case endsAt = "p_ends_at"
+        case imageURL = "p_image_url"
+        case activityConfiguration =
+            "p_activity_config"
     }
 }
 
@@ -1061,7 +1121,7 @@ final class CommunityGroupStore: ObservableObject {
                     options: FileOptions(
                         cacheControl: "3600",
                         contentType: "image/jpeg",
-                        upsert: true
+                        upsert: false
                     )
                 )
 
@@ -1687,9 +1747,11 @@ final class CommunityGroupStore: ObservableObject {
         activityType: String,
         startsAt: Date,
         meetingName: String,
-        imageData: Data? = nil
+        imageData: Data? = nil,
+        activityConfiguration:
+            CommunityGroupActivityConfiguration? = nil
     ) async -> Bool {
-        guard let userID = currentUserID,
+        guard currentUserID != nil,
               let group = group(for: groupID),
               canCreateGroupContent(group)
         else {
@@ -1728,12 +1790,11 @@ final class CommunityGroupStore: ObservableObject {
             }
 
             try await client
-                .from("community_group_events")
-                .insert(
-                    CommunityGroupEventInsert(
+                .rpc(
+                    "create_community_group_event",
+                    params: CommunityGroupEventCreateParams(
                         id: eventID,
                         groupID: groupID,
-                        creatorID: userID,
                         title: String(
                             cleanTitle.prefix(160)
                         ),
@@ -1742,11 +1803,12 @@ final class CommunityGroupStore: ObservableObject {
                         ),
                         activityType: activityType,
                         startsAt: startsAt,
-                        endsAt: nil,
                         meetingName: String(
                             cleanMeet.prefix(180)
                         ),
-                        imageURL: imageURL
+                        imageURL: imageURL,
+                        activityConfiguration:
+                            activityConfiguration
                     )
                 )
                 .execute()
@@ -1777,9 +1839,11 @@ final class CommunityGroupStore: ObservableObject {
         targetValue: Double,
         startsAt: Date,
         endsAt: Date,
-        imageData: Data? = nil
+        imageData: Data? = nil,
+        activityConfiguration:
+            CommunityGroupActivityConfiguration? = nil
     ) async -> Bool {
-        guard let userID = currentUserID,
+        guard currentUserID != nil,
               let group = group(for: groupID),
               canCreateGroupContent(group),
               targetValue > 0,
@@ -1793,6 +1857,7 @@ final class CommunityGroupStore: ObservableObject {
         let cleanTitle = title.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
+
         guard !cleanTitle.isEmpty else {
             errorMessage = "Give the challenge a title."
             return false
@@ -1816,24 +1881,26 @@ final class CommunityGroupStore: ObservableObject {
             }
 
             try await client
-                .from("community_group_challenges")
-                .insert(
-                    CommunityGroupChallengeInsert(
-                        id: challengeID,
-                        groupID: groupID,
-                        creatorID: userID,
-                        title: String(
-                            cleanTitle.prefix(160)
-                        ),
-                        summary: String(
-                            summary.prefix(800)
-                        ),
-                        metric: metric,
-                        targetValue: targetValue,
-                        startsAt: startsAt,
-                        endsAt: endsAt,
-                        imageURL: imageURL
-                    )
+                .rpc(
+                    "create_community_group_challenge",
+                    params:
+                        CommunityGroupChallengeCreateParams(
+                            id: challengeID,
+                            groupID: groupID,
+                            title: String(
+                                cleanTitle.prefix(160)
+                            ),
+                            summary: String(
+                                summary.prefix(800)
+                            ),
+                            metric: metric.rawValue,
+                            targetValue: targetValue,
+                            startsAt: startsAt,
+                            endsAt: endsAt,
+                            imageURL: imageURL,
+                            activityConfiguration:
+                                activityConfiguration
+                        )
                 )
                 .execute()
 
@@ -1852,6 +1919,30 @@ final class CommunityGroupStore: ObservableObject {
 
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    private func challengeMatchesWorkout(
+        _ challenge: CommunityGroupChallengeRecord,
+        workout: SocialPublishableWorkout
+    ) -> Bool {
+        guard let configuration =
+            challenge.activityConfiguration
+        else {
+            return true
+        }
+
+        switch configuration.activityType {
+        case "running":
+            return workout.activity == .running
+        case "walking":
+            return workout.activity == .walking
+        case "cycling":
+            return workout.activity == .cycling
+        case "strength":
+            return workout.activity == .strength
+        default:
+            return true
         }
     }
 
@@ -1874,6 +1965,13 @@ final class CommunityGroupStore: ObservableObject {
 
             let writes = activeChallenges.compactMap { challenge
                 -> CommunityGroupChallengeWorkoutInsert? in
+                guard challengeMatchesWorkout(
+                    challenge,
+                    workout: workout
+                ) else {
+                    return nil
+                }
+
                 let contribution: Double
 
                 switch challenge.metric {
