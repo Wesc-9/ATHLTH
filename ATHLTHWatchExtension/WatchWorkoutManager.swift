@@ -515,7 +515,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         plannedRouteLocations = []
         plannedRouteCumulativeMeters = []
         plannedRouteGeometryMeters = 0
-        lastOffRouteHapticAt = nil
+        offRouteStartedAt = nil
+        lastOffRouteAlertAt = nil
+        routeWasOff = false
+        targetViolationStartedAt = nil
+        lastTargetAlertAt = nil
+        targetWasOutside = false
         lastLapElapsedTime = 0
         lastLapDistanceMeters = 0
         speechSynthesizer.stopSpeaking(at: .immediate)
@@ -529,6 +534,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.routeProgressPercent = nil
             self.routeRemainingMeters = nil
             self.routeDeviationMeters = nil
+            self.routeAlertConfiguration = .standard
+            self.targetAlertConfiguration = nil
+            self.liveTargetStatus = nil
             self.lapCount = 0
             self.currentLapElapsedTime = 0
             self.currentLapDistanceMeters = 0
@@ -583,6 +591,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     )
                 }
             self.routeDeviationMeters = nil
+            self.routeAlertConfiguration = .standard
+            self.targetAlertConfiguration = nil
+            self.liveTargetStatus = nil
             self.lapCount = 0
             self.currentLapElapsedTime = 0
             self.currentLapDistanceMeters = 0
@@ -597,7 +608,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredWorkoutComplete = false
         lastLapElapsedTime = 0
         lastLapDistanceMeters = 0
-        lastOffRouteHapticAt = nil
+        offRouteStartedAt = nil
+        lastOffRouteAlertAt = nil
+        routeWasOff = false
+        targetViolationStartedAt = nil
+        lastTargetAlertAt = nil
+        targetWasOutside = false
         resetAudioCoachThresholds()
 
         do {
@@ -792,6 +808,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         )
                 }
                 self.evaluateStructuredRunningWorkout()
+                self.evaluateWorkoutTargetAlerts()
                 self.evaluateAudioCoach()
 
                 Task { [weak self] in
