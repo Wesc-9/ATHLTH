@@ -6278,7 +6278,34 @@ extension View {
     }
 }
 
+private struct ATHLTHSwipeBackEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(
+        context: Context
+    ) -> UIViewController {
+        SwipeBackController()
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIViewController,
+        context: Context
+    ) {}
+
+    private final class SwipeBackController: UIViewController {
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+
+            navigationController?
+                .interactivePopGestureRecognizer?
+                .delegate = nil
+            navigationController?
+                .interactivePopGestureRecognizer?
+                .isEnabled = true
+        }
+    }
+}
+
 struct ATHLTHProfileView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var trophyStore: TrophyStore
     @EnvironmentObject private var health: HealthKitManager
@@ -6298,12 +6325,9 @@ struct ATHLTHProfileView: View {
         } content: {
             LazyVStack(spacing: 16) {
                 profileSocialStatsCard
-                trainingIdentityCard
                 ProfileGearSummaryView()
-
                 WorkoutHistoryPreviewSection()
-
-                goalsAndTrophies
+                goalsCard
 
                 if settings.showPerformanceStatsOnProfile {
                     ProfilePerformanceSection(
@@ -6311,6 +6335,8 @@ struct ATHLTHProfileView: View {
                         isLoading: performanceStatsLoading
                     )
                 }
+
+                trophiesCard
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
@@ -6320,7 +6346,12 @@ struct ATHLTHProfileView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .background {
+            ATHLTHSwipeBackEnabler()
+                .frame(width: 0, height: 0)
+        }
         .refreshable {
             await refreshProfile(forceRefresh: true)
         }
@@ -6328,6 +6359,32 @@ struct ATHLTHProfileView: View {
             await refreshProfile()
         }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep.opacity(0.74)
+                        )
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Color.white.opacity(0.46),
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white.opacity(0.58),
+                                    lineWidth: 0.8
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+            }
+
             ToolbarItemGroup(placement: .topBarTrailing) {
                 NavigationLink {
                     ATHLTHPrivacyCenterView()
@@ -6371,40 +6428,39 @@ struct ATHLTHProfileView: View {
     private var profileHero: some View {
         GeometryReader { proxy in
             ZStack {
+                Image("ProfileHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height,
+                        alignment: .leading
+                    )
+                    .clipped()
+
                 LinearGradient(
                     colors: [
-                        ATHLTHTheme.cardWarm,
-                        ATHLTHTheme.surfaceSage,
-                        ATHLTHTheme.canvasBottom
+                        Color.white.opacity(0.92),
+                        ATHLTHTheme.cardWarm.opacity(0.74),
+                        ATHLTHTheme.cardWarm.opacity(0.28)
                     ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
 
-                RadialGradient(
+                LinearGradient(
                     colors: [
-                        ATHLTHTheme.premiumGold.opacity(0.24),
-                        Color.clear
+                        Color.clear,
+                        ATHLTHTheme.canvasBottom.opacity(0.38)
                     ],
-                    center: .topTrailing,
-                    startRadius: 0,
-                    endRadius: max(proxy.size.width * 0.70, 260)
-                )
-
-                RadialGradient(
-                    colors: [
-                        ATHLTHTheme.vitality.opacity(0.16),
-                        Color.clear
-                    ],
-                    center: .bottomLeading,
-                    startRadius: 10,
-                    endRadius: max(proxy.size.width * 0.56, 220)
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
 
                 HStack(alignment: .center, spacing: 16) {
                     profileAvatar
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 5) {
                         Text("PROFILE")
                             .font(.caption2.weight(.bold))
                             .tracking(1.6)
@@ -6422,8 +6478,33 @@ struct ATHLTHProfileView: View {
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(ATHLTHTheme.mutedText)
 
+                        if let focus = trainingIdentityFocus {
+                            Label(
+                                focus.title,
+                                systemImage: focus.systemImage
+                            )
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(identityTint(focus))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                Color.white.opacity(0.66),
+                                in: Capsule()
+                            )
+                            .overlay {
+                                Capsule()
+                                    .stroke(
+                                        identityTint(focus).opacity(0.14),
+                                        lineWidth: 0.8
+                                    )
+                            }
+                            .padding(.top, 2)
+                        }
+
                         if !session.profile.bio
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
                             .isEmpty {
                             Text(session.profile.bio)
                                 .font(.caption)
@@ -6431,7 +6512,7 @@ struct ATHLTHProfileView: View {
                                     ATHLTHTheme.primaryText.opacity(0.72)
                                 )
                                 .lineLimit(2)
-                                .padding(.top, 2)
+                                .padding(.top, 1)
                         }
                     }
 
@@ -6441,119 +6522,98 @@ struct ATHLTHProfileView: View {
                         ATHLTHEditProfileView()
                     } label: {
                         Image(systemName: "pencil")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(
+                                .system(
+                                    size: 14,
+                                    weight: .semibold
+                                )
+                            )
                             .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 42, height: 42)
+                            .frame(width: 38, height: 38)
                             .background(.ultraThinMaterial, in: Circle())
                             .overlay {
                                 Circle()
                                     .stroke(
-                                        Color.white.opacity(0.74),
-                                        lineWidth: 1
+                                        Color.white.opacity(0.72),
+                                        lineWidth: 0.8
                                     )
                             }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Edit Profile")
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 62)
+                .padding(.horizontal, 24)
+                .padding(.top, 72)
                 .padding(.bottom, 24)
             }
         }
-        .frame(height: 230)
+        .frame(height: 236)
         .clipped()
     }
 
     private var profileSocialStatsCard: some View {
-        ATHLTHCard {
-            HStack(spacing: 0) {
-                NavigationLink {
-                    ProfileFollowListView(mode: .followers)
-                } label: {
-                    socialStat(
-                        value: social.followerCount,
-                        title: "Followers",
-                        icon: "person.2.fill"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                profileStatDivider
-
-                NavigationLink {
-                    ProfileFollowListView(mode: .following)
-                } label: {
-                    socialStat(
-                        value: social.followingCount,
-                        title: "Following",
-                        icon: "person.badge.plus"
-                    )
-                }
-                .buttonStyle(.plain)
+        HStack(spacing: 0) {
+            NavigationLink {
+                ProfileFollowListView(mode: .followers)
+            } label: {
+                socialStat(
+                    value: social.followerCount,
+                    title: "Followers",
+                    icon: "person.2.fill"
+                )
             }
+            .buttonStyle(.plain)
+
+            profileStatDivider
+
+            NavigationLink {
+                ProfileFollowListView(mode: .following)
+            } label: {
+                socialStat(
+                    value: social.followingCount,
+                    title: "Following",
+                    icon: "person.badge.plus"
+                )
+            }
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background {
+            RoundedRectangle(
+                cornerRadius: ATHLTHTheme.cornerRadius,
+                style: .continuous
+            )
+            .fill(
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.card,
+                        ATHLTHTheme.cardWarm.opacity(0.62)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: ATHLTHTheme.cornerRadius,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.055),
+            radius: 12,
+            x: 0,
+            y: 5
+        )
     }
 
-    private var trainingIdentityCard: some View {
-        ATHLTHCard {
-            HStack {
-                Text("Training Identity")
-                    .font(.title3.weight(.bold))
-
-                Spacer()
-
-                NavigationLink {
-                    ATHLTHEditProfileView()
-                } label: {
-                    HStack(spacing: 5) {
-                        Text("Edit")
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
-                }
-                .buttonStyle(.plain)
-            }
-
-            if identityFocuses.isEmpty {
-                HStack(spacing: 10) {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(ATHLTHTheme.accent)
-                    Text("Choose your training identity in Edit Profile.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(.top, 12)
-            } else {
-                HStack(spacing: 9) {
-                    ForEach(identityFocuses) { focus in
-                        Label(focus.title, systemImage: focus.systemImage)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(identityTint(focus))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 9)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                identityTint(focus).opacity(0.09),
-                                in: Capsule()
-                            )
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                    }
-                }
-                .padding(.top, 12)
-            }
-        }
-    }
-
-    private var goalsAndTrophies: some View {
-        VStack(spacing: 12) {
-            goalsCard
-            trophiesCard
-        }
-    }
 
     private var goalsCard: some View {
         NavigationLink {
@@ -6683,16 +6743,8 @@ struct ATHLTHProfileView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var identityFocuses: [TrainingFocus] {
-        guard let focus = session.onboardingProfile?.trainingFocus else {
-            return []
-        }
-
-        if focus == .hybrid {
-            return [.running, .strength, .hybrid]
-        }
-
-        return [focus]
+    private var trainingIdentityFocus: TrainingFocus? {
+        session.onboardingProfile?.trainingFocus
     }
 
     private func identityTint(_ focus: TrainingFocus) -> Color {
@@ -6749,7 +6801,7 @@ struct ATHLTHProfileView: View {
                     avatarFallback
                 }
             }
-            .frame(width: 104, height: 104)
+            .frame(width: 96, height: 96)
             .clipShape(Circle())
             .overlay {
                 Circle()
@@ -6758,7 +6810,7 @@ struct ATHLTHProfileView: View {
             .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
         } else {
             avatarFallback
-                .frame(width: 104, height: 104)
+                .frame(width: 96, height: 96)
         }
     }
 
