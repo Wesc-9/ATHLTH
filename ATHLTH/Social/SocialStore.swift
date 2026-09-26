@@ -160,7 +160,14 @@ final class SocialStore: ObservableObject {
             if let notificationStore {
                 importInboxEvents(into: notificationStore)
             }
+
+            errorMessage = nil
+        } catch is CancellationError {
+            // SwiftUI may cancel Community refresh work when the view
+            // is replaced or pull-to-refresh supersedes an existing task.
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
