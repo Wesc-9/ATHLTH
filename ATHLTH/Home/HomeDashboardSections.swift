@@ -232,6 +232,7 @@ struct HomeThisWeekCard: View {
 struct HomeGettingStartedCard: View {
     let hasPlan: Bool
     let hasGoal: Bool
+    let hasEditedProfile: Bool
     let onDismiss: () -> Void
 
     var body: some View {
@@ -282,9 +283,9 @@ struct HomeGettingStartedCard: View {
                         destination: AnyView(GoalsHubView())
                     )
 
-                    actionRow(
+                    setupRow(
                         title: "Edit your profile",
-                        icon: "person.crop.circle.badge.pencil",
+                        complete: hasEditedProfile,
                         destination: AnyView(ATHLTHEditProfileView())
                     )
                 }
@@ -336,37 +337,7 @@ struct HomeGettingStartedCard: View {
         .disabled(complete)
     }
 
-    private func actionRow(
-        title: String,
-        icon: String,
-        destination: AnyView
-    ) -> some View {
-        NavigationLink {
-            destination
-        } label: {
-            HStack(spacing: 11) {
-                Image(systemName: icon)
-                    .foregroundStyle(ATHLTHTheme.accent)
 
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2.bold())
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 44)
-            .background(
-                Color.primary.opacity(0.028),
-                in: RoundedRectangle(cornerRadius: 13)
-            )
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 struct HomeHappeningCard: View {
