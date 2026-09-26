@@ -178,6 +178,22 @@ private struct CommunityGroupInsert: Encodable {
     }
 }
 
+private struct CommunityGroupUpdate: Encodable {
+    let name: String
+    let summary: String
+    let locationName: String
+    let visibility: String
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case summary
+        case locationName = "location_name"
+        case visibility
+        case updatedAt = "updated_at"
+    }
+}
+
 private struct CommunityGroupMemberInsert: Encodable {
     let groupID: UUID
     let userID: UUID
@@ -432,7 +448,8 @@ final class CommunityGroupStore: ObservableObject {
     func createGroup(
         name: String,
         locationName: String,
-        summary: String
+        summary: String,
+        visibility: String
     ) async -> Bool {
         guard let userID = currentUserID else { return false }
 
@@ -453,12 +470,64 @@ final class CommunityGroupStore: ObservableObject {
                 name: String(cleanName.prefix(80)),
                 summary: String(summary.prefix(800)),
                 locationName: String(cleanLocation.prefix(120)),
-                visibility: "public"
+                visibility:
+                    visibility == "private"
+                        ? "private"
+                        : "public"
             )
 
             try await client
                 .from("community_groups")
                 .insert(payload)
+                .execute()
+
+            await refresh()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func updateGroup(
+        _ group: CommunityGroupRecord,
+        name: String,
+        locationName: String,
+        summary: String,
+        visibility: String
+    ) async -> Bool {
+        guard isOwner(of: group) else {
+            return false
+        }
+
+        let cleanName = name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanLocation = locationName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard cleanName.count >= 2,
+              cleanLocation.count >= 2
+        else {
+            errorMessage = "Add a group name and area or city."
+            return false
+        }
+
+        do {
+            let payload = CommunityGroupUpdate(
+                name: String(cleanName.prefix(80)),
+                summary: String(summary.prefix(800)),
+                locationName: String(cleanLocation.prefix(120)),
+                visibility:
+                    visibility == "private"
+                        ? "private"
+                        : "public",
+                updatedAt: Date()
+            )
+
+            try await client
+                .from("community_groups")
+                .update(payload)
+                .eq("id", value: group.id)
                 .execute()
 
             await refresh()
@@ -734,13 +803,20 @@ struct CommunityGroupsView: View {
     @State private var showingCreate = false
 
     private var matchingGroups: [CommunityGroupRecord] {
+        let publicGroups = groups.groups.filter {
+            $0.visibility == "public" &&
+            !groups.joinedGroupIDs.contains($0.id)
+        }
+
         let clean = query
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
 
-        guard !clean.isEmpty else { return groups.groups }
+        guard !clean.isEmpty else {
+            return publicGroups
+        }
 
-        return groups.groups.filter {
+        return publicGroups.filter {
             $0.name.lowercased().contains(clean) ||
             $0.locationName.lowercased().contains(clean) ||
             $0.summary.lowercased().contains(clean)
@@ -755,6 +831,7 @@ struct CommunityGroupsView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
+                    publicGroupSearchBar
                     introCard
 
                     if !groups.joinedGroups.isEmpty {
@@ -764,7 +841,7 @@ struct CommunityGroupsView: View {
                         }
                     }
 
-                    sectionTitle("DISCOVER")
+                    sectionTitle("DISCOVER PUBLIC GROUPS")
                     if matchingGroups.isEmpty {
                         ContentUnavailableView(
                             "No groups found",
@@ -775,9 +852,7 @@ struct CommunityGroupsView: View {
                         )
                         .padding(.vertical, 36)
                     } else {
-                        ForEach(matchingGroups.filter {
-                            !groups.joinedGroupIDs.contains($0.id)
-                        }) { group in
+                        ForEach(matchingGroups) { group in
                             groupLink(group, joined: false)
                         }
                     }
@@ -789,7 +864,6 @@ struct CommunityGroupsView: View {
         }
         .navigationTitle("Groups")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, prompt: "City, area or group name")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -811,6 +885,53 @@ struct CommunityGroupsView: View {
         }
     }
 
+    private var publicGroupSearchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            TextField(
+                "Search public groups",
+                text: $query
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText.opacity(0.72)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear group search")
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 48)
+        .background(
+            Color.white.opacity(0.82),
+            in: RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border.opacity(0.72),
+                lineWidth: 1
+            )
+        }
+    }
+
     private var introCard: some View {
         ATHLTHCard {
             HStack(spacing: 14) {
@@ -827,7 +948,7 @@ struct CommunityGroupsView: View {
                     Text("Train with your community")
                         .font(.headline)
                     Text(
-                        "Join a local group to chat, create private events and take on shared challenges."
+                        "Find public groups, train together and take on shared challenges."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -872,6 +993,22 @@ struct CommunityGroupsView: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                    Label(
+                        group.visibility == "private"
+                            ? "Private"
+                            : "Public",
+                        systemImage:
+                            group.visibility == "private"
+                                ? "lock.fill"
+                                : "globe"
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        group.visibility == "private"
+                            ? ATHLTHTheme.mutedText
+                            : ATHLTHTheme.accentDeep
+                    )
                 }
 
                 Spacer()
@@ -909,6 +1046,13 @@ struct CommunityGroupDetailView: View {
     @State private var messageDraft = ""
     @State private var showingCreateEvent = false
     @State private var showingCreateChallenge = false
+    @State private var showingGroupSettings = false
+
+    private var currentGroup: CommunityGroupRecord {
+        groups.groups.first {
+            $0.id == group.id
+        } ?? group
+    }
 
     private var isMember: Bool {
         groups.joinedGroupIDs.contains(group.id)
@@ -966,13 +1110,16 @@ struct CommunityGroupDetailView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .navigationTitle(group.name)
+        .navigationTitle(currentGroup.name)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingCreateEvent) {
-            CommunityGroupEventCreateView(group: group)
+            CommunityGroupEventCreateView(group: currentGroup)
         }
         .sheet(isPresented: $showingCreateChallenge) {
-            CommunityGroupChallengeCreateView(group: group)
+            CommunityGroupChallengeCreateView(group: currentGroup)
+        }
+        .sheet(isPresented: $showingGroupSettings) {
+            CommunityGroupSettingsView(group: currentGroup)
         }
         .task {
             if groups.groups.isEmpty {
@@ -1003,12 +1150,31 @@ struct CommunityGroupDetailView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(group.name)
+                    Text(currentGroup.name)
                         .font(.title3.weight(.bold))
 
-                    Label(group.locationName, systemImage: "location.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Label(
+                        currentGroup.locationName,
+                        systemImage: "location.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    Label(
+                        currentGroup.visibility == "private"
+                            ? "Private group"
+                            : "Public group",
+                        systemImage:
+                            currentGroup.visibility == "private"
+                                ? "lock.fill"
+                                : "globe"
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        currentGroup.visibility == "private"
+                            ? ATHLTHTheme.mutedText
+                            : ATHLTHTheme.accentDeep
+                    )
 
                     if isMember {
                         Text("\(groups.members(in: group.id).count) members")
@@ -1019,10 +1185,26 @@ struct CommunityGroupDetailView: View {
 
                 Spacer()
 
-                if isMember && !groups.isOwner(of: group) {
+                if groups.isOwner(of: currentGroup) {
+                    Menu {
+                        Button {
+                            showingGroupSettings = true
+                        } label: {
+                            Label(
+                                "Group Settings",
+                                systemImage: "gearshape"
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 34, height: 34)
+                    }
+                } else if isMember {
                     Menu {
                         Button("Leave Group", role: .destructive) {
-                            Task { await groups.leave(group) }
+                            Task {
+                                await groups.leave(currentGroup)
+                            }
                         }
                     } label: {
                         Image(systemName: "ellipsis")
@@ -1031,8 +1213,8 @@ struct CommunityGroupDetailView: View {
                 }
             }
 
-            if !group.summary.isEmpty {
-                Text(group.summary)
+            if !currentGroup.summary.isEmpty {
+                Text(currentGroup.summary)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.top, 10)
@@ -1443,6 +1625,7 @@ struct CommunityGroupCreateView: View {
     @State private var name = ""
     @State private var location = ""
     @State private var summary = ""
+    @State private var visibility = "public"
     @State private var saving = false
 
     var body: some View {
@@ -1455,9 +1638,27 @@ struct CommunityGroupCreateView: View {
                         .lineLimit(2...5)
                 }
 
+                Section("Visibility") {
+                    Picker("Group visibility", selection: $visibility) {
+                        Label("Public", systemImage: "globe")
+                            .tag("public")
+                        Label("Private", systemImage: "lock.fill")
+                            .tag("private")
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(
+                        visibility == "public"
+                            ? "Public groups appear in Discover and can be joined by signed-in ATHLTH users."
+                            : "Private groups do not appear in Discover. Only the owner and existing members can see the group."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
                 Section {
                     Label(
-                        "Groups are discoverable by signed-in ATHLTH users. Chat, events and challenges are only visible after joining.",
+                        "Group chat, events and challenges are visible only to members.",
                         systemImage: "hand.raised.fill"
                     )
                     .font(.caption)
@@ -1477,7 +1678,8 @@ struct CommunityGroupCreateView: View {
                             let ok = await groups.createGroup(
                                 name: name,
                                 locationName: location,
-                                summary: summary
+                                summary: summary,
+                                visibility: visibility
                             )
                             saving = false
                             if ok { dismiss() }
@@ -1486,6 +1688,103 @@ struct CommunityGroupCreateView: View {
                     .disabled(
                         name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 ||
                         location.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 ||
+                        saving
+                    )
+                }
+            }
+        }
+    }
+}
+
+struct CommunityGroupSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var groups: CommunityGroupStore
+
+    let group: CommunityGroupRecord
+
+    @State private var name: String
+    @State private var location: String
+    @State private var summary: String
+    @State private var visibility: String
+    @State private var saving = false
+
+    init(group: CommunityGroupRecord) {
+        self.group = group
+        _name = State(initialValue: group.name)
+        _location = State(initialValue: group.locationName)
+        _summary = State(initialValue: group.summary)
+        _visibility = State(initialValue: group.visibility)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Group") {
+                    TextField("Group name", text: $name)
+                    TextField("Area or city", text: $location)
+                    TextField(
+                        "Description",
+                        text: $summary,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+                }
+
+                Section("Visibility") {
+                    Picker(
+                        "Group visibility",
+                        selection: $visibility
+                    ) {
+                        Label("Public", systemImage: "globe")
+                            .tag("public")
+                        Label("Private", systemImage: "lock.fill")
+                            .tag("private")
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(
+                        visibility == "public"
+                            ? "Public groups appear in Discover and can be joined by signed-in ATHLTH users."
+                            : "Private groups are hidden from Discover. Existing members keep access."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Group Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "Saving…" : "Save") {
+                        Task {
+                            saving = true
+                            let ok = await groups.updateGroup(
+                                group,
+                                name: name,
+                                locationName: location,
+                                summary: summary,
+                                visibility: visibility
+                            )
+                            saving = false
+
+                            if ok {
+                                dismiss()
+                            }
+                        }
+                    }
+                    .disabled(
+                        name.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).count < 2 ||
+                        location.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).count < 2 ||
                         saving
                     )
                 }
