@@ -8,6 +8,7 @@ final class AppSessionStore: ObservableObject {
             persistActivePlan()
         }
     }
+    @Published private(set) var scheduledPlans: [TrainingPlan]
     @Published private(set) var planTemplates: [TrainingPlan]
     @Published private(set) var savedWorkoutTemplates: [PlannedSession]
     @Published private(set) var manuallyCompletedPlanSessions: Set<String>
@@ -41,6 +42,7 @@ final class AppSessionStore: ObservableObject {
 
         self.profile = resolvedProfile
         self.activePlan = activePlan ?? Self.loadActivePlan(from: defaults)
+        self.scheduledPlans = Self.loadScheduledPlans(from: defaults)
         self.planTemplates = Self.loadPlanTemplates(from: defaults)
         self.savedWorkoutTemplates = Self.loadSavedWorkoutTemplates(from: defaults)
         self.manuallyCompletedPlanSessions =
@@ -95,6 +97,9 @@ final class AppSessionStore: ObservableObject {
         } else {
             self.onboardingProfile = nil
         }
+
+        migrateLegacyTrainingPlanIfNeeded()
+        refreshActivePlanForToday()
     }
 
     private static func makeSignedOutProfile() -> UserProfile {
@@ -396,6 +401,7 @@ final class AppSessionStore: ObservableObject {
         resetAuthenticationState()
         profile = Self.makeSignedOutProfile()
         activePlan = nil
+        scheduledPlans = []
         savedRoutes = []
         planTemplates = []
         savedWorkoutTemplates = []
@@ -403,6 +409,7 @@ final class AppSessionStore: ObservableObject {
         previewModeEnabled = false
         usernameSeed = profile.displayName
         defaults.removeObject(forKey: "session.activeTrainingPlan")
+        defaults.removeObject(forKey: "session.scheduledTrainingPlans")
         defaults.removeObject(forKey: "session.savedRoutes")
         defaults.removeObject(forKey: "session.trainingPlanTemplates")
         defaults.removeObject(forKey: "session.savedWorkoutTemplates")
