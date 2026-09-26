@@ -124,6 +124,7 @@ struct CommunityGroupEventRecord: Codable, Identifiable, Hashable {
     let startsAt: Date
     let endsAt: Date?
     let meetingName: String
+    let imageURL: String?
     let createdAt: Date
     let updatedAt: Date
 
@@ -137,6 +138,7 @@ struct CommunityGroupEventRecord: Codable, Identifiable, Hashable {
         case startsAt = "starts_at"
         case endsAt = "ends_at"
         case meetingName = "meeting_name"
+        case imageURL = "image_url"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -184,6 +186,7 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
     let targetValue: Double
     let startsAt: Date
     let endsAt: Date
+    let imageURL: String?
     let createdAt: Date
     let updatedAt: Date
 
@@ -197,6 +200,7 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
         case targetValue = "target_value"
         case startsAt = "starts_at"
         case endsAt = "ends_at"
+        case imageURL = "image_url"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -386,6 +390,7 @@ private struct CommunityGroupEventInsert: Encodable {
     let startsAt: Date
     let endsAt: Date?
     let meetingName: String
+    let imageURL: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -397,6 +402,7 @@ private struct CommunityGroupEventInsert: Encodable {
         case startsAt = "starts_at"
         case endsAt = "ends_at"
         case meetingName = "meeting_name"
+        case imageURL = "image_url"
     }
 }
 
@@ -410,6 +416,7 @@ private struct CommunityGroupChallengeInsert: Encodable {
     let targetValue: Double
     let startsAt: Date
     let endsAt: Date
+    let imageURL: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -421,6 +428,7 @@ private struct CommunityGroupChallengeInsert: Encodable {
         case targetValue = "target_value"
         case startsAt = "starts_at"
         case endsAt = "ends_at"
+        case imageURL = "image_url"
     }
 }
 
@@ -642,7 +650,7 @@ final class CommunityGroupStore: ObservableObject {
 
     func notificationMode(in groupID: UUID) -> String {
         notificationPreferencesByGroup[groupID]?.mode
-            ?? "important"
+            ?? "all"
     }
 
     func pinnedAnnouncement(
@@ -1390,7 +1398,7 @@ final class CommunityGroupStore: ObservableObject {
     ) async -> Bool {
         guard let userID = currentUserID,
               joinedGroupIDs.contains(groupID),
-              ["all", "important", "muted"].contains(mode)
+              ["all", "muted"].contains(mode)
         else {
             return false
         }
@@ -1604,13 +1612,82 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    private func communityContentImagePath(
+        groupID: UUID,
+        kind: String,
+        contentID: UUID
+    ) -> String {
+        "\(groupID.uuidString.lowercased())/" +
+        "\(kind)/" +
+        "\(contentID.uuidString.lowercased())/cover.jpg"
+    }
+
+    private func uploadCommunityContentImage(
+        groupID: UUID,
+        kind: String,
+        contentID: UUID,
+        jpegData: Data
+    ) async throws -> String {
+        guard jpegData.count <= 5_242_880 else {
+            throw NSError(
+                domain: "ATHLTH.Community",
+                code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Image must be smaller than 5 MB."
+                ]
+            )
+        }
+
+        let path = communityContentImagePath(
+            groupID: groupID,
+            kind: kind,
+            contentID: contentID
+        )
+
+        try await client.storage
+            .from("community-content-images")
+            .upload(
+                path: path,
+                file: jpegData,
+                options: FileOptions(
+                    cacheControl: "3600",
+                    contentType: "image/jpeg",
+                    upsert: true
+                )
+            )
+
+        let publicURL = try client.storage
+            .from("community-content-images")
+            .getPublicURL(path: path)
+
+        return publicURL.absoluteString
+    }
+
+    private func removeCommunityContentImage(
+        groupID: UUID,
+        kind: String,
+        contentID: UUID
+    ) async {
+        let path = communityContentImagePath(
+            groupID: groupID,
+            kind: kind,
+            contentID: contentID
+        )
+
+        try? await client.storage
+            .from("community-content-images")
+            .remove(paths: [path])
+    }
+
     func createEvent(
         groupID: UUID,
         title: String,
         summary: String,
         activityType: String,
         startsAt: Date,
-        meetingName: String
+        meetingName: String,
+        imageData: Data? = nil
     ) async -> Bool {
         guard let userID = currentUserID,
               let group = group(for: groupID),
@@ -1621,35 +1698,72 @@ final class CommunityGroupStore: ObservableObject {
             return false
         }
 
-        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanMeet = meetingName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanTitle.isEmpty, !cleanMeet.isEmpty else {
-            errorMessage = "Add an event title and meeting point."
+        let cleanTitle = title.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let cleanMeet = meetingName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard !cleanTitle.isEmpty else {
+            errorMessage = "Add an event title."
             return false
         }
 
+        let eventID = UUID()
+        var uploadedImage = false
+
         do {
+            let imageURL: String?
+            if let imageData {
+                imageURL = try await uploadCommunityContentImage(
+                    groupID: groupID,
+                    kind: "events",
+                    contentID: eventID,
+                    jpegData: imageData
+                )
+                uploadedImage = true
+            } else {
+                imageURL = nil
+            }
+
             try await client
                 .from("community_group_events")
                 .insert(
                     CommunityGroupEventInsert(
-                        id: UUID(),
+                        id: eventID,
                         groupID: groupID,
                         creatorID: userID,
-                        title: String(cleanTitle.prefix(160)),
-                        summary: String(summary.prefix(1200)),
+                        title: String(
+                            cleanTitle.prefix(160)
+                        ),
+                        summary: String(
+                            summary.prefix(1200)
+                        ),
                         activityType: activityType,
                         startsAt: startsAt,
                         endsAt: nil,
-                        meetingName: String(cleanMeet.prefix(180))
+                        meetingName: String(
+                            cleanMeet.prefix(180)
+                        ),
+                        imageURL: imageURL
                     )
                 )
                 .execute()
 
+            errorMessage = nil
             await loadGroupContent(groupID)
             await refresh()
             return true
         } catch {
+            if uploadedImage {
+                await removeCommunityContentImage(
+                    groupID: groupID,
+                    kind: "events",
+                    contentID: eventID
+                )
+            }
+
             errorMessage = error.localizedDescription
             return false
         }
@@ -1662,7 +1776,8 @@ final class CommunityGroupStore: ObservableObject {
         metric: CommunityGroupChallengeMetric,
         targetValue: Double,
         startsAt: Date,
-        endsAt: Date
+        endsAt: Date,
+        imageData: Data? = nil
     ) async -> Bool {
         guard let userID = currentUserID,
               let group = group(for: groupID),
@@ -1675,34 +1790,66 @@ final class CommunityGroupStore: ObservableObject {
             return false
         }
 
-        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanTitle = title.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
         guard !cleanTitle.isEmpty else {
             errorMessage = "Give the challenge a title."
             return false
         }
 
+        let challengeID = UUID()
+        var uploadedImage = false
+
         do {
+            let imageURL: String?
+            if let imageData {
+                imageURL = try await uploadCommunityContentImage(
+                    groupID: groupID,
+                    kind: "challenges",
+                    contentID: challengeID,
+                    jpegData: imageData
+                )
+                uploadedImage = true
+            } else {
+                imageURL = nil
+            }
+
             try await client
                 .from("community_group_challenges")
                 .insert(
                     CommunityGroupChallengeInsert(
-                        id: UUID(),
+                        id: challengeID,
                         groupID: groupID,
                         creatorID: userID,
-                        title: String(cleanTitle.prefix(160)),
-                        summary: String(summary.prefix(800)),
+                        title: String(
+                            cleanTitle.prefix(160)
+                        ),
+                        summary: String(
+                            summary.prefix(800)
+                        ),
                         metric: metric,
                         targetValue: targetValue,
                         startsAt: startsAt,
-                        endsAt: endsAt
+                        endsAt: endsAt,
+                        imageURL: imageURL
                     )
                 )
                 .execute()
 
+            errorMessage = nil
             await loadGroupContent(groupID)
             await refresh()
             return true
         } catch {
+            if uploadedImage {
+                await removeCommunityContentImage(
+                    groupID: groupID,
+                    kind: "challenges",
+                    contentID: challengeID
+                )
+            }
+
             errorMessage = error.localizedDescription
             return false
         }
