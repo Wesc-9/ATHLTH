@@ -31,6 +31,16 @@ struct RouteDetailView: View {
         currentRoute.ownerID == session.profile.userID
     }
 
+    private var savedCopy: TrainingRoute? {
+        if isOwner {
+            return currentRoute
+        }
+
+        return session.savedRoutes.first {
+            $0.sharedSourceRouteID == currentRoute.id
+        }
+    }
+
     private var leaderboard: [RouteAttemptRecord] {
         attempts.leaderboard()
     }
@@ -586,6 +596,26 @@ struct RouteDetailView: View {
     private var actionsCard: some View {
         ATHLTHCard {
             VStack(spacing: 10) {
+                if !isOwner && savedCopy == nil {
+                    Button {
+                        session.saveSharedRoute(
+                            currentRoute,
+                            sourceOwnerID: currentRoute.ownerID,
+                            sourceRouteID: currentRoute.id
+                        )
+                        watchMessage = "Route saved to My Routes."
+                    } label: {
+                        Label(
+                            "Save Route",
+                            systemImage: "bookmark.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
+                    .controlSize(.large)
+                }
+
                 if settings.trainingDeviceProvider == .appleWatch {
                     Button {
                         Task {
@@ -603,7 +633,11 @@ struct RouteDetailView: View {
                             .frame(maxWidth: .infinity)
                         }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(
+                        isOwner || savedCopy != nil
+                            ? .borderedProminent
+                            : .bordered
+                    )
                     .tint(ATHLTHTheme.accent)
                     .controlSize(.large)
                     .disabled(
@@ -612,19 +646,24 @@ struct RouteDetailView: View {
                     )
                 }
 
-                NavigationLink {
-                    ChallengeCreationView(
-                        preselectedRouteID: currentRoute.id
-                    )
-                } label: {
-                    Label(
-                        "Challenge Friends",
-                        systemImage: "trophy.fill"
-                    )
-                    .frame(maxWidth: .infinity)
+                if let challengeRoute = isOwner
+                    ? Optional(currentRoute)
+                    : savedCopy {
+                    NavigationLink {
+                        ChallengeCreationView(
+                            preselectedRouteID:
+                                challengeRoute.id
+                        )
+                    } label: {
+                        Label(
+                            "Challenge Friends",
+                            systemImage: "trophy.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
             }
         }
     }
@@ -867,12 +906,9 @@ struct RouteDetailView: View {
     private func prepareRouteData(
         forceHealthSync: Bool = false
     ) async {
-        guard isOwner else {
-            await attempts.refresh(routeID: currentRoute.id)
-            return
+        if isOwner {
+            await discovery.publish(currentRoute)
         }
-
-        await discovery.publish(currentRoute)
 
         if forceHealthSync || health.hasRequestedAuthorization {
             await attempts.syncHealthAttempts(
