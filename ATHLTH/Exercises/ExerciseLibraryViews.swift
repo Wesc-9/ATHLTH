@@ -31,11 +31,13 @@ struct ExerciseLibraryView: View {
     @State private var selectedSection: ExerciseLibrarySection = .library
 
     init(
+        initialBodyPart: String = "All",
         selectionTitle: String? = nil,
         onSelect: ((ExerciseLibraryEntry) -> Void)? = nil
     ) {
         self.selectionTitle = selectionTitle
         self.onSelect = onSelect
+        _selectedBodyPart = State(initialValue: initialBodyPart)
     }
 
     private var results: [ExerciseLibraryEntry] {
