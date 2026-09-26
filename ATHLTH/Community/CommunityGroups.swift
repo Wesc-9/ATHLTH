@@ -4104,6 +4104,18 @@ struct CommunityGroupDetailView: View {
         )
     }
 
+    private var visibleGroupEvents:
+        [CommunityGroupEventRecord] {
+        groups.events(in: group.id).filter {
+            event in
+
+            event.status != "draft" ||
+            groups.canManage(currentGroup) ||
+            event.creatorID ==
+                session.profile.userID
+        }
+    }
+
     private var events: some View {
         ATHLTHCard {
             HStack {
@@ -4135,7 +4147,7 @@ struct CommunityGroupDetailView: View {
                 }
             }
 
-            if groups.events(in: group.id).isEmpty {
+            if visibleGroupEvents.isEmpty {
                 ContentUnavailableView(
                     "No group events",
                     systemImage: "calendar.badge.plus",
@@ -4151,86 +4163,204 @@ struct CommunityGroupDetailView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(
-                        groups.events(in: group.id)
+                        visibleGroupEvents
                     ) { event in
-                        VStack(
-                            alignment: .leading,
-                            spacing: 10
-                        ) {
-                            if let imageURL = event.imageURL,
-                               !imageURL.isEmpty {
-                                communityContentCover(
-                                    imageURL,
-                                    height: 140
-                                )
-                            }
-
-                            HStack(spacing: 12) {
-                                Image(
-                                    systemName:
-                                        eventIcon(
-                                            event.activityType
-                                        )
-                                )
-                                .foregroundStyle(.purple)
-                                .frame(width: 38, height: 38)
-                                .background(
-                                    Color.purple.opacity(0.08),
-                                    in: RoundedRectangle(
-                                        cornerRadius: 12
+                        NavigationLink {
+                            CommunityGroupEventDetailView(
+                                group: currentGroup,
+                                event: event
+                            )
+                        } label: {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 10
+                            ) {
+                                if let imageURL =
+                                    event.imageURL,
+                                   !imageURL.isEmpty {
+                                    communityContentCover(
+                                        imageURL,
+                                        height: 140
                                     )
-                                )
-
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 2
-                                ) {
-                                    Text(event.title)
-                                        .font(
-                                            .subheadline
-                                                .weight(.semibold)
-                                        )
-                                    Text(
-                                        eventDetailText(event)
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-
-                                    if let configuration =
-                                        event.activityConfiguration {
-                                        Text(
-                                            configuration
-                                                .compactSummary
-                                        )
-                                        .font(
-                                            .caption
-                                                .weight(.semibold)
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .accentDeep
-                                        )
-                                        .lineLimit(2)
-                                    }
-
-                                    if !event.summary.isEmpty {
-                                        Text(event.summary)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(2)
-                                    }
                                 }
 
-                                Spacer()
+                                HStack(spacing: 12) {
+                                    Image(
+                                        systemName:
+                                            eventIcon(
+                                                event
+                                                    .activityType
+                                            )
+                                    )
+                                    .foregroundStyle(.purple)
+                                    .frame(
+                                        width: 38,
+                                        height: 38
+                                    )
+                                    .background(
+                                        Color.purple
+                                            .opacity(0.08),
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius:
+                                                    12
+                                            )
+                                    )
+
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 2
+                                    ) {
+                                        HStack(spacing: 7) {
+                                            Text(event.title)
+                                                .font(
+                                                    .subheadline
+                                                        .weight(
+                                                            .semibold
+                                                        )
+                                                )
+
+                                            Text(
+                                                event
+                                                    .resolvedStatus
+                                                    .title
+                                            )
+                                            .font(
+                                                .system(
+                                                    size: 9,
+                                                    weight:
+                                                        .bold
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                groupContentStatusColor(
+                                                    event
+                                                        .resolvedStatus
+                                                )
+                                            )
+                                            .padding(
+                                                .horizontal,
+                                                6
+                                            )
+                                            .padding(
+                                                .vertical,
+                                                3
+                                            )
+                                            .background(
+                                                groupContentStatusColor(
+                                                    event
+                                                        .resolvedStatus
+                                                )
+                                                .opacity(
+                                                    0.10
+                                                ),
+                                                in: Capsule()
+                                            )
+                                        }
+
+                                        Text(
+                                            eventDetailText(
+                                                event
+                                            )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+
+                                        if let configuration =
+                                            event
+                                                .activityConfiguration {
+                                            Text(
+                                                configuration
+                                                    .compactSummary
+                                            )
+                                            .font(
+                                                .caption
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+                                            .foregroundStyle(
+                                                ATHLTHTheme
+                                                    .accentDeep
+                                            )
+                                            .lineLimit(2)
+                                        }
+
+                                        if !event.summary.isEmpty {
+                                            Text(
+                                                event.summary
+                                            )
+                                            .font(.caption)
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                            .lineLimit(2)
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    Image(
+                                        systemName:
+                                            "chevron.right"
+                                    )
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(
+                                        .tertiary
+                                    )
+                                }
+
+                                let going =
+                                    groups
+                                        .eventRSVPCount(
+                                            eventID:
+                                                event.id,
+                                            status:
+                                                "going"
+                                        )
+                                let waitlist =
+                                    groups
+                                        .eventRSVPCount(
+                                            eventID:
+                                                event.id,
+                                            status:
+                                                "waitlist"
+                                        )
+
+                                if going > 0 ||
+                                    waitlist > 0 ||
+                                    event.capacity != nil {
+                                    HStack(spacing: 8) {
+                                        Label(
+                                            event.capacity.map {
+                                                "\(going)/\($0) going"
+                                            } ??
+                                            "\(going) going",
+                                            systemImage:
+                                                "person.2.fill"
+                                        )
+
+                                        if waitlist > 0 {
+                                            Text(
+                                                "· \(waitlist) waitlisted"
+                                            )
+                                        }
+                                    }
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
                             }
-
-                            eventRSVPControls(event)
+                            .contentShape(Rectangle())
+                            .padding(.vertical, 10)
                         }
-                        .padding(.vertical, 10)
+                        .buttonStyle(.plain)
 
-                        if event.id != groups.events(
-                            in: group.id
-                        ).last?.id {
+                        if event.id !=
+                            visibleGroupEvents.last?.id {
                             Divider()
                         }
                     }
@@ -4240,81 +4370,16 @@ struct CommunityGroupDetailView: View {
         }
     }
 
-    private func eventRSVPControls(
-        _ event: CommunityGroupEventRecord
-    ) -> some View {
-        let current =
-            groups.eventRSVP(
-                eventID: event.id
-            )?.status
+    private var visibleGroupChallenges:
+        [CommunityGroupChallengeRecord] {
+        groups.challenges(in: group.id).filter {
+            challenge in
 
-        return VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 7) {
-                rsvpButton(
-                    event: event,
-                    title: "Going",
-                    status: "going",
-                    selected: current == "going"
-                )
-                rsvpButton(
-                    event: event,
-                    title: "Maybe",
-                    status: "maybe",
-                    selected: current == "maybe"
-                )
-                rsvpButton(
-                    event: event,
-                    title: "Can't go",
-                    status: "not_going",
-                    selected: current == "not_going"
-                )
-            }
-
-            let going = groups.eventRSVPCount(
-                eventID: event.id,
-                status: "going"
-            )
-            let maybe = groups.eventRSVPCount(
-                eventID: event.id,
-                status: "maybe"
-            )
-
-            if going > 0 || maybe > 0 {
-                Text(
-                    "\(going) going · \(maybe) maybe"
-                )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
+            challenge.status != "draft" ||
+            groups.canManage(currentGroup) ||
+            challenge.creatorID ==
+                session.profile.userID
         }
-        .padding(.leading, 50)
-    }
-
-    private func rsvpButton(
-        event: CommunityGroupEventRecord,
-        title: String,
-        status: String,
-        selected: Bool
-    ) -> some View {
-        Button {
-            Task {
-                _ = await groups.setEventRSVP(
-                    groupID: group.id,
-                    eventID: event.id,
-                    status: status
-                )
-            }
-        } label: {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.bordered)
-        .tint(
-            selected
-                ? ATHLTHTheme.accentDeep
-                : Color.gray
-        )
     }
 
     private var challenges: some View {
@@ -4348,7 +4413,7 @@ struct CommunityGroupDetailView: View {
                 }
             }
 
-            if groups.challenges(in: group.id).isEmpty {
+            if visibleGroupChallenges.isEmpty {
                 ContentUnavailableView(
                     "No group challenges",
                     systemImage: "bolt.badge.plus",
@@ -4364,9 +4429,19 @@ struct CommunityGroupDetailView: View {
             } else {
                 VStack(spacing: 12) {
                     ForEach(
-                        groups.challenges(in: group.id)
+                        visibleGroupChallenges
                     ) { challenge in
-                        groupChallengeCard(challenge)
+                        NavigationLink {
+                            CommunityGroupChallengeDetailView(
+                                group: currentGroup,
+                                challenge: challenge
+                            )
+                        } label: {
+                            groupChallengeCard(
+                                challenge
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.top, 10)
@@ -4638,6 +4713,23 @@ struct CommunityGroupDetailView: View {
         }
 
         return parts.joined(separator: " · ")
+    }
+
+    private func groupContentStatusColor(
+        _ status: CommunityGroupContentStatus
+    ) -> Color {
+        switch status {
+        case .draft:
+            return .secondary
+        case .upcoming:
+            return .blue
+        case .live:
+            return .green
+        case .completed:
+            return .indigo
+        case .cancelled:
+            return .red
+        }
     }
 
     private func eventIcon(_ activity: String) -> String {
@@ -6318,11 +6410,13 @@ struct CommunityGroupEventCreateView: View {
 
                 CommunityGroupEventAdvancedEditor(
                     group: group,
+                    eventStartsAt: startsAt,
                     options: $advancedOptions,
                     cohostIDs: $cohostIDs,
                     routeStart:
                         activityDraft
-                            .selectedRoute?
+                            .configuration
+                            .route?
                             .coordinates
                             .first
                 )
@@ -6589,8 +6683,12 @@ struct CommunityGroupChallengeCreateView: View {
                     routeSelected:
                         activityDraft.mode ==
                             .route &&
-                        activityDraft
-                            .selectedRoute != nil
+                        (
+                            activityDraft
+                                .selectedRoute != nil ||
+                            activityDraft
+                                .selectedRouteSnapshot != nil
+                        )
                 )
 
                 Section {
