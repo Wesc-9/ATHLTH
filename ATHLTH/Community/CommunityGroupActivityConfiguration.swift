@@ -246,9 +246,11 @@ struct CommunityGroupActivityDraft {
                                     .map { $0 / 1_000 }
                         ),
                 route:
-                    selectedRoute.map(
-                        CommunityGroupRouteSnapshot.init
-                    ),
+                    selectedRoute.map {
+                        CommunityGroupRouteSnapshot(
+                            route: $0
+                        )
+                    },
                 runningWorkout:
                     activityType == "running" &&
                     mode == .workout
@@ -270,9 +272,11 @@ struct CommunityGroupActivityDraft {
                 strengthExercises:
                     selectedExercises.isEmpty
                         ? nil
-                        : selectedExercises.map(
-                            CommunityGroupStrengthExerciseSnapshot.init
-                        )
+                        : selectedExercises.map {
+                            CommunityGroupStrengthExerciseSnapshot(
+                                entry: $0
+                            )
+                        }
             )
 
         default:
@@ -358,12 +362,15 @@ struct CommunityGroupActivityEditor: View {
         .sheet(isPresented: $showingRunningWorkouts) {
             NavigationStack {
                 RunningWorkoutLibraryView(
-                    selectionTitle: "Choose Running Workout"
-                ) { workout in
-                    draft.selectedRunningWorkout = workout
-                    draft.mode = .workout
-                    showingRunningWorkouts = false
-                }
+                    selectionTitle:
+                        "Choose Running Workout",
+                    onSelect: { workout in
+                        draft.selectedRunningWorkout =
+                            workout
+                        draft.mode = .workout
+                        showingRunningWorkouts = false
+                    }
+                )
             }
             .environmentObject(runningLibrary)
         }
