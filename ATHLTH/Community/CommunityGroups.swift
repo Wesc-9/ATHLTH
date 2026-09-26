@@ -1153,7 +1153,8 @@ final class CommunityGroupStore: ObservableObject {
         summary: String,
         visibility: String,
         joinMode: String = "open",
-        membersCanCreateContent: Bool = true
+        membersCanCreateContent: Bool = true,
+        imageJPEGData: Data? = nil
     ) async -> Bool {
         guard let userID = currentUserID else { return false }
 
@@ -1180,8 +1181,10 @@ final class CommunityGroupStore: ObservableObject {
                             : "open"
                     )
 
+            let groupID = UUID()
+
             let payload = CommunityGroupInsert(
-                id: UUID(),
+                id: groupID,
                 creatorID: userID,
                 name: String(cleanName.prefix(80)),
                 summary: String(summary.prefix(800)),
@@ -1196,6 +1199,73 @@ final class CommunityGroupStore: ObservableObject {
                 .from("community_groups")
                 .insert(payload)
                 .execute()
+
+            if let imageJPEGData {
+                guard imageJPEGData.count <= 5_242_880 else {
+                    errorMessage =
+                        "Club image must be smaller than 5 MB."
+                    await refresh()
+                    return true
+                }
+
+                let path =
+                    "\(groupID.uuidString.lowercased())/cover.jpg"
+
+                do {
+                    try await client.storage
+                        .from("community-group-images")
+                        .upload(
+                            path: path,
+                            file: imageJPEGData,
+                            options: FileOptions(
+                                cacheControl: "3600",
+                                contentType: "image/jpeg",
+                                upsert: false
+                            )
+                        )
+
+                    let publicURL = try client.storage
+                        .from("community-group-images")
+                        .getPublicURL(path: path)
+
+                    var components = URLComponents(
+                        url: publicURL,
+                        resolvingAgainstBaseURL: false
+                    )
+                    components?.queryItems = [
+                        URLQueryItem(
+                            name: "v",
+                            value: String(
+                                Int(
+                                    Date()
+                                        .timeIntervalSince1970
+                                )
+                            )
+                        )
+                    ]
+
+                    let finalURL =
+                        components?.url ?? publicURL
+
+                    try await client
+                        .from("community_groups")
+                        .update(
+                            CommunityGroupImageUpdate(
+                                imageURL:
+                                    finalURL.absoluteString,
+                                updatedAt: Date()
+                            )
+                        )
+                        .eq("id", value: groupID)
+                        .execute()
+                } catch {
+                    // The club itself has already been created. Keep it
+                    // usable even if Storage is temporarily unavailable;
+                    // the owner can add/change the cover in Club Settings.
+                    errorMessage =
+                        "Club created, but the image could not be uploaded. You can add it from Club Settings."
+                }
+            }
 
             await refresh()
             return true
@@ -3016,191 +3086,201 @@ struct CommunityGroupDetailView: View {
 
     private var groupHeader: some View {
         ZStack(alignment: .bottomLeading) {
+            groupHeroBackground
+
+            // Same readability treatment used on the ATHLTH profile hero:
+            // a bright leading gradient keeps the Club identity readable
+            // without hiding the photography.
             LinearGradient(
                 colors: [
-                    Color.indigo.opacity(0.22),
-                    ATHLTHTheme.cardWarm.opacity(0.92),
-                    ATHLTHTheme.canvasTop
+                    Color.white.opacity(
+                        currentGroup.imageURL == nil
+                            ? 0.18
+                            : 0.92
+                    ),
+                    ATHLTHTheme.cardWarm.opacity(
+                        currentGroup.imageURL == nil
+                            ? 0.16
+                            : 0.72
+                    ),
+                    ATHLTHTheme.cardWarm.opacity(
+                        currentGroup.imageURL == nil
+                            ? 0.08
+                            : 0.22
+                    )
                 ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                startPoint: .leading,
+                endPoint: .trailing
             )
 
-            Circle()
-                .fill(Color.white.opacity(0.28))
-                .frame(width: 180, height: 180)
-                .offset(x: 230, y: -82)
-                .allowsHitTesting(false)
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    ATHLTHTheme.canvasBottom.opacity(0.34)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 14) {
-                    if groups.canManage(currentGroup) {
-                        Button {
-                            showingGroupSettings = true
-                        } label: {
-                            detailGroupImage
-                                .overlay(alignment: .bottomTrailing) {
-                                    Image(systemName: "pencil")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 22, height: 22)
-                                        .background(
-                                            ATHLTHTheme.accentDeep,
-                                            in: Circle()
-                                        )
-                                        .overlay {
-                                            Circle()
-                                                .stroke(
-                                                    Color.white,
-                                                    lineWidth: 2
-                                                )
-                                        }
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Change group photo")
-                    } else {
+            HStack(alignment: .bottom, spacing: 14) {
+                if groups.canManage(currentGroup) {
+                    Button {
+                        showingGroupSettings = true
+                    } label: {
                         detailGroupImage
+                            .overlay(alignment: .bottomTrailing) {
+                                Image(systemName: "pencil")
+                                    .font(
+                                        .system(
+                                            size: 10,
+                                            weight: .bold
+                                        )
+                                    )
+                                    .foregroundStyle(.white)
+                                    .frame(width: 22, height: 22)
+                                    .background(
+                                        ATHLTHTheme.accentDeep,
+                                        in: Circle()
+                                    )
+                                    .overlay {
+                                        Circle()
+                                            .stroke(
+                                                Color.white,
+                                                lineWidth: 2
+                                            )
+                                    }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Change Club photo")
+                } else {
+                    detailGroupImage
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("CLUB")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.6)
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep.opacity(0.62)
+                        )
+
+                    Text(currentGroup.name)
+                        .font(
+                            .system(
+                                size: 27,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.76)
+
+                    if !currentGroup.summary
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        .isEmpty {
+                        Text(currentGroup.summary)
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText.opacity(0.72)
+                            )
+                            .lineLimit(2)
                     }
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(currentGroup.name)
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        if !currentGroup.summary
+                    HStack(spacing: 10) {
+                        if !currentGroup.locationName
                             .trimmingCharacters(
                                 in: .whitespacesAndNewlines
                             )
                             .isEmpty {
-                            Text(currentGroup.summary)
-                                .font(.subheadline)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
-                                .lineLimit(3)
-                        }
-
-                        HStack(spacing: 10) {
-                            if !currentGroup.locationName
-                                .trimmingCharacters(
-                                    in: .whitespacesAndNewlines
-                                )
-                                .isEmpty {
-                                Label(
-                                    currentGroup.locationName,
-                                    systemImage: "location.fill"
-                                )
-                            }
-
                             Label(
-                                currentGroup.visibility == "private"
-                                    ? "Private"
-                                    : "Public",
-                                systemImage:
-                                    currentGroup.visibility == "private"
-                                        ? "lock.fill"
-                                        : "globe"
+                                currentGroup.locationName,
+                                systemImage: "location.fill"
                             )
-
-                            if isMember {
-                                Text(memberCountText)
-                            }
                         }
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Label(
+                            currentGroup.visibility == "private"
+                                ? "Private"
+                                : "Public",
+                            systemImage:
+                                currentGroup.visibility == "private"
+                                    ? "lock.fill"
+                                    : "globe"
+                        )
+
+                        if isMember {
+                            Text(memberCountText)
+                        }
                     }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
 
-                    Spacer()
+                Spacer(minLength: 8)
 
-                    if isMember {
-                        HStack(spacing: 8) {
-                            NavigationLink {
-                                CommunityGroupMembersView(
-                                    group: currentGroup
-                                )
-                            } label: {
-                                Image(
-                                    systemName:
-                                        "person.2.fill"
-                                )
-                                .font(
-                                    .system(
-                                        size: 14,
-                                        weight: .semibold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-                                .frame(
-                                    width: 36,
-                                    height: 36
-                                )
-                                .background(
-                                    Color.white.opacity(0.56),
-                                    in: Circle()
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                "Members, \(memberCountText)"
+                if isMember {
+                    HStack(spacing: 8) {
+                        NavigationLink {
+                            CommunityGroupMembersView(
+                                group: currentGroup
                             )
+                        } label: {
+                            Image(
+                                systemName: "person.2.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 14,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                            .frame(width: 36, height: 36)
+                            .background(
+                                Color.white.opacity(0.66),
+                                in: Circle()
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            "Members, \(memberCountText)"
+                        )
 
-                            if groups.canManage(
-                                currentGroup
-                            ) {
-                                Menu {
-                                    Button {
-                                        showingGroupSettings = true
-                                    } label: {
-                                        Label(
-                                            "Group Settings",
-                                            systemImage: "gearshape"
-                                        )
-                                    }
-
-                                    Button {
-                                        showingNotificationSettings =
-                                            true
-                                    } label: {
-                                        Label(
-                                            "Notifications",
-                                            systemImage: "bell"
-                                        )
-                                    }
-
-                                    if !groups.isOwner(
-                                        of: currentGroup
-                                    ) {
-                                        Button(
-                                            "Leave Group",
-                                            role: .destructive
-                                        ) {
-                                            Task {
-                                                await groups.leave(
-                                                    currentGroup
-                                                )
-                                            }
-                                        }
-                                    }
+                        if groups.canManage(currentGroup) {
+                            Menu {
+                                Button {
+                                    showingGroupSettings = true
                                 } label: {
-                                    groupMenuButton
+                                    Label(
+                                        "Club Settings",
+                                        systemImage: "gearshape"
+                                    )
                                 }
-                            } else {
-                                Menu {
-                                    Button {
-                                        showingNotificationSettings =
-                                            true
-                                    } label: {
-                                        Label(
-                                            "Notifications",
-                                            systemImage: "bell"
-                                        )
-                                    }
 
+                                Button {
+                                    showingNotificationSettings =
+                                        true
+                                } label: {
+                                    Label(
+                                        "Notifications",
+                                        systemImage: "bell"
+                                    )
+                                }
+
+                                if !groups.isOwner(
+                                    of: currentGroup
+                                ) {
                                     Button(
-                                        "Leave Group",
+                                        "Leave Club",
                                         role: .destructive
                                     ) {
                                         Task {
@@ -3209,17 +3289,45 @@ struct CommunityGroupDetailView: View {
                                             )
                                         }
                                     }
-                                } label: {
-                                    groupMenuButton
                                 }
+                            } label: {
+                                groupMenuButton
+                            }
+                        } else {
+                            Menu {
+                                Button {
+                                    showingNotificationSettings =
+                                        true
+                                } label: {
+                                    Label(
+                                        "Notifications",
+                                        systemImage: "bell"
+                                    )
+                                }
+
+                                Button(
+                                    "Leave Club",
+                                    role: .destructive
+                                ) {
+                                    Task {
+                                        await groups.leave(
+                                            currentGroup
+                                        )
+                                    }
+                                }
+                            } label: {
+                                groupMenuButton
                             }
                         }
                     }
                 }
             }
-            .padding(18)
+            .padding(.horizontal, 20)
+            .padding(.top, 58)
+            .padding(.bottom, 20)
         }
-        .frame(minHeight: 166)
+        .frame(height: 224)
+        .frame(maxWidth: .infinity)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 28,
@@ -3239,6 +3347,44 @@ struct CommunityGroupDetailView: View {
             x: 0,
             y: 8
         )
+    }
+
+    @ViewBuilder
+    private var groupHeroBackground: some View {
+        if let value = currentGroup.imageURL,
+           let url = URL(string: value) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    groupHeroFallback
+                }
+            }
+        } else {
+            groupHeroFallback
+        }
+    }
+
+    private var groupHeroFallback: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.indigo.opacity(0.24),
+                    ATHLTHTheme.cardWarm.opacity(0.92),
+                    ATHLTHTheme.canvasTop
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.white.opacity(0.30))
+                .frame(width: 190, height: 190)
+                .offset(x: 230, y: -74)
+        }
     }
 
     private var groupMenuButton: some View {
@@ -4881,12 +5027,59 @@ struct CommunityGroupCreateView: View {
     @State private var visibility = "public"
     @State private var joinMode = "open"
     @State private var membersCanCreateContent = true
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedImageData: Data?
     @State private var saving = false
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Group") {
+                Section {
+                    VStack(spacing: 14) {
+                        createCoverPreview
+
+                        PhotosPicker(
+                            selection: $selectedPhoto,
+                            matching: .images
+                        ) {
+                            Label(
+                                selectedImageData == nil
+                                    ? "Choose Club Photo"
+                                    : "Change Club Photo",
+                                systemImage: "photo.on.rectangle.angled"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accentDeep)
+
+                        if selectedImageData != nil {
+                            Button(role: .destructive) {
+                                selectedImageData = nil
+                                selectedPhoto = nil
+                            } label: {
+                                Label(
+                                    "Remove Photo",
+                                    systemImage: "trash"
+                                )
+                            }
+                            .font(.caption.weight(.semibold))
+                        }
+
+                        Text(
+                            "This photo becomes the Club hero image and is also used as the Club thumbnail."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                } header: {
+                    Text("Club photo")
+                }
+
+                Section("Club") {
                     TextField("Group name", text: $name)
                     TextField(
                         "Description",
@@ -4962,7 +5155,7 @@ struct CommunityGroupCreateView: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Create Group")
+            .navigationTitle("Create Club")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -4985,7 +5178,9 @@ struct CommunityGroupCreateView: View {
                                 visibility: visibility,
                                 joinMode: joinMode,
                                 membersCanCreateContent:
-                                    membersCanCreateContent
+                                    membersCanCreateContent,
+                                imageJPEGData:
+                                    selectedImageData
                             )
                             saving = false
 
@@ -5008,7 +5203,173 @@ struct CommunityGroupCreateView: View {
                     joinMode = "invite_only"
                 }
             }
+            .onChange(of: selectedPhoto) { _, item in
+                guard let item else {
+                    return
+                }
+
+                Task {
+                    do {
+                        guard
+                            let data = try await item
+                                .loadTransferable(type: Data.self),
+                            let jpeg =
+                                prepareCreateClubImageData(data)
+                        else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that image. Try another photo."
+                            return
+                        }
+
+                        await MainActor.run {
+                            selectedImageData = jpeg
+                        }
+                    } catch {
+                        groups.errorMessage =
+                            error.localizedDescription
+                    }
+                }
+            }
         }
+    }
+
+    @ViewBuilder
+    private var createCoverPreview: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let selectedImageData,
+                   let image = UIImage(
+                       data: selectedImageData
+                   ) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    LinearGradient(
+                        colors: [
+                            Color.indigo.opacity(0.22),
+                            ATHLTHTheme.cardWarm,
+                            ATHLTHTheme.canvasTop
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            }
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(
+                        selectedImageData == nil
+                            ? 0.16
+                            : 0.88
+                    ),
+                    ATHLTHTheme.cardWarm.opacity(
+                        selectedImageData == nil
+                            ? 0.10
+                            : 0.60
+                    ),
+                    Color.clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    ATHLTHTheme.canvasBottom.opacity(0.28)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("CLUB")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.5)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep.opacity(0.62)
+                    )
+
+                Text(
+                    name.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty
+                        ? "Your Club"
+                        : name
+                )
+                .font(.title3.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+            }
+            .padding(16)
+        }
+        .frame(height: 150)
+        .frame(maxWidth: .infinity)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(ATHLTHTheme.border, lineWidth: 1)
+        }
+    }
+
+    private func prepareCreateClubImageData(
+        _ data: Data
+    ) -> Data? {
+        guard let image = UIImage(data: data) else {
+            return nil
+        }
+
+        let maxDimension: CGFloat = 1_600
+        let longest = max(
+            image.size.width,
+            image.size.height
+        )
+        let scale = min(
+            1,
+            maxDimension / max(longest, 1)
+        )
+        let targetSize = CGSize(
+            width: max(1, image.size.width * scale),
+            height: max(1, image.size.height * scale)
+        )
+
+        let format =
+            UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+
+        let resized = UIGraphicsImageRenderer(
+            size: targetSize,
+            format: format
+        ).image { _ in
+            image.draw(
+                in: CGRect(
+                    origin: .zero,
+                    size: targetSize
+                )
+            )
+        }
+
+        if let jpeg = resized.jpegData(
+            compressionQuality: 0.80
+        ),
+        jpeg.count <= 5_242_880 {
+            return jpeg
+        }
+
+        return resized.jpegData(
+            compressionQuality: 0.62
+        )
     }
 
     private var joinModeDescription: String {
@@ -5109,7 +5470,7 @@ struct CommunityGroupSettingsView: View {
                         }
 
                         Text(
-                            "The group photo appears beside the group name. The large header stays a gradient so the group keeps a consistent ATHLTH look."
+                            "The Club photo is used as the hero image with an ATHLTH readability gradient, and as the Club thumbnail elsewhere in Community."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -5118,7 +5479,7 @@ struct CommunityGroupSettingsView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 } header: {
-                    Text("Group photo")
+                    Text("Club photo")
                 }
 
                 Section("Group") {
@@ -5204,7 +5565,7 @@ struct CommunityGroupSettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Group Settings")
+            .navigationTitle("Club Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
