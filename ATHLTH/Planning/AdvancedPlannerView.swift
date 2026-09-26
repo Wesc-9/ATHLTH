@@ -1776,7 +1776,23 @@ private struct ProgramStartView: View {
     let program: TrainingPlan
     let onStarted: () -> Void
 
-    @State private var startDate = Calendar.current.startOfDay(for: Date())
+    @State private var startDate =
+        Calendar.current.startOfDay(for: Date())
+
+    private var endDate: Date {
+        Calendar.current.date(
+            byAdding: .day,
+            value: max(program.weeks.count * 7 - 1, 0),
+            to: Calendar.current.startOfDay(for: startDate)
+        ) ?? startDate
+    }
+
+    private var conflictingPlan: TrainingPlan? {
+        session.trainingPlanConflict(
+            startDate: startDate,
+            endDate: endDate
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -1791,7 +1807,10 @@ private struct ProgramStartView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    LabeledContent("Length", value: "\(program.weeks.count) weeks")
+                    LabeledContent(
+                        "Length",
+                        value: "\(program.weeks.count) weeks"
+                    )
                 }
 
                 Section("Add to Calendar") {
@@ -1801,11 +1820,35 @@ private struct ProgramStartView: View {
                         displayedComponents: .date
                     )
 
+                    LabeledContent(
+                        "Ends",
+                        value: endDate.formatted(
+                            date: .abbreviated,
+                            time: .omitted
+                        )
+                    )
+
                     Text(
-                        "Starting the program makes it your active program and places its weeks into Calendar from this date."
+                        "ATHLTH adds this program to your plan timeline. It becomes active automatically when today falls inside this date range."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+
+                if let conflict = conflictingPlan {
+                    Section("Schedule Conflict") {
+                        Label(
+                            "Overlaps with \(conflict.title)",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .foregroundStyle(.orange)
+
+                        Text(
+                            "Choose a start date after the existing plan ends. Only one training plan can be active on a given date."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                 }
             }
             .navigationTitle("Start Program")
@@ -1819,14 +1862,26 @@ private struct ProgramStartView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start") {
-                        session.usePlanTemplate(
-                            program.id,
-                            startDate: startDate
-                        )
+                        guard let created =
+                                session.usePlanTemplate(
+                                    program.id,
+                                    startDate: startDate
+                                )
+                        else {
+                            return
+                        }
+
                         dismiss()
-                        onStarted()
+
+                        if session.trainingPlanStatus(created) == .active {
+                            onStarted()
+                        }
                     }
+                    .disabled(conflictingPlan != nil)
                 }
+            }
+            .onAppear {
+                startDate = session.suggestedTrainingPlanStartDate
             }
         }
     }
