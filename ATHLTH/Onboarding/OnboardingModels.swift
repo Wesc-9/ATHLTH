@@ -35,19 +35,22 @@ struct HealthProfileBasics: Codable, Hashable {
     var healthSex: HealthSex?
     var weightKilograms: Double?
     var heightCentimeters: Double?
+    var maximumHeartRateBPM: Int? = nil
 
     static let empty = HealthProfileBasics(
         dateOfBirth: nil,
         healthSex: nil,
         weightKilograms: nil,
-        heightCentimeters: nil
+        heightCentimeters: nil,
+        maximumHeartRateBPM: nil
     )
 
     var hasAnyValue: Bool {
         dateOfBirth != nil ||
         healthSex != nil ||
         weightKilograms != nil ||
-        heightCentimeters != nil
+        heightCentimeters != nil ||
+        maximumHeartRateBPM != nil
     }
 }
 
@@ -295,6 +298,7 @@ struct OnboardingProfileData: Codable, Hashable {
     var healthSex: HealthSex?
     var weightKilograms: Double?
     var heightCentimeters: Double?
+    var maximumHeartRateBPM: Int? = nil
     var personalDetailsSource: PersonalDetailsSource
     var trainingFocus: TrainingFocus? = nil
 
@@ -307,7 +311,8 @@ struct OnboardingProfileData: Codable, Hashable {
             dateOfBirth: dateOfBirth,
             healthSex: healthSex,
             weightKilograms: weightKilograms,
-            heightCentimeters: heightCentimeters
+            heightCentimeters: heightCentimeters,
+            maximumHeartRateBPM: maximumHeartRateBPM
         )
     }
 }
