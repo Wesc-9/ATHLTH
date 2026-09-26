@@ -3546,6 +3546,8 @@ struct CommunityGroupCreateView: View {
     @State private var name = ""
     @State private var summary = ""
     @State private var visibility = "public"
+    @State private var joinMode = "open"
+    @State private var membersCanCreateContent = true
     @State private var saving = false
 
     var body: some View {
@@ -3553,12 +3555,19 @@ struct CommunityGroupCreateView: View {
             Form {
                 Section("Group") {
                     TextField("Group name", text: $name)
-                    TextField("Description", text: $summary, axis: .vertical)
-                        .lineLimit(2...5)
+                    TextField(
+                        "Description",
+                        text: $summary,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
                 }
 
                 Section("Visibility") {
-                    Picker("Group visibility", selection: $visibility) {
+                    Picker(
+                        "Group visibility",
+                        selection: $visibility
+                    ) {
                         Label("Public", systemImage: "globe")
                             .tag("public")
                         Label("Private", systemImage: "lock.fill")
@@ -3568,8 +3577,44 @@ struct CommunityGroupCreateView: View {
 
                     Text(
                         visibility == "public"
-                            ? "Public groups appear in Discover and can be joined by signed-in ATHLTH users."
-                            : "Private groups do not appear in Discover. Only the owner and existing members can see the group."
+                            ? "Public groups appear in Discover."
+                            : "Private groups stay hidden from Discover and are reached through invitations or an existing membership."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section("Membership") {
+                    Picker(
+                        "Who can join",
+                        selection: $joinMode
+                    ) {
+                        if visibility == "public" {
+                            Text("Open")
+                                .tag("open")
+                        }
+
+                        Text("Approval required")
+                            .tag("approval")
+                        Text("Invite only")
+                            .tag("invite_only")
+                    }
+
+                    Text(joinModeDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Member permissions") {
+                    Toggle(
+                        "Members can create events & challenges",
+                        isOn: $membersCanCreateContent
+                    )
+
+                    Text(
+                        membersCanCreateContent
+                            ? "Members and Contributors can create events and challenges. Owner and Admin can always create them."
+                            : "Only Owner and Admin can create events and challenges. Contributor still keeps update-publishing access."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -3577,8 +3622,8 @@ struct CommunityGroupCreateView: View {
 
                 Section {
                     Label(
-                        "Group chat, events and challenges are visible only to members.",
-                        systemImage: "hand.raised.fill"
+                        "Owner has full control. Admin has full management access except deleting the group. Contributor can publish official group updates.",
+                        systemImage: "person.3.fill"
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -3588,27 +3633,59 @@ struct CommunityGroupCreateView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        dismiss()
+                    }
                 }
+
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Creating…" : "Create") {
+                    Button(
+                        saving
+                            ? "Creating…"
+                            : "Create"
+                    ) {
                         Task {
                             saving = true
                             let ok = await groups.createGroup(
                                 name: name,
                                 summary: summary,
-                                visibility: visibility
+                                visibility: visibility,
+                                joinMode: joinMode,
+                                membersCanCreateContent:
+                                    membersCanCreateContent
                             )
                             saving = false
-                            if ok { dismiss() }
+
+                            if ok {
+                                dismiss()
+                            }
                         }
                     }
                     .disabled(
-                        name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 ||
+                        name.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).count < 2 ||
                         saving
                     )
                 }
             }
+            .onChange(of: visibility) { _, value in
+                if value == "private" &&
+                    joinMode == "open" {
+                    joinMode = "approval"
+                }
+            }
+        }
+    }
+
+    private var joinModeDescription: String {
+        switch joinMode {
+        case "open":
+            return "Anyone can join immediately."
+        case "approval":
+            return "People request access. Owner or Admin approves them."
+        default:
+            return "Only people invited by Owner or Admin can join."
         }
     }
 }
@@ -3622,6 +3699,8 @@ struct CommunityGroupSettingsView: View {
     @State private var name: String
     @State private var summary: String
     @State private var visibility: String
+    @State private var joinMode: String
+    @State private var membersCanCreateContent: Bool
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
     @State private var saving = false
@@ -3633,6 +3712,10 @@ struct CommunityGroupSettingsView: View {
         _name = State(initialValue: group.name)
         _summary = State(initialValue: group.summary)
         _visibility = State(initialValue: group.visibility)
+        _joinMode = State(initialValue: group.joinMode)
+        _membersCanCreateContent = State(
+            initialValue: group.membersCanCreateContent
+        )
     }
 
     private var currentGroup: CommunityGroupRecord {
@@ -3729,14 +3812,50 @@ struct CommunityGroupSettingsView: View {
 
                     Text(
                         visibility == "public"
-                            ? "Public groups appear in Discover and can be joined by signed-in ATHLTH users."
-                            : "Private groups are hidden from Discover. Existing members keep access."
+                            ? "Public groups appear in Discover."
+                            : "Private groups stay hidden from Discover."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
 
-                if groups.canManage(currentGroup) {
+                Section("Membership") {
+                    Picker(
+                        "Who can join",
+                        selection: $joinMode
+                    ) {
+                        if visibility == "public" {
+                            Text("Open")
+                                .tag("open")
+                        }
+
+                        Text("Approval required")
+                            .tag("approval")
+                        Text("Invite only")
+                            .tag("invite_only")
+                    }
+
+                    Text(joinModeDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Member permissions") {
+                    Toggle(
+                        "Members can create events & challenges",
+                        isOn: $membersCanCreateContent
+                    )
+
+                    Text(
+                        membersCanCreateContent
+                            ? "Members and Contributors can create events and challenges. Owner and Admin can always create them."
+                            : "Only Owner and Admin can create events and challenges."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                if groups.isOwner(of: currentGroup) {
                     Section {
                         Button(
                             "Delete Group",
@@ -3747,7 +3866,7 @@ struct CommunityGroupSettingsView: View {
                         .disabled(saving || deleting)
                     } footer: {
                         Text(
-                            "Deleting a group permanently removes its messages, updates, events, challenges and memberships."
+                            "Only the Owner can delete the group. Deleting it permanently removes messages, updates, events, challenges and memberships."
                         )
                     }
                 }
@@ -3774,6 +3893,12 @@ struct CommunityGroupSettingsView: View {
                         saving ||
                         deleting
                     )
+                }
+            }
+            .onChange(of: visibility) { _, value in
+                if value == "private" &&
+                    joinMode == "open" {
+                    joinMode = "approval"
                 }
             }
             .onChange(of: selectedPhoto) { _, item in
@@ -3833,6 +3958,17 @@ struct CommunityGroupSettingsView: View {
         }
     }
 
+    private var joinModeDescription: String {
+        switch joinMode {
+        case "open":
+            return "Anyone can join immediately."
+        case "approval":
+            return "New members request access. Owner or Admin can approve them."
+        default:
+            return "Only people invited by Owner or Admin can join."
+        }
+    }
+
     private func saveChanges() async {
         saving = true
 
@@ -3841,7 +3977,10 @@ struct CommunityGroupSettingsView: View {
             name: name,
             locationName: currentGroup.locationName,
             summary: summary,
-            visibility: visibility
+            visibility: visibility,
+            joinMode: joinMode,
+            membersCanCreateContent:
+                membersCanCreateContent
         )
 
         if saved,
