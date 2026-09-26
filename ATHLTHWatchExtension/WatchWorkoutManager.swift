@@ -47,6 +47,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var startedAt: Date?
     private var finishing = false
     private var mirroringActive = false
+    private var mirroringRetryPending = false
     private var lastMirrorSnapshotSentAt: Date?
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var nextDistanceAnnouncementMeters: Double?
@@ -178,6 +179,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         startedAt = nil
         finishing = false
         mirroringActive = false
+        mirroringRetryPending = false
         lastMirrorSnapshotSentAt = nil
         nextDistanceAnnouncementMeters = nil
         nextTimeAnnouncementSeconds = nil
@@ -271,15 +273,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             do {
                 try await session.startMirroringToCompanionDevice()
                 mirroringActive = true
+                mirroringRetryPending = false
                 await sendLiveSnapshot(
                     stateOverride: .preparing,
                     force: true
                 )
             } catch {
+                // HealthKit can reject the first mirror request while the
+                // session is still preparing. The workout itself must still
+                // start; retry once after the session reaches .running.
                 mirroringActive = false
-                publish {
-                    self.errorMessage = "iPhone live view unavailable: \(error.localizedDescription)"
-                }
+                mirroringRetryPending = true
             }
 
             session.startActivity(with: startDate)
@@ -315,6 +319,53 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             announceCurrentStructuredStep(prefix: "Starting")
         } catch {
             fail(error)
+        }
+    }
+
+    private func retryMirroringIfNeeded(
+        _ session: HKWorkoutSession
+    ) async {
+        guard mirroringRetryPending,
+              !mirroringActive,
+              workoutSession === session
+        else {
+            return
+        }
+
+        // Give HealthKit a brief moment after the running-state callback.
+        try? await Task.sleep(
+            nanoseconds: 350_000_000
+        )
+
+        guard mirroringRetryPending,
+              !mirroringActive,
+              workoutSession === session
+        else {
+            return
+        }
+
+        do {
+            try await session.startMirroringToCompanionDevice()
+            mirroringActive = true
+            mirroringRetryPending = false
+
+            publish {
+                if self.errorMessage?
+                    .contains("iPhone live") == true {
+                    self.errorMessage = nil
+                }
+            }
+
+            await sendLiveSnapshot(
+                stateOverride: .running,
+                force: true
+            )
+        } catch {
+            mirroringRetryPending = false
+            publish {
+                self.errorMessage =
+                    "iPhone live metrics unavailable. Workout continues normally on Apple Watch."
+            }
         }
     }
 
@@ -1101,7 +1152,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             lastMirrorSnapshotSentAt = now
         } catch {
             publish {
-                self.errorMessage = "iPhone mirroring: \(error.localizedDescription)"
+                self.errorMessage =
+                    "iPhone live metrics are temporarily unavailable. Workout continues normally."
             }
         }
     }
@@ -1280,6 +1332,9 @@ extension WatchWorkoutManager: HKWorkoutSessionDelegate {
         case .running:
             publishState(.running)
             Task {
+                await retryMirroringIfNeeded(
+                    workoutSession
+                )
                 await sendLiveSnapshot(
                     stateOverride: .running,
                     force: true
