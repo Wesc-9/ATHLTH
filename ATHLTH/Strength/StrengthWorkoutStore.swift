@@ -6,6 +6,10 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var currentExerciseIndex = 0
     @Published private(set) var currentSetIndex = 0
     @Published private(set) var restEndsAt: Date?
+    @Published private(set) var draftReps = 8
+    @Published private(set) var draftWeightKilograms = 20.0
+    @Published private(set) var draftRestSeconds = 90
+    @Published private(set) var draftRPE = 8.0
     @Published private(set) var completedWorkout: StrengthWorkoutLog?
     @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
 
@@ -279,6 +283,98 @@ final class StrengthWorkoutStore: ObservableObject {
         return currentExerciseIndex + 1 < workout.exercises.count
     }
 
+    func setDraft(
+        reps: Int? = nil,
+        weightKilograms: Double? = nil,
+        restSeconds: Int? = nil,
+        rpe: Double? = nil
+    ) {
+        if let reps {
+            draftReps = max(reps, 0)
+        }
+
+        if let weightKilograms {
+            draftWeightKilograms = max(weightKilograms, 0)
+        }
+
+        if let restSeconds {
+            draftRestSeconds = min(
+                max(restSeconds, 0),
+                600
+            )
+        }
+
+        if let rpe {
+            draftRPE = min(
+                max(rpe, 1),
+                10
+            )
+        }
+    }
+
+    func reloadDraftFromCurrentSet() {
+        guard let set = currentSet else {
+            draftReps = 8
+            draftWeightKilograms = 20
+            draftRestSeconds = 90
+            draftRPE = 8
+            return
+        }
+
+        draftReps =
+            set.completedReps ??
+            set.plannedReps ??
+            8
+        draftWeightKilograms =
+            set.completedWeightKilograms ??
+            set.plannedWeightKilograms ??
+            max(draftWeightKilograms, 20)
+        draftRestSeconds =
+            max(set.restSeconds ?? 90, 0)
+        draftRPE = set.rpe ?? 8
+    }
+
+    var watchSnapshot: WatchStrengthSessionSnapshot? {
+        guard let workout = activeWorkout else {
+            return nil
+        }
+
+        let exercise = currentExercise
+        let set = currentSet
+        let totalSets =
+            workout.exercises
+                .flatMap(\.sets)
+                .count
+        let allExercisesComplete =
+            !workout.exercises.isEmpty &&
+            workout.exercises.allSatisfy(\.isCompleted)
+
+        return WatchStrengthSessionSnapshot(
+            workoutID: workout.id,
+            title: workout.title,
+            exerciseIndex: currentExerciseIndex,
+            exerciseCount: workout.exercises.count,
+            exerciseName: exercise?.exercise.name,
+            primaryMuscles:
+                exercise?.exercise.primaryMuscles ?? [],
+            setIndex: currentSetIndex,
+            setCount: exercise?.sets.count ?? 0,
+            setNumber: set?.setNumber,
+            completedSets: workout.totalCompletedSets,
+            totalSets: totalSets,
+            draftReps: draftReps,
+            draftWeightKilograms: draftWeightKilograms,
+            draftRestSeconds: draftRestSeconds,
+            isResting: isResting,
+            restEndsAt: restEndsAt,
+            currentExerciseComplete:
+                currentExerciseAllSetsCompleted,
+            hasNextExercise: hasNextExercise,
+            allExercisesComplete: allExercisesComplete,
+            updatedAt: Date()
+        )
+    }
+
     func startFreestyle(
         watchSessionID: UUID?,
         trackingMode: StrengthTrackingMode = .advanced,
@@ -306,6 +402,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = 0
         currentSetIndex = 0
         restEndsAt = nil
+        reloadDraftFromCurrentSet()
     }
 
     func appendExercise(
@@ -347,6 +444,7 @@ final class StrengthWorkoutStore: ObservableObject {
             currentExerciseIndex = 0
             currentSetIndex = 0
             restEndsAt = nil
+            reloadDraftFromCurrentSet()
         }
     }
 
@@ -402,6 +500,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = 0
         currentSetIndex = 0
         restEndsAt = nil
+        reloadDraftFromCurrentSet()
     }
 
     func completeCurrentSet(
@@ -441,6 +540,16 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         activeWorkout = workout
+        reloadDraftFromCurrentSet()
+    }
+
+    func completeCurrentDraftSet() {
+        completeCurrentSet(
+            reps: draftReps,
+            weightKilograms: draftWeightKilograms,
+            rpe: draftRPE,
+            restSeconds: draftRestSeconds
+        )
     }
 
     func enableAdvancedTracking() {
@@ -483,6 +592,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentSetIndex = workout.exercises[currentExerciseIndex].sets.firstIndex(where: { !$0.isCompleted }) ?? 0
         restEndsAt = nil
         activeWorkout = workout
+        reloadDraftFromCurrentSet()
     }
 
     func finish(
@@ -516,6 +626,10 @@ final class StrengthWorkoutStore: ObservableObject {
         restEndsAt = nil
         currentExerciseIndex = 0
         currentSetIndex = 0
+        draftReps = 8
+        draftWeightKilograms = 20
+        draftRestSeconds = 90
+        draftRPE = 8
     }
 
     func goalEvidence(
