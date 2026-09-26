@@ -2516,7 +2516,7 @@ struct SessionEditorView: View {
     @State private var editorMode: SessionEditorMode = .basic
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var audioCoachOverride:
-        WatchAudioCoachConfiguration?
+        WatchAudioCoachConfiguration? = nil
     @State private var showingAudioCoachEditor = false
 
     @State private var targetPaceEnabled = false
