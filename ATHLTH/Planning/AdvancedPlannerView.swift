@@ -1104,9 +1104,24 @@ struct AdvancedPlannerView: View {
     ) -> String {
         var parts: [String] = []
 
-        if let running = workout.runningWorkout {
-            parts.append(running.type.title)
-            parts.append("\(running.blocks.count) blocks")
+        let runningWorkouts = workout.resolvedRunningWorkouts
+
+        if !runningWorkouts.isEmpty {
+            parts.append(
+                runningWorkouts.count == 1
+                    ? runningWorkouts[0].type.title
+                    : "\(runningWorkouts.count) run workouts"
+            )
+
+            if let duration = workout.durationMinutes {
+                parts.append("\(duration) min")
+            }
+
+            if let distance = workout.targetDistanceKilometers {
+                parts.append(
+                    String(format: "%.1f km", distance)
+                )
+            }
         } else {
             if let duration = workout.durationMinutes {
                 parts.append("\(duration) min")
@@ -2413,7 +2428,7 @@ struct SessionEditorView: View {
     @State private var exerciseBeingEdited: PlannedExercise?
     @State private var showingExerciseLibrary = false
 
-    @State private var selectedRunningWorkout: RunningWorkoutTemplate?
+    @State private var selectedRunningWorkouts: [RunningWorkoutTemplate] = []
     @State private var showingRunningLibrary = false
     @State private var selectedRouteID: UUID?
 
@@ -2444,8 +2459,8 @@ struct SessionEditorView: View {
         )
         _notes = State(initialValue: workout.notes ?? "")
         _plannedExercises = State(initialValue: workout.exercises)
-        _selectedRunningWorkout = State(
-            initialValue: workout.runningWorkout
+        _selectedRunningWorkouts = State(
+            initialValue: workout.resolvedRunningWorkouts
         )
         _selectedRouteID = State(initialValue: workout.routeID)
         _scheduledTimeEnabled = State(
@@ -2572,11 +2587,9 @@ struct SessionEditorView: View {
             .sheet(isPresented: $showingRunningLibrary) {
                 NavigationStack {
                     RunningWorkoutLibraryView(
-                        selectionTitle: "Use in Plan"
+                        selectionTitle: "Add to Plan"
                     ) { workout in
-                        selectedRunningWorkout = workout
-                        title = workout.title
-                        showingRunningLibrary = false
+                        addRunningWorkout(workout)
                     }
                 }
             }
@@ -2690,73 +2703,108 @@ struct SessionEditorView: View {
     }
 
     private var runningBuilder: some View {
-        Group {
-            Section("Running Workout") {
-                if let workout = selectedRunningWorkout {
+        Section("Running Workout") {
+            if selectedRunningWorkouts.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "figure.run")
+                            .foregroundStyle(ATHLTHTheme.accent)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Open run")
+                                .font(.subheadline.weight(.semibold))
+
+                            Text(
+                                "Use the duration and distance above, or add one or more structured workouts."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+
                     Button {
                         showingRunningLibrary = true
                     } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Image(systemName: workout.type.systemImage)
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                Text(workout.title)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundStyle(.tertiary)
-                            }
-
-                            Text(workout.summary)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            Text(
-                                "\(workout.blocks.count) blocks · \(workout.type.title)"
-                            )
-                            .font(.caption2)
-                            .foregroundStyle(ATHLTHTheme.accent)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    ForEach(
-                        Array(workout.blocks.enumerated()),
-                        id: \.element.id
-                    ) { index, block in
-                        RunningWorkoutBlockRow(
-                            index: index + 1,
-                            block: block
+                        Label(
+                            "Add Structured Running Workout",
+                            systemImage: "plus.circle.fill"
                         )
                     }
-                } else {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "figure.run")
-                                .foregroundStyle(ATHLTHTheme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Open run")
-                                    .font(.subheadline.weight(.semibold))
-                                Text("Use the duration and distance above, or choose a structured workout.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                }
+            } else {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(
+                            selectedRunningWorkouts.count == 1
+                                ? "1 structured workout"
+                                : "\(selectedRunningWorkouts.count) structured workouts"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Text(runningSelectionSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showingRunningLibrary = true
+                    } label: {
+                        Label("Add", systemImage: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                ForEach(
+                    Array(selectedRunningWorkouts.enumerated()),
+                    id: \.element.id
+                ) { index, workout in
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(
+                                Array(workout.blocks.enumerated()),
+                                id: \.element.id
+                            ) { blockIndex, block in
+                                RunningWorkoutBlockRow(
+                                    index: blockIndex + 1,
+                                    block: block
+                                )
                             }
                         }
+                        .padding(.top, 8)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: workout.type.systemImage)
+                                .foregroundStyle(ATHLTHTheme.accent)
 
-                        Button {
-                            showingRunningLibrary = true
-                        } label: {
-                            Label(
-                                "Choose Structured Running Workout",
-                                systemImage: "list.bullet.rectangle"
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(workout.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+
+                                Text(runningWorkoutMetricSummary(workout))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Button(role: .destructive) {
+                                removeRunningWorkout(at: index)
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                "Remove \(workout.title)"
                             )
                         }
                     }
                 }
             }
-
-            routeBuilder
         }
     }
 
@@ -2843,6 +2891,128 @@ struct SessionEditorView: View {
         }
     }
 
+    private var runningSelectionSummary: String {
+        var parts: [String] = []
+
+        let distanceValues =
+            selectedRunningWorkouts
+                .compactMap(\.estimatedDistanceMeters)
+
+        if distanceValues.count == selectedRunningWorkouts.count,
+           !distanceValues.isEmpty {
+            let kilometers =
+                distanceValues.reduce(0, +) / 1_000
+            parts.append(
+                String(format: "%.1f km", kilometers)
+            )
+        }
+
+        let durationValues =
+            selectedRunningWorkouts
+                .compactMap(\.estimatedDurationSeconds)
+
+        if durationValues.count == selectedRunningWorkouts.count,
+           !durationValues.isEmpty {
+            let minutes = Int(
+                (durationValues.reduce(0, +) / 60).rounded()
+            )
+            parts.append("\(minutes) min")
+        }
+
+        return parts.isEmpty
+            ? "Totals can be adjusted manually above."
+            : parts.joined(separator: " · ")
+    }
+
+    private func runningWorkoutMetricSummary(
+        _ workout: RunningWorkoutTemplate
+    ) -> String {
+        var parts = [
+            workout.type.title,
+            "\(workout.blocks.count) blocks"
+        ]
+
+        if let distance = workout.estimatedDistanceMeters {
+            parts.append(
+                String(
+                    format: "%.1f km",
+                    distance / 1_000
+                )
+            )
+        }
+
+        if let duration = workout.estimatedDurationSeconds {
+            parts.append(
+                "\(Int((duration / 60).rounded())) min"
+            )
+        }
+
+        return parts.joined(separator: " · ")
+    }
+
+    private func addRunningWorkout(
+        _ workout: RunningWorkoutTemplate
+    ) {
+        guard !selectedRunningWorkouts.contains(
+            where: { $0.id == workout.id }
+        ) else {
+            return
+        }
+
+        let wasEmpty = selectedRunningWorkouts.isEmpty
+        selectedRunningWorkouts.append(workout)
+
+        if wasEmpty,
+           title == "New Workout" ||
+           title == "Running Workout" ||
+           title == "Walk" {
+            title = workout.title
+        }
+
+        syncRunningMetricsFromSelection()
+    }
+
+    private func removeRunningWorkout(
+        at index: Int
+    ) {
+        guard selectedRunningWorkouts.indices.contains(index)
+        else {
+            return
+        }
+
+        selectedRunningWorkouts.remove(at: index)
+        syncRunningMetricsFromSelection()
+    }
+
+    private func syncRunningMetricsFromSelection() {
+        guard !selectedRunningWorkouts.isEmpty else {
+            return
+        }
+
+        let distanceValues =
+            selectedRunningWorkouts
+                .compactMap(\.estimatedDistanceMeters)
+
+        if distanceValues.count == selectedRunningWorkouts.count {
+            distanceKilometers =
+                distanceValues.reduce(0, +) / 1_000
+        }
+
+        let durationValues =
+            selectedRunningWorkouts
+                .compactMap(\.estimatedDurationSeconds)
+
+        if durationValues.count == selectedRunningWorkouts.count {
+            durationMinutes = max(
+                5,
+                Int(
+                    (durationValues.reduce(0, +) / 60)
+                        .rounded()
+                )
+            )
+        }
+    }
+
     private func saveSession() {
         let cleanNotes = notes
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2856,12 +3026,9 @@ struct SessionEditorView: View {
                 : nil,
             durationMinutes: durationMinutes,
             targetDistanceKilometers:
-                selectedRunningWorkout?
-                    .estimatedDistanceMeters
-                    .map { $0 / 1_000 }
-                ?? ((kind == .walking || kind == .running)
+                (kind == .walking || kind == .running)
                     ? distanceKilometers
-                    : nil),
+                    : nil,
             targetPaceSecondsPerKilometer:
                 existingWorkout?.targetPaceSecondsPerKilometer,
             routeID: selectedRouteID,
@@ -2870,7 +3037,10 @@ struct SessionEditorView: View {
                 : [],
             notes: cleanNotes.isEmpty ? nil : cleanNotes,
             runningWorkout: kind == .running
-                ? selectedRunningWorkout
+                ? selectedRunningWorkouts.first
+                : nil,
+            runningWorkouts: kind == .running
+                ? selectedRunningWorkouts
                 : nil
         )
 
