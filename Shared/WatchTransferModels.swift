@@ -184,6 +184,7 @@ enum WatchStrengthCommandKind: String, Codable, Hashable {
 }
 
 struct WatchStrengthCommand: Codable, Hashable {
+    var id: UUID
     var workoutID: UUID?
     var kind: WatchStrengthCommandKind
     var reps: Int?
