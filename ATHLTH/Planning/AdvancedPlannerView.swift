@@ -676,27 +676,62 @@ struct AdvancedPlannerView: View {
         _ workout: PlannedSession,
         dayID: UUID
     ) -> some View {
-        HStack(spacing: 8) {
+        let planID = session.activePlan?.id
+        let completed =
+            planID.map {
+                session.isPlanSessionManuallyCompleted(
+                    planID: $0,
+                    sessionID: workout.id
+                )
+            } ?? false
+
+        return HStack(spacing: 8) {
             Button {
                 selectedWorkout = workout
             } label: {
                 HStack(spacing: 11) {
-                    Image(systemName: workout.kind.systemImage)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 38, height: 38)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 12)
-                        )
+                    Image(
+                        systemName: completed
+                            ? "checkmark.circle.fill"
+                            : workout.kind.systemImage
+                    )
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(
+                        completed
+                            ? ATHLTHTheme.vitality
+                            : ATHLTHTheme.accent
+                    )
+                    .frame(width: 38, height: 38)
+                    .background(
+                        (
+                            completed
+                                ? ATHLTHTheme.vitalitySoft
+                                : ATHLTHTheme.accentSoft
+                        ),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
 
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 7) {
                             Text(workout.title)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .foregroundStyle(
+                                    completed
+                                        ? ATHLTHTheme.mutedText
+                                        : ATHLTHTheme.primaryText
+                                )
 
-                            if let start = workout.scheduledStart {
+                            if completed {
+                                Text("Completed")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(ATHLTHTheme.vitality)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(
+                                        ATHLTHTheme.vitalitySoft,
+                                        in: Capsule()
+                                    )
+                            } else if let start = workout.scheduledStart {
                                 Text(
                                     start.formatted(
                                         date: .omitted,
@@ -710,7 +745,11 @@ struct AdvancedPlannerView: View {
 
                         Text(sessionSummary(workout))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(
+                                completed
+                                    ? ATHLTHTheme.mutedText.opacity(0.72)
+                                    : Color.secondary
+                            )
                             .lineLimit(1)
                     }
 
@@ -722,7 +761,9 @@ struct AdvancedPlannerView: View {
                 }
                 .padding(11)
                 .background(
-                    Color.primary.opacity(0.025),
+                    completed
+                        ? ATHLTHTheme.vitalitySoft.opacity(0.28)
+                        : Color.primary.opacity(0.025),
                     in: RoundedRectangle(
                         cornerRadius: 15,
                         style: .continuous
@@ -732,6 +773,27 @@ struct AdvancedPlannerView: View {
             .buttonStyle(.plain)
 
             Menu {
+                if let planID {
+                    Button {
+                        session.setPlanSessionManuallyCompleted(
+                            planID: planID,
+                            sessionID: workout.id,
+                            completed: !completed
+                        )
+                    } label: {
+                        Label(
+                            completed
+                                ? "Mark as Not Completed"
+                                : "Mark as Completed",
+                            systemImage: completed
+                                ? "arrow.uturn.backward.circle"
+                                : "checkmark.circle"
+                        )
+                    }
+                }
+
+                Divider()
+
                 Button(role: .destructive) {
                     session.removeSession(
                         workout.id,
