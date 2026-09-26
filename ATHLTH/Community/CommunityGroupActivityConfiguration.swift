@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 enum CommunityGroupActivityMode: String, Codable, Hashable {
@@ -241,8 +242,10 @@ struct CommunityGroupActivityDraft {
                             mode == .route
                                 ? selectedRoute?
                                     .distanceKilometers
-                                : selectedRunningWorkout?
-                                    .estimatedDistanceMeters
+                                : (
+                                    selectedRunningWorkout?
+                                        .estimatedDistanceMeters
+                                ).flatMap { $0 }
                                     .map { $0 / 1_000 }
                         ),
                 route:
