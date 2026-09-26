@@ -2239,7 +2239,9 @@ struct SessionEditorView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
-    let dayID: UUID
+    let dayID: UUID?
+    let planID: UUID?
+    let existingWorkout: PlannedSession?
 
     @State private var title = "New Workout"
     @State private var kind: WorkoutKind = .strength
@@ -2257,6 +2259,42 @@ struct SessionEditorView: View {
 
     @State private var scheduledTimeEnabled = false
     @State private var scheduledTime = Date()
+
+    init(dayID: UUID) {
+        self.dayID = dayID
+        self.planID = nil
+        self.existingWorkout = nil
+    }
+
+    init(
+        planID: UUID,
+        workout: PlannedSession
+    ) {
+        self.dayID = nil
+        self.planID = planID
+        self.existingWorkout = workout
+
+        _title = State(initialValue: workout.title)
+        _kind = State(initialValue: workout.kind)
+        _durationMinutes = State(
+            initialValue: workout.durationMinutes ?? 45
+        )
+        _distanceKilometers = State(
+            initialValue: workout.targetDistanceKilometers ?? 5.0
+        )
+        _notes = State(initialValue: workout.notes ?? "")
+        _plannedExercises = State(initialValue: workout.exercises)
+        _selectedRunningWorkout = State(
+            initialValue: workout.runningWorkout
+        )
+        _selectedRouteID = State(initialValue: workout.routeID)
+        _scheduledTimeEnabled = State(
+            initialValue: workout.scheduledStart != nil
+        )
+        _scheduledTime = State(
+            initialValue: workout.scheduledStart ?? Date()
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -2333,7 +2371,7 @@ struct SessionEditorView: View {
                     }
                 }
             }
-            .navigationTitle("Add Session")
+            .navigationTitle(existingWorkout == nil ? "Add Session" : "Edit Workout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -2343,8 +2381,8 @@ struct SessionEditorView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        addSession()
+                    Button(existingWorkout == nil ? "Add" : "Save") {
+                        saveSession()
                     }
                     .disabled(!canAdd)
                 }
@@ -2383,6 +2421,8 @@ struct SessionEditorView: View {
                 }
             }
             .onChange(of: kind) { _, newKind in
+                guard existingWorkout == nil else { return }
+
                 if newKind == .strength && title == "New Workout" {
                     title = "Strength Workout"
                 } else if newKind == .running && title == "New Workout" {
@@ -2643,12 +2683,12 @@ struct SessionEditorView: View {
         }
     }
 
-    private func addSession() {
+    private func saveSession() {
         let cleanNotes = notes
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         let workout = PlannedSession(
-            id: UUID(),
+            id: existingWorkout?.id ?? UUID(),
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             kind: kind,
             scheduledStart: scheduledTimeEnabled
@@ -2662,7 +2702,8 @@ struct SessionEditorView: View {
                 ?? ((kind == .walking || kind == .running)
                     ? distanceKilometers
                     : nil),
-            targetPaceSecondsPerKilometer: nil,
+            targetPaceSecondsPerKilometer:
+                existingWorkout?.targetPaceSecondsPerKilometer,
             routeID: selectedRouteID,
             exercises: kind == .strength
                 ? plannedExercises
@@ -2673,7 +2714,19 @@ struct SessionEditorView: View {
                 : nil
         )
 
-        session.addSession(workout, toDay: dayID)
+        if existingWorkout != nil,
+           let planID {
+            session.updateSession(
+                workout,
+                inPlan: planID
+            )
+        } else if let dayID {
+            session.addSession(
+                workout,
+                toDay: dayID
+            )
+        }
+
         dismiss()
     }
 
