@@ -3314,7 +3314,7 @@ struct CommunityGroupDetailView: View {
         .tint(
             selected
                 ? ATHLTHTheme.accentDeep
-                : .secondary
+                : Color.gray
         )
     }
 
