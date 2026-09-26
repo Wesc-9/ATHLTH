@@ -2147,8 +2147,7 @@ private struct ATHLTHTrainingSettingsView: View {
                             $settings.routeAlertDelivery
                     ) {
                         ForEach(
-                            WatchAlertDelivery.allCases,
-                            id: \.self
+                            WatchAlertDelivery.allCases
                         ) { delivery in
                             Text(delivery.title)
                                 .tag(delivery)
