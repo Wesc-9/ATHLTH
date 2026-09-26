@@ -704,10 +704,10 @@ private enum AppleCalendarSyncError:
     var errorDescription: String? {
         switch self {
         case .calendarAccessRequired:
-            return "ATHLTH needs full Apple Calendar access to create and keep the ATHLTH training calendar synchronized."
+            return "ATHLTH needs full Calendar access to create and keep the ATHLTH training calendar synchronized."
 
         case .noWritableCalendarSource:
-            return "ATHLTH could not find a writable Apple Calendar account on this iPhone."
+            return "ATHLTH could not find a writable Calendar account on this iPhone."
         }
     }
 }
