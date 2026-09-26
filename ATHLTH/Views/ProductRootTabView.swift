@@ -108,6 +108,8 @@ struct ATHLTHHomeView: View {
     @State private var showingHomeStrengthWorkout = false
     @State private var homeWatchTransferMessage: String?
     @State private var homeWatchTransferError: String?
+    @AppStorage("homeGettingStartedDismissed")
+    private var homeGettingStartedDismissed = false
 
     var body: some View {
         NavigationStack {
@@ -247,9 +249,15 @@ struct ATHLTHHomeView: View {
 
                     if shouldShowGettingStarted {
                         HomeGettingStartedCard(
-                            healthConnected: health.hasRequestedAuthorization,
                             hasPlan: session.activePlan != nil,
                             hasGoal: !goalStore.activeGoals.isEmpty
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                homeGettingStartedDismissed = true
+                            }
+                        }
+                        .transition(
+                            .opacity.combined(with: .move(edge: .top))
                         )
                     }
 
@@ -1134,9 +1142,7 @@ struct ATHLTHHomeView: View {
     }
 
     private var shouldShowGettingStarted: Bool {
-        !health.hasRequestedAuthorization ||
-        session.activePlan == nil ||
-        goalStore.activeGoals.isEmpty
+        !homeGettingStartedDismissed
     }
 
     private var readinessTint: Color {
