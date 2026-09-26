@@ -68,10 +68,10 @@ struct CommunityGroupEventDetailView: View {
         .navigationTitle("Event")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if canManageContent {
-                ToolbarItem(
-                    placement: .topBarTrailing
-                ) {
+            ToolbarItem(
+                placement: .topBarTrailing
+            ) {
+                if canManageContent {
                     Menu {
                         if current.status != "cancelled" {
                             Button {
