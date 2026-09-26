@@ -93,6 +93,9 @@ enum CommunityGroupChallengeGoalPreset:
     case fastestTime
     case mostCompletions
     case mostActiveMinutes
+    case strengthVolume
+    case heaviestWeight
+    case strengthReps
     case completeTarget
 
     var id: String { rawValue }
@@ -107,6 +110,12 @@ enum CommunityGroupChallengeGoalPreset:
             return "Most Completions"
         case .mostActiveMinutes:
             return "Most Active Minutes"
+        case .strengthVolume:
+            return "Total Volume"
+        case .heaviestWeight:
+            return "Heaviest Weight"
+        case .strengthReps:
+            return "Total Reps"
         case .completeTarget:
             return "Complete Target"
         }
@@ -122,6 +131,12 @@ enum CommunityGroupChallengeGoalPreset:
             return .workouts
         case .mostActiveMinutes:
             return .activeMinutes
+        case .strengthVolume:
+            return .strengthVolume
+        case .heaviestWeight:
+            return .heaviestWeight
+        case .strengthReps:
+            return .strengthReps
         case .completeTarget:
             return .workouts
         }
@@ -129,7 +144,8 @@ enum CommunityGroupChallengeGoalPreset:
 
     var scoringMode: CommunityGroupScoringMode {
         switch self {
-        case .fastestTime:
+        case .fastestTime,
+             .heaviestWeight:
             return .bestAttempt
         case .completeTarget:
             return .completeTarget
