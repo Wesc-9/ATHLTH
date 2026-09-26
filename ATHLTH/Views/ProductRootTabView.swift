@@ -3059,6 +3059,7 @@ struct ATHLTHTrainView: View {
                     .environmentObject(session)
             }
             .task {
+                session.refreshActivePlanForToday()
                 await exerciseLibrary.refresh()
             }
             .alert("ATHLTH", isPresented: Binding(
