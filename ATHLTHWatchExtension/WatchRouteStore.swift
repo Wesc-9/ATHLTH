@@ -186,10 +186,25 @@ final class WatchRouteStore: NSObject, ObservableObject {
             }
             return true
 
+        case .strengthSnapshot:
+            guard let snapshot = try? JSONDecoder().decode(
+                WatchStrengthSessionSnapshot.self,
+                from: data
+            ) else {
+                return false
+            }
+
+            DispatchQueue.main.async {
+                WatchWorkoutManager.shared
+                    .configureStrengthSession(snapshot)
+            }
+            return true
+
         case .route,
              .workoutResult,
              .workoutCommand,
              .workoutRouteSelection,
+             .strengthCommand,
              .connectivityProbe,
              .connectivityAck:
             return false
@@ -340,6 +355,12 @@ extension WatchRouteStore: WCSessionDelegate {
             if session.isReachable {
                 self?.companionLinked = true
                 self?.connectionText = "Connected to iPhone"
+
+                if WatchWorkoutManager.shared.kind == .strength,
+                   WatchWorkoutManager.shared.isActive {
+                    WatchWorkoutManager.shared
+                        .requestStrengthSnapshot()
+                }
             } else if session.activationState == .activated,
                       self?.companionLinked != true {
                 self?.connectionText = "Ready for iPhone"
