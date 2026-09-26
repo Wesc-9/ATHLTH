@@ -1524,7 +1524,10 @@ private struct WatchRunWalkWorkoutPager: View {
             return "Locating"
         }
 
-        if meters <= 80 {
+        if meters <=
+            workoutManager
+                .routeAlertConfiguration
+                .deviationMeters {
             return "On route"
         }
 
