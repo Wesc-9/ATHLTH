@@ -9,10 +9,32 @@ struct PlannedWorkoutDetailView: View {
     let workout: PlannedSession
     let isHealthCompleted: Bool
 
+    @State private var showingEditor = false
+
+    private var currentWorkout: PlannedSession {
+        guard let plan = session.activePlan,
+              plan.id == planID
+        else {
+            return workout
+        }
+
+        for week in plan.weeks {
+            for day in week.days {
+                if let updated = day.sessions.first(
+                    where: { $0.id == currentWorkout.id }
+                ) {
+                    return updated
+                }
+            }
+        }
+
+        return workout
+    }
+
     private var isManuallyCompleted: Bool {
         session.isPlanSessionManuallyCompleted(
             planID: planID,
-            sessionID: workout.id
+            sessionID: currentWorkout.id
         )
     }
 
@@ -27,11 +49,11 @@ struct PlannedWorkoutDetailView: View {
                     header
                     overviewCard
 
-                    if !workout.exercises.isEmpty {
+                    if !currentWorkout.exercises.isEmpty {
                         strengthCard
                     }
 
-                    if let runningWorkout = workout.runningWorkout {
+                    if let runningWorkout = currentWorkout.runningWorkout {
                         runningCard(runningWorkout)
                     }
 
@@ -60,11 +82,23 @@ struct PlannedWorkoutDetailView: View {
             .navigationTitle("Workout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
                         dismiss()
                     }
                 }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Edit") {
+                        showingEditor = true
+                    }
+                }
+            }
+            .sheet(isPresented: $showingEditor) {
+                SessionEditorView(
+                    planID: planID,
+                    workout: currentWorkout
+                )
             }
         }
         .presentationDetents([.medium, .large])
@@ -74,7 +108,7 @@ struct PlannedWorkoutDetailView: View {
     private var header: some View {
         ATHLTHCard {
             HStack(alignment: .top, spacing: 14) {
-                Image(systemName: workout.kind.systemImage)
+                Image(systemName: currentWorkout.kind.systemImage)
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.accent)
                     .frame(width: 52, height: 52)
@@ -84,12 +118,12 @@ struct PlannedWorkoutDetailView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(workout.title)
+                    Text(currentWorkout.title)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
                     HStack(spacing: 7) {
-                        Text(workout.kind.title)
+                        Text(currentWorkout.kind.title)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHTheme.mutedText)
 
@@ -122,7 +156,7 @@ struct PlannedWorkoutDetailView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle("Plan details")
 
-                if let scheduledStart = workout.scheduledStart {
+                if let scheduledStart = currentWorkout.scheduledStart {
                     detailRow(
                         icon: "clock",
                         title: "Scheduled",
@@ -133,7 +167,7 @@ struct PlannedWorkoutDetailView: View {
                     )
                 }
 
-                if let duration = workout.durationMinutes {
+                if let duration = currentWorkout.durationMinutes {
                     detailRow(
                         icon: "timer",
                         title: "Duration",
@@ -141,7 +175,7 @@ struct PlannedWorkoutDetailView: View {
                     )
                 }
 
-                if let distance = workout.targetDistanceKilometers {
+                if let distance = currentWorkout.targetDistanceKilometers {
                     detailRow(
                         icon: "point.topleft.down.to.point.bottomright.curvepath",
                         title: "Distance",
@@ -149,7 +183,7 @@ struct PlannedWorkoutDetailView: View {
                     )
                 }
 
-                if let pace = workout.targetPaceSecondsPerKilometer {
+                if let pace = currentWorkout.targetPaceSecondsPerKilometer {
                     detailRow(
                         icon: "speedometer",
                         title: "Target pace",
@@ -157,7 +191,7 @@ struct PlannedWorkoutDetailView: View {
                     )
                 }
 
-                if let routeID = workout.routeID,
+                if let routeID = currentWorkout.routeID,
                    let route = session.savedRoutes.first(where: { $0.id == routeID }) {
                     detailRow(
                         icon: "map",
@@ -166,12 +200,12 @@ struct PlannedWorkoutDetailView: View {
                     )
                 }
 
-                if workout.scheduledStart == nil &&
-                    workout.durationMinutes == nil &&
-                    workout.targetDistanceKilometers == nil &&
-                    workout.targetPaceSecondsPerKilometer == nil &&
-                    workout.routeID == nil {
-                    Text("No additional targets are set for this workout.")
+                if currentWorkout.scheduledStart == nil &&
+                    currentWorkout.durationMinutes == nil &&
+                    currentWorkout.targetDistanceKilometers == nil &&
+                    currentWorkout.targetPaceSecondsPerKilometer == nil &&
+                    currentWorkout.routeID == nil {
+                    Text("No additional targets are set for this currentWorkout.")
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                 }
@@ -184,7 +218,7 @@ struct PlannedWorkoutDetailView: View {
             VStack(alignment: .leading, spacing: 13) {
                 sectionTitle("Exercises")
 
-                ForEach(Array(workout.exercises.enumerated()), id: \.element.id) { index, exercise in
+                ForEach(Array(currentWorkout.exercises.enumerated()), id: \.element.id) { index, exercise in
                     HStack(alignment: .top, spacing: 11) {
                         Text("\(index + 1)")
                             .font(.caption.weight(.bold))
@@ -207,7 +241,7 @@ struct PlannedWorkoutDetailView: View {
                         Spacer()
                     }
 
-                    if index < workout.exercises.count - 1 {
+                    if index < currentWorkout.exercises.count - 1 {
                         Divider()
                     }
                 }
@@ -299,7 +333,7 @@ struct PlannedWorkoutDetailView: View {
                     Button {
                         session.setPlanSessionManuallyCompleted(
                             planID: planID,
-                            sessionID: workout.id,
+                            sessionID: currentWorkout.id,
                             completed: !isManuallyCompleted
                         )
                     } label: {
@@ -347,7 +381,7 @@ struct PlannedWorkoutDetailView: View {
                     .buttonStyle(.plain)
 
                     Text(
-                        "Manual completion updates your ATHLTH plan only. It does not create an Apple Health workout."
+                        "Manual completion updates your ATHLTH plan only. It does not create an Apple Health currentWorkout."
                     )
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -358,7 +392,7 @@ struct PlannedWorkoutDetailView: View {
     }
 
     private var cleanNotes: String? {
-        guard let notes = workout.notes?
+        guard let notes = currentWorkout.notes?
             .trimmingCharacters(in: .whitespacesAndNewlines),
               !notes.isEmpty
         else {
