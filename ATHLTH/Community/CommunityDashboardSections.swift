@@ -87,19 +87,29 @@ struct CommunityPulseCard: View {
             }
             .buttonStyle(.plain)
 
-            pulseTile(
-                value: "\(activeChallenges)",
-                title: "challenges",
-                icon: "bolt.fill",
-                tint: .orange
-            )
+            NavigationLink {
+                ChallengeHubView()
+            } label: {
+                pulseTile(
+                    value: "\(activeChallenges)",
+                    title: "challenges",
+                    icon: "bolt.fill",
+                    tint: .orange
+                )
+            }
+            .buttonStyle(.plain)
 
-            pulseTile(
-                value: "\(upcomingEvents)",
-                title: "events",
-                icon: "calendar",
-                tint: .purple
-            )
+            NavigationLink {
+                CommunityEventsView()
+            } label: {
+                pulseTile(
+                    value: "\(upcomingEvents)",
+                    title: "events",
+                    icon: "calendar",
+                    tint: .purple
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 

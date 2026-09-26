@@ -1060,6 +1060,181 @@ private struct CommunityAvatar: View {
     }
 }
 
+struct CommunityEventsView: View {
+    @EnvironmentObject private var community: CommunityEventStore
+    @State private var showingCreateEvent = false
+
+    private var upcoming: [CommunityEventItem] {
+        community.upcomingEvents
+    }
+
+    private var history: [CommunityEventItem] {
+        community.events
+            .filter {
+                $0.event.status != "upcoming" ||
+                $0.event.startsAt < Date()
+            }
+            .sorted {
+                $0.event.startsAt > $1.event.startsAt
+            }
+    }
+
+    var body: some View {
+        List {
+            if community.isLoading &&
+                community.events.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView("Loading events…")
+                    Spacer()
+                }
+                .listRowBackground(Color.clear)
+            } else if community.events.isEmpty {
+                ContentUnavailableView {
+                    Label(
+                        "No events yet",
+                        systemImage: "calendar.badge.plus"
+                    )
+                } description: {
+                    Text(
+                        "Create a public or friends-only run, walk or group workout."
+                    )
+                } actions: {
+                    Button("Create Event") {
+                        showingCreateEvent = true
+                    }
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                if !upcoming.isEmpty {
+                    Section("Upcoming") {
+                        ForEach(upcoming) { item in
+                            NavigationLink {
+                                CommunityEventDetailView(
+                                    eventID: item.id
+                                )
+                            } label: {
+                                CommunityEventListRow(
+                                    item: item
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if !history.isEmpty {
+                    Section("History") {
+                        ForEach(history) { item in
+                            NavigationLink {
+                                CommunityEventDetailView(
+                                    eventID: item.id
+                                )
+                            } label: {
+                                CommunityEventListRow(
+                                    item: item
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Events")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingCreateEvent = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Create Event")
+            }
+        }
+        .refreshable {
+            await community.refresh()
+        }
+        .task {
+            if community.events.isEmpty {
+                await community.refresh()
+            }
+        }
+        .sheet(isPresented: $showingCreateEvent) {
+            CommunityEventCreateView()
+                .environmentObject(community)
+        }
+    }
+}
+
+private struct CommunityEventListRow: View {
+    let item: CommunityEventItem
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(spacing: 2) {
+                Text(
+                    item.event.startsAt
+                        .formatted(
+                            .dateTime.month(.abbreviated)
+                        )
+                        .uppercased()
+                )
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(ATHLTHTheme.accent)
+
+                Text(
+                    item.event.startsAt
+                        .formatted(.dateTime.day())
+                )
+                .font(.title3.weight(.bold))
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+            }
+            .frame(width: 44, height: 52)
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(
+                        systemName:
+                            item.event.activityType.systemImage
+                    )
+                    .foregroundStyle(ATHLTHTheme.accent)
+
+                    Text(item.event.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+                }
+
+                Text(
+                    "\(item.event.startsAt.formatted(date: .omitted, time: .shortened)) · \(item.event.meetingName)"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+                Label(
+                    "\(item.participantCount) joined",
+                    systemImage: "person.2.fill"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 struct CommunityEventDetailView: View {
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var session: AppSessionStore
