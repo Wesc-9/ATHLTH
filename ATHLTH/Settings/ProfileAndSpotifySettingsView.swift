@@ -61,7 +61,7 @@ struct ATHLTHEditProfileView: View {
                 .padding(.vertical, 8)
             }
 
-            Section("Public profile") {
+            Section {
                 TextField("Display name", text: $displayName)
                     .textContentType(.name)
 
@@ -88,6 +88,10 @@ struct ATHLTHEditProfileView: View {
                         .font(.caption2)
                         .foregroundStyle(bio.count > 160 ? .red : .secondary)
                 }
+            } header: {
+                Text("Public profile")
+            } footer: {
+                Text("Display name, username, bio and profile photo are social profile data. Health details remain private and are managed separately.")
             }
 
             Section("Training Identity") {
@@ -124,25 +128,26 @@ struct ATHLTHEditProfileView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section {
-                Button {
-                    Task { await saveProfile() }
-                } label: {
-                    HStack {
-                        Text("Save Profile")
-                        Spacer()
-                        if saving {
-                            ProgressView()
-                        }
-                    }
-                }
-                .disabled(!canSave || saving)
-            } footer: {
-                Text("Display name, username, bio and profile photo are social profile data. Health details remain private and are managed separately.")
-            }
         }
         .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await saveProfile() }
+                } label: {
+                    if saving {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("Save")
+                            .fontWeight(.semibold)
+                    }
+                }
+                .disabled(!canSave || saving)
+                .accessibilityLabel(saving ? "Saving profile" : "Save profile")
+            }
+        }
         .onAppear(perform: loadCurrentProfile)
         .task {
             await gear.refresh()
