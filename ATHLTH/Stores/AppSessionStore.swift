@@ -1,5 +1,14 @@
 import Foundation
 
+enum TrainingPlanTimingStatus: String, CaseIterable, Identifiable {
+    case active
+    case upcoming
+    case completed
+    case unscheduled
+
+    var id: String { rawValue }
+}
+
 @MainActor
 final class AppSessionStore: ObservableObject {
     @Published var profile: UserProfile
@@ -760,6 +769,484 @@ final class AppSessionStore: ObservableObject {
         }
 
         persistPlanTemplates()
+    }
+
+    var trainingPlans: [TrainingPlan] {
+        var plans = scheduledPlans
+
+        if let activePlan {
+            plans.removeAll { $0.id == activePlan.id }
+            plans.append(activePlan)
+        }
+
+        var seen = Set<UUID>()
+        return plans
+            .filter { seen.insert($0.id).inserted }
+            .sorted {
+                let lhs = $0.startDate ?? $0.createdAt
+                let rhs = $1.startDate ?? $1.createdAt
+                return lhs < rhs
+            }
+    }
+
+    var nextTrainingPlan: TrainingPlan? {
+        let today = Calendar.current.startOfDay(for: Date())
+
+        return trainingPlans
+            .filter {
+                guard let startDate = $0.startDate else {
+                    return false
+                }
+
+                return Calendar.current.startOfDay(for: startDate) > today
+            }
+            .min {
+                ($0.startDate ?? .distantFuture) <
+                ($1.startDate ?? .distantFuture)
+            }
+    }
+
+    func trainingPlan(
+        withID planID: UUID
+    ) -> TrainingPlan? {
+        if activePlan?.id == planID {
+            return activePlan
+        }
+
+        return scheduledPlans.first { $0.id == planID }
+    }
+
+    func trainingPlanEndDate(
+        _ plan: TrainingPlan
+    ) -> Date? {
+        let calendar = Calendar.current
+
+        if let endDate = plan.endDate {
+            return calendar.startOfDay(for: endDate)
+        }
+
+        guard let startDate = plan.startDate else {
+            return nil
+        }
+
+        return calendar.date(
+            byAdding: .day,
+            value: max(plan.weeks.count * 7 - 1, 0),
+            to: calendar.startOfDay(for: startDate)
+        )
+    }
+
+    func trainingPlanStatus(
+        _ plan: TrainingPlan,
+        referenceDate: Date = Date()
+    ) -> TrainingPlanTimingStatus {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: referenceDate)
+
+        guard let rawStart = plan.startDate,
+              let rawEnd = trainingPlanEndDate(plan)
+        else {
+            return activePlan?.id == plan.id
+                ? .active
+                : .unscheduled
+        }
+
+        let start = calendar.startOfDay(for: rawStart)
+        let end = calendar.startOfDay(for: rawEnd)
+
+        if today < start {
+            return .upcoming
+        }
+
+        if today > end {
+            return .completed
+        }
+
+        return .active
+    }
+
+    func trainingPlanConflict(
+        startDate: Date,
+        endDate: Date,
+        excludingPlanID: UUID? = nil
+    ) -> TrainingPlan? {
+        let calendar = Calendar.current
+        let candidateStart = calendar.startOfDay(for: startDate)
+        let candidateEnd = calendar.startOfDay(for: max(endDate, startDate))
+
+        return trainingPlans.first { plan in
+            guard plan.id != excludingPlanID,
+                  let rawStart = plan.startDate,
+                  let rawEnd = trainingPlanEndDate(plan)
+            else {
+                return false
+            }
+
+            let existingStart = calendar.startOfDay(for: rawStart)
+            let existingEnd = calendar.startOfDay(for: rawEnd)
+
+            return candidateStart <= existingEnd &&
+                candidateEnd >= existingStart
+        }
+    }
+
+    func trainingPlanConflict(
+        startDate: Date,
+        weekCount: Int,
+        excludingPlanID: UUID? = nil
+    ) -> TrainingPlan? {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: startDate)
+        let weeks = min(max(weekCount, 1), 52)
+        let end = calendar.date(
+            byAdding: .day,
+            value: max(weeks * 7 - 1, 0),
+            to: start
+        ) ?? start
+
+        return trainingPlanConflict(
+            startDate: start,
+            endDate: end,
+            excludingPlanID: excludingPlanID
+        )
+    }
+
+    @discardableResult
+    func addTrainingPlan(
+        _ source: TrainingPlan
+    ) -> Bool {
+        let plan = normalizedTrainingPlan(source)
+
+        if let startDate = plan.startDate,
+           let endDate = trainingPlanEndDate(plan),
+           trainingPlanConflict(
+               startDate: startDate,
+               endDate: endDate,
+               excludingPlanID: plan.id
+           ) != nil {
+            return false
+        }
+
+        if trainingPlanStatus(plan) == .active {
+            guard activePlan == nil || activePlan?.id == plan.id else {
+                return false
+            }
+
+            activePlan = plan
+            scheduledPlans.removeAll { $0.id == plan.id }
+        } else {
+            scheduledPlans.removeAll { $0.id == plan.id }
+            scheduledPlans.append(plan)
+        }
+
+        persistScheduledPlans()
+        refreshActivePlanForToday()
+        return true
+    }
+
+    func refreshActivePlanForToday(
+        referenceDate: Date = Date()
+    ) {
+        var plans = trainingPlans.map(normalizedTrainingPlan)
+        let activeCandidates = plans.filter {
+            trainingPlanStatusWithoutCurrentPlan(
+                $0,
+                referenceDate: referenceDate
+            ) == .active
+        }
+
+        let resolvedActive: TrainingPlan?
+        if let currentID = activePlan?.id,
+           let current = activeCandidates.first(
+               where: { $0.id == currentID }
+           ) {
+            resolvedActive = current
+        } else {
+            resolvedActive = activeCandidates.max {
+                ($0.startDate ?? .distantPast) <
+                ($1.startDate ?? .distantPast)
+            }
+        }
+
+        if let resolvedActive {
+            plans.removeAll { $0.id == resolvedActive.id }
+        }
+
+        activePlan = resolvedActive
+        scheduledPlans = plans.sorted {
+            let lhs = $0.startDate ?? $0.createdAt
+            let rhs = $1.startDate ?? $1.createdAt
+            return lhs < rhs
+        }
+        persistScheduledPlans()
+    }
+
+    func deleteTrainingPlan(
+        _ planID: UUID
+    ) {
+        if activePlan?.id == planID {
+            activePlan = nil
+        }
+
+        scheduledPlans.removeAll { $0.id == planID }
+        persistScheduledPlans()
+        refreshActivePlanForToday()
+    }
+
+    @discardableResult
+    func duplicateTrainingPlan(
+        _ planID: UUID
+    ) -> TrainingPlan? {
+        guard let source = trainingPlan(withID: planID) else {
+            return nil
+        }
+
+        let calendar = Calendar.current
+        let durationDays = max(source.weeks.count * 7 - 1, 0)
+        var proposedStart = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: trainingPlanEndDate(source) ??
+                calendar.startOfDay(for: Date())
+        ) ?? calendar.startOfDay(for: Date())
+        var proposedEnd = calendar.date(
+            byAdding: .day,
+            value: durationDays,
+            to: proposedStart
+        ) ?? proposedStart
+
+        while let conflict = trainingPlanConflict(
+            startDate: proposedStart,
+            endDate: proposedEnd
+        ),
+        let conflictEnd = trainingPlanEndDate(conflict) {
+            proposedStart = calendar.date(
+                byAdding: .day,
+                value: 1,
+                to: conflictEnd
+            ) ?? proposedStart
+            proposedEnd = calendar.date(
+                byAdding: .day,
+                value: durationDays,
+                to: proposedStart
+            ) ?? proposedStart
+        }
+
+        let duplicate = TrainingPlan(
+            id: UUID(),
+            ownerID: source.ownerID,
+            title: "\(source.title) Copy",
+            summary: source.summary,
+            visibility: .privateOnly,
+            version: 1,
+            weeks: source.weeks,
+            tags: source.tags,
+            spotifyPlaylist: source.spotifyPlaylist,
+            spotifyAutoplayOnWorkoutStart:
+                source.spotifyAutoplayOnWorkoutStart,
+            createdAt: Date(),
+            updatedAt: Date(),
+            startDate: proposedStart,
+            endDate: proposedEnd
+        )
+
+        guard addTrainingPlan(duplicate) else {
+            return nil
+        }
+
+        return duplicate
+    }
+
+    @discardableResult
+    func setTrainingPlanWeekCount(
+        planID: UUID,
+        weekCount: Int
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID) else {
+            return false
+        }
+
+        let resolved = min(max(weekCount, 1), 52)
+        let current = plan.weeks.count
+
+        if resolved > current {
+            for number in (current + 1)...resolved {
+                plan.weeks.append(makeEmptyWeek(number: number))
+            }
+        } else if resolved < current {
+            plan.weeks = Array(plan.weeks.prefix(resolved))
+        }
+
+        if let startDate = plan.startDate {
+            let endDate = Calendar.current.date(
+                byAdding: .day,
+                value: max(resolved * 7 - 1, 0),
+                to: Calendar.current.startOfDay(for: startDate)
+            ) ?? startDate
+
+            if trainingPlanConflict(
+                startDate: startDate,
+                endDate: endDate,
+                excludingPlanID: plan.id
+            ) != nil {
+                return false
+            }
+
+            plan.endDate = endDate
+        }
+
+        plan.updatedAt = Date()
+        plan.version += 1
+        replaceTrainingPlan(plan)
+        return true
+    }
+
+    @discardableResult
+    func updateTrainingPlanMetadata(
+        planID: UUID,
+        title: String,
+        summary: String,
+        visibility: ProfileVisibility,
+        tags: [String],
+        startDate: Date
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID) else {
+            return false
+        }
+
+        let cleanTitle = title.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !cleanTitle.isEmpty else {
+            return false
+        }
+
+        let start = Calendar.current.startOfDay(for: startDate)
+        let end = Calendar.current.date(
+            byAdding: .day,
+            value: max(plan.weeks.count * 7 - 1, 0),
+            to: start
+        ) ?? start
+
+        if trainingPlanConflict(
+            startDate: start,
+            endDate: end,
+            excludingPlanID: plan.id
+        ) != nil {
+            return false
+        }
+
+        plan.title = cleanTitle
+        plan.summary = summary.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        plan.visibility = visibility
+        plan.tags = tags
+            .map {
+                $0.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .lowercased()
+            }
+            .filter { !$0.isEmpty }
+        plan.startDate = start
+        plan.endDate = end
+        plan.updatedAt = Date()
+        plan.version += 1
+
+        replaceTrainingPlan(plan)
+        return true
+    }
+
+    private func replaceTrainingPlan(
+        _ source: TrainingPlan
+    ) {
+        let plan = normalizedTrainingPlan(source)
+
+        if activePlan?.id == plan.id {
+            activePlan = plan
+        } else if let index = scheduledPlans.firstIndex(
+            where: { $0.id == plan.id }
+        ) {
+            scheduledPlans[index] = plan
+        } else {
+            scheduledPlans.append(plan)
+        }
+
+        persistScheduledPlans()
+        refreshActivePlanForToday()
+    }
+
+    private func normalizedTrainingPlan(
+        _ source: TrainingPlan
+    ) -> TrainingPlan {
+        var plan = source
+        let calendar = Calendar.current
+
+        guard let startDate = plan.startDate else {
+            plan.endDate = nil
+            return plan
+        }
+
+        let start = calendar.startOfDay(for: startDate)
+        plan.startDate = start
+
+        if let endDate = plan.endDate {
+            plan.endDate = max(
+                calendar.startOfDay(for: endDate),
+                start
+            )
+        } else {
+            plan.endDate = calendar.date(
+                byAdding: .day,
+                value: max(plan.weeks.count * 7 - 1, 0),
+                to: start
+            )
+        }
+
+        return plan
+    }
+
+    private func trainingPlanStatusWithoutCurrentPlan(
+        _ plan: TrainingPlan,
+        referenceDate: Date
+    ) -> TrainingPlanTimingStatus {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: referenceDate)
+
+        guard let rawStart = plan.startDate,
+              let rawEnd = trainingPlanEndDate(plan)
+        else {
+            return .unscheduled
+        }
+
+        let start = calendar.startOfDay(for: rawStart)
+        let end = calendar.startOfDay(for: rawEnd)
+
+        if today < start {
+            return .upcoming
+        }
+
+        if today > end {
+            return .completed
+        }
+
+        return .active
+    }
+
+    private func migrateLegacyTrainingPlanIfNeeded() {
+        guard var plan = activePlan else {
+            return
+        }
+
+        if plan.startDate == nil {
+            plan.startDate = Calendar.current.startOfDay(for: Date())
+        }
+
+        plan = normalizedTrainingPlan(plan)
+        activePlan = plan
+        scheduledPlans.removeAll { $0.id == plan.id }
+        persistScheduledPlans()
     }
 
     func createStarterPlan() {
