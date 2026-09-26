@@ -5189,90 +5189,35 @@ private struct ATHLTHProgressHero: View {
     let subtitle: String
     var height: CGFloat = 190
 
-    private var hasDedicatedProgressArtwork: Bool {
-        guard let image = UIImage(named: "ProgressHero"),
-              image.size.height > 0 else {
-            return false
-        }
-
-        // The temporary/legacy duplicate is an ultra-wide 3:1 profile photo.
-        // The intended Progress artwork is 16:9. Keep the fallback active until
-        // the dedicated asset has actually been replaced.
-        return image.size.width / image.size.height < 2.2
-    }
-
-    @ViewBuilder
-    var body: some View {
-        if hasDedicatedProgressArtwork {
-            ATHLTHTabHero(
-                imageName: "ProgressHero",
-                title: title,
-                subtitle: subtitle,
-                height: height,
-                alignment: .leading,
-                focalOffsetX: -12,
-                focalOffsetY: 12
-            )
-        } else {
-            ATHLTHProgressFallbackHero(
-                title: title,
-                subtitle: subtitle,
-                height: height
-            )
-        }
-    }
-}
-
-private struct ATHLTHProgressFallbackHero: View {
-    let title: String
-    let subtitle: String
-    var height: CGFloat = 190
-
-    private let sky = Color(red: 0.84, green: 0.92, blue: 0.98)
-    private let warm = Color(red: 1.00, green: 0.95, blue: 0.86)
-    private let stone = Color(red: 0.93, green: 0.90, blue: 0.84)
-
     var body: some View {
         GeometryReader { proxy in
-            ZStack {
-                LinearGradient(
-                    colors: [sky, Color.white, warm],
-                    startPoint: .topTrailing,
-                    endPoint: .bottomLeading
-                )
-
-                scenicBackdrop(proxy: proxy)
+            ZStack(alignment: .leading) {
+                progressBackdrop(proxy: proxy)
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.96),
-                        Color.white.opacity(0.72),
-                        Color.white.opacity(0.10),
+                        Color.black.opacity(0.52),
+                        Color.black.opacity(0.20),
+                        Color.black.opacity(0.03),
                         Color.clear
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
 
-                HStack(spacing: 0) {
-                    heroCopy
-                        .frame(
-                            width: min(proxy.size.width * 0.47, 360),
-                            alignment: .leading
-                        )
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.20),
+                        Color.clear,
+                        Color.black.opacity(0.12)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
 
-                    Spacer(minLength: 4)
+                progressArtwork(proxy: proxy)
 
-                    metricsArtwork
-                        .frame(
-                            width: max(proxy.size.width * 0.51, 190),
-                            alignment: .trailing
-                        )
-                        .offset(y: 13)
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 43)
-                .padding(.bottom, 14)
+                heroCopy(proxy: proxy)
             }
             .clipped()
         }
@@ -5281,74 +5226,238 @@ private struct ATHLTHProgressFallbackHero: View {
         .accessibilityLabel("\(title). \(subtitle)")
     }
 
-    @ViewBuilder
-    private func scenicBackdrop(
+    private func progressBackdrop(
         proxy: GeometryProxy
     ) -> some View {
-        ZStack(alignment: .bottom) {
-            Ellipse()
-                .fill(Color(red: 0.63, green: 0.72, blue: 0.78).opacity(0.24))
-                .frame(
-                    width: proxy.size.width * 0.84,
-                    height: proxy.size.height * 0.58
-                )
-                .offset(
-                    x: proxy.size.width * 0.20,
-                    y: proxy.size.height * 0.26
-                )
-
-            Ellipse()
-                .fill(Color(red: 0.49, green: 0.60, blue: 0.66).opacity(0.16))
-                .frame(
-                    width: proxy.size.width * 0.68,
-                    height: proxy.size.height * 0.45
-                )
-                .offset(
-                    x: proxy.size.width * 0.31,
-                    y: proxy.size.height * 0.31
-                )
-
+        ZStack {
             LinearGradient(
                 colors: [
-                    Color(red: 0.58, green: 0.76, blue: 0.86).opacity(0.34),
-                    Color.white.opacity(0.12)
+                    Color(red: 0.25, green: 0.39, blue: 0.47),
+                    Color(red: 0.49, green: 0.68, blue: 0.73),
+                    Color(red: 0.88, green: 0.83, blue: 0.69)
                 ],
-                startPoint: .top,
-                endPoint: .bottom
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
-            .frame(height: proxy.size.height * 0.42)
-            .offset(y: proxy.size.height * 0.13)
 
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            stone.opacity(0.90),
-                            Color.white.opacity(0.82)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(0.46),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 10,
+                endRadius: max(proxy.size.width * 0.58, 240)
+            )
+
+            RadialGradient(
+                colors: [
+                    ATHLTHTheme.premiumGold.opacity(0.32),
+                    Color.clear
+                ],
+                center: .bottomTrailing,
+                startRadius: 0,
+                endRadius: max(proxy.size.width * 0.48, 190)
+            )
+
+            Ellipse()
+                .fill(Color.white.opacity(0.10))
                 .frame(
-                    width: proxy.size.width * 0.72,
-                    height: proxy.size.height * 0.31
+                    width: proxy.size.width * 0.90,
+                    height: proxy.size.height * 0.54
                 )
                 .offset(
-                    x: proxy.size.width * 0.24,
-                    y: proxy.size.height * 0.18
+                    x: proxy.size.width * 0.30,
+                    y: proxy.size.height * 0.34
                 )
+                .blur(radius: 8)
+        }
+    }
+
+    private func progressArtwork(
+        proxy: GeometryProxy
+    ) -> some View {
+        HStack(spacing: 8) {
+            Spacer(minLength: proxy.size.width * 0.47)
+
+            ZStack {
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+                .fill(Color.black.opacity(0.74))
+                .frame(width: 82, height: 104)
                 .shadow(
-                    color: Color.black.opacity(0.06),
-                    radius: 16,
+                    color: Color.black.opacity(0.20),
+                    radius: 14,
                     x: 0,
                     y: 8
                 )
+
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.17, green: 0.24, blue: 0.29),
+                            Color(red: 0.10, green: 0.15, blue: 0.19)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 68, height: 88)
+
+                VStack(spacing: 5) {
+                    ZStack {
+                        Circle()
+                            .stroke(
+                                Color.white.opacity(0.12),
+                                lineWidth: 5
+                            )
+
+                        Circle()
+                            .trim(from: 0, to: 0.78)
+                            .stroke(
+                                ATHLTHTheme.premiumGold,
+                                style: StrokeStyle(
+                                    lineWidth: 5,
+                                    lineCap: .round
+                                )
+                            )
+                            .rotationEffect(.degrees(-90))
+
+                        Text("78")
+                            .font(
+                                .system(
+                                    size: 14,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 43, height: 43)
+
+                    Text("PROGRESS")
+                        .font(.system(size: 6.5, weight: .bold))
+                        .tracking(0.8)
+                        .foregroundStyle(.white.opacity(0.70))
+                }
+            }
+
+            VStack(spacing: 6) {
+                metricGlassTile(
+                    title: "Workouts",
+                    icon: "dumbbell.fill",
+                    tint: .blue
+                )
+
+                metricGlassTile(
+                    title: "Activity",
+                    icon: "bolt.fill",
+                    tint: .green
+                )
+            }
+
+            VStack(spacing: 6) {
+                metricGlassTile(
+                    title: "Steps",
+                    icon: "figure.walk",
+                    tint: .cyan
+                )
+
+                metricGlassTile(
+                    title: "Recovery",
+                    icon: "leaf.fill",
+                    tint: .purple
+                )
+            }
         }
+        .padding(.trailing, 14)
+        .padding(.top, 54)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .trailing
+        )
         .allowsHitTesting(false)
     }
 
-    private var heroCopy: some View {
+    private func metricGlassTile(
+        title: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(tint)
+
+                Spacer(minLength: 2)
+
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.64))
+            }
+
+            Text(title)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(0..<5, id: \.self) { index in
+                    Capsule()
+                        .fill(
+                            tint.opacity(
+                                0.34 + Double(index) * 0.12
+                            )
+                        )
+                        .frame(
+                            width: 3,
+                            height: CGFloat(
+                                5 + ((index * 5) % 11)
+                            )
+                        )
+                }
+            }
+            .frame(height: 15, alignment: .bottom)
+        }
+        .padding(7)
+        .frame(width: 66, height: 51, alignment: .leading)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(
+                cornerRadius: 13,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 13,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.34),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.10),
+            radius: 8,
+            x: 0,
+            y: 4
+        )
+    }
+
+    private func heroCopy(
+        proxy: GeometryProxy
+    ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("ATHLTH")
                 .font(.system(size: 17, weight: .black))
@@ -5359,115 +5468,37 @@ private struct ATHLTHProgressFallbackHero: View {
                 .tracking(1.7)
                 .padding(.top, 2)
 
-            Spacer(minLength: 10)
+            Spacer(minLength: 12)
 
             Text(title)
                 .font(.system(size: 30, weight: .bold))
-                .lineLimit(1)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
 
             Text(subtitle)
                 .font(.subheadline)
                 .lineLimit(2)
+                .minimumScaleFactor(0.86)
                 .padding(.top, 2)
         }
-        .foregroundStyle(ATHLTHTheme.primaryText)
-        .shadow(color: .white.opacity(0.46), radius: 3)
-    }
-
-    private var metricsArtwork: some View {
-        HStack(spacing: 6) {
-            progressMetricPanel(
-                title: "Workouts",
-                value: "12",
-                detail: "THIS WEEK",
-                tint: .blue,
-                icon: "dumbbell.fill"
-            )
-
-            progressMetricPanel(
-                title: "Activity",
-                value: "4.2k",
-                detail: "ACTIVE",
-                tint: .green,
-                icon: "bolt.fill"
-            )
-
-            progressMetricPanel(
-                title: "Steps",
-                value: "8.4k",
-                detail: "DAILY AVG",
-                tint: .cyan,
-                icon: "figure.walk"
-            )
-
-            progressMetricPanel(
-                title: "Recovery",
-                value: "78%",
-                detail: "SCORE",
-                tint: .purple,
-                icon: "leaf.fill"
-            )
-        }
-        .scaleEffect(0.92, anchor: .trailing)
-    }
-
-    private func progressMetricPanel(
-        title: String,
-        value: String,
-        detail: String,
-        tint: Color,
-        icon: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(tint)
-
-            Spacer(minLength: 2)
-
-            Text(value)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .minimumScaleFactor(0.72)
-
-            Text(title)
-                .font(.system(size: 8.5, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-
-            Text(detail)
-                .font(.system(size: 6.5, weight: .bold))
-                .tracking(0.4)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .lineLimit(1)
-
-            HStack(spacing: 2) {
-                ForEach(0..<4, id: \.self) { index in
-                    Capsule()
-                        .fill(tint.opacity(0.25 + Double(index) * 0.15))
-                        .frame(
-                            width: 3,
-                            height: CGFloat(5 + index * 3)
-                        )
-                }
-            }
-            .frame(height: 14, alignment: .bottom)
-        }
-        .padding(8)
-        .frame(width: 62, height: 102, alignment: .leading)
-        .background(
-            Color.white.opacity(0.78),
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.85), lineWidth: 1)
-        }
+        .foregroundStyle(.white)
         .shadow(
-            color: Color.black.opacity(0.08),
-            radius: 9,
+            color: .black.opacity(0.30),
+            radius: 5,
             x: 0,
-            y: 5
+            y: 2
+        )
+        .padding(.leading, 20)
+        .padding(.trailing, 18)
+        .padding(.top, 48)
+        .padding(.bottom, 16)
+        .frame(
+            maxWidth: min(
+                proxy.size.width * 0.58,
+                600
+            ),
+            maxHeight: .infinity,
+            alignment: .leading
         )
     }
 }
