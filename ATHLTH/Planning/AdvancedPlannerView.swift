@@ -2982,15 +2982,17 @@ struct SessionEditorView: View {
                             )
 
                             Text(
-                                estimatedMaximumHeartRate != nil
-                                    ? "ATHLTH estimates zones from your age in Health Profile. Choose Custom BPM if you use lab-tested or manually defined zones."
-                                    : "Using the saved BPM range for this zone. Add a date of birth in Health Profile to recalculate estimated zones."
+                                session.onboardingProfile?.maximumHeartRateBPM != nil
+                                    ? "ATHLTH uses your saved maximum heart rate from Health Profile as the source of truth for this zone."
+                                    : resolvedMaximumHeartRate != nil
+                                        ? "ATHLTH estimates maximum heart rate from your age because no known max is saved in Health Profile."
+                                        : "Using the saved BPM range for this zone. Add a known max heart rate or date of birth in Health Profile to calculate zones."
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         } else {
                             Text(
-                                "A date of birth is needed to estimate zones. Add it in Health Profile or choose Custom BPM."
+                                "Add a known maximum heart rate or date of birth in Health Profile to calculate zones, or choose Custom BPM."
                             )
                             .font(.caption)
                             .foregroundStyle(.orange)
@@ -3188,10 +3190,21 @@ struct SessionEditorView: View {
         )
     }
 
-    private var estimatedMaximumHeartRate: Double? {
-        guard let dateOfBirth =
-                health.personalDetails.dateOfBirth
-        else {
+    private var resolvedMaximumHeartRate: Double? {
+        if let known =
+                session
+                    .onboardingProfile?
+                    .maximumHeartRateBPM,
+           known >= 100,
+           known <= 240 {
+            return Double(known)
+        }
+
+        let dateOfBirth =
+            session.onboardingProfile?.dateOfBirth ??
+            health.personalDetails.dateOfBirth
+
+        guard let dateOfBirth else {
             return nil
         }
 
@@ -3219,7 +3232,7 @@ struct SessionEditorView: View {
         for zone: Int
     ) -> (lower: Int, upper: Int)? {
         guard let maximum =
-                estimatedMaximumHeartRate
+                resolvedMaximumHeartRate
         else {
             return nil
         }
