@@ -645,6 +645,9 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     let activeEnergyKilocalories: Double?
     let strengthMuscleGroups: [String]?
     let strengthExerciseCount: Int?
+    let strengthTotalVolumeKilograms: Double?
+    let strengthHeaviestWeightKilograms: Double?
+    let strengthTotalReps: Int?
     let source: String
 
     init(summary: WorkoutSummary) {
@@ -658,6 +661,9 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         activeEnergyKilocalories = summary.activeEnergyKilocalories
         strengthMuscleGroups = nil
         strengthExerciseCount = nil
+        strengthTotalVolumeKilograms = nil
+        strengthHeaviestWeightKilograms = nil
+        strengthTotalReps = nil
         source = "Apple Health"
     }
 
@@ -687,6 +693,51 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         }
 
         strengthExerciseCount = performedExercises.count
+
+        let completedSets = performedExercises
+            .flatMap(\.sets)
+            .filter { set in
+                set.isCompleted ||
+                set.completedReps != nil ||
+                set.completedWeightKilograms != nil
+            }
+
+        let totalVolume = completedSets.reduce(0.0) {
+            partial,
+            set in
+
+            guard
+                let reps = set.completedReps,
+                let weight =
+                    set.completedWeightKilograms
+            else {
+                return partial
+            }
+
+            return partial +
+                Double(reps) * weight
+        }
+
+        let heaviest = completedSets
+            .compactMap(
+                \.completedWeightKilograms
+            )
+            .max()
+
+        let totalReps = completedSets
+            .compactMap(\.completedReps)
+            .reduce(0, +)
+
+        strengthTotalVolumeKilograms =
+            totalVolume > 0
+                ? totalVolume
+                : nil
+        strengthHeaviestWeightKilograms =
+            heaviest
+        strengthTotalReps =
+            totalReps > 0
+                ? totalReps
+                : nil
 
         var muscleGroups: [String] = []
         for rawGroup in performedExercises.flatMap({ $0.exercise.primaryMuscles }) {
@@ -740,6 +791,9 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
             : nil
         strengthMuscleGroups = nil
         strengthExerciseCount = nil
+        strengthTotalVolumeKilograms = nil
+        strengthHeaviestWeightKilograms = nil
+        strengthTotalReps = nil
         source = "Apple Watch"
     }
 
@@ -771,6 +825,9 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
             wearableRecord.activeEnergyKilocalories
         strengthMuscleGroups = nil
         strengthExerciseCount = nil
+        strengthTotalVolumeKilograms = nil
+        strengthHeaviestWeightKilograms = nil
+        strengthTotalReps = nil
         source = wearableRecord.provider.title
     }
 
