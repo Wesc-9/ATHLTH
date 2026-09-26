@@ -581,15 +581,23 @@ struct HomeAroundYouSection: View {
 
 struct AroundYouExploreView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     @ObservedObject var locationStore: HomeLocationStore
+
+    @StateObject private var routeAttempts = RouteAttemptStore()
 
     @State private var filter: AroundYouFilter = .all
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var hasCenteredOnUser = false
     @State private var selectedRoute: TrainingRoute?
+    @State private var routeActionMessage: String?
+    @State private var routeActionError: String?
+    @State private var startingRoute = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -609,33 +617,69 @@ struct AroundYouExploreView: View {
 
                 if filter != .events {
                     ForEach(nearbyRoutes.prefix(25)) { route in
+                        let isSelected =
+                            selectedRoute?.id == route.id
+
                         MapPolyline(
-                            coordinates: route.coordinates.map(\.coordinate)
+                            coordinates:
+                                route.coordinates.map(\.coordinate)
                         )
                         .stroke(
                             route.isMine
                                 ? ATHLTHTheme.premiumGold
                                 : ATHLTHTheme.accent,
-                            lineWidth: route.isMine ? 5 : 4
+                            lineWidth: isSelected
+                                ? 7
+                                : (route.isMine ? 5 : 4)
                         )
 
                         if let center = route.centerCoordinate {
-                            Annotation(route.title, coordinate: center) {
+                            Annotation(
+                                route.title,
+                                coordinate: center
+                            ) {
                                 Button {
-                                    selectedRoute = route.trainingRoute
-                                } label: {
-                                    Image(systemName: "figure.run.circle.fill")
-                                        .font(.title3)
-                                        .foregroundStyle(
-                                            route.isMine
-                                                ? ATHLTHTheme.premiumGold
-                                                : ATHLTHTheme.accentDeep
+                                    withAnimation(
+                                        .spring(
+                                            response: 0.34,
+                                            dampingFraction: 0.86
                                         )
-                                        .background(.white, in: Circle())
+                                    ) {
+                                        selectedRoute =
+                                            route.trainingRoute
+                                    }
+                                } label: {
+                                    Image(
+                                        systemName:
+                                            isSelected
+                                                ? "figure.run.circle.fill"
+                                                : "figure.run.circle"
+                                    )
+                                    .font(
+                                        isSelected
+                                            ? .title2
+                                            : .title3
+                                    )
+                                    .foregroundStyle(
+                                        route.isMine
+                                            ? ATHLTHTheme.premiumGold
+                                            : ATHLTHTheme.accentDeep
+                                    )
+                                    .background(
+                                        .white,
+                                        in: Circle()
+                                    )
+                                    .shadow(
+                                        color: .black.opacity(
+                                            isSelected ? 0.16 : 0.08
+                                        ),
+                                        radius: isSelected ? 7 : 3,
+                                        y: 2
+                                    )
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel(
-                                    "Open \(route.title)"
+                                    "Preview \(route.title)"
                                 )
                             }
                         }
@@ -644,10 +688,14 @@ struct AroundYouExploreView: View {
 
                 if filter != .routes {
                     ForEach(nearbyEvents.prefix(30)) { item in
-                        if let coordinate = eventCoordinate(item) {
+                        if let coordinate =
+                            eventCoordinate(item) {
                             Marker(
                                 item.event.title,
-                                systemImage: item.event.activityType.systemImage,
+                                systemImage:
+                                    item.event
+                                        .activityType
+                                        .systemImage,
                                 coordinate: coordinate
                             )
                             .tint(.purple)
@@ -655,16 +703,38 @@ struct AroundYouExploreView: View {
                     }
                 }
             }
-            .mapStyle(.standard(elevation: .realistic))
+            .mapStyle(
+                .standard(elevation: .realistic)
+            )
             .mapControls {
                 MapCompass()
                 MapScaleView()
                 MapUserLocationButton()
             }
+            .overlay(alignment: .bottom) {
+                if let route = selectedRoute {
+                    routePreviewCard(route)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .transition(
+                            .move(edge: .bottom)
+                                .combined(with: .opacity)
+                        )
+                        .zIndex(10)
+                }
+            }
+            .animation(
+                .spring(
+                    response: 0.34,
+                    dampingFraction: 0.86
+                ),
+                value: selectedRoute?.id
+            )
         }
         .background(ATHLTHPremiumCanvas())
         .navigationTitle("Around You")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -674,19 +744,29 @@ struct AroundYouExploreView: View {
                 } label: {
                     Image(systemName: "location.fill")
                 }
-                .accessibilityLabel("Center on my location")
+                .accessibilityLabel(
+                    "Center on my location"
+                )
             }
         }
         .task {
             async let routesRefresh: Void =
                 routeDiscovery.refresh()
-            async let eventsRefresh: Void = community.refresh()
-            _ = await (routesRefresh, eventsRefresh)
+            async let eventsRefresh: Void =
+                community.refresh()
+            _ = await (
+                routesRefresh,
+                eventsRefresh
+            )
         }
-        .sheet(item: $selectedRoute) { route in
-            NavigationStack {
-                RouteDetailView(route: route)
+        .task(id: selectedRoute?.id) {
+            guard let selectedRoute else {
+                return
             }
+
+            await routeAttempts.refresh(
+                routeID: selectedRoute.id
+            )
         }
         .onAppear {
             locationStore.start()
@@ -700,79 +780,720 @@ struct AroundYouExploreView: View {
                 centerOnUser()
             }
         }
+        .onChange(of: filter) { _, _ in
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedRoute = nil
+            }
+        }
+        .alert(
+            "ATHLTH",
+            isPresented: Binding(
+                get: {
+                    routeActionMessage != nil ||
+                    routeActionError != nil
+                },
+                set: { visible in
+                    if !visible {
+                        routeActionMessage = nil
+                        routeActionError = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(
+                routeActionError ??
+                routeActionMessage ??
+                ""
+            )
+        }
+    }
+
+    private func routePreviewCard(
+        _ route: TrainingRoute
+    ) -> some View {
+        let leaderboard = previewLeaderboard(
+            for: route
+        )
+        let topThree = Array(
+            leaderboard.prefix(3)
+        )
+        let fastest = leaderboard.first
+        let saved = isRouteSaved(route)
+        let creator = creatorProfile(for: route)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 11) {
+                creatorAvatar(
+                    route: route,
+                    profile: creator
+                )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(route.title)
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+
+                    Text(
+                        creatorLabel(
+                            route: route,
+                            profile: creator
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .lineLimit(1)
+                }
+
+                Spacer()
+
+                Button {
+                    withAnimation(
+                        .easeInOut(duration: 0.18)
+                    ) {
+                        selectedRoute = nil
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(
+                            .system(
+                                size: 10,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Color.primary.opacity(0.055),
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "Close route preview"
+                )
+            }
+
+            HStack(spacing: 8) {
+                previewMetric(
+                    value: String(
+                        format: "%.1f km",
+                        route.distanceKilometers
+                    ),
+                    icon: "figure.run"
+                )
+
+                if let elevation =
+                    route.elevationGainMeters {
+                    previewMetric(
+                        value:
+                            "\(Int(elevation.rounded())) m ↑",
+                        icon: "mountain.2.fill"
+                    )
+                }
+
+                if let distance =
+                    distanceToRouteStart(route) {
+                    previewMetric(
+                        value: distance,
+                        icon: "location.fill"
+                    )
+                }
+
+                previewMetric(
+                    value:
+                        "\(previewAttemptCount(for: route))",
+                    icon:
+                        "arrow.trianglehead.2.clockwise.rotate.90"
+                )
+            }
+
+            if routeAttempts.isLoading &&
+               routeAttempts.loadedRouteID != route.id {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+
+                    Text("Loading route times…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(height: 46)
+            } else if let fastest {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label(
+                            "Fastest",
+                            systemImage: "trophy.fill"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.premiumGold
+                        )
+
+                        Spacer()
+
+                        Text(
+                            routeClock(
+                                fastest.durationSeconds
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .monospacedDigit()
+                                .weight(.bold)
+                        )
+                    }
+
+                    HStack(spacing: 6) {
+                        ForEach(
+                            Array(topThree.enumerated()),
+                            id: \.element.id
+                        ) { index, attempt in
+                            leaderboardChip(
+                                attempt,
+                                rank: index + 1
+                            )
+                        }
+                    }
+                }
+            } else {
+                Label(
+                    "No qualifying times yet",
+                    systemImage: "trophy"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(height: 46)
+            }
+
+            HStack(spacing: 8) {
+                if route.ownerID !=
+                    session.profile.userID {
+                    Button {
+                        if !saved {
+                            session.saveSharedRoute(
+                                route,
+                                sourceOwnerID: route.ownerID,
+                                sourceRouteID: route.id
+                            )
+                            routeActionMessage =
+                                "Route saved to My Routes."
+                        }
+                    } label: {
+                        Label(
+                            saved ? "Saved" : "Save",
+                            systemImage:
+                                saved
+                                    ? "bookmark.fill"
+                                    : "bookmark"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(saved)
+                }
+
+                if settings.trainingDeviceProvider ==
+                    .appleWatch {
+                    Button {
+                        Task {
+                            await startRouteOnWatch(
+                                route
+                            )
+                        }
+                    } label: {
+                        if startingRoute {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(
+                                    maxWidth: .infinity
+                                )
+                        } else {
+                            Label(
+                                "Start",
+                                systemImage: "play.fill"
+                            )
+                            .font(
+                                .caption.weight(.semibold)
+                            )
+                            .frame(
+                                maxWidth: .infinity
+                            )
+                        }
+                    }
+                    .frame(height: 38)
+                    .buttonStyle(.bordered)
+                    .disabled(
+                        startingRoute ||
+                        !watchConnection.isReady
+                    )
+                }
+
+                NavigationLink {
+                    RouteDetailView(route: route)
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("Details")
+                        Image(
+                            systemName: "chevron.right"
+                        )
+                    }
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accent)
+            }
+        }
+        .padding(14)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: .black.opacity(0.12),
+            radius: 18,
+            y: 7
+        )
+    }
+
+    private func previewMetric(
+        value: String,
+        icon: String
+    ) -> some View {
+        Label(value, systemImage: icon)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(
+                ATHLTHTheme.primaryText.opacity(0.78)
+            )
+            .padding(.horizontal, 8)
+            .frame(height: 27)
+            .background(
+                Color.primary.opacity(0.04),
+                in: Capsule()
+            )
+            .lineLimit(1)
+    }
+
+    private func leaderboardChip(
+        _ attempt: RouteAttemptRecord,
+        rank: Int
+    ) -> some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 3) {
+                Text("#\(rank)")
+                    .foregroundStyle(
+                        rank == 1
+                            ? ATHLTHTheme.premiumGold
+                            : ATHLTHTheme.mutedText
+                    )
+
+                Text(
+                    attempt.userID ==
+                        session.profile.userID
+                        ? "You"
+                        : compactAthleteName(attempt)
+                )
+                .lineLimit(1)
+            }
+            .font(
+                .system(
+                    size: 9,
+                    weight: .semibold
+                )
+            )
+
+            Text(
+                routeClock(
+                    attempt.durationSeconds
+                )
+            )
+            .font(
+                .caption
+                    .monospacedDigit()
+                    .weight(.bold)
+            )
+        }
+        .foregroundStyle(ATHLTHTheme.primaryText)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 7)
+        .background(
+            Color.primary.opacity(0.035),
+            in: RoundedRectangle(
+                cornerRadius: 11,
+                style: .continuous
+            )
+        )
+    }
+
+    @ViewBuilder
+    private func creatorAvatar(
+        route: TrainingRoute,
+        profile: SocialProfileCard?
+    ) -> some View {
+        if let url = creatorAvatarURL(
+            route: route,
+            profile: profile
+        ) {
+            AsyncImage(url: url) { phase in
+                if case .success(let image) = phase {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    creatorAvatarFallback
+                }
+            }
+            .frame(width: 38, height: 38)
+            .clipShape(Circle())
+        } else {
+            creatorAvatarFallback
+                .frame(width: 38, height: 38)
+        }
+    }
+
+    private var creatorAvatarFallback: some View {
+        Circle()
+            .fill(ATHLTHTheme.accentSoft)
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+            }
+    }
+
+    private func creatorProfile(
+        for route: TrainingRoute
+    ) -> SocialProfileCard? {
+        social.visibleProfiles.first {
+            $0.userID == route.ownerID
+        }
+    }
+
+    private func creatorLabel(
+        route: TrainingRoute,
+        profile: SocialProfileCard?
+    ) -> String {
+        if route.ownerID == session.profile.userID {
+            let username = session.profile.username
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+            return username.isEmpty
+                ? "Created by you"
+                : "Created by @\(username)"
+        }
+
+        if let username = profile?.username,
+           !username.isEmpty {
+            return "Created by @\(username)"
+        }
+
+        if let profile {
+            return "Created by \(profile.resolvedName)"
+        }
+
+        return "Created by ATHLTH athlete"
+    }
+
+    private func creatorAvatarURL(
+        route: TrainingRoute,
+        profile: SocialProfileCard?
+    ) -> URL? {
+        if route.ownerID == session.profile.userID {
+            return session.profile.avatarURL
+        }
+
+        guard let value = profile?.avatarURL else {
+            return nil
+        }
+
+        return URL(string: value)
+    }
+
+    private func previewLeaderboard(
+        for route: TrainingRoute
+    ) -> [RouteAttemptRecord] {
+        guard routeAttempts.loadedRouteID == route.id
+        else {
+            return []
+        }
+
+        return routeAttempts.leaderboard()
+    }
+
+    private func previewAttemptCount(
+        for route: TrainingRoute
+    ) -> Int {
+        guard routeAttempts.loadedRouteID == route.id
+        else {
+            return 0
+        }
+
+        return routeAttempts.attempts.count
+    }
+
+    private func isRouteSaved(
+        _ route: TrainingRoute
+    ) -> Bool {
+        if route.ownerID == session.profile.userID {
+            return true
+        }
+
+        return session.savedRoutes.contains {
+            $0.id == route.id ||
+            $0.sharedSourceRouteID == route.id
+        }
+    }
+
+    private func distanceToRouteStart(
+        _ route: TrainingRoute
+    ) -> String? {
+        guard let userLocation =
+                locationStore.location,
+              let first =
+                route.coordinates.first
+        else {
+            return nil
+        }
+
+        let start = CLLocation(
+            latitude: first.latitude,
+            longitude: first.longitude
+        )
+        let meters =
+            userLocation.distance(from: start)
+
+        if meters < 1_000 {
+            return "\(Int(meters.rounded())) m"
+        }
+
+        return String(
+            format: "%.1f km",
+            meters / 1_000
+        )
+    }
+
+    private func compactAthleteName(
+        _ attempt: RouteAttemptRecord
+    ) -> String {
+        if let username = attempt.username,
+           !username.isEmpty {
+            return "@\(username)"
+        }
+
+        let name = attempt.athleteName
+        if name.count > 12 {
+            return String(name.prefix(11)) + "…"
+        }
+
+        return name
+    }
+
+    private func routeClock(
+        _ duration: TimeInterval
+    ) -> String {
+        let seconds =
+            max(Int(duration.rounded()), 0)
+        let hours = seconds / 3_600
+        let minutes =
+            (seconds % 3_600) / 60
+        let remainder = seconds % 60
+
+        if hours > 0 {
+            return String(
+                format: "%d:%02d:%02d",
+                hours,
+                minutes,
+                remainder
+            )
+        }
+
+        return String(
+            format: "%d:%02d",
+            minutes,
+            remainder
+        )
+    }
+
+    private func startRouteOnWatch(
+        _ route: TrainingRoute
+    ) async {
+        guard watchConnection.isReady else {
+            routeActionError =
+                "Apple Watch is not ready."
+            return
+        }
+
+        startingRoute = true
+        defer { startingRoute = false }
+
+        do {
+            try watchConnection.sendRoute(route)
+            watchConnection.sendWorkoutRouteSelection(
+                route.id
+            )
+            try await watchConnection
+                .startWorkoutOnWatch(.running)
+
+            routeActionMessage =
+                "\(route.title) started on Apple Watch."
+        } catch {
+            routeActionError =
+                error.localizedDescription
+        }
     }
 
     private var nearbyRoutes: [AroundYouRouteItem] {
-        var routesByID: [UUID: AroundYouRouteItem] = [:]
+        var routesByID:
+            [UUID: AroundYouRouteItem] = [:]
 
         for route in routeDiscovery.routes {
-            routesByID[route.id] = AroundYouRouteItem(
-                id: route.id,
-                title: route.title,
-                distanceKilometers: route.distanceKilometers,
-                elevationGainMeters: route.elevationGainMeters,
-                coordinates: route.coordinates,
-                ownerID: route.ownerID,
-                isMine: route.ownerID == session.profile.userID,
-                trainingRoute: route.trainingRoute
-            )
+            routesByID[route.id] =
+                AroundYouRouteItem(
+                    id: route.id,
+                    title: route.title,
+                    distanceKilometers:
+                        route.distanceKilometers,
+                    elevationGainMeters:
+                        route.elevationGainMeters,
+                    coordinates: route.coordinates,
+                    ownerID: route.ownerID,
+                    isMine:
+                        route.ownerID ==
+                        session.profile.userID,
+                    trainingRoute:
+                        route.trainingRoute
+                )
         }
 
         for route in session.savedRoutes {
-            routesByID[route.id] = AroundYouRouteItem(
-                id: route.id,
-                title: route.title,
-                distanceKilometers: route.distanceKilometers,
-                elevationGainMeters: route.elevationGainMeters,
-                coordinates: route.coordinates,
-                ownerID: route.ownerID,
-                isMine: true,
-                trainingRoute: route
-            )
+            routesByID[route.id] =
+                AroundYouRouteItem(
+                    id: route.id,
+                    title: route.title,
+                    distanceKilometers:
+                        route.distanceKilometers,
+                    elevationGainMeters:
+                        route.elevationGainMeters,
+                    coordinates:
+                        route.coordinates,
+                    ownerID: route.ownerID,
+                    isMine: true,
+                    trainingRoute: route
+                )
         }
 
-        let values = Array(routesByID.values)
+        let values =
+            Array(routesByID.values)
 
-        guard let location = locationStore.location else {
+        guard let location =
+                locationStore.location
+        else {
             return values
         }
 
         return values
-            .compactMap { route -> (AroundYouRouteItem, CLLocationDistance)? in
-                guard let center = route.centerCoordinate else { return nil }
+            .compactMap {
+                route ->
+                    (
+                        AroundYouRouteItem,
+                        CLLocationDistance
+                    )?
+                in
+                guard let center =
+                        route.centerCoordinate
+                else {
+                    return nil
+                }
+
                 let distance = CLLocation(
                     latitude: center.latitude,
                     longitude: center.longitude
                 )
                 .distance(from: location)
-                guard distance <= 50_000 else { return nil }
+
+                guard distance <= 50_000 else {
+                    return nil
+                }
+
                 return (route, distance)
             }
             .sorted { $0.1 < $1.1 }
             .map(\.0)
     }
 
-    private var nearbyEvents: [CommunityEventItem] {
-        let candidates = community.upcomingEvents.filter {
-            $0.event.visibility == ProfileVisibility.publicProfile.rawValue
-        }
+    private var nearbyEvents:
+        [CommunityEventItem] {
+        let candidates =
+            community.upcomingEvents.filter {
+                $0.event.visibility ==
+                    ProfileVisibility
+                        .publicProfile
+                        .rawValue
+            }
 
-        guard let location = locationStore.location else {
+        guard let location =
+                locationStore.location
+        else {
             return candidates
         }
 
         return candidates
-            .compactMap { item -> (CommunityEventItem, CLLocationDistance)? in
-                guard let coordinate = eventCoordinate(item) else {
+            .compactMap {
+                item ->
+                    (
+                        CommunityEventItem,
+                        CLLocationDistance
+                    )?
+                in
+                guard let coordinate =
+                        eventCoordinate(item)
+                else {
                     return nil
                 }
 
                 let distance = CLLocation(
-                    latitude: coordinate.latitude,
-                    longitude: coordinate.longitude
+                    latitude:
+                        coordinate.latitude,
+                    longitude:
+                        coordinate.longitude
                 )
                 .distance(from: location)
-                guard distance <= 50_000 else { return nil }
+
+                guard distance <= 50_000
+                else {
+                    return nil
+                }
+
                 return (item, distance)
             }
             .sorted { $0.1 < $1.1 }
@@ -782,8 +1503,10 @@ struct AroundYouExploreView: View {
     private func eventCoordinate(
         _ item: CommunityEventItem
     ) -> CLLocationCoordinate2D? {
-        guard let latitude = item.event.latitude,
-              let longitude = item.event.longitude
+        guard let latitude =
+                item.event.latitude,
+              let longitude =
+                item.event.longitude
         else {
             return nil
         }
@@ -795,13 +1518,17 @@ struct AroundYouExploreView: View {
     }
 
     private func centerOnUser() {
-        guard let coordinate = locationStore.location?.coordinate else {
+        guard let coordinate =
+                locationStore.location?.coordinate
+        else {
             return
         }
 
         hasCenteredOnUser = true
 
-        withAnimation(.easeInOut(duration: 0.35)) {
+        withAnimation(
+            .easeInOut(duration: 0.35)
+        ) {
             mapPosition = .region(
                 MKCoordinateRegion(
                     center: coordinate,
