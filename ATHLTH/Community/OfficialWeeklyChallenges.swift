@@ -609,7 +609,7 @@ enum OfficialWeeklyChallengeProgress {
             )
 
         case .sessions:
-            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) runs"
+            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) workouts"
 
         case .minutes:
             return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) min"
@@ -790,6 +790,9 @@ struct OfficialWeeklyChallengeCard: View {
                         Button {
                             Task {
                                 await store.join(challenge)
+                                await store.syncCompletionState(
+                                    workouts: health.workouts
+                                )
                             }
                         } label: {
                             HStack(spacing: 7) {
@@ -841,6 +844,12 @@ struct OfficialWeeklyChallengeCard: View {
             radius: 14,
             y: 7
         )
+        .task(id: health.workouts.map(\.id)) {
+            guard joined else { return }
+            await store.syncCompletionState(
+                workouts: health.workouts
+            )
+        }
     }
 
     private var visibleParticipantProfiles: [SocialProfileCard] {
@@ -910,6 +919,15 @@ struct OfficialWeeklyChallengeDetailView: View {
         store.challenges.first { $0.id == challengeID }
     }
 
+    private var countedWorkouts: [WorkoutSummary] {
+        guard let challenge else { return [] }
+
+        return OfficialWeeklyChallengeProgress.countedWorkouts(
+            challenge: challenge,
+            workouts: health.workouts
+        )
+    }
+
     var body: some View {
         Group {
             if let challenge {
@@ -966,9 +984,65 @@ struct OfficialWeeklyChallengeDetailView: View {
                             )
                             .font(.title3.bold())
 
-                            Text("\(store.participantCount(for: challenge.id)) people have joined")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 6) {
+                                Text("\(store.participantCount(for: challenge.id)) joined")
+                                Text("·")
+                                Text("\(store.completedCount(for: challenge.id)) completed")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                            if store.isCompleted(challenge.id) {
+                                Label(
+                                    "Challenge completed",
+                                    systemImage: "checkmark.seal.fill"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.green)
+                            }
+                        }
+
+                        ATHLTHCard {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Counted workouts")
+                                        .font(.headline)
+
+                                    Text("Registered runs and walks during the challenge window count automatically.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Text("\(countedWorkouts.count)")
+                                    .font(.title3.bold())
+                                    .monospacedDigit()
+                            }
+
+                            if countedWorkouts.isEmpty {
+                                ContentUnavailableView(
+                                    "No qualifying workouts yet",
+                                    systemImage: "figure.walk.motion",
+                                    description: Text(
+                                        "Complete a run or walk and it will appear here after Health syncs."
+                                    )
+                                )
+                                .padding(.vertical, 12)
+                            } else {
+                                VStack(spacing: 0) {
+                                    ForEach(countedWorkouts) { workout in
+                                        OfficialWeeklyCountedWorkoutRow(
+                                            workout: workout
+                                        )
+
+                                        if workout.id != countedWorkouts.last?.id {
+                                            Divider()
+                                                .padding(.leading, 46)
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         Button {
@@ -977,6 +1051,9 @@ struct OfficialWeeklyChallengeDetailView: View {
                                     await store.leave(challenge)
                                 } else {
                                     await store.join(challenge)
+                                    await store.syncCompletionState(
+                                        workouts: health.workouts
+                                    )
                                 }
                             }
                         } label: {
@@ -1000,6 +1077,12 @@ struct OfficialWeeklyChallengeDetailView: View {
                 }
                 .navigationTitle("Weekly Challenge")
                 .navigationBarTitleDisplayMode(.inline)
+                .task(id: health.workouts.map(\.id)) {
+                    guard store.isJoined(challenge.id) else { return }
+                    await store.syncCompletionState(
+                        workouts: health.workouts
+                    )
+                }
             } else {
                 ContentUnavailableView(
                     "Challenge unavailable",
@@ -1010,6 +1093,91 @@ struct OfficialWeeklyChallengeDetailView: View {
                 )
             }
         }
+    }
+}
+
+private struct OfficialWeeklyCountedWorkoutRow: View {
+    let workout: WorkoutSummary
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    workout.activity == .walking
+                        ? "figure.walk"
+                        : "figure.run"
+            )
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(
+                workout.activity == .walking
+                    ? Color.green
+                    : ATHLTHTheme.accent
+            )
+            .frame(width: 34, height: 34)
+            .background(
+                (
+                    workout.activity == .walking
+                        ? Color.green
+                        : ATHLTHTheme.accent
+                )
+                .opacity(0.09),
+                in: RoundedRectangle(
+                    cornerRadius: 10,
+                    style: .continuous
+                )
+            )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(
+                    workout.activity == .walking
+                        ? "Walk"
+                        : "Run"
+                )
+                .font(.subheadline.weight(.semibold))
+
+                Text(
+                    workout.startDate.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                if let distance = workout.distanceMeters,
+                   distance > 0 {
+                    Text(
+                        String(
+                            format: "%.2f km",
+                            distance / 1_000
+                        )
+                    )
+                    .font(.subheadline.bold())
+                }
+
+                Text(durationText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 9)
+    }
+
+    private var durationText: String {
+        let minutes = max(
+            Int((workout.duration / 60).rounded()),
+            0
+        )
+
+        if minutes >= 60 {
+            return "\(minutes / 60)h \(minutes % 60)m"
+        }
+
+        return "\(minutes) min"
     }
 }
 
