@@ -1256,16 +1256,20 @@ struct MuscleRecoveryCard: View {
 
     var body: some View {
         ATHLTHCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("Muscle recovery")
                         .font(.title3.weight(.bold))
-                    Text("Based on recent strength work and your soreness log.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                    Text(
+                        "Updates automatically from completed strength sets. Your check-in can refine soreness."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer()
+                Spacer(minLength: 8)
 
                 Button("Check in") {
                     onLogSoreness()
@@ -1275,73 +1279,120 @@ struct MuscleRecoveryCard: View {
 
             if statuses.isEmpty {
                 HStack(spacing: 11) {
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .foregroundStyle(ATHLTHTheme.accent)
+                    Image(
+                        systemName:
+                            "figure.strengthtraining.traditional"
+                    )
+                    .foregroundStyle(ATHLTHTheme.accent)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
 
                     Text(
-                        "Complete a tracked strength workout or log soreness to start muscle recovery guidance."
+                        "Complete a tracked strength workout and ATHLTH will automatically start recovery for the muscle groups you trained."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
                 .padding(.top, 12)
             } else {
-                VStack(spacing: 12) {
-                    ForEach(statuses.prefix(6)) { status in
-                        HStack(spacing: 11) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(status.muscleGroup)
-                                        .font(.subheadline.weight(.semibold))
-
-                                    Spacer()
-
-                                    Text(status.statusTitle)
-                                        .font(.caption2.weight(.bold))
-                                        .foregroundStyle(
-                                            statusTint(status)
-                                        )
-                                }
-
-                                ProgressView(value: status.progress)
-                                    .tint(statusTint(status))
-
-                                HStack {
-                                    if status.completedSets > 0 {
-                                        Text(
-                                            "\(status.completedSets) recent sets"
-                                        )
-                                    }
-
-                                    if let last = status.lastTrainedAt {
-                                        Text(
-                                            relativeDescription(last)
-                                        )
-                                    }
-
-                                    if status.soreness != .none {
-                                        Text(
-                                            "Logged: \(status.soreness.title)"
-                                        )
-                                    }
-                                }
-                                .font(.system(size: 9.5))
-                                .foregroundStyle(.secondary)
-                            }
-                        }
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    ForEach(statuses.prefix(8)) { status in
+                        muscleTile(status)
                     }
                 }
                 .padding(.top, 12)
             }
 
             Text(
-                "Recovery time is an estimate from recent training volume and your feedback, not a medical measurement."
+                "Recovery percentages are training estimates based on completed sets, time since training and your soreness feedback — not a medical measurement."
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
             .padding(.top, 10)
+        }
+    }
+
+    private func muscleTile(
+        _ status: MuscleRecoveryStatus
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(status.muscleGroup)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Spacer(minLength: 6)
+
+                Text("\(Int((status.progress * 100).rounded()))%")
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(statusTint(status))
+            }
+
+            ProgressView(value: status.progress)
+                .tint(statusTint(status))
+
+            Text(status.statusTitle)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(statusTint(status))
+
+            HStack(spacing: 5) {
+                if status.completedSets > 0 {
+                    Text("\(status.completedSets) sets")
+                }
+
+                if let last = status.lastTrainedAt {
+                    if status.completedSets > 0 {
+                        Text("·")
+                    }
+                    Text(relativeDescription(last))
+                }
+            }
+            .font(.system(size: 9.5))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            statusTint(status).opacity(0.055),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                statusTint(status).opacity(0.10),
+                lineWidth: 1
+            )
         }
     }
 

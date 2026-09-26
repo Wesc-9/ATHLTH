@@ -4423,13 +4423,18 @@ struct ATHLTHRecoveryView: View {
     var onSelectTab: (Int) -> Void = { _ in }
 
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
 
     @StateObject private var sorenessStore = RecoverySorenessStore()
     @State private var recoverySnapshot = RecoveryTrendSnapshot.empty
+    @State private var recoveryAIInsight: RecoveryAIInsight?
+    @State private var isLoadingRecoveryAI = false
+    @State private var recoveryAIError: String?
     @State private var showingSorenessLog = false
     @State private var showingRecoveryInfo = false
+    @State private var showingRecoverySense = false
     @State private var selectedRecoveryTool: RecoveryTool?
 
     var body: some View {
@@ -4440,7 +4445,7 @@ struct ATHLTHRecoveryView: View {
                 ATHLTHTabHero(
                     imageName: "RecoveryHero",
                         title: "Recovery",
-                        subtitle: "Use sleep and recovery signals to guide today's load.",
+                        subtitle: "Understand your body. Make better decisions. Stay in the game.",
                         height: 190,
                         alignment: .leading,
                         focalOffsetX: 14,
@@ -4448,7 +4453,31 @@ struct ATHLTHRecoveryView: View {
                 )
             } content: {
                 LazyVStack(spacing: 16) {
-                        if shouldShowWearableRecoveryContent {
+                    if shouldShowWearableRecoveryContent {
+                        if session.hasPaidAccess {
+                            RecoveryAIInsightCard(
+                                insight: recoveryAIInsight ?? fallbackRecoveryAIInsight,
+                                context: recoveryAIContext,
+                                isLoading: isLoadingRecoveryAI,
+                                onScoreDetails: {
+                                    showingRecoveryInfo = true
+                                },
+                                onAdjustTraining: {
+                                    onSelectTab(1)
+                                },
+                                onAskATHLTH: {
+                                    showingRecoverySense = true
+                                }
+                            )
+
+                            RecoverySuggestedTodayCard(
+                                suggestion:
+                                    (recoveryAIInsight ?? fallbackRecoveryAIInsight)
+                                        .suggestion
+                            ) {
+                                onSelectTab(1)
+                            }
+                        } else {
                             recoveryScoreCard
 
                             RecoveryReadinessBreakdownCard(
@@ -4456,57 +4485,56 @@ struct ATHLTHRecoveryView: View {
                                 sleep: health.sleep,
                                 heart: health.heart
                             )
+                        }
 
-                            if health.sleep.totalAsleep > 0 {
-                                RecoveryLastNightCard(
-                                    sleep: health.sleep
-                                )
-                            }
+                        MuscleRecoveryCard(
+                            statuses: muscleRecoveryStatuses
+                        ) {
+                            showingSorenessLog = true
+                        }
 
-                            RecoveryTrendsCard(
-                                snapshot: recoverySnapshot,
+                        RecoveryDailyCheckInCard(
+                            store: sorenessStore
+                        ) {
+                            showingSorenessLog = true
+                        }
+
+                        RecoveryToolsCard { tool in
+                            selectedRecoveryTool = tool
+                        }
+
+                        // Keep the familiar raw-data sections, but move
+                        // them below the new interpretation/action layer.
+                        if health.sleep.totalAsleep > 0 {
+                            RecoveryLastNightCard(
                                 sleep: health.sleep
                             )
+                        }
 
-                            RecoveryDailyCheckInCard(
-                                store: sorenessStore
-                            ) {
-                                showingSorenessLog = true
-                            }
+                        RecoveryTrendsCard(
+                            snapshot: recoverySnapshot,
+                            sleep: health.sleep
+                        )
+                    } else {
+                        recoveryUnavailableCard
 
-                            todaysGuidanceCard
+                        MuscleRecoveryCard(
+                            statuses: muscleRecoveryStatuses
+                        ) {
+                            showingSorenessLog = true
+                        }
 
-                            MuscleRecoveryCard(
-                                statuses: muscleRecoveryStatuses
-                            ) {
-                                showingSorenessLog = true
-                            }
+                        RecoveryDailyCheckInCard(
+                            store: sorenessStore
+                        ) {
+                            showingSorenessLog = true
+                        }
 
-                            RecoveryToolsCard { tool in
-                                selectedRecoveryTool = tool
-                            }
-                        } else {
-                            recoveryUnavailableCard
-
-                            RecoveryDailyCheckInCard(
-                                store: sorenessStore
-                            ) {
-                                showingSorenessLog = true
-                            }
-
-                            todaysGuidanceCard
-
-                            MuscleRecoveryCard(
-                                statuses: muscleRecoveryStatuses
-                            ) {
-                                showingSorenessLog = true
-                            }
-
-                            RecoveryToolsCard { tool in
-                                selectedRecoveryTool = tool
-                            }
+                        RecoveryToolsCard { tool in
+                            selectedRecoveryTool = tool
                         }
                     }
+                }
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
                 .padding(.bottom, 30)
@@ -4517,10 +4545,12 @@ struct ATHLTHRecoveryView: View {
                 await health.refreshAll()
                 recoverySnapshot =
                     await health.recoveryTrendSnapshot()
+                await loadRecoveryAIIfNeeded(force: true)
             }
             .task {
                 recoverySnapshot =
                     await health.recoveryTrendSnapshot()
+                await loadRecoveryAIIfNeeded()
             }
             .sheet(isPresented: $showingSorenessLog) {
                 RecoverySorenessLogView(
@@ -4532,6 +4562,12 @@ struct ATHLTHRecoveryView: View {
             }
             .sheet(item: $selectedRecoveryTool) { tool in
                 RecoveryGuidedToolView(tool: tool)
+            }
+            .sheet(isPresented: $showingRecoverySense) {
+                RecoverySenseView(
+                    context: recoveryAIContext,
+                    insight: recoveryAIInsight ?? fallbackRecoveryAIInsight
+                )
             }
             .toolbar(.hidden, for: .navigationBar)
         }
@@ -5180,6 +5216,182 @@ struct ATHLTHRecoveryView: View {
             history: strengthWorkout.workoutHistory,
             soreness: sorenessStore
         )
+    }
+
+    private var recoveryAIContext: RecoveryAIContext {
+        RecoveryAIContext(
+            recoveryScore: health.recovery.score,
+            recoveryState: health.recovery.state.title,
+            recoveryDetail: health.recovery.detail,
+            sleepSeconds: health.sleep.totalAsleep > 0
+                ? health.sleep.totalAsleep
+                : nil,
+            baselineSleepSeconds: health.recovery.averageSleepDuration,
+            hrvMilliseconds: health.heart.hrvMilliseconds,
+            baselineHRVMilliseconds:
+                health.recovery.baselineHRVMilliseconds,
+            restingHeartRate: health.heart.restingHeartRate,
+            baselineRestingHeartRate:
+                health.recovery.baselineRestingHeartRate,
+            yesterdayTrainingMinutes: yesterdayTrainingMinutes,
+            acuteTrainingMinutes:
+                recoverySnapshot.trainingLoad.acuteMinutes,
+            chronicWeeklyAverageMinutes:
+                recoverySnapshot.trainingLoad.chronicWeeklyAverageMinutes,
+            muscles: muscleRecoveryStatuses.prefix(8).map {
+                RecoveryAIMuscleInput(
+                    name: $0.muscleGroup,
+                    recoveryPercent: Int(
+                        ($0.progress * 100).rounded()
+                    ),
+                    status: $0.statusTitle,
+                    completedSets: $0.completedSets
+                )
+            },
+            checkIn: RecoveryAICheckIn(
+                energy: sorenessStore.todayEnergy,
+                stress: sorenessStore.todayStress,
+                overallSoreness:
+                    sorenessStore.todayOverallSoreness,
+                motivation: sorenessStore.todayMotivation
+            )
+        )
+    }
+
+    private var yesterdayTrainingMinutes: Double {
+        let calendar = Calendar.current
+        guard let yesterday = calendar.date(
+            byAdding: .day,
+            value: -1,
+            to: Date()
+        ) else {
+            return 0
+        }
+
+        return recoverySnapshot.days.first {
+            calendar.isDate(
+                $0.date,
+                inSameDayAs: yesterday
+            )
+        }?.trainingMinutes ?? 0
+    }
+
+    private var fallbackRecoveryAIInsight: RecoveryAIInsight {
+        RecoveryAIInsight(
+            headline: recoveryHeadline,
+            summary: health.recovery.detail,
+            factors: [
+                RecoveryAIFactor(
+                    title: "Sleep",
+                    detail: sleepComparisonText ?? "No personal baseline yet.",
+                    impact: recoveryFactorImpact(
+                        current: health.sleep.totalAsleep > 0
+                            ? health.sleep.totalAsleep
+                            : nil,
+                        baseline: health.recovery.averageSleepDuration,
+                        higherIsBetter: true
+                    )
+                ),
+                RecoveryAIFactor(
+                    title: "HRV",
+                    detail: hrvComparisonText ?? "No personal baseline yet.",
+                    impact: recoveryFactorImpact(
+                        current: health.heart.hrvMilliseconds,
+                        baseline:
+                            health.recovery.baselineHRVMilliseconds,
+                        higherIsBetter: true
+                    )
+                ),
+                RecoveryAIFactor(
+                    title: "Resting HR",
+                    detail:
+                        restingHRComparisonText ??
+                        "No personal baseline yet.",
+                    impact: recoveryFactorImpact(
+                        current: health.heart.restingHeartRate,
+                        baseline:
+                            health.recovery.baselineRestingHeartRate,
+                        higherIsBetter: false
+                    )
+                )
+            ],
+            suggestion: RecoveryAISuggestion(
+                title: guidanceTitle,
+                subtitle: fallbackSuggestionSubtitle,
+                reason: guidanceDetail
+            ),
+            quickQuestions: [
+                "Why is my recovery different today?",
+                "Should I change today's workout?",
+                "Which muscle groups need more recovery?"
+            ]
+        )
+    }
+
+    private var fallbackSuggestionSubtitle: String {
+        switch health.recovery.state {
+        case .ready:
+            return "Normal to hard · follow your plan"
+        case .balanced:
+            return "Train as planned · stay flexible"
+        case .takeItEasy:
+            return "Easy effort · reduce load if needed"
+        case .recover:
+            return "Rest, mobility or very easy activity"
+        case .buildingBaseline:
+            return "Keep collecting recovery data"
+        }
+    }
+
+    private func recoveryFactorImpact(
+        current: Double?,
+        baseline: Double?,
+        higherIsBetter: Bool
+    ) -> String {
+        guard let current,
+              let baseline,
+              baseline > 0 else {
+            return "neutral"
+        }
+
+        let difference = (current - baseline) / baseline
+        guard abs(difference) >= 0.04 else {
+            return "neutral"
+        }
+
+        let favorable = higherIsBetter
+            ? difference > 0
+            : difference < 0
+        return favorable ? "positive" : "negative"
+    }
+
+    @MainActor
+    private func loadRecoveryAIIfNeeded(
+        force: Bool = false
+    ) async {
+        guard session.hasPaidAccess,
+              shouldShowWearableRecoveryContent else {
+            recoveryAIInsight = nil
+            recoveryAIError = nil
+            return
+        }
+
+        if !force, recoveryAIInsight != nil {
+            return
+        }
+
+        isLoadingRecoveryAI = true
+        recoveryAIError = nil
+        defer { isLoadingRecoveryAI = false }
+
+        do {
+            recoveryAIInsight = try await RecoveryAIService()
+                .generate(recoveryAIContext)
+        } catch {
+            // The deterministic fallback remains visible so Recovery
+            // never becomes an empty screen when AI is unavailable.
+            recoveryAIError = error.localizedDescription
+        }
     }
 
 }
