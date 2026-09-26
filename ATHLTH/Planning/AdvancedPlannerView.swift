@@ -174,16 +174,18 @@ struct AdvancedPlannerView: View {
                     Spacer()
 
                     HStack(spacing: 8) {
-                        Button {
-                            showingAllPlans = true
-                        } label: {
-                            Image(systemName: "square.stack.3d.up")
-                                .font(.system(size: 15, weight: .semibold))
-                                .frame(width: 38, height: 38)
+                        if planID == nil {
+                            Button {
+                                showingAllPlans = true
+                            } label: {
+                                Image(systemName: "square.stack.3d.up")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .frame(width: 38, height: 38)
+                            }
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.circle)
+                            .accessibilityLabel("All training plans")
                         }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.circle)
-                        .accessibilityLabel("All training plans")
 
                         Button {
                             showingPlanEditor = true
@@ -810,7 +812,9 @@ struct AdvancedPlannerView: View {
             .buttonStyle(.plain)
 
             Menu {
-                if let planID {
+                if let planID,
+                   let plan = displayedPlan,
+                   session.trainingPlanStatus(plan) == .active {
                     Button {
                         session.setPlanSessionManuallyCompleted(
                             planID: planID,
@@ -827,9 +831,9 @@ struct AdvancedPlannerView: View {
                                 : "checkmark.circle"
                         )
                     }
-                }
 
-                Divider()
+                    Divider()
+                }
 
                 Button(role: .destructive) {
                     if let planID = displayedPlan?.id {
