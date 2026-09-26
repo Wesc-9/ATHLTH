@@ -127,6 +127,16 @@ struct CommunityGroupEventRecord: Codable, Identifiable, Hashable {
     let imageURL: String?
     let activityConfiguration:
         CommunityGroupActivityConfiguration?
+    let status: String
+    let organizerKind: CommunityGroupOrganizerKind
+    let organizerUserID: UUID?
+    let capacity: Int?
+    let rsvpDeadline: Date?
+    let meetingLatitude: Double?
+    let meetingLongitude: Double?
+    let repeatRule: String?
+    let repeatUntil: Date?
+    let seriesID: UUID?
     let createdAt: Date
     let updatedAt: Date
 
@@ -142,6 +152,16 @@ struct CommunityGroupEventRecord: Codable, Identifiable, Hashable {
         case meetingName = "meeting_name"
         case imageURL = "image_url"
         case activityConfiguration = "activity_config"
+        case status
+        case organizerKind = "organizer_kind"
+        case organizerUserID = "organizer_user_id"
+        case capacity
+        case rsvpDeadline = "rsvp_deadline"
+        case meetingLatitude = "meeting_lat"
+        case meetingLongitude = "meeting_long"
+        case repeatRule = "repeat_rule"
+        case repeatUntil = "repeat_until"
+        case seriesID = "series_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -151,6 +171,7 @@ enum CommunityGroupChallengeMetric: String, Codable, CaseIterable, Identifiable 
     case distanceKM = "distance_km"
     case workouts
     case activeMinutes = "active_minutes"
+    case fastestTime = "fastest_time_seconds"
 
     var id: String { rawValue }
 
@@ -159,6 +180,7 @@ enum CommunityGroupChallengeMetric: String, Codable, CaseIterable, Identifiable 
         case .distanceKM: return "Distance"
         case .workouts: return "Workouts"
         case .activeMinutes: return "Active Minutes"
+        case .fastestTime: return "Fastest Time"
         }
     }
 
@@ -167,6 +189,7 @@ enum CommunityGroupChallengeMetric: String, Codable, CaseIterable, Identifiable 
         case .distanceKM: return "km"
         case .workouts: return "workouts"
         case .activeMinutes: return "min"
+        case .fastestTime: return "time"
         }
     }
 
@@ -175,6 +198,7 @@ enum CommunityGroupChallengeMetric: String, Codable, CaseIterable, Identifiable 
         case .distanceKM: return "figure.run"
         case .workouts: return "checkmark.circle.fill"
         case .activeMinutes: return "clock.fill"
+        case .fastestTime: return "timer"
         }
     }
 }
@@ -192,6 +216,15 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
     let imageURL: String?
     let activityConfiguration:
         CommunityGroupActivityConfiguration?
+    let status: String
+    let organizerKind: CommunityGroupOrganizerKind
+    let organizerUserID: UUID?
+    let scoringMode: CommunityGroupScoringMode
+    let attemptLimit: Int?
+    let routeVerificationEnabled: Bool
+    let routeToleranceMeters: Int
+    let joinRequired: Bool
+    let seriesID: UUID?
     let createdAt: Date
     let updatedAt: Date
 
@@ -207,6 +240,17 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
         case endsAt = "ends_at"
         case imageURL = "image_url"
         case activityConfiguration = "activity_config"
+        case status
+        case organizerKind = "organizer_kind"
+        case organizerUserID = "organizer_user_id"
+        case scoringMode = "scoring_mode"
+        case attemptLimit = "attempt_limit"
+        case routeVerificationEnabled =
+            "route_verification_enabled"
+        case routeToleranceMeters =
+            "route_tolerance_meters"
+        case joinRequired = "join_required"
+        case seriesID = "series_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -217,6 +261,8 @@ struct CommunityGroupChallengeWorkoutRecord: Codable, Hashable {
     let userID: UUID
     let workoutID: UUID
     let contribution: Double
+    let routeMatchPercent: Double?
+    let verificationStatus: String
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -224,6 +270,8 @@ struct CommunityGroupChallengeWorkoutRecord: Codable, Hashable {
         case userID = "user_id"
         case workoutID = "workout_id"
         case contribution
+        case routeMatchPercent = "route_match_percent"
+        case verificationStatus = "verification_status"
         case createdAt = "created_at"
     }
 }
@@ -492,17 +540,79 @@ private struct CommunityGroupChallengeCreateParams: Encodable {
     }
 }
 
+private struct CommunityGroupEventCreateV2Params: Encodable {
+    let id: UUID
+    let groupID: UUID
+    let title: String
+    let summary: String
+    let activityType: String
+    let startsAt: Date
+    let meetingName: String
+    let imageURL: String?
+    let activityConfiguration:
+        CommunityGroupActivityConfiguration?
+    let options: CommunityGroupEventAdvancedOptions
+
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
+        case groupID = "p_group_id"
+        case title = "p_title"
+        case summary = "p_summary"
+        case activityType = "p_activity_type"
+        case startsAt = "p_starts_at"
+        case meetingName = "p_meeting_name"
+        case imageURL = "p_image_url"
+        case activityConfiguration =
+            "p_activity_config"
+        case options = "p_options"
+    }
+}
+
+private struct CommunityGroupChallengeCreateV2Params: Encodable {
+    let id: UUID
+    let groupID: UUID
+    let title: String
+    let summary: String
+    let metric: String
+    let targetValue: Double
+    let startsAt: Date
+    let endsAt: Date
+    let imageURL: String?
+    let activityConfiguration:
+        CommunityGroupActivityConfiguration?
+    let options: CommunityGroupChallengeAdvancedOptions
+
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
+        case groupID = "p_group_id"
+        case title = "p_title"
+        case summary = "p_summary"
+        case metric = "p_metric"
+        case targetValue = "p_target_value"
+        case startsAt = "p_starts_at"
+        case endsAt = "p_ends_at"
+        case imageURL = "p_image_url"
+        case activityConfiguration =
+            "p_activity_config"
+        case options = "p_options"
+    }
+}
+
 private struct CommunityGroupChallengeWorkoutInsert: Encodable {
     let challengeID: UUID
     let userID: UUID
     let workoutID: UUID
     let contribution: Double
+    let routeMatchPercent: Double?
+    let verificationStatus: String
 
     enum CodingKeys: String, CodingKey {
         case challengeID = "challenge_id"
         case userID = "user_id"
         case workoutID = "workout_id"
         case contribution
+        case routeMatchPercent = "route_match_percent"
+        case verificationStatus = "verification_status"
     }
 }
 
@@ -1740,6 +1850,32 @@ final class CommunityGroupStore: ObservableObject {
             .remove(paths: [path])
     }
 
+    private func saveContentHosts(
+        groupID: UUID,
+        contentType: String,
+        contentID: UUID,
+        cohostIDs: [UUID]
+    ) async throws {
+        let unique = Array(Set(cohostIDs))
+        guard !unique.isEmpty else {
+            return
+        }
+
+        let payload = unique.map {
+            CommunityGroupContentHostInsert(
+                groupID: groupID,
+                contentType: contentType,
+                contentID: contentID,
+                userID: $0
+            )
+        }
+
+        try await client
+            .from("community_group_content_hosts")
+            .insert(payload)
+            .execute()
+    }
+
     func createEvent(
         groupID: UUID,
         title: String,
@@ -1749,7 +1885,11 @@ final class CommunityGroupStore: ObservableObject {
         meetingName: String,
         imageData: Data? = nil,
         activityConfiguration:
-            CommunityGroupActivityConfiguration? = nil
+            CommunityGroupActivityConfiguration? = nil,
+        advancedOptions:
+            CommunityGroupEventAdvancedOptions =
+                CommunityGroupEventAdvancedOptions(),
+        cohostIDs: [UUID] = []
     ) async -> Bool {
         guard currentUserID != nil,
               let group = group(for: groupID),
@@ -1791,27 +1931,36 @@ final class CommunityGroupStore: ObservableObject {
 
             try await client
                 .rpc(
-                    "create_community_group_event",
-                    params: CommunityGroupEventCreateParams(
-                        id: eventID,
-                        groupID: groupID,
-                        title: String(
-                            cleanTitle.prefix(160)
-                        ),
-                        summary: String(
-                            summary.prefix(1200)
-                        ),
-                        activityType: activityType,
-                        startsAt: startsAt,
-                        meetingName: String(
-                            cleanMeet.prefix(180)
-                        ),
-                        imageURL: imageURL,
-                        activityConfiguration:
-                            activityConfiguration
-                    )
+                    "create_community_group_event_v2",
+                    params:
+                        CommunityGroupEventCreateV2Params(
+                            id: eventID,
+                            groupID: groupID,
+                            title: String(
+                                cleanTitle.prefix(160)
+                            ),
+                            summary: String(
+                                summary.prefix(1200)
+                            ),
+                            activityType: activityType,
+                            startsAt: startsAt,
+                            meetingName: String(
+                                cleanMeet.prefix(180)
+                            ),
+                            imageURL: imageURL,
+                            activityConfiguration:
+                                activityConfiguration,
+                            options: advancedOptions
+                        )
                 )
                 .execute()
+
+            try await saveContentHosts(
+                groupID: groupID,
+                contentType: "event",
+                contentID: eventID,
+                cohostIDs: cohostIDs
+            )
 
             errorMessage = nil
             await loadGroupContent(groupID)
@@ -1841,7 +1990,11 @@ final class CommunityGroupStore: ObservableObject {
         endsAt: Date,
         imageData: Data? = nil,
         activityConfiguration:
-            CommunityGroupActivityConfiguration? = nil
+            CommunityGroupActivityConfiguration? = nil,
+        advancedOptions:
+            CommunityGroupChallengeAdvancedOptions =
+                CommunityGroupChallengeAdvancedOptions(),
+        cohostIDs: [UUID] = []
     ) async -> Bool {
         guard currentUserID != nil,
               let group = group(for: groupID),
@@ -1882,9 +2035,9 @@ final class CommunityGroupStore: ObservableObject {
 
             try await client
                 .rpc(
-                    "create_community_group_challenge",
+                    "create_community_group_challenge_v2",
                     params:
-                        CommunityGroupChallengeCreateParams(
+                        CommunityGroupChallengeCreateV2Params(
                             id: challengeID,
                             groupID: groupID,
                             title: String(
@@ -1899,10 +2052,18 @@ final class CommunityGroupStore: ObservableObject {
                             endsAt: endsAt,
                             imageURL: imageURL,
                             activityConfiguration:
-                                activityConfiguration
+                                activityConfiguration,
+                            options: advancedOptions
                         )
                 )
                 .execute()
+
+            try await saveContentHosts(
+                groupID: groupID,
+                contentType: "challenge",
+                contentID: challengeID,
+                cohostIDs: cohostIDs
+            )
 
             errorMessage = nil
             await loadGroupContent(groupID)
