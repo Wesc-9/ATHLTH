@@ -899,6 +899,36 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+    func updateSession(
+        _ updatedSession: PlannedSession,
+        inPlan planID: UUID
+    ) {
+        guard var plan = activePlan,
+              plan.id == planID
+        else {
+            return
+        }
+
+        for weekIndex in plan.weeks.indices {
+            for dayIndex in plan.weeks[weekIndex].days.indices {
+                guard let sessionIndex =
+                    plan.weeks[weekIndex].days[dayIndex].sessions.firstIndex(
+                        where: { $0.id == updatedSession.id }
+                    )
+                else {
+                    continue
+                }
+
+                plan.weeks[weekIndex].days[dayIndex].sessions[sessionIndex] =
+                    updatedSession
+                plan.updatedAt = Date()
+                plan.version += 1
+                activePlan = plan
+                return
+            }
+        }
+    }
+
     func removeSession(_ sessionID: UUID, fromDay dayID: UUID) {
         guard var plan = activePlan else { return }
 
