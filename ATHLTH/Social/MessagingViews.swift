@@ -717,6 +717,18 @@ struct DirectMessageThreadView: View {
                 .padding(.horizontal, 14)
             }
 
+            if !mentionSuggestions.isEmpty {
+                ATHLTHMentionSuggestionList(
+                    suggestions: mentionSuggestions
+                ) { suggestion in
+                    text = ATHLTHMentionSupport.inserting(
+                        suggestion,
+                        into: text
+                    )
+                }
+                .padding(.horizontal)
+            }
+
             HStack(alignment: .bottom, spacing: 10) {
                 if currentConversation?.requestStatus == .accepted {
                     Button {
@@ -765,6 +777,13 @@ struct DirectMessageThreadView: View {
         }
         .padding(.top, 8)
         .background(.ultraThinMaterial)
+    }
+
+    private var mentionSuggestions: [ATHLTHMentionSuggestion] {
+        ATHLTHMentionSupport.suggestions(
+            in: text,
+            candidates: [friend]
+        )
     }
 
     private var canSend: Bool {
