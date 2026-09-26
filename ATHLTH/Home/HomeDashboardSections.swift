@@ -230,42 +230,65 @@ struct HomeThisWeekCard: View {
 }
 
 struct HomeGettingStartedCard: View {
-    let healthConnected: Bool
     let hasPlan: Bool
     let hasGoal: Bool
+    let onDismiss: () -> Void
 
     var body: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Make ATHLTH Yours")
-                    .font(.title3.weight(.bold))
-                Text("Finish the essentials and Home will adapt around your training.")
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-            }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Make ATHLTH Yours")
+                            .font(.title3.weight(.bold))
 
-            VStack(spacing: 9) {
-                setupRow(
-                    title: "Connect Apple Health",
-                    complete: healthConnected,
-                    destination: AnyView(ATHLTHSettingsView())
-                )
+                        Text(
+                            "A few quick ways to make ATHLTH feel more like yours."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
 
-                setupRow(
-                    title: "Create a training plan",
-                    complete: hasPlan,
-                    destination: AnyView(
-                        AdvancedPlannerView(onOpenPrograms: {})
+                    Spacer()
+
+                    Button {
+                        onDismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Color.primary.opacity(0.045),
+                                in: Circle()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss setup tips")
+                }
+
+                VStack(spacing: 9) {
+                    setupRow(
+                        title: "Create a training plan",
+                        complete: hasPlan,
+                        destination: AnyView(
+                            AdvancedPlannerView(onOpenPrograms: {})
+                        )
                     )
-                )
 
-                setupRow(
-                    title: "Set your first goal",
-                    complete: hasGoal,
-                    destination: AnyView(GoalsHubView())
-                )
+                    setupRow(
+                        title: "Set your first goal",
+                        complete: hasGoal,
+                        destination: AnyView(GoalsHubView())
+                    )
+
+                    actionRow(
+                        title: "Edit your profile",
+                        icon: "person.crop.circle.badge.pencil",
+                        destination: AnyView(ATHLTHEditProfileView())
+                    )
+                }
             }
-            .padding(.top, 12)
         }
     }
 
@@ -311,6 +334,38 @@ struct HomeGettingStartedCard: View {
         }
         .buttonStyle(.plain)
         .disabled(complete)
+    }
+
+    private func actionRow(
+        title: String,
+        icon: String,
+        destination: AnyView
+    ) -> some View {
+        NavigationLink {
+            destination
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: icon)
+                    .foregroundStyle(ATHLTHTheme.accent)
+
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(
+                Color.primary.opacity(0.028),
+                in: RoundedRectangle(cornerRadius: 13)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
