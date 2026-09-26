@@ -271,6 +271,39 @@ final class CommunityGroupAdvancedStore: ObservableObject {
         }
     }
 
+    func submitManualStrengthResult(
+        challengeID: UUID,
+        contribution: Double,
+        note: String
+    ) async -> Bool {
+        guard contribution > 0 else {
+            errorMessage =
+                "Result must be greater than zero."
+            return false
+        }
+
+        do {
+            try await client
+                .rpc(
+                    "submit_community_group_manual_challenge_result",
+                    params:
+                        CommunityGroupManualResultParams(
+                            challengeID:
+                                challengeID,
+                            contribution:
+                                contribution,
+                            note: note
+                        )
+                )
+                .execute()
+
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func postComment(
         groupID: UUID,
         contentType: String,
@@ -796,6 +829,20 @@ private struct CommunityGroupSetHostsParams:
         case contentType = "p_content_type"
         case contentID = "p_content_id"
         case userIDs = "p_user_ids"
+    }
+}
+
+private struct CommunityGroupManualResultParams:
+    Encodable
+{
+    let challengeID: UUID
+    let contribution: Double
+    let note: String
+
+    enum CodingKeys: String, CodingKey {
+        case challengeID = "p_challenge_id"
+        case contribution = "p_contribution"
+        case note = "p_note"
     }
 }
 
