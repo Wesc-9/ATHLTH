@@ -2812,7 +2812,7 @@ struct SessionEditorView: View {
 
     @ViewBuilder
     private var advancedOptions: some View {
-        if kind == .running || kind == .walking {
+        if kind == .running {
             Section("Performance") {
                 Toggle(
                     "Target pace",
@@ -2848,6 +2848,9 @@ struct SessionEditorView: View {
                 }
             }
 
+        }
+
+        if kind == .running || kind == .walking {
             Section("Audio Coach") {
                 Button {
                     showingAudioCoachEditor = true
@@ -2985,6 +2988,29 @@ struct SessionEditorView: View {
             return $0.name.localizedCaseInsensitiveCompare(
                 $1.name
             ) == .orderedAscending
+        }
+    }
+
+    private var plannedGearIDsForSave: [UUID]? {
+        let allowed = selectedGearIDs.filter { id in
+            guard let item = gear.items.first(
+                where: { $0.id == id }
+            ) else {
+                return true
+            }
+
+            return item.category != .shoes ||
+                kind == .running
+        }
+
+        if allowed.isEmpty &&
+            !gearSelectionTouched &&
+            existingWorkout?.gearIDs == nil {
+            return nil
+        }
+
+        return allowed.sorted {
+            $0.uuidString < $1.uuidString
         }
     }
 
@@ -3658,15 +3684,7 @@ struct SessionEditorView: View {
             runningWorkouts: kind == .running
                 ? selectedRunningWorkouts
                 : nil,
-            gearIDs:
-                selectedGearIDs.isEmpty &&
-                !gearSelectionTouched &&
-                existingWorkout?.gearIDs == nil
-                    ? nil
-                    : selectedGearIDs
-                        .sorted {
-                            $0.uuidString < $1.uuidString
-                        },
+            gearIDs: plannedGearIDsForSave,
             audioCoachConfiguration:
                 (kind == .running || kind == .walking)
                     ? audioCoachOverride
