@@ -643,6 +643,8 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     let duration: TimeInterval
     let distanceMeters: Double?
     let activeEnergyKilocalories: Double?
+    let strengthMuscleGroups: [String]?
+    let strengthExerciseCount: Int?
     let source: String
 
     init(summary: WorkoutSummary) {
@@ -654,6 +656,8 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         duration = summary.duration
         distanceMeters = summary.distanceMeters
         activeEnergyKilocalories = summary.activeEnergyKilocalories
+        strengthMuscleGroups = nil
+        strengthExerciseCount = nil
         source = "Apple Health"
     }
 
@@ -669,7 +673,34 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
             0
         )
         distanceMeters = nil
-        activeEnergyKilocalories = nil
+        activeEnergyKilocalories = strengthWorkout.healthMetrics.activeCalories
+
+        let performedExercises: [StrengthExerciseLog]
+        if strengthWorkout.trackingMode == .advanced {
+            let completedExercises = strengthWorkout.exercises.filter { exercise in
+                exercise.isCompleted ||
+                    exercise.sets.contains(where: { $0.isCompleted })
+            }
+            performedExercises = completedExercises
+        } else {
+            performedExercises = strengthWorkout.exercises
+        }
+
+        strengthExerciseCount = performedExercises.count
+
+        var muscleGroups: [String] = []
+        for rawGroup in performedExercises.flatMap({ $0.exercise.primaryMuscles }) {
+            let group = rawGroup.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !group.isEmpty else { continue }
+
+            if !muscleGroups.contains(where: {
+                $0.caseInsensitiveCompare(group) == .orderedSame
+            }) {
+                muscleGroups.append(group)
+            }
+        }
+
+        strengthMuscleGroups = muscleGroups.isEmpty ? nil : muscleGroups
         source = "ATHLTH"
     }
 
@@ -707,6 +738,8 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         activeEnergyKilocalories = watchResult.activeCalories > 0
             ? watchResult.activeCalories
             : nil
+        strengthMuscleGroups = nil
+        strengthExerciseCount = nil
         source = "Apple Watch"
     }
 
@@ -736,6 +769,8 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         distanceMeters = wearableRecord.distanceMeters
         activeEnergyKilocalories =
             wearableRecord.activeEnergyKilocalories
+        strengthMuscleGroups = nil
+        strengthExerciseCount = nil
         source = wearableRecord.provider.title
     }
 

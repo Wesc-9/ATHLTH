@@ -968,16 +968,19 @@ struct PostWorkoutReviewView: View {
 
     private var summaryCard: some View {
         ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: [ATHLTHTheme.accent.opacity(0.88), .black.opacity(0.92)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            summaryBackground
 
-            ATHLTHMarkShape()
-                .fill(.white.opacity(0.11))
-                .frame(width: 175, height: 125)
-                .offset(x: 190, y: -30)
+            if workout.activity == .strength {
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        .black.opacity(0.18),
+                        .black.opacity(0.78)
+                    ],
+                    startPoint: .topTrailing,
+                    endPoint: .bottomLeading
+                )
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 Label("WORKOUT COMPLETE", systemImage: "checkmark.circle.fill")
@@ -986,34 +989,129 @@ struct PostWorkoutReviewView: View {
 
                 Text(workout.title)
                     .font(.title.bold())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
 
-                HStack(spacing: 12) {
-                    Label(durationText(workout.duration), systemImage: "clock.fill")
-
-                    if let distance = workout.distanceMeters,
-                       distance > 0 {
-                        Label(
-                            String(format: "%.2f km", distance / 1_000),
-                            systemImage: "location.fill"
-                        )
-                    }
-
-                    if let calories = workout.activeEnergyKilocalories,
-                       calories > 0 {
-                        Label(
-                            String(format: "%.0f kcal", calories),
-                            systemImage: "flame.fill"
-                        )
-                    }
+                ViewThatFits(in: .horizontal) {
+                    summaryMetrics(maxMuscleGroups: 3)
+                    summaryMetrics(maxMuscleGroups: 2)
+                    summaryMetrics(maxMuscleGroups: 1)
                 }
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.78))
             }
             .foregroundStyle(.white)
             .padding(18)
         }
         .frame(height: 190)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+    }
+
+    @ViewBuilder
+    private var summaryBackground: some View {
+        if workout.activity == .strength {
+            Image("StrengthPostWorkoutHero")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+        } else {
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.accent.opacity(0.88),
+                    .black.opacity(0.92)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            ATHLTHMarkShape()
+                .fill(.white.opacity(0.11))
+                .frame(width: 175, height: 125)
+                .offset(x: 190, y: -30)
+        }
+    }
+
+    @ViewBuilder
+    private func summaryMetrics(
+        maxMuscleGroups: Int
+    ) -> some View {
+        HStack(spacing: 10) {
+            Label(
+                durationText(workout.duration),
+                systemImage: "clock.fill"
+            )
+
+            if let distance = workout.distanceMeters,
+               distance > 0 {
+                Label(
+                    String(format: "%.2f km", distance / 1_000),
+                    systemImage: "location.fill"
+                )
+            }
+
+            if let calories = workout.activeEnergyKilocalories,
+               calories > 0 {
+                Label(
+                    String(format: "%.0f kcal", calories),
+                    systemImage: "flame.fill"
+                )
+            }
+
+            if workout.activity == .strength,
+               let exerciseCount = workout.strengthExerciseCount,
+               exerciseCount > 0 {
+                Label(
+                    exerciseCount == 1
+                        ? "1 exercise"
+                        : "\(exerciseCount) exercises",
+                    systemImage: "dumbbell.fill"
+                )
+            }
+
+            if workout.activity == .strength,
+               let muscles = muscleGroupsText(limit: maxMuscleGroups) {
+                Label(
+                    muscles,
+                    systemImage: "figure.strengthtraining.traditional"
+                )
+                .lineLimit(1)
+            }
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.white.opacity(0.94))
+        .lineLimit(1)
+    }
+
+    private func muscleGroupsText(
+        limit: Int
+    ) -> String? {
+        guard let groups = workout.strengthMuscleGroups,
+              !groups.isEmpty
+        else {
+            return nil
+        }
+
+        let cleanGroups = groups.map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                .capitalized
+        }
+        .filter { !$0.isEmpty }
+
+        guard !cleanGroups.isEmpty else {
+            return nil
+        }
+
+        let shown = Array(cleanGroups.prefix(max(limit, 1)))
+        let remaining = cleanGroups.count - shown.count
+        let base = shown.joined(separator: " · ")
+
+        return remaining > 0
+            ? "\(base) +\(remaining)"
+            : base
     }
 
     @ViewBuilder
