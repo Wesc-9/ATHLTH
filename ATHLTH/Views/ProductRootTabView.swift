@@ -104,8 +104,8 @@ struct ATHLTHHomeView: View {
     @State private var showingGlobalSearch = false
     @State private var selectedHomeStrengthSession: PlannedSession?
     @State private var pendingHomeQuickStartKind: WorkoutKind?
-    @State private var pendingHomePlanSession: PlannedSession?
     @State private var showingHomeStrengthWorkout = false
+    @State private var homeDirectStartInProgress = false
     @State private var homeWatchTransferMessage: String?
     @State private var homeWatchTransferError: String?
     @AppStorage("hasEditedATHLTHProfile")
@@ -442,30 +442,19 @@ struct ATHLTHHomeView: View {
                         settings.trainingDeviceProvider == .appleWatch &&
                         watchConnection.isReady
                 ) { selectedFriends, gearIDs in
-                    let planned = pendingHomePlanSession
-
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
-                            title: planned?.title ?? kind.title,
+                            title: kind.title,
                             kind: kind,
                             friends: selectedFriends,
                             creatorName: session.profile.displayName,
                             creatorUsername: session.profile.username
                         )
 
-                        if let planned {
-                            startHomePlannedWorkoutOnWatch(
-                                planned,
-                                gearIDs: gearIDs
-                            )
-                        } else {
-                            startHomeQuickWorkoutOnWatch(
-                                kind,
-                                gearIDs: gearIDs
-                            )
-                        }
-
-                        pendingHomePlanSession = nil
+                        startHomeQuickWorkoutOnWatch(
+                            kind,
+                            gearIDs: gearIDs
+                        )
                     }
                 }
             }
@@ -1438,16 +1427,30 @@ struct ATHLTHHomeView: View {
                         Button {
                             startHomeWorkout(workout)
                         } label: {
-                            Label(
-                                "Start Workout",
-                                systemImage: "play.fill"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 20)
-                            .frame(height: 42)
+                            if homeDirectStartInProgress {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(.white)
+
+                                    Text("Starting…")
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 20)
+                                .frame(height: 42)
+                            } else {
+                                Label(
+                                    "Start Workout",
+                                    systemImage: "play.fill"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 20)
+                                .frame(height: 42)
+                            }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(ATHLTHTheme.accentDeep)
+                        .disabled(homeDirectStartInProgress)
                     } else {
                         NavigationLink {
                             PlannedWorkoutDetailView(
@@ -1545,7 +1548,6 @@ struct ATHLTHHomeView: View {
                     ) {
                         if settings.trainingDeviceProvider == .appleWatch &&
                             watchConnection.isReady {
-                            pendingHomePlanSession = nil
                             pendingHomeQuickStartKind = .running
                         } else {
                             onSelectTab(1)
@@ -1662,13 +1664,19 @@ struct ATHLTHHomeView: View {
     private func homeCanStartDirectly(
         _ workout: PlannedSession
     ) -> Bool {
+        guard !homeDirectStartInProgress else {
+            return true
+        }
+
         switch workout.kind {
         case .strength:
             return strengthWorkout.activeWorkout == nil
+
         case .running, .walking:
             return settings.trainingDeviceProvider == .appleWatch &&
                 watchConnection.isReady &&
                 !watchConnection.workoutLaunchInProgress
+
         case .mobility, .recovery, .custom:
             return false
         }
@@ -1711,13 +1719,16 @@ struct ATHLTHHomeView: View {
     private func startHomeWorkout(
         _ workout: PlannedSession
     ) {
+        guard !homeDirectStartInProgress else {
+            return
+        }
+
         switch workout.kind {
         case .strength:
-            selectedHomeStrengthSession = workout
+            startHomePlannedStrengthWorkout(workout)
 
         case .running, .walking:
-            pendingHomePlanSession = workout
-            pendingHomeQuickStartKind = workout.kind
+            startHomePlannedWorkoutOnWatch(workout)
 
         case .mobility, .recovery, .custom:
             break
@@ -1765,8 +1776,7 @@ struct ATHLTHHomeView: View {
     }
 
     private func startHomePlannedWorkoutOnWatch(
-        _ workout: PlannedSession,
-        gearIDs: Set<UUID>
+        _ workout: PlannedSession
     ) {
         guard let watchKind = homeWatchKind(workout.kind),
               settings.trainingDeviceProvider == .appleWatch,
@@ -1777,29 +1787,333 @@ struct ATHLTHHomeView: View {
             return
         }
 
-        if let routeID = workout.routeID,
-           let route = session.savedRoutes.first(
+        let selectedRoute: TrainingRoute?
+
+        if let routeID = workout.routeID {
+            selectedRoute = session.savedRoutes.first(
                 where: { $0.id == routeID }
-           ) {
-            do {
-                try watchConnection.sendRoute(route)
-            } catch {
-                homeWatchTransferError = error.localizedDescription
-                return
-            }
+            )
+        } else {
+            selectedRoute = nil
         }
 
-        Task {
+        do {
+            if let selectedRoute {
+                try watchConnection.sendRoute(selectedRoute)
+                watchConnection.sendWorkoutRouteSelection(
+                    selectedRoute.id
+                )
+            } else {
+                watchConnection.sendWorkoutRouteSelection(nil)
+            }
+        } catch {
+            homeWatchTransferError = error.localizedDescription
+            return
+        }
+
+        homeDirectStartInProgress = true
+        homeWatchTransferError = nil
+
+        Task { @MainActor in
+            defer {
+                homeDirectStartInProgress = false
+            }
+
             do {
-                try await watchConnection.startWorkoutOnWatch(watchKind)
-                gear.prepareNextWorkoutGear(gearIDs)
+                try await watchConnection
+                    .startWorkoutOnWatch(watchKind)
+
+                // Planned workouts start immediately from Home. Gear can
+                // still be managed afterwards; no setup sheet is required.
+                gear.prepareNextWorkoutGear([])
+
+                let routeDistanceMeters =
+                    selectedRoute.map {
+                        $0.distanceKilometers * 1_000
+                    }
+                    ?? workout.targetDistanceKilometers.map {
+                        $0 * 1_000
+                    }
+
+                watchConnection.sendAudioCoachConfiguration(
+                    settings.audioCoachConfiguration(
+                        enabled:
+                            settings.audioCoachEnabledByDefault,
+                        routeDistanceMeters:
+                            routeDistanceMeters
+                    )
+                )
+
+                if workout.kind == .running {
+                    watchConnection.sendRunningWorkout(
+                        homeRunningWorkoutTransfer(
+                            from: workout
+                        )
+                    )
+                } else {
+                    // Clear any structured run left from an earlier session.
+                    watchConnection.sendRunningWorkout(
+                        WatchRunningWorkoutTransfer(
+                            title: workout.title,
+                            steps: []
+                        )
+                    )
+                }
+
                 session.beginTrainingStatus(for: workout)
-                homeWatchTransferMessage =
-                    "\(workout.title) started on Apple Watch."
+
+                // No success modal: the Home card/live mirror becomes the
+                // confirmation that the planned workout has started.
+                homeWatchTransferMessage = nil
             } catch {
-                homeWatchTransferError = error.localizedDescription
+                homeWatchTransferError =
+                    error.localizedDescription
             }
         }
+    }
+
+    private func startHomePlannedStrengthWorkout(
+        _ workout: PlannedSession
+    ) {
+        guard strengthWorkout.activeWorkout == nil else {
+            return
+        }
+
+        let trackingMode: StrengthTrackingMode =
+            settings.defaultStrengthTracking == .advanced
+                ? .advanced
+                : .simple
+
+        let useAppleWatch =
+            settings.trainingDeviceProvider == .appleWatch &&
+            watchConnection.isReady &&
+            settings.preferredWorkoutCapture != .iPhone
+
+        homeDirectStartInProgress = true
+        homeWatchTransferError = nil
+
+        if useAppleWatch {
+            Task { @MainActor in
+                defer {
+                    homeDirectStartInProgress = false
+                }
+
+                do {
+                    try await watchConnection
+                        .startWorkoutOnWatch(.strength)
+
+                    session.beginTrainingStatus(for: workout)
+                    strengthWorkout.start(
+                        session: workout,
+                        watchSessionID: UUID(),
+                        trackingMode: trackingMode,
+                        captureDevice: .appleWatch
+                    )
+                    showingHomeStrengthWorkout = true
+                } catch {
+                    homeWatchTransferError =
+                        error.localizedDescription
+                }
+            }
+        } else {
+            session.beginTrainingStatus(for: workout)
+            strengthWorkout.start(
+                session: workout,
+                watchSessionID: nil,
+                trackingMode: trackingMode,
+                captureDevice: .iPhone
+            )
+            homeDirectStartInProgress = false
+            showingHomeStrengthWorkout = true
+        }
+    }
+
+    private func homeRunningWorkoutTransfer(
+        from workout: PlannedSession
+    ) -> WatchRunningWorkoutTransfer {
+        let structured = workout.resolvedRunningWorkouts
+
+        if !structured.isEmpty {
+            let steps = structured.flatMap {
+                homeRunningSteps(from: $0)
+            }
+
+            return WatchRunningWorkoutTransfer(
+                title: workout.title,
+                steps: steps
+            )
+        }
+
+        let fallback: WatchRunningWorkoutStep
+
+        if let distance = workout.targetDistanceKilometers,
+           distance > 0 {
+            fallback = WatchRunningWorkoutStep(
+                id: UUID(),
+                title: workout.title,
+                measure: .distance,
+                distanceMeters: distance * 1_000,
+                durationSeconds: nil,
+                intensityText: homePlannedPaceText(workout)
+            )
+        } else if let minutes = workout.durationMinutes,
+                  minutes > 0 {
+            fallback = WatchRunningWorkoutStep(
+                id: UUID(),
+                title: workout.title,
+                measure: .time,
+                distanceMeters: nil,
+                durationSeconds:
+                    TimeInterval(minutes * 60),
+                intensityText: homePlannedPaceText(workout)
+            )
+        } else {
+            fallback = WatchRunningWorkoutStep(
+                id: UUID(),
+                title: workout.title,
+                measure: .open,
+                distanceMeters: nil,
+                durationSeconds: nil,
+                intensityText: homePlannedPaceText(workout)
+            )
+        }
+
+        return WatchRunningWorkoutTransfer(
+            title: workout.title,
+            steps: [fallback]
+        )
+    }
+
+    private func homeRunningSteps(
+        from template: RunningWorkoutTemplate
+    ) -> [WatchRunningWorkoutStep] {
+        template.blocks.flatMap { block in
+            let repetitions = max(block.repetitions, 1)
+            var result: [WatchRunningWorkoutStep] = []
+
+            for repetition in 0..<repetitions {
+                result.append(
+                    homeRunningStep(
+                        title:
+                            repetitions > 1
+                                ? "\(block.title) \(repetition + 1)/\(repetitions)"
+                                : block.title,
+                        target: block.work
+                    )
+                )
+
+                if repetition < repetitions - 1,
+                   let recovery = block.recovery {
+                    result.append(
+                        homeRunningStep(
+                            title: "Recovery",
+                            target: recovery
+                        )
+                    )
+                }
+            }
+
+            return result
+        }
+    }
+
+    private func homeRunningStep(
+        title: String,
+        target: RunningStepTarget
+    ) -> WatchRunningWorkoutStep {
+        let measure: WatchRunningStepMeasure
+
+        switch target.measure {
+        case .distance:
+            measure = .distance
+        case .time:
+            measure = .time
+        case .open:
+            measure = .open
+        }
+
+        return WatchRunningWorkoutStep(
+            id: UUID(),
+            title: title,
+            measure: measure,
+            distanceMeters: target.distanceMeters,
+            durationSeconds: target.durationSeconds,
+            intensityText:
+                homeRunningIntensityText(
+                    target.intensity
+                )
+        )
+    }
+
+    private func homeRunningIntensityText(
+        _ intensity: RunningIntensityTarget
+    ) -> String? {
+        switch intensity.kind {
+        case .none:
+            return nil
+
+        case .easy:
+            return "Easy effort"
+
+        case .pace:
+            if let minimum =
+                    intensity.paceMinSecondsPerKilometer,
+               let maximum =
+                    intensity.paceMaxSecondsPerKilometer {
+                return
+                    "\(homePaceText(minimum))–\(homePaceText(maximum)) /km"
+            }
+
+            if let pace =
+                    intensity.paceMinSecondsPerKilometer ??
+                    intensity.paceMaxSecondsPerKilometer {
+                return "\(homePaceText(pace)) /km"
+            }
+
+            return "Pace target"
+
+        case .heartRateZone:
+            if let zone = intensity.heartRateZone {
+                return "Heart-rate zone \(zone)"
+            }
+            return "Heart-rate target"
+
+        case .rpe:
+            if let rpe = intensity.rpe {
+                return String(
+                    format: "RPE %.1f",
+                    rpe
+                )
+            }
+            return "RPE target"
+        }
+    }
+
+    private func homePlannedPaceText(
+        _ workout: PlannedSession
+    ) -> String? {
+        guard let pace =
+                workout.targetPaceSecondsPerKilometer,
+              pace > 0
+        else {
+            return nil
+        }
+
+        return "\(homePaceText(pace)) /km"
+    }
+
+    private func homePaceText(
+        _ secondsPerKilometer: Double
+    ) -> String {
+        let total = max(
+            Int(secondsPerKilometer.rounded()),
+            0
+        )
+        return String(
+            format: "%d:%02d",
+            total / 60,
+            total % 60
+        )
     }
 
     private var homeNextUp: HomeNextUpItem? {
