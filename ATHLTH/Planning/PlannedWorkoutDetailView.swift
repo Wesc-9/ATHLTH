@@ -21,7 +21,7 @@ struct PlannedWorkoutDetailView: View {
         for week in plan.weeks {
             for day in week.days {
                 if let updated = day.sessions.first(
-                    where: { $0.id == currentWorkout.id }
+                    where: { $0.id == workout.id }
                 ) {
                     return updated
                 }
