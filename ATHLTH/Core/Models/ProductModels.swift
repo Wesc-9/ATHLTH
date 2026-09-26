@@ -340,9 +340,30 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var routeID: UUID?
     var exercises: [PlannedExercise]
     var notes: String?
+
+    // Kept for backwards compatibility with plans created before multi-run
+    // support. New sessions also store the first selected workout here so
+    // older code paths still have a useful structured workout.
     var runningWorkout: RunningWorkoutTemplate? = nil
+
+    // Optional so previously persisted plans decode without migration.
+    var runningWorkouts: [RunningWorkoutTemplate]? = nil
+
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil
+
+    var resolvedRunningWorkouts: [RunningWorkoutTemplate] {
+        if let runningWorkouts,
+           !runningWorkouts.isEmpty {
+            return runningWorkouts
+        }
+
+        if let runningWorkout {
+            return [runningWorkout]
+        }
+
+        return []
+    }
 }
 
 struct TrainingPlanDay: Identifiable, Codable, Hashable {
