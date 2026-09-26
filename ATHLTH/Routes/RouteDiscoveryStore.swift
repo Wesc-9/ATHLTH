@@ -179,8 +179,19 @@ final class RouteDiscoveryStore: ObservableObject {
         defer { isLoading = false }
 
         do {
-            routes = try await service.loadDiscoverableRoutes()
+            let loadedRoutes = try await service.loadDiscoverableRoutes()
+
+            guard !Task.isCancelled else { return }
+
+            routes = loadedRoutes
+            errorMessage = nil
+        } catch is CancellationError {
+            // Pull-to-refresh and SwiftUI view tasks may legitimately
+            // cancel an in-flight discovery request. Do not surface
+            // cancellation as a user-facing Community error.
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
