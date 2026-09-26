@@ -1373,33 +1373,270 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 nearestDistance
         }
 
-        guard nearestDistance > 80,
-              location.horizontalAccuracy <= 35
+        evaluateRouteAlert(
+            deviationMeters: nearestDistance,
+            horizontalAccuracy:
+                location.horizontalAccuracy
+        )
+    }
+
+    private func evaluateRouteAlert(
+        deviationMeters: Double,
+        horizontalAccuracy: Double
+    ) {
+        let configuration =
+            routeAlertConfiguration
+
+        guard configuration.enabled,
+              horizontalAccuracy >= 0,
+              horizontalAccuracy <= 35
         else {
+            offRouteStartedAt = nil
             return
         }
 
         let now = Date()
+        let isOffRoute =
+            deviationMeters >
+            configuration.deviationMeters
 
-        if let lastOffRouteHapticAt,
-           now.timeIntervalSince(
-                lastOffRouteHapticAt
-           ) < 120 {
+        guard isOffRoute else {
+            offRouteStartedAt = nil
+
+            if routeWasOff {
+                routeWasOff = false
+
+                if configuration
+                    .announceBackOnRoute {
+                    deliverWorkoutAlert(
+                        english: "Back on route",
+                        norwegian: "Tilbake på ruten",
+                        delivery:
+                            configuration.delivery,
+                        haptic: .success
+                    )
+                }
+            }
             return
         }
 
-        lastOffRouteHapticAt = now
-        WKInterfaceDevice.current()
-            .play(.directionDown)
+        if offRouteStartedAt == nil {
+            offRouteStartedAt = now
+        }
 
-        if audioCoachConfiguration.enabled {
+        guard now.timeIntervalSince(
+            offRouteStartedAt ?? now
+        ) >= configuration.graceSeconds
+        else {
+            return
+        }
+
+        if let lastOffRouteAlertAt,
+           now.timeIntervalSince(
+                lastOffRouteAlertAt
+           ) < configuration.repeatSeconds {
+            return
+        }
+
+        routeWasOff = true
+        lastOffRouteAlertAt = now
+
+        deliverWorkoutAlert(
+            english:
+                "You are off route. " +
+                spokenDistance(deviationMeters),
+            norwegian:
+                "Du er utenfor ruten. " +
+                spokenDistance(deviationMeters),
+            delivery:
+                configuration.delivery,
+            haptic: .directionDown
+        )
+    }
+
+    private func evaluateWorkoutTargetAlerts() {
+        guard state == .running,
+              kind == .running || kind == .walking,
+              let configuration =
+                targetAlertConfiguration
+        else {
+            publish {
+                self.liveTargetStatus = nil
+            }
+            targetViolationStartedAt = nil
+            targetWasOutside = false
+            return
+        }
+
+        var violation:
+            (
+                english: String,
+                norwegian: String
+            )?
+        var hasEvaluableTarget = false
+
+        if configuration.heartRateEnabled,
+           heartRate > 0,
+           let minimum =
+                configuration
+                    .heartRateMinimumBPM,
+           let maximum =
+                configuration
+                    .heartRateMaximumBPM {
+            hasEvaluableTarget = true
+
+            if heartRate < minimum {
+                violation = (
+                    english:
+                        "Heart rate below target",
+                    norwegian:
+                        "Pulsen er under målområdet"
+                )
+            } else if heartRate > maximum {
+                violation = (
+                    english:
+                        "Heart rate above target",
+                    norwegian:
+                        "Pulsen er over målområdet"
+                )
+            }
+        }
+
+        if violation == nil,
+           configuration.paceAlertsEnabled,
+           let pace =
+                currentPaceSecondsPerKilometer,
+           let step =
+                currentStructuredRunningStep {
+            let first =
+                step
+                    .targetPaceMinSecondsPerKilometer
+            let second =
+                step
+                    .targetPaceMaxSecondsPerKilometer
+
+            if first != nil || second != nil {
+                hasEvaluableTarget = true
+
+                let low =
+                    min(
+                        first ?? second ?? pace,
+                        second ?? first ?? pace
+                    ) -
+                    configuration
+                        .paceToleranceSecondsPerKilometer
+                let high =
+                    max(
+                        first ?? second ?? pace,
+                        second ?? first ?? pace
+                    ) +
+                    configuration
+                        .paceToleranceSecondsPerKilometer
+
+                if pace < low {
+                    violation = (
+                        english:
+                            "Pace faster than target",
+                        norwegian:
+                            "Tempoet er raskere enn målet"
+                    )
+                } else if pace > high {
+                    violation = (
+                        english:
+                            "Pace slower than target",
+                        norwegian:
+                            "Tempoet er saktere enn målet"
+                    )
+                }
+            }
+        }
+
+        guard hasEvaluableTarget else {
+            publish {
+                self.liveTargetStatus = nil
+            }
+            targetViolationStartedAt = nil
+            targetWasOutside = false
+            return
+        }
+
+        guard let violation else {
+            publish {
+                self.liveTargetStatus = "On target"
+            }
+            targetViolationStartedAt = nil
+
+            if targetWasOutside {
+                targetWasOutside = false
+
+                if configuration
+                    .announceBackInTarget {
+                    deliverWorkoutAlert(
+                        english: "Back in target",
+                        norwegian:
+                            "Tilbake i målområdet",
+                        delivery:
+                            configuration.delivery,
+                        haptic: .success
+                    )
+                }
+            }
+            return
+        }
+
+        publish {
+            self.liveTargetStatus =
+                violation.english
+        }
+
+        let now = Date()
+
+        if targetViolationStartedAt == nil {
+            targetViolationStartedAt = now
+        }
+
+        guard now.timeIntervalSince(
+            targetViolationStartedAt ?? now
+        ) >= configuration.graceSeconds
+        else {
+            return
+        }
+
+        if let lastTargetAlertAt,
+           now.timeIntervalSince(
+                lastTargetAlertAt
+           ) < configuration.repeatSeconds {
+            return
+        }
+
+        targetWasOutside = true
+        lastTargetAlertAt = now
+
+        deliverWorkoutAlert(
+            english: violation.english,
+            norwegian: violation.norwegian,
+            delivery:
+                configuration.delivery,
+            haptic: .notification
+        )
+    }
+
+    private func deliverWorkoutAlert(
+        english: String,
+        norwegian: String,
+        delivery: WatchAlertDelivery,
+        haptic: WKHapticType
+    ) {
+        if delivery.usesHaptics {
+            WKInterfaceDevice.current()
+                .play(haptic)
+        }
+
+        if delivery.usesVoice {
             speak(
                 coachPhrase(
-                    english: "You are off route",
-                    norwegian: "Du er utenfor ruten"
-                ) + ". " +
-                spokenDistance(
-                    nearestDistance
+                    english: english,
+                    norwegian: norwegian
                 )
             )
         }
