@@ -3286,9 +3286,9 @@ struct ATHLTHTrainView: View {
 
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Workout Library")
+                Text("Running Library")
                     .font(.title3.weight(.bold))
-                Text("Choose a complete workout or use exercises to build your own.")
+                Text("Structured running workouts you can start, schedule or customize.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
