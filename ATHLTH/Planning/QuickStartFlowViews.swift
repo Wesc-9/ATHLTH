@@ -1348,7 +1348,13 @@ private func watchRunningStep(
         durationSeconds: target.durationSeconds,
         intensityText: watchIntensityText(
             target.intensity
-        )
+        ),
+        targetPaceMinSecondsPerKilometer:
+            target.intensity
+                .paceMinSecondsPerKilometer,
+        targetPaceMaxSecondsPerKilometer:
+            target.intensity
+                .paceMaxSecondsPerKilometer
     )
 }
 
