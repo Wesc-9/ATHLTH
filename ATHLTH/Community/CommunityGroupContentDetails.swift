@@ -93,9 +93,7 @@ struct CommunityGroupEventDetailView: View {
                                             hostIDs:
                                                 advanced
                                                     .hosts
-                                                    .map(
-                                                        .userID
-                                                    )
+                                                    .map(\.userID)
                                         )
 
                                 if result != nil {
@@ -929,10 +927,10 @@ struct CommunityGroupChallengeDetailView: View {
         .navigationTitle("Challenge")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if canManageContent {
-                ToolbarItem(
-                    placement: .topBarTrailing
-                ) {
+            ToolbarItem(
+                placement: .topBarTrailing
+            ) {
+                if canManageContent {
                     Menu {
                         if current.status != "cancelled" {
                             Button {
@@ -955,9 +953,7 @@ struct CommunityGroupChallengeDetailView: View {
                                             hostIDs:
                                                 advanced
                                                     .hosts
-                                                    .map(
-                                                        .userID
-                                                    )
+                                                    .map(\.userID)
                                         )
 
                                 if result != nil {
