@@ -541,6 +541,170 @@ final class CommunityGroupAdvancedStore: ObservableObject {
         }
     }
 
+    func duplicateEvent(
+        event: CommunityGroupEventRecord,
+        hostIDs: [UUID]
+    ) async -> UUID? {
+        let id = UUID()
+        let shiftedStart = max(
+            event.startsAt.addingTimeInterval(
+                7 * 24 * 3_600
+            ),
+            Date().addingTimeInterval(3_600)
+        )
+        let delta = shiftedStart
+            .timeIntervalSince(event.startsAt)
+
+        var options =
+            CommunityGroupEventAdvancedOptions()
+        options.organizerKind =
+            event.organizerKind
+        options.status = .draft
+        options.capacity = event.capacity
+        options.rsvpDeadline =
+            event.rsvpDeadline.map {
+                $0.addingTimeInterval(delta)
+            }
+        options.endsAt =
+            event.endsAt.map {
+                $0.addingTimeInterval(delta)
+            }
+        options.meetingLatitude =
+            event.meetingLatitude
+        options.meetingLongitude =
+            event.meetingLongitude
+        options.repeatWeekly =
+            event.repeatRule == "weekly"
+        options.repeatUntil =
+            event.repeatUntil.map {
+                $0.addingTimeInterval(delta)
+            }
+
+        do {
+            try await client
+                .rpc(
+                    "create_community_group_event_v2",
+                    params:
+                        CommunityGroupDuplicateEventParams(
+                            id: id,
+                            groupID: event.groupID,
+                            title: event.title,
+                            summary: event.summary,
+                            activityType:
+                                event.activityType,
+                            startsAt: shiftedStart,
+                            meetingName:
+                                event.meetingName,
+                            imageURL:
+                                event.imageURL,
+                            activityConfiguration:
+                                event.activityConfiguration,
+                            options: options
+                        )
+                )
+                .execute()
+
+            _ = await setHosts(
+                groupID: event.groupID,
+                contentType: "event",
+                contentID: id,
+                userIDs: hostIDs
+            )
+
+            return id
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return nil
+        }
+    }
+
+    func duplicateChallenge(
+        challenge:
+            CommunityGroupChallengeRecord,
+        hostIDs: [UUID]
+    ) async -> UUID? {
+        let id = UUID()
+        let shiftedStart = max(
+            challenge.startsAt
+                .addingTimeInterval(
+                    7 * 24 * 3_600
+                ),
+            Date()
+        )
+        let duration =
+            challenge.endsAt
+                .timeIntervalSince(
+                    challenge.startsAt
+                )
+        let shiftedEnd =
+            shiftedStart.addingTimeInterval(
+                max(duration, 3_600)
+            )
+
+        var options =
+            CommunityGroupChallengeAdvancedOptions()
+        options.organizerKind =
+            challenge.organizerKind
+        options.status = .draft
+        options.scoringMode =
+            challenge.scoringMode
+        options.attemptLimit =
+            challenge.attemptLimit
+        options.routeVerificationEnabled =
+            challenge.routeVerificationEnabled
+        options.routeToleranceMeters =
+            challenge.routeToleranceMeters
+        options.joinRequired =
+            challenge.joinRequired
+
+        do {
+            try await client
+                .rpc(
+                    "create_community_group_challenge_v2",
+                    params:
+                        CommunityGroupDuplicateChallengeParams(
+                            id: id,
+                            groupID:
+                                challenge.groupID,
+                            title:
+                                challenge.title,
+                            summary:
+                                challenge.summary,
+                            metric:
+                                challenge.metric
+                                    .rawValue,
+                            targetValue:
+                                challenge.targetValue,
+                            startsAt:
+                                shiftedStart,
+                            endsAt:
+                                shiftedEnd,
+                            imageURL:
+                                challenge.imageURL,
+                            activityConfiguration:
+                                challenge
+                                    .activityConfiguration,
+                            options: options
+                        )
+                )
+                .execute()
+
+            _ = await setHosts(
+                groupID: challenge.groupID,
+                contentType: "challenge",
+                contentID: id,
+                userIDs: hostIDs
+            )
+
+            return id
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return nil
+        }
+    }
+
     private func reloadComments(
         contentType: String,
         contentID: UUID
@@ -568,6 +732,70 @@ final class CommunityGroupAdvancedStore: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct CommunityGroupDuplicateEventParams:
+    Encodable
+{
+    let id: UUID
+    let groupID: UUID
+    let title: String
+    let summary: String
+    let activityType: String
+    let startsAt: Date
+    let meetingName: String
+    let imageURL: String?
+    let activityConfiguration:
+        CommunityGroupActivityConfiguration?
+    let options:
+        CommunityGroupEventAdvancedOptions
+
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
+        case groupID = "p_group_id"
+        case title = "p_title"
+        case summary = "p_summary"
+        case activityType = "p_activity_type"
+        case startsAt = "p_starts_at"
+        case meetingName = "p_meeting_name"
+        case imageURL = "p_image_url"
+        case activityConfiguration =
+            "p_activity_config"
+        case options = "p_options"
+    }
+}
+
+private struct CommunityGroupDuplicateChallengeParams:
+    Encodable
+{
+    let id: UUID
+    let groupID: UUID
+    let title: String
+    let summary: String
+    let metric: String
+    let targetValue: Double
+    let startsAt: Date
+    let endsAt: Date
+    let imageURL: String?
+    let activityConfiguration:
+        CommunityGroupActivityConfiguration?
+    let options:
+        CommunityGroupChallengeAdvancedOptions
+
+    enum CodingKeys: String, CodingKey {
+        case id = "p_id"
+        case groupID = "p_group_id"
+        case title = "p_title"
+        case summary = "p_summary"
+        case metric = "p_metric"
+        case targetValue = "p_target_value"
+        case startsAt = "p_starts_at"
+        case endsAt = "p_ends_at"
+        case imageURL = "p_image_url"
+        case activityConfiguration =
+            "p_activity_config"
+        case options = "p_options"
     }
 }
 
