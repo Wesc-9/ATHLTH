@@ -1022,6 +1022,99 @@ final class HealthKitManager: ObservableObject {
         }
     }
 
+    func groupChallengeRouteMatchPercent(
+        workoutID: UUID,
+        referenceCoordinates: [RouteCoordinate],
+        toleranceMeters: Double
+    ) async -> Double? {
+        guard referenceCoordinates.count >= 2,
+              let workout = try? await workoutForChallenge(
+                uuid: workoutID
+              ),
+              let route = try? await fetchRoute(
+                for: workout
+              ),
+              route.count >= 2
+        else {
+            return nil
+        }
+
+        let actual = route.filter {
+            $0.horizontalAccuracy >= 0 &&
+            $0.horizontalAccuracy <= 65
+        }
+
+        guard actual.count >= 2 else {
+            return nil
+        }
+
+        let references = referenceCoordinates.map {
+            CLLocation(
+                latitude: $0.latitude,
+                longitude: $0.longitude
+            )
+        }
+
+        let sampleStep = max(
+            references.count / 100,
+            1
+        )
+        let samples = stride(
+            from: 0,
+            to: references.count,
+            by: sampleStep
+        ).map { references[$0] }
+
+        guard !samples.isEmpty else {
+            return nil
+        }
+
+        let tolerance = min(
+            max(toleranceMeters, 25),
+            1_000
+        )
+        let matched = samples.reduce(0) {
+            count,
+            reference in
+
+            let nearest = actual.lazy
+                .map {
+                    $0.distance(from: reference)
+                }
+                .min()
+                ?? .greatestFiniteMagnitude
+
+            return count +
+                (nearest <= tolerance ? 1 : 0)
+        }
+
+        return Double(matched) /
+            Double(samples.count) *
+            100
+    }
+
+    func groupChallengeFastestSegmentDuration(
+        workoutID: UUID,
+        targetDistanceMeters: Double
+    ) async -> TimeInterval? {
+        guard targetDistanceMeters > 0,
+              let workout = try? await workoutForChallenge(
+                uuid: workoutID
+              ),
+              let route = try? await fetchRoute(
+                for: workout
+              ),
+              route.count >= 2
+        else {
+            return nil
+        }
+
+        return fastestSegmentDuration(
+            in: route,
+            targetDistance: targetDistanceMeters
+        )
+    }
+
     func profilePerformanceStats(
         forceRefresh: Bool = false
     ) async throws -> ProfilePerformanceStats {
