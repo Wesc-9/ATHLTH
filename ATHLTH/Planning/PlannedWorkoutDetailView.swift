@@ -53,8 +53,10 @@ struct PlannedWorkoutDetailView: View {
                         strengthCard
                     }
 
-                    if let runningWorkout = currentWorkout.runningWorkout {
-                        runningCard(runningWorkout)
+                    if !currentWorkout.resolvedRunningWorkouts.isEmpty {
+                        runningCard(
+                            currentWorkout.resolvedRunningWorkouts
+                        )
                     }
 
                     if let notes = cleanNotes {
@@ -205,7 +207,7 @@ struct PlannedWorkoutDetailView: View {
                     currentWorkout.targetDistanceKilometers == nil &&
                     currentWorkout.targetPaceSecondsPerKilometer == nil &&
                     currentWorkout.routeID == nil {
-                    Text("No additional targets are set for this currentWorkout.")
+                    Text("No additional targets are set for this workout.")
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                 }
@@ -250,41 +252,59 @@ struct PlannedWorkoutDetailView: View {
     }
 
     private func runningCard(
-        _ runningWorkout: RunningWorkoutTemplate
+        _ runningWorkouts: [RunningWorkoutTemplate]
     ) -> some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Running workout")
+            VStack(alignment: .leading, spacing: 12) {
+                sectionTitle(
+                    runningWorkouts.count == 1
+                        ? "Running workout"
+                        : "Running workouts"
+                )
 
-                HStack(spacing: 11) {
-                    Image(systemName: runningWorkout.type.systemImage)
-                        .font(.title3)
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 38, height: 38)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 12)
-                        )
+                ForEach(
+                    Array(runningWorkouts.enumerated()),
+                    id: \.element.id
+                ) { index, runningWorkout in
+                    HStack(spacing: 11) {
+                        Image(systemName: runningWorkout.type.systemImage)
+                            .font(.title3)
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .frame(width: 38, height: 38)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(runningWorkout.title)
-                            .font(.subheadline.weight(.semibold))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(runningWorkout.title)
+                                .font(.subheadline.weight(.semibold))
 
-                        Text(
-                            "\(runningWorkout.type.title) · \(runningWorkout.blocks.count) blocks"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                            Text(
+                                "\(runningWorkout.type.title) · \(runningWorkout.blocks.count) blocks"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            if !runningWorkout.summary.isEmpty {
+                                Text(runningWorkout.summary)
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.mutedText
+                                    )
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
+                            }
+                        }
+
+                        Spacer()
                     }
 
-                    Spacer()
-                }
-
-                if !runningWorkout.summary.isEmpty {
-                    Text(runningWorkout.summary)
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if index < runningWorkouts.count - 1 {
+                        Divider()
+                    }
                 }
             }
         }
@@ -381,7 +401,7 @@ struct PlannedWorkoutDetailView: View {
                     .buttonStyle(.plain)
 
                     Text(
-                        "Manual completion updates your ATHLTH plan only. It does not create an Apple Health currentWorkout."
+                        "Manual completion updates your ATHLTH plan only. It does not create an Apple Health workout."
                     )
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
