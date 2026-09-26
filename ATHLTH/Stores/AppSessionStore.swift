@@ -735,6 +735,41 @@ final class AppSessionStore: ObservableObject {
             }
         }
 
+        for planIndex in scheduledPlans.indices {
+            var changed = false
+
+            for weekIndex in scheduledPlans[planIndex].weeks.indices {
+                for dayIndex in scheduledPlans[planIndex]
+                    .weeks[weekIndex]
+                    .days.indices {
+                    for sessionIndex in scheduledPlans[planIndex]
+                        .weeks[weekIndex]
+                        .days[dayIndex]
+                        .sessions.indices {
+                        if scheduledPlans[planIndex]
+                            .weeks[weekIndex]
+                            .days[dayIndex]
+                            .sessions[sessionIndex]
+                            .routeID == routeID {
+                            scheduledPlans[planIndex]
+                                .weeks[weekIndex]
+                                .days[dayIndex]
+                                .sessions[sessionIndex]
+                                .routeID = nil
+                            changed = true
+                        }
+                    }
+                }
+            }
+
+            if changed {
+                scheduledPlans[planIndex].version += 1
+                scheduledPlans[planIndex].updatedAt = Date()
+            }
+        }
+
+        persistScheduledPlans()
+
         for index in savedWorkoutTemplates.indices {
             if savedWorkoutTemplates[index].routeID == routeID {
                 savedWorkoutTemplates[index].routeID = nil
@@ -1434,7 +1469,24 @@ final class AppSessionStore: ObservableObject {
     }
 
     func replaceActivePlan(with plan: TrainingPlan) {
-        activePlan = plan
+        var replacement = plan
+
+        if let current = activePlan {
+            replacement.startDate =
+                current.startDate ??
+                Calendar.current.startOfDay(for: Date())
+            replacement.endDate =
+                current.endDate ??
+                trainingPlanEndDate(current)
+        } else if replacement.startDate == nil {
+            replacement.startDate =
+                Calendar.current.startOfDay(for: Date())
+        }
+
+        replacement = normalizedTrainingPlan(replacement)
+        activePlan = replacement
+        scheduledPlans.removeAll { $0.id == replacement.id }
+        persistScheduledPlans()
     }
 
     func fillEmptyDaysFromGeneratedProgram(
@@ -1492,16 +1544,15 @@ final class AppSessionStore: ObservableObject {
     }
 
     func addWeekToActivePlan() {
-        guard var plan = activePlan else {
+        guard let plan = activePlan else {
             createStarterPlan()
             return
         }
 
-        let number = (plan.weeks.map(\.weekNumber).max() ?? 0) + 1
-        plan.weeks.append(makeEmptyWeek(number: number))
-        plan.updatedAt = Date()
-        plan.version += 1
-        activePlan = plan
+        _ = setTrainingPlanWeekCount(
+            planID: plan.id,
+            weekCount: min(plan.weeks.count + 1, 52)
+        )
     }
 
     func removeWeekFromActivePlan(_ weekID: UUID) {
@@ -1519,6 +1570,14 @@ final class AppSessionStore: ObservableObject {
         for weekIndex in plan.weeks.indices {
             plan.weeks[weekIndex].weekNumber = weekIndex + 1
             plan.weeks[weekIndex].title = "Week \(weekIndex + 1)"
+        }
+
+        if let startDate = plan.startDate {
+            plan.endDate = Calendar.current.date(
+                byAdding: .day,
+                value: max(plan.weeks.count * 7 - 1, 0),
+                to: Calendar.current.startOfDay(for: startDate)
+            )
         }
 
         plan.updatedAt = Date()
