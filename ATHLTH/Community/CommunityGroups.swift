@@ -2478,6 +2478,21 @@ struct CommunityGroupDetailView: View {
                                     systemImage: "bell"
                                 )
                             }
+
+                            if !groups.isOwner(
+                                of: currentGroup
+                            ) {
+                                Button(
+                                    "Leave Group",
+                                    role: .destructive
+                                ) {
+                                    Task {
+                                        await groups.leave(
+                                            currentGroup
+                                        )
+                                    }
+                                }
+                            }
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(.system(size: 16, weight: .bold))
