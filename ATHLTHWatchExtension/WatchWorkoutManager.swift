@@ -3,6 +3,7 @@ import CoreLocation
 import Foundation
 import HealthKit
 import WatchConnectivity
+import WatchKit
 
 enum WatchWorkoutState: Equatable {
     case idle
@@ -23,6 +24,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var heartRate: Double = 0
     @Published private(set) var activeCalories: Double = 0
     @Published private(set) var distanceMeters: Double = 0
+    @Published private(set) var currentPaceSecondsPerKilometer:
+        TimeInterval?
+    @Published private(set) var routeProgressPercent: Double?
+    @Published private(set) var routeRemainingMeters: Double?
+    @Published private(set) var routeDeviationMeters: Double?
+    @Published private(set) var lapCount = 0
+    @Published private(set) var currentLapElapsedTime: TimeInterval = 0
+    @Published private(set) var currentLapDistanceMeters: Double = 0
     @Published private(set) var averageHeartRate: Double?
     @Published private(set) var maxHeartRate: Double?
     @Published private(set) var routePoints: [WatchRoutePoint] = []
@@ -57,6 +66,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var structuredStepStartElapsedTime: TimeInterval = 0
     private var structuredStepStartDistanceMeters: Double = 0
     private var structuredWorkoutComplete = false
+    private var plannedRouteLocations: [CLLocation] = []
+    private var plannedRouteCumulativeMeters: [Double] = []
+    private var plannedRouteGeometryMeters: Double = 0
+    private var lastOffRouteHapticAt: Date?
+    private var lastLapElapsedTime: TimeInterval = 0
+    private var lastLapDistanceMeters: Double = 0
 
     private override init() {
         super.init()
@@ -68,8 +83,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func configurePlannedRoute(
         _ route: WatchRouteTransfer?
     ) {
+        cachePlannedRouteGeometry(route)
+
         publish {
             self.plannedRoute = route
+            self.routeProgressPercent =
+                route == nil ? nil : 0
+            self.routeRemainingMeters =
+                route.map {
+                    max(
+                        $0.distanceKilometers * 1_000,
+                        0
+                    )
+                }
+            self.routeDeviationMeters = nil
         }
     }
 
@@ -104,6 +131,99 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
            !workout.steps.isEmpty {
             announceCurrentStructuredStep(prefix: "Starting")
         }
+    }
+
+    var averagePaceSecondsPerKilometer: TimeInterval? {
+        guard distanceMeters >= 100,
+              elapsedTime > 0
+        else {
+            return nil
+        }
+
+        return elapsedTime /
+            (distanceMeters / 1_000)
+    }
+
+    var currentStructuredStepElapsedTime: TimeInterval {
+        max(
+            elapsedTime -
+            structuredStepStartElapsedTime,
+            0
+        )
+    }
+
+    var currentStructuredStepDistanceMeters: Double {
+        max(
+            distanceMeters -
+            structuredStepStartDistanceMeters,
+            0
+        )
+    }
+
+    var nextStructuredRunningStep: WatchRunningWorkoutStep? {
+        guard let workout = structuredRunningWorkout else {
+            return nil
+        }
+
+        let index = structuredStepIndex + 1
+        return workout.steps.indices.contains(index)
+            ? workout.steps[index]
+            : nil
+    }
+
+    var audioCoachConfigured: Bool {
+        let configuration = audioCoachConfiguration
+
+        return configuration.enabled ||
+            configuration.distanceIntervalMeters != nil ||
+            configuration.timeIntervalSeconds != nil ||
+            configuration.announceDistance ||
+            configuration.announceElapsedTime ||
+            configuration.announceAveragePace ||
+            configuration.announceClockTime ||
+            configuration.announceHeartRate ||
+            configuration.announceRemainingRouteDistance ||
+            configuration.announceEstimatedRemainingRouteTime ||
+            configuration.announceCurrentWorkoutStep ||
+            configuration.announceRemainingStepTime ||
+            configuration.announceRemainingStepDistance
+    }
+
+    func setAudioCoachEnabled(_ enabled: Bool) {
+        guard audioCoachConfigured else {
+            return
+        }
+
+        publish {
+            self.audioCoachConfiguration.enabled = enabled
+        }
+
+        resetAudioCoachThresholds()
+
+        if enabled {
+            WKInterfaceDevice.current().play(.click)
+            if currentStructuredRunningStep != nil {
+                announceCurrentStructuredStep(
+                    prefix: "Current"
+                )
+            }
+        }
+    }
+
+    func markLap() {
+        guard kind == .running || kind == .walking,
+              state == .running
+        else {
+            return
+        }
+
+        lapCount += 1
+        lastLapElapsedTime = elapsedTime
+        lastLapDistanceMeters = distanceMeters
+        currentLapElapsedTime = 0
+        currentLapDistanceMeters = 0
+
+        WKInterfaceDevice.current().play(.click)
     }
 
     func configureStrengthSession(
