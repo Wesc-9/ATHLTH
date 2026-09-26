@@ -411,6 +411,17 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    func canPublishUpdates(_ group: CommunityGroupRecord) -> Bool {
+        if canManage(group) {
+            return true
+        }
+
+        return ownMemberships.contains {
+            $0.groupID == group.id &&
+            $0.role == "contributor"
+        }
+    }
+
     func profileCard(for userID: UUID) -> SocialProfileCard? {
         profileCardsByID[userID]
     }
@@ -795,13 +806,54 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    func deleteGroup(
+        _ group: CommunityGroupRecord
+    ) async -> Bool {
+        guard canManage(group) else {
+            errorMessage = "You do not have permission to delete this group."
+            return false
+        }
+
+        let imagePath =
+            "\(group.id.uuidString.lowercased())/cover.jpg"
+
+        do {
+            // Storage objects do not cascade with the database row, so remove
+            // the group photo while the group still exists and permissions can
+            // be evaluated.
+            try? await client.storage
+                .from("community-group-images")
+                .remove(paths: [imagePath])
+
+            try await client
+                .from("community_groups")
+                .delete()
+                .eq("id", value: group.id)
+                .execute()
+
+            membersByGroup[group.id] = nil
+            announcementsByGroup[group.id] = nil
+            activityByGroup[group.id] = nil
+            messagesByGroup[group.id] = nil
+            eventsByGroup[group.id] = nil
+            challengesByGroup[group.id] = nil
+
+            await refresh()
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func postAnnouncement(
         groupID: UUID,
         body: String
     ) async -> Bool {
         guard let userID = currentUserID,
               let group = group(for: groupID),
-              canManage(group)
+              canPublishUpdates(group)
         else {
             return false
         }
@@ -841,8 +893,9 @@ final class CommunityGroupStore: ObservableObject {
         role: String
     ) async -> Bool {
         guard let group = group(for: groupID),
-              isOwner(of: group),
-              role == "admin" || role == "member"
+              canManage(group),
+              userID != group.creatorID,
+              ["admin", "contributor", "member"].contains(role)
         else {
             return false
         }
@@ -1414,6 +1467,7 @@ struct CommunityGroupsView: View {
 }
 
 struct CommunityGroupDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var session: AppSessionStore
 
@@ -1424,7 +1478,8 @@ struct CommunityGroupDetailView: View {
     @State private var showingCreateEvent = false
     @State private var showingCreateChallenge = false
     @State private var showingGroupSettings = false
-    @State private var showingPostUpdate = false
+    @State private var updateDraft = ""
+    @State private var postingUpdate = false
 
     private var currentGroup: CommunityGroupRecord {
         groups.groups.first {
@@ -1499,11 +1554,6 @@ struct CommunityGroupDetailView: View {
         .sheet(isPresented: $showingGroupSettings) {
             CommunityGroupSettingsView(group: currentGroup)
         }
-        .sheet(isPresented: $showingPostUpdate) {
-            CommunityGroupAnnouncementCreateView(
-                group: currentGroup
-            )
-        }
         .task {
             if groups.groups.isEmpty {
                 await groups.refresh()
@@ -1518,138 +1568,221 @@ struct CommunityGroupDetailView: View {
                 await groups.loadGroupContent(group.id)
             }
         }
-    }
-
-    private var groupHeader: some View {
-        ATHLTHCard {
-            HStack(alignment: .top, spacing: 14) {
-                detailGroupImage
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(currentGroup.name)
-                        .font(.title3.weight(.bold))
-
-                    if !currentGroup.locationName
-                        .trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        )
-                        .isEmpty {
-                        Label(
-                            currentGroup.locationName,
-                            systemImage: "location.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Label(
-                        currentGroup.visibility == "private"
-                            ? "Private group"
-                            : "Public group",
-                        systemImage:
-                            currentGroup.visibility == "private"
-                                ? "lock.fill"
-                                : "globe"
-                    )
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(
-                        currentGroup.visibility == "private"
-                            ? ATHLTHTheme.mutedText
-                            : ATHLTHTheme.accentDeep
-                    )
-
-                    if isMember {
-                        Text(memberCountText)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                    }
-                }
-
-                Spacer()
-
-                if groups.canManage(currentGroup) {
-                    Menu {
-                        Button {
-                            showingPostUpdate = true
-                        } label: {
-                            Label(
-                                "Post Group Update",
-                                systemImage: "megaphone.fill"
-                            )
-                        }
-
-                        Button {
-                            showingGroupSettings = true
-                        } label: {
-                            Label(
-                                "Group Settings",
-                                systemImage: "gearshape"
-                            )
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .frame(width: 34, height: 34)
-                    }
-                } else if isMember {
-                    Menu {
-                        Button("Leave Group", role: .destructive) {
-                            Task {
-                                await groups.leave(currentGroup)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .frame(width: 34, height: 34)
-                    }
-                }
-            }
-
-            if !currentGroup.summary.isEmpty {
-                Text(currentGroup.summary)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 10)
+        .onChange(of: groups.groups.map(\.id)) { _, groupIDs in
+            if !groupIDs.contains(group.id) {
+                dismiss()
             }
         }
     }
 
-    @ViewBuilder
-    private var detailGroupImage: some View {
-        if let value = currentGroup.imageURL,
-           let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    detailGroupImageFallback
+    private var groupHeader: some View {
+        ZStack(alignment: .bottomLeading) {
+            LinearGradient(
+                colors: [
+                    Color.indigo.opacity(0.22),
+                    ATHLTHTheme.cardWarm.opacity(0.92),
+                    ATHLTHTheme.canvasTop
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.white.opacity(0.28))
+                .frame(width: 180, height: 180)
+                .offset(x: 230, y: -82)
+                .allowsHitTesting(false)
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
+                    if groups.canManage(currentGroup) {
+                        Button {
+                            showingGroupSettings = true
+                        } label: {
+                            detailGroupImage
+                                .overlay(alignment: .bottomTrailing) {
+                                    Image(systemName: "pencil")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 22, height: 22)
+                                        .background(
+                                            ATHLTHTheme.accentDeep,
+                                            in: Circle()
+                                        )
+                                        .overlay {
+                                            Circle()
+                                                .stroke(
+                                                    Color.white,
+                                                    lineWidth: 2
+                                                )
+                                        }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Change group photo")
+                    } else {
+                        detailGroupImage
+                    }
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(currentGroup.name)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        if !currentGroup.summary
+                            .trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
+                            .isEmpty {
+                            Text(currentGroup.summary)
+                                .font(.subheadline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                                .lineLimit(3)
+                        }
+
+                        HStack(spacing: 10) {
+                            if !currentGroup.locationName
+                                .trimmingCharacters(
+                                    in: .whitespacesAndNewlines
+                                )
+                                .isEmpty {
+                                Label(
+                                    currentGroup.locationName,
+                                    systemImage: "location.fill"
+                                )
+                            }
+
+                            Label(
+                                currentGroup.visibility == "private"
+                                    ? "Private"
+                                    : "Public",
+                                systemImage:
+                                    currentGroup.visibility == "private"
+                                        ? "lock.fill"
+                                        : "globe"
+                            )
+
+                            if isMember {
+                                Text(memberCountText)
+                            }
+                        }
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Spacer()
+
+                    if groups.canManage(currentGroup) {
+                        Menu {
+                            Button {
+                                showingGroupSettings = true
+                            } label: {
+                                Label(
+                                    "Group Settings",
+                                    systemImage: "gearshape"
+                                )
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Color.white.opacity(0.56),
+                                    in: Circle()
+                                )
+                        }
+                    } else if isMember {
+                        Menu {
+                            Button(
+                                "Leave Group",
+                                role: .destructive
+                            ) {
+                                Task {
+                                    await groups.leave(currentGroup)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Color.white.opacity(0.56),
+                                    in: Circle()
+                                )
+                        }
+                    }
                 }
             }
-            .frame(width: 58, height: 58)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
+            .padding(18)
+        }
+        .frame(minHeight: 166)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
             )
-        } else {
-            detailGroupImageFallback
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.78), lineWidth: 1)
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.08),
+            radius: 18,
+            x: 0,
+            y: 8
+        )
+    }
+
+    @ViewBuilder
+    private var detailGroupImage: some View {
+        Group {
+            if let value = currentGroup.imageURL,
+               let url = URL(string: value) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        detailGroupImageFallback
+                    }
+                }
+            } else {
+                detailGroupImageFallback
+            }
+        }
+        .frame(width: 72, height: 72)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.92), lineWidth: 2)
         }
     }
 
     private var detailGroupImageFallback: some View {
         Image(systemName: "person.3.fill")
-            .font(.system(size: 24, weight: .semibold))
+            .font(.system(size: 27, weight: .semibold))
             .foregroundStyle(.indigo)
-            .frame(width: 58, height: 58)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
-                Color.indigo.opacity(0.09),
-                in: RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
+                Color.indigo.opacity(0.10)
             )
     }
 
@@ -1662,34 +1795,28 @@ struct CommunityGroupDetailView: View {
 
     private var overview: some View {
         VStack(spacing: 16) {
-            if let update = groups.announcements(
-                in: group.id
-            ).first {
-                groupUpdateCard(update)
-            } else if groups.canManage(currentGroup) {
-                Button {
-                    showingPostUpdate = true
-                } label: {
-                    ATHLTHCard {
-                        HStack(spacing: 12) {
-                            Image(systemName: "megaphone.fill")
-                                .foregroundStyle(.indigo)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Post your first group update")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                Text("Updates appear here and in Community Activity.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.tertiary)
-                        }
+            if groups.canPublishUpdates(currentGroup) {
+                groupUpdateComposer
+            }
+
+            let updates = groups.announcements(in: group.id)
+            if !updates.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Updates")
+                        .font(.headline)
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
+                        .padding(.horizontal, 4)
+
+                    ForEach(updates) { update in
+                        groupUpdateCard(update)
                     }
                 }
-                .buttonStyle(.plain)
             }
+
+            comingUpCard
 
             membersOverviewCard
 
@@ -1716,34 +1843,240 @@ struct CommunityGroupDetailView: View {
                 }
                 .padding(.top, 10)
             }
+        }
+    }
 
-            if let next = groups.events(in: group.id)
-                .filter({ $0.startsAt >= Date() })
-                .sorted(by: { $0.startsAt < $1.startsAt })
-                .first {
-                ATHLTHCard {
-                    Text("Next Event")
-                        .font(.headline)
-                    Text(next.title)
-                        .font(.title3.weight(.bold))
-                        .padding(.top, 4)
-                    Text(
-                        next.startsAt.formatted(
-                            date: .abbreviated,
-                            time: .shortened
-                        ) + " · " + next.meetingName
+    private var groupUpdateComposer: some View {
+        ATHLTHCard {
+            HStack(spacing: 9) {
+                Image(systemName: "megaphone.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.indigo)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        Color.indigo.opacity(0.10),
+                        in: RoundedRectangle(
+                            cornerRadius: 11,
+                            style: .continuous
+                        )
                     )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Group update")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Visible to every group member")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
+
+                Spacer()
             }
 
-            if let active = groups.challenges(in: group.id)
-                .filter({ $0.startsAt <= Date() && $0.endsAt >= Date() })
-                .first {
-                groupChallengeCard(active)
+            HStack(alignment: .bottom, spacing: 10) {
+                TextField(
+                    "Share an update…",
+                    text: $updateDraft,
+                    axis: .vertical
+                )
+                .lineLimit(1...5)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 11)
+                .background(
+                    Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
+                )
+
+                Button {
+                    let body = updateDraft
+                    updateDraft = ""
+
+                    Task {
+                        postingUpdate = true
+                        let posted = await groups.postAnnouncement(
+                            groupID: group.id,
+                            body: body
+                        )
+                        postingUpdate = false
+
+                        if !posted {
+                            updateDraft = body
+                        }
+                    }
+                } label: {
+                    Group {
+                        if postingUpdate {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 15, weight: .bold))
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.accentDeep,
+                        in: Circle()
+                    )
+                }
+                .disabled(
+                    updateDraft.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty ||
+                    updateDraft.count > 1200 ||
+                    postingUpdate
+                )
+            }
+            .padding(.top, 12)
+        }
+    }
+
+    private var nextGroupEvent: CommunityGroupEventRecord? {
+        groups.events(in: group.id)
+            .filter { $0.startsAt >= Date() }
+            .sorted { $0.startsAt < $1.startsAt }
+            .first
+    }
+
+    private var nextGroupChallenge: CommunityGroupChallengeRecord? {
+        let now = Date()
+
+        return groups.challenges(in: group.id)
+            .filter { $0.endsAt >= now }
+            .sorted { lhs, rhs in
+                let lhsActive =
+                    lhs.startsAt <= now && lhs.endsAt >= now
+                let rhsActive =
+                    rhs.startsAt <= now && rhs.endsAt >= now
+
+                if lhsActive != rhsActive {
+                    return lhsActive
+                }
+
+                return lhs.startsAt < rhs.startsAt
+            }
+            .first
+    }
+
+    private var comingUpCard: some View {
+        ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Coming Up")
+                        .font(.title3.weight(.bold))
+                    Text("The next things happening in this group.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            if nextGroupEvent == nil &&
+                nextGroupChallenge == nil {
+                Text("No upcoming events or challenges yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 14)
+            } else {
+                VStack(spacing: 0) {
+                    if let event = nextGroupEvent {
+                        Button {
+                            selectedTab = .events
+                        } label: {
+                            comingUpRow(
+                                icon: "calendar",
+                                title: event.title,
+                                detail:
+                                    event.startsAt.formatted(
+                                        date: .abbreviated,
+                                        time: .shortened
+                                    ) +
+                                    " · " +
+                                    event.meetingName,
+                                tint: .purple
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if nextGroupEvent != nil &&
+                        nextGroupChallenge != nil {
+                        Divider()
+                            .padding(.leading, 46)
+                    }
+
+                    if let challenge = nextGroupChallenge {
+                        Button {
+                            selectedTab = .challenges
+                        } label: {
+                            comingUpRow(
+                                icon: "bolt.fill",
+                                title: challenge.title,
+                                detail:
+                                    challenge.startsAt <= Date()
+                                        ? "Active now · ends " +
+                                            challenge.endsAt.formatted(
+                                                date: .abbreviated,
+                                                time: .omitted
+                                            )
+                                        : "Starts " +
+                                            challenge.startsAt.formatted(
+                                                date: .abbreviated,
+                                                time: .shortened
+                                            ),
+                                tint: .green
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 8)
             }
         }
+    }
+
+    private func comingUpRow(
+        icon: String,
+        title: String,
+        detail: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 34, height: 34)
+                .background(
+                    tint.opacity(0.10),
+                    in: RoundedRectangle(
+                        cornerRadius: 11,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.bold())
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 9)
     }
 
     private func groupUpdateCard(
@@ -1778,18 +2111,21 @@ struct CommunityGroupDetailView: View {
             if let author = groups.profileCard(
                 for: update.authorID
             ) {
-                Text("Posted by \(author.resolvedName)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
-            }
-
-            if groups.canManage(currentGroup) {
-                Button("Post another update") {
-                    showingPostUpdate = true
-                }
-                .font(.caption.weight(.semibold))
-                .padding(.top, 6)
+                Text(
+                    author.username
+                        .flatMap { value in
+                            let clean = value.trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
+                            return clean.isEmpty
+                                ? nil
+                                : "Posted by @\(clean)"
+                        }
+                        ?? "Posted by \(author.resolvedName)"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
             }
         }
     }
@@ -2292,6 +2628,8 @@ struct CommunityGroupSettingsView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
     @State private var saving = false
+    @State private var deleting = false
+    @State private var showingDeleteConfirmation = false
 
     init(group: CommunityGroupRecord) {
         self.group = group
@@ -2300,40 +2638,74 @@ struct CommunityGroupSettingsView: View {
         _visibility = State(initialValue: group.visibility)
     }
 
+    private var currentGroup: CommunityGroupRecord {
+        groups.group(for: group.id) ?? group
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Group Image") {
-                    HStack {
-                        Spacer()
+                Section {
+                    VStack(spacing: 14) {
                         groupImagePreview
-                        Spacer()
-                    }
 
-                    PhotosPicker(
-                        selection: $selectedPhoto,
-                        matching: .images
-                    ) {
-                        Label(
-                            selectedImageData == nil
-                                ? "Choose Image"
-                                : "Change Image",
-                            systemImage: "photo"
-                        )
-                    }
+                        HStack(spacing: 10) {
+                            PhotosPicker(
+                                selection: $selectedPhoto,
+                                matching: .images
+                            ) {
+                                Label(
+                                    selectedImageData == nil
+                                        ? "Choose Photo"
+                                        : "Change Photo",
+                                    systemImage: "photo"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accent)
 
-                    if group.imageURL != nil {
-                        Button(
-                            "Remove Image",
-                            role: .destructive
-                        ) {
-                            Task {
-                                saving = true
-                                _ = await groups.removeGroupImage(group)
-                                saving = false
+                            if selectedImageData != nil {
+                                Button(role: .destructive) {
+                                    selectedImageData = nil
+                                    selectedPhoto = nil
+                                } label: {
+                                    Label(
+                                        "Remove",
+                                        systemImage: "trash"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                            } else if currentGroup.imageURL != nil {
+                                Button(role: .destructive) {
+                                    Task {
+                                        saving = true
+                                        _ = await groups.removeGroupImage(
+                                            currentGroup
+                                        )
+                                        saving = false
+                                    }
+                                } label: {
+                                    Label(
+                                        "Remove",
+                                        systemImage: "trash"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(saving)
                             }
                         }
+
+                        Text(
+                            "The group photo appears beside the group name. The large header stays a gradient so the group keeps a consistent ATHLTH look."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                } header: {
+                    Text("Group photo")
                 }
 
                 Section("Group") {
@@ -2366,6 +2738,22 @@ struct CommunityGroupSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
+
+                if groups.canManage(currentGroup) {
+                    Section {
+                        Button(
+                            "Delete Group",
+                            role: .destructive
+                        ) {
+                            showingDeleteConfirmation = true
+                        }
+                        .disabled(saving || deleting)
+                    } footer: {
+                        Text(
+                            "Deleting a group permanently removes its messages, updates, events, challenges and memberships."
+                        )
+                    }
+                }
             }
             .navigationTitle("Group Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -2379,32 +2767,15 @@ struct CommunityGroupSettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(saving ? "Saving…" : "Save") {
                         Task {
-                            saving = true
-                            let ok = await groups.updateGroup(
-                                group,
-                                name: name,
-                                locationName: group.locationName,
-                                summary: summary,
-                                visibility: visibility
-                            )
-                            saving = false
-
-                            if ok {
-                                if let selectedImageData {
-                                    _ = await groups.uploadGroupImage(
-                                        group,
-                                        jpegData: selectedImageData
-                                    )
-                                }
-                                dismiss()
-                            }
+                            await saveChanges()
                         }
                     }
                     .disabled(
                         name.trimmingCharacters(
                             in: .whitespacesAndNewlines
                         ).count < 2 ||
-                        saving
+                        saving ||
+                        deleting
                     )
                 }
             }
@@ -2418,11 +2789,10 @@ struct CommunityGroupSettingsView: View {
                         guard
                             let data = try await item
                                 .loadTransferable(type: Data.self),
-                            let image = UIImage(data: data),
-                            let jpeg = image.jpegData(
-                                compressionQuality: 0.82
-                            )
+                            let jpeg = prepareGroupImageData(data)
                         else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that image. Try another photo."
                             return
                         }
 
@@ -2435,59 +2805,162 @@ struct CommunityGroupSettingsView: View {
                     }
                 }
             }
+            .confirmationDialog(
+                "Delete \(currentGroup.name)?",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(
+                    "Delete Group",
+                    role: .destructive
+                ) {
+                    Task {
+                        deleting = true
+                        let deleted = await groups.deleteGroup(
+                            currentGroup
+                        )
+                        deleting = false
+
+                        if deleted {
+                            dismiss()
+                        }
+                    }
+                }
+
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "This cannot be undone. All group content will be permanently removed."
+                )
+            }
+        }
+    }
+
+    private func saveChanges() async {
+        saving = true
+
+        var saved = await groups.updateGroup(
+            currentGroup,
+            name: name,
+            locationName: currentGroup.locationName,
+            summary: summary,
+            visibility: visibility
+        )
+
+        if saved,
+           let selectedImageData {
+            saved = await groups.uploadGroupImage(
+                currentGroup,
+                jpegData: selectedImageData
+            )
+        }
+
+        saving = false
+
+        if saved {
+            dismiss()
         }
     }
 
     @ViewBuilder
     private var groupImagePreview: some View {
-        if let selectedImageData,
-           let image = UIImage(data: selectedImageData) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 120, height: 120)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 24,
-                        style: .continuous
-                    )
-                )
-        } else if let value = group.imageURL,
-                  let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    groupImagePlaceholder
+        Group {
+            if let selectedImageData,
+               let image = UIImage(data: selectedImageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if let value = currentGroup.imageURL,
+                      let url = URL(string: value) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        groupImagePlaceholder
+                    }
                 }
+            } else {
+                groupImagePlaceholder
             }
-            .frame(width: 120, height: 120)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
-                )
+        }
+        .frame(width: 112, height: 112)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
             )
-        } else {
-            groupImagePlaceholder
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(ATHLTHTheme.border, lineWidth: 1)
         }
     }
 
     private var groupImagePlaceholder: some View {
-        Image(systemName: "person.3.fill")
-            .font(.system(size: 34, weight: .semibold))
-            .foregroundStyle(.indigo)
-            .frame(width: 120, height: 120)
-            .background(
-                Color.indigo.opacity(0.09),
-                in: RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
+        RoundedRectangle(
+            cornerRadius: 28,
+            style: .continuous
+        )
+        .fill(Color.indigo.opacity(0.10))
+        .overlay {
+            Image(systemName: "person.3.fill")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(.indigo)
+        }
+    }
+
+    private func prepareGroupImageData(
+        _ data: Data
+    ) -> Data? {
+        guard let image = UIImage(data: data) else {
+            return nil
+        }
+
+        let maxDimension: CGFloat = 1_600
+        let longest = max(
+            image.size.width,
+            image.size.height
+        )
+        let scale = min(
+            1,
+            maxDimension / max(longest, 1)
+        )
+        let targetSize = CGSize(
+            width: max(1, image.size.width * scale),
+            height: max(1, image.size.height * scale)
+        )
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+
+        let resized = UIGraphicsImageRenderer(
+            size: targetSize,
+            format: format
+        ).image { _ in
+            image.draw(
+                in: CGRect(
+                    origin: .zero,
+                    size: targetSize
                 )
             )
+        }
+
+        if let jpeg = resized.jpegData(
+            compressionQuality: 0.80
+        ),
+        jpeg.count <= 5_242_880 {
+            return jpeg
+        }
+
+        return resized.jpegData(
+            compressionQuality: 0.62
+        )
     }
 }
 
@@ -2837,13 +3310,7 @@ struct CommunityGroupMembersView: View {
 
             Text(roleTitle(member.role))
                 .font(.caption2.weight(.bold))
-                .foregroundStyle(
-                    member.role == "owner"
-                        ? ATHLTHTheme.premiumGold
-                        : member.role == "admin"
-                            ? .indigo
-                            : .secondary
-                )
+                .foregroundStyle(roleTint(member.role))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
@@ -2851,30 +3318,65 @@ struct CommunityGroupMembersView: View {
                     in: Capsule()
                 )
 
-            if groups.isOwner(of: group) &&
+            if groups.canManage(group) &&
                 member.role != "owner" {
                 Menu {
-                    if member.role == "admin" {
-                        Button("Make Member") {
-                            Task {
-                                _ = await groups.setMemberRole(
-                                    groupID: group.id,
-                                    userID: member.userID,
-                                    role: "member"
-                                )
-                            }
+                    Button {
+                        Task {
+                            _ = await groups.setMemberRole(
+                                groupID: group.id,
+                                userID: member.userID,
+                                role: "admin"
+                            )
                         }
-                    } else {
-                        Button("Make Admin") {
-                            Task {
-                                _ = await groups.setMemberRole(
-                                    groupID: group.id,
-                                    userID: member.userID,
-                                    role: "admin"
-                                )
-                            }
-                        }
+                    } label: {
+                        Label(
+                            "Admin",
+                            systemImage:
+                                member.role == "admin"
+                                    ? "checkmark"
+                                    : "shield.fill"
+                        )
                     }
+                    .disabled(member.role == "admin")
+
+                    Button {
+                        Task {
+                            _ = await groups.setMemberRole(
+                                groupID: group.id,
+                                userID: member.userID,
+                                role: "contributor"
+                            )
+                        }
+                    } label: {
+                        Label(
+                            "Contributor",
+                            systemImage:
+                                member.role == "contributor"
+                                    ? "checkmark"
+                                    : "megaphone.fill"
+                        )
+                    }
+                    .disabled(member.role == "contributor")
+
+                    Button {
+                        Task {
+                            _ = await groups.setMemberRole(
+                                groupID: group.id,
+                                userID: member.userID,
+                                role: "member"
+                            )
+                        }
+                    } label: {
+                        Label(
+                            "Member",
+                            systemImage:
+                                member.role == "member"
+                                    ? "checkmark"
+                                    : "person.fill"
+                        )
+                    }
+                    .disabled(member.role == "member")
                 } label: {
                     Image(systemName: "ellipsis")
                         .frame(width: 30, height: 30)
@@ -2887,15 +3389,29 @@ struct CommunityGroupMembersView: View {
         switch role {
         case "owner": return 0
         case "admin": return 1
-        default: return 2
+        case "contributor": return 2
+        default: return 3
         }
     }
 
     private func roleTitle(_ role: String) -> String {
         switch role {
-        case "owner": return "Owner"
-        case "admin": return "Admin"
+        case "owner", "admin": return "Admin"
+        case "contributor": return "Contributor"
         default: return "Member"
+        }
+    }
+
+    private func roleTint(_ role: String) -> Color {
+        switch role {
+        case "owner":
+            return ATHLTHTheme.premiumGold
+        case "admin":
+            return .indigo
+        case "contributor":
+            return .orange
+        default:
+            return .secondary
         }
     }
 }
