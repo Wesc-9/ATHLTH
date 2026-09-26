@@ -253,9 +253,15 @@ struct AdvancedPlannerView: View {
                         selectedDayID = day.id
                     } label: {
                         VStack(spacing: 5) {
-                            Text(String(day.title.prefix(3)).uppercased())
-                                .font(.system(size: 9, weight: .bold))
-                                .tracking(0.6)
+                            Text(
+                                shortDayLabel(
+                                    day,
+                                    week: week,
+                                    plan: plan
+                                )
+                            )
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.6)
 
                             Text(
                                 date?.formatted(
@@ -327,8 +333,14 @@ struct AdvancedPlannerView: View {
         ATHLTHCard {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(day.title)
-                        .font(.title3.weight(.bold))
+                    Text(
+                        displayDayTitle(
+                            day,
+                            week: week,
+                            plan: plan
+                        )
+                    )
+                    .font(.title3.weight(.bold))
 
                     Text(daySubtitle(day, week: week, plan: plan))
                         .font(.caption)
@@ -428,8 +440,14 @@ struct AdvancedPlannerView: View {
                         selectedDayID = day.id
                     } label: {
                         HStack(spacing: 12) {
-                            Text(shortDayLabel(day))
-                                .font(.caption.weight(.bold))
+                            Text(
+                                shortDayLabel(
+                                    day,
+                                    week: week,
+                                    plan: plan
+                                )
+                            )
+                            .font(.caption.weight(.bold))
                                 .foregroundStyle(
                                     selectedDayID == day.id
                                         ? ATHLTHTheme.accent
@@ -740,10 +758,55 @@ struct AdvancedPlannerView: View {
         return "Week \(week.weekNumber) · \(day.sessions.count) planned"
     }
 
-    private func shortDayLabel(
-        _ day: TrainingPlanDay
+    private func displayDayTitle(
+        _ day: TrainingPlanDay,
+        week: TrainingPlanWeek,
+        plan: TrainingPlan
     ) -> String {
-        String(day.title.prefix(3)).uppercased()
+        guard let date = date(
+            for: day,
+            in: week,
+            plan: plan
+        ) else {
+            return day.title
+        }
+
+        let weekday = Calendar.current.component(
+            .weekday,
+            from: date
+        )
+
+        let titles = [
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday"
+        ]
+
+        guard (1...7).contains(weekday) else {
+            return day.title
+        }
+
+        return titles[weekday - 1]
+    }
+
+    private func shortDayLabel(
+        _ day: TrainingPlanDay,
+        week: TrainingPlanWeek,
+        plan: TrainingPlan
+    ) -> String {
+        String(
+            displayDayTitle(
+                day,
+                week: week,
+                plan: plan
+            )
+            .prefix(3)
+        )
+        .uppercased()
     }
 
     private func date(
