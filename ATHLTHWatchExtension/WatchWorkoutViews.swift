@@ -337,53 +337,19 @@ struct WatchActiveWorkoutView: View {
 
             if snapshot.isResting,
                let restEndsAt = snapshot.restEndsAt {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    let remaining = max(
-                        restEndsAt.timeIntervalSince(
-                            context.date
-                        ),
-                        0
-                    )
-
-                    VStack(spacing: 8) {
-                        Text("REST")
-                            .font(.system(size: 9, weight: .bold))
-                            .tracking(1.2)
-                            .foregroundStyle(WatchTheme.muted)
-
-                        Text(
-                            durationText(remaining)
-                        )
-                        .font(
-                            .system(
-                                size: 34,
-                                weight: .bold,
-                                design: .rounded
+                WatchStrengthRestView(
+                    restEndsAt: restEndsAt,
+                    onAdd: {
+                        workoutManager
+                            .addStrengthRest(
+                                seconds: 30
                             )
-                        )
-                        .monospacedDigit()
-
-                        HStack(spacing: 7) {
-                            Button("+30") {
-                                workoutManager
-                                    .addStrengthRest(
-                                        seconds: 30
-                                    )
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button("Skip") {
-                                workoutManager
-                                    .skipStrengthRest()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(WatchTheme.green)
-                        }
+                    },
+                    onSkip: {
+                        workoutManager
+                            .skipStrengthRest()
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(10)
-                    .watchSurface()
-                }
+                )
             } else if snapshot.currentExerciseComplete {
                 VStack(spacing: 8) {
                     Image(
@@ -838,5 +804,90 @@ private struct WatchStrengthCrownControl: View {
         .onTapGesture {
             crownFocused = true
         }
+    }
+}
+
+
+private struct WatchStrengthRestView: View {
+    let restEndsAt: Date
+    let onAdd: () -> Void
+    let onSkip: () -> Void
+
+    @State private var sentCompletion = false
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) {
+            context in
+            let remaining = max(
+                restEndsAt.timeIntervalSince(
+                    context.date
+                ),
+                0
+            )
+
+            VStack(spacing: 8) {
+                Text("REST")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(WatchTheme.muted)
+
+                if remaining > 0 {
+                    Text(durationText(remaining))
+                        .font(
+                            .system(
+                                size: 34,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .monospacedDigit()
+
+                    HStack(spacing: 7) {
+                        Button("+30") {
+                            onAdd()
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button("Skip") {
+                            onSkip()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(WatchTheme.green)
+                    }
+                } else {
+                    Label(
+                        "Next set",
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(WatchTheme.green)
+                    .onAppear {
+                        guard !sentCompletion else {
+                            return
+                        }
+                        sentCompletion = true
+                        onSkip()
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(10)
+            .watchSurface()
+        }
+    }
+
+    private func durationText(
+        _ duration: TimeInterval
+    ) -> String {
+        let total = max(
+            Int(duration.rounded(.down)),
+            0
+        )
+
+        return String(
+            format: "%02d:%02d",
+            total / 60,
+            total % 60
+        )
     }
 }
