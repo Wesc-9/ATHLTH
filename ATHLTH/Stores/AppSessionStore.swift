@@ -656,6 +656,99 @@ final class AppSessionStore: ObservableObject {
         savedRoutes.insert(ownedRoute, at: 0)
     }
 
+    func updateSavedRoute(
+        _ routeID: UUID,
+        title: String? = nil,
+        visibility: ProfileVisibility? = nil
+    ) {
+        guard let index = savedRoutes.firstIndex(
+            where: { $0.id == routeID }
+        ) else {
+            return
+        }
+
+        if let title {
+            let clean = title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            if !clean.isEmpty {
+                savedRoutes[index].title = clean
+            }
+        }
+
+        if let visibility {
+            savedRoutes[index].visibility = visibility
+        }
+    }
+
+    func deleteSavedRoute(_ routeID: UUID) {
+        savedRoutes.removeAll { $0.id == routeID }
+
+        if var plan = activePlan {
+            var changed = false
+
+            for weekIndex in plan.weeks.indices {
+                for dayIndex in plan.weeks[weekIndex].days.indices {
+                    for sessionIndex in plan.weeks[weekIndex]
+                        .days[dayIndex]
+                        .sessions.indices {
+                        if plan.weeks[weekIndex]
+                            .days[dayIndex]
+                            .sessions[sessionIndex]
+                            .routeID == routeID {
+                            plan.weeks[weekIndex]
+                                .days[dayIndex]
+                                .sessions[sessionIndex]
+                                .routeID = nil
+                            changed = true
+                        }
+                    }
+                }
+            }
+
+            if changed {
+                plan.version += 1
+                plan.updatedAt = Date()
+                activePlan = plan
+            }
+        }
+
+        for index in savedWorkoutTemplates.indices {
+            if savedWorkoutTemplates[index].routeID == routeID {
+                savedWorkoutTemplates[index].routeID = nil
+            }
+        }
+
+        persistSavedWorkoutTemplates()
+
+        for planIndex in planTemplates.indices {
+            for weekIndex in planTemplates[planIndex].weeks.indices {
+                for dayIndex in planTemplates[planIndex]
+                    .weeks[weekIndex]
+                    .days.indices {
+                    for sessionIndex in planTemplates[planIndex]
+                        .weeks[weekIndex]
+                        .days[dayIndex]
+                        .sessions.indices {
+                        if planTemplates[planIndex]
+                            .weeks[weekIndex]
+                            .days[dayIndex]
+                            .sessions[sessionIndex]
+                            .routeID == routeID {
+                            planTemplates[planIndex]
+                                .weeks[weekIndex]
+                                .days[dayIndex]
+                                .sessions[sessionIndex]
+                                .routeID = nil
+                        }
+                    }
+                }
+            }
+        }
+
+        persistPlanTemplates()
+    }
+
     func createStarterPlan() {
         createTrainingPlan(
             title: "My Training Plan",
