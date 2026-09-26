@@ -392,6 +392,7 @@ private enum HealthProfileField: String, Identifiable {
     case healthSex
     case weight
     case height
+    case maximumHeartRate
 
     var id: String { rawValue }
 
@@ -401,6 +402,7 @@ private enum HealthProfileField: String, Identifiable {
         case .healthSex: return "Sex for health calculations"
         case .weight: return "Weight"
         case .height: return "Height"
+        case .maximumHeartRate: return "Maximum heart rate"
         }
     }
 
@@ -410,6 +412,7 @@ private enum HealthProfileField: String, Identifiable {
         case .healthSex: return "person.fill"
         case .weight: return "scalemass.fill"
         case .height: return "ruler.fill"
+        case .maximumHeartRate: return "heart.circle.fill"
         }
     }
 }
@@ -429,6 +432,8 @@ struct PersonalHealthProfileView: View {
     @State private var weightKilograms = 75.0
     @State private var includeHeight = false
     @State private var heightCentimeters = 180.0
+    @State private var includeMaximumHeartRate = false
+    @State private var maximumHeartRateBPM = 190
 
     @State private var editingField: HealthProfileField?
     @State private var refreshingAppleHealth = false
@@ -584,10 +589,21 @@ struct PersonalHealthProfileView: View {
                     value: includeHeight ? heightDisplay : "Add",
                     isSet: includeHeight
                 )
+
+                Divider().padding(.leading, 48)
+
+                healthDetailRow(
+                    .maximumHeartRate,
+                    value:
+                        includeMaximumHeartRate
+                            ? "\(maximumHeartRateBPM) bpm"
+                            : "Add",
+                    isSet: includeMaximumHeartRate
+                )
             }
 
             Text(
-                "These values are used only for ATHLTH health and training calculations. They are not shown on your public profile."
+                "These values are used only for ATHLTH health and training calculations. A known maximum heart rate becomes the source of truth for heart-rate zones and workout alerts. They are not shown on your public profile."
             )
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -619,7 +635,7 @@ struct PersonalHealthProfileView: View {
                             .foregroundStyle(ATHLTHTheme.primaryText)
 
                         Text(
-                            "Date of birth, sex, weight and height stay private. Sharing health metrics always requires a separate explicit action."
+                            "Date of birth, sex, weight, height and maximum heart rate stay private. Sharing health metrics always requires a separate explicit action."
                         )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -742,6 +758,32 @@ struct PersonalHealthProfileView: View {
                                 value: heightBinding,
                                 in: heightRange,
                                 step: 1
+                            )
+                        }
+                        .padding(.vertical, 8)
+
+                    case .maximumHeartRate:
+                        VStack(spacing: 18) {
+                            Text("\(maximumHeartRateBPM) bpm")
+                                .font(.system(size: 34, weight: .bold))
+                                .monospacedDigit()
+                                .frame(maxWidth: .infinity)
+
+                            Stepper(
+                                "Adjust by 1 bpm",
+                                value: $maximumHeartRateBPM,
+                                in: 100...240,
+                                step: 1
+                            )
+
+                            Text(
+                                "If you know your tested or measured maximum heart rate, enter it here. ATHLTH will use this value instead of an estimated max when calculating heart-rate zones."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
                             )
                         }
                         .padding(.vertical, 8)
@@ -887,7 +929,11 @@ struct PersonalHealthProfileView: View {
             dateOfBirth: includeDateOfBirth ? dateOfBirth : nil,
             healthSex: includeSex ? healthSex : nil,
             weightKilograms: includeWeight ? weightKilograms : nil,
-            heightCentimeters: includeHeight ? heightCentimeters : nil
+            heightCentimeters: includeHeight ? heightCentimeters : nil,
+            maximumHeartRateBPM:
+                includeMaximumHeartRate
+                    ? maximumHeartRateBPM
+                    : nil
         )
 
         let existingSource =
@@ -908,6 +954,8 @@ struct PersonalHealthProfileView: View {
         case .healthSex: return includeSex
         case .weight: return includeWeight
         case .height: return includeHeight
+        case .maximumHeartRate:
+            return includeMaximumHeartRate
         }
     }
 
@@ -921,6 +969,8 @@ struct PersonalHealthProfileView: View {
             includeWeight = true
         case .height:
             includeHeight = true
+        case .maximumHeartRate:
+            includeMaximumHeartRate = true
         }
     }
 
@@ -934,6 +984,8 @@ struct PersonalHealthProfileView: View {
             includeWeight = false
         case .height:
             includeHeight = false
+        case .maximumHeartRate:
+            includeMaximumHeartRate = false
         }
 
         persistManualDetails()
@@ -969,6 +1021,13 @@ struct PersonalHealthProfileView: View {
             heightCentimeters = value
         } else {
             includeHeight = false
+        }
+
+        if let value = profile.maximumHeartRateBPM {
+            includeMaximumHeartRate = true
+            maximumHeartRateBPM = value
+        } else {
+            includeMaximumHeartRate = false
         }
     }
 }
