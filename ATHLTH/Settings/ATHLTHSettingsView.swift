@@ -14,6 +14,7 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
 
     @State private var showingMembership = false
     @State private var healthRequestInProgress = false
@@ -188,6 +189,33 @@ struct ATHLTHSettingsView: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(healthRequestInProgress)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                AppleCalendarSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "calendar",
+                                    iconTint: .red,
+                                    iconBackground: Color.red.opacity(0.09),
+                                    title: "Apple Calendar",
+                                    subtitle: appleCalendarConnectionSubtitle
+                                ) {
+                                    connectionTrailing(
+                                        calendarSync.isSyncing
+                                            ? "Syncing"
+                                            : calendarSync.isEnabled
+                                                ? "On"
+                                                : calendarSync.hasFullAccess
+                                                    ? "Ready"
+                                                    : "Connect",
+                                        showChevron: true,
+                                        loading: calendarSync.isSyncing
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
 
                             SettingsDivider()
 
@@ -847,6 +875,18 @@ struct ATHLTHSettingsView: View {
         return "Permission configured · run the first sync"
     }
 
+    private var appleCalendarConnectionSubtitle: String {
+        if calendarSync.isEnabled {
+            return "Training plan sync · ATHLTH calendar"
+        }
+
+        if calendarSync.hasFullAccess {
+            return "Apple Calendar connected · training plan sync is off"
+        }
+
+        return "Sync planned workouts to a dedicated ATHLTH calendar"
+    }
+
     private var spotifyGreen: Color {
         Color(red: 0.12, green: 0.72, blue: 0.35)
     }
@@ -930,6 +970,445 @@ struct ATHLTHSettingsView: View {
             forInfoDictionaryKey: "CFBundleVersion"
         ) as? String ?? "—"
         return "\(version) (\(build))"
+    }
+}
+
+private struct AppleCalendarSettingsView: View {
+    @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
+
+    @State private var showingRemoveConfirmation = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionTitle("APPLE CALENDAR")
+
+                    PremiumSettingsCard {
+                        HStack(spacing: 14) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.red)
+                                .frame(width: 46, height: 46)
+                                .background(
+                                    Color.red.opacity(0.09),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 14,
+                                        style: .continuous
+                                    )
+                                )
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("ATHLTH Calendar")
+                                    .font(.headline)
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                Text(calendarSync.authorizationTitle)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+
+                            Spacer()
+
+                            if calendarSync.isSyncing {
+                                ProgressView()
+                                    .tint(ATHLTHTheme.accent)
+                            } else {
+                                Image(
+                                    systemName:
+                                        calendarSync.hasFullAccess
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                )
+                                .font(.title3)
+                                .foregroundStyle(
+                                    calendarSync.hasFullAccess
+                                        ? ATHLTHTheme.accentDeep
+                                        : Color.secondary.opacity(0.45)
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+
+                        SettingsDivider()
+
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Sync Training Plan")
+                                    .font(.system(size: 16.5, weight: .medium))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                Text("Keep your active ATHLTH plan in Apple Calendar.")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+
+                            Spacer()
+
+                            Toggle(
+                                "",
+                                isOn: calendarSyncBinding
+                            )
+                            .labelsHidden()
+                            .tint(ATHLTHTheme.accent)
+                            .disabled(calendarSync.isSyncing)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionTitle("SYNC STATUS")
+
+                    PremiumSettingsCard {
+                        statusRow(
+                            title: "Calendar",
+                            value: calendarSync.calendarExists
+                                ? calendarSync.calendarName
+                                : "Not created",
+                            icon: "calendar.badge.checkmark"
+                        )
+
+                        SettingsDivider()
+
+                        statusRow(
+                            title: "Last sync",
+                            value: lastSyncText,
+                            icon: "arrow.triangle.2.circlepath"
+                        )
+
+                        SettingsDivider()
+
+                        Button {
+                            Task {
+                                if calendarSync.hasFullAccess {
+                                    await calendarSync.sync(
+                                        plan: session.activePlan
+                                    )
+                                } else {
+                                    await calendarSync.enable(
+                                        plan: session.activePlan
+                                    )
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Label(
+                                    calendarSync.hasFullAccess
+                                        ? "Sync Now"
+                                        : "Connect Apple Calendar",
+                                    systemImage: calendarSync.hasFullAccess
+                                        ? "arrow.triangle.2.circlepath"
+                                        : "calendar.badge.plus"
+                                )
+                                .font(.subheadline.weight(.semibold))
+
+                                Spacer()
+
+                                if calendarSync.isSyncing {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.bold())
+                                }
+                            }
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(.horizontal, 16)
+                            .frame(height: 50)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(calendarSync.isSyncing)
+
+                        if calendarPermissionNeedsSettings {
+                            SettingsDivider()
+
+                            Button {
+                                if let url = URL(
+                                    string: UIApplication.openSettingsURLString
+                                ) {
+                                    openURL(url)
+                                }
+                            } label: {
+                                HStack {
+                                    Label(
+                                        "Open iOS Settings",
+                                        systemImage: "gear"
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+
+                                    Spacer()
+
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption.bold())
+                                }
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 16)
+                                .frame(height: 50)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionTitle("HOW IT WORKS")
+
+                    ATHLTHCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            calendarInfoRow(
+                                icon: "clock",
+                                title: "Planned time",
+                                text:
+                                    "Workouts with a time use that exact start time and planned duration."
+                            )
+
+                            Divider()
+
+                            calendarInfoRow(
+                                icon: "calendar.day.timeline.left",
+                                title: "No time set",
+                                text:
+                                    "A workout with “–” as its time appears as an all-day event."
+                            )
+
+                            Divider()
+
+                            calendarInfoRow(
+                                icon: "arrow.triangle.2.circlepath",
+                                title: "Automatic updates",
+                                text:
+                                    "Adding, editing or removing workouts in the active plan updates the ATHLTH calendar automatically."
+                            )
+
+                            Divider()
+
+                            calendarInfoRow(
+                                icon: "arrow.right",
+                                title: "One-way sync",
+                                text:
+                                    "ATHLTH remains the source of truth. Changes made directly in Apple Calendar do not edit your training plan."
+                            )
+                        }
+                    }
+                }
+
+                if calendarSync.calendarExists {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionTitle("CALENDAR")
+
+                        PremiumSettingsCard {
+                            Button(role: .destructive) {
+                                showingRemoveConfirmation = true
+                            } label: {
+                                HStack {
+                                    Label(
+                                        "Remove ATHLTH Calendar",
+                                        systemImage: "trash"
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+
+                                    Spacer()
+                                }
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, 16)
+                                .frame(height: 50)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Text(
+                            "Turning sync off keeps the calendar and its current events. Removing the calendar deletes the dedicated ATHLTH calendar from Apple Calendar."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                    }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 80)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.canvasTop,
+                    Color.white,
+                    ATHLTHTheme.canvasBottom
+                ],
+                startPoint: .top,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        )
+        .navigationTitle("Apple Calendar")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            calendarSync.refreshAuthorizationStatus()
+
+            if calendarSync.isEnabled {
+                await calendarSync.syncIfEnabled(
+                    plan: session.activePlan
+                )
+            }
+        }
+        .confirmationDialog(
+            "Remove ATHLTH Calendar?",
+            isPresented: $showingRemoveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                "Remove Calendar",
+                role: .destructive
+            ) {
+                Task {
+                    await calendarSync.removeATHLTHCalendar()
+                }
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "This removes the dedicated ATHLTH calendar and all workout events synced into it. Your ATHLTH training plan is not changed."
+            )
+        }
+        .alert(
+            "Apple Calendar",
+            isPresented: Binding(
+                get: {
+                    calendarSync.errorMessage != nil
+                },
+                set: { visible in
+                    if !visible {
+                        calendarSync.errorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(
+                calendarSync.errorMessage ??
+                "Apple Calendar could not be updated."
+            )
+        }
+    }
+
+    private var calendarSyncBinding: Binding<Bool> {
+        Binding(
+            get: {
+                calendarSync.isEnabled
+            },
+            set: { enabled in
+                if enabled {
+                    Task {
+                        await calendarSync.enable(
+                            plan: session.activePlan
+                        )
+                    }
+                } else {
+                    calendarSync.disable()
+                }
+            }
+        )
+    }
+
+    private var calendarPermissionNeedsSettings: Bool {
+        switch calendarSync.authorizationStatus {
+        case .denied, .restricted:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var lastSyncText: String {
+        guard let date = calendarSync.lastSyncedAt else {
+            return "Never"
+        }
+
+        return date.formatted(
+            date: .abbreviated,
+            time: .shortened
+        )
+    }
+
+    private func sectionTitle(
+        _ title: String
+    ) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .tracking(2.4)
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep.opacity(0.82)
+            )
+            .padding(.leading, 16)
+    }
+
+    private func statusRow(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 32)
+
+            Text(title)
+                .font(.subheadline.weight(.medium))
+
+            Spacer()
+
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    private func calendarInfoRow(
+        icon: String,
+        title: String,
+        text: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+                .frame(width: 32, height: 32)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(text)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            }
+
+            Spacer()
+        }
     }
 }
 
