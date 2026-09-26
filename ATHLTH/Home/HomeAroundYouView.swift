@@ -1465,6 +1465,15 @@ struct AroundYouExploreView: View {
             try await watchConnection
                 .startWorkoutOnWatch(.running)
 
+            watchConnection.sendRunningWorkout(
+                WatchRunningWorkoutTransfer(
+                    title: route.title,
+                    steps: [],
+                    routeAlerts:
+                        settings.routeAlertConfiguration
+                )
+            )
+
             routeActionMessage =
                 "\(route.title) started on Apple Watch."
         } catch {
