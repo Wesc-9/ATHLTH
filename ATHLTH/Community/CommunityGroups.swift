@@ -5856,16 +5856,18 @@ private func prepareCommunityCoverImageData(
 
 struct CommunityGroupEventCreateView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var groups: CommunityGroupStore
+    @EnvironmentObject private var groups:
+        CommunityGroupStore
 
     let group: CommunityGroupRecord
 
     @State private var title = ""
     @State private var summary = ""
-    @State private var activityType = "running"
     @State private var startsAt =
         Date().addingTimeInterval(3600)
     @State private var meetingName = ""
+    @State private var activityDraft =
+        CommunityGroupActivityDraft()
     @State private var selectedPhoto:
         PhotosPickerItem?
     @State private var imageData: Data?
@@ -5885,27 +5887,17 @@ struct CommunityGroupEventCreateView: View {
                 }
 
                 Section("Event") {
-                    TextField("Title", text: $title)
+                    TextField(
+                        "Title",
+                        text: $title
+                    )
+
                     TextField(
                         "Description",
                         text: $summary,
                         axis: .vertical
                     )
                     .lineLimit(2...5)
-
-                    Picker(
-                        "Activity",
-                        selection: $activityType
-                    ) {
-                        Text("Run").tag("running")
-                        Text("Walk").tag("walking")
-                        Text("Strength").tag("strength")
-                        Text("Cycling").tag("cycling")
-                        Text("Hike").tag("hike")
-                        Text("Group workout")
-                            .tag("group_workout")
-                        Text("Other").tag("other")
-                    }
 
                     DatePicker(
                         "Starts",
@@ -5916,6 +5908,10 @@ struct CommunityGroupEventCreateView: View {
                         ]
                     )
                 }
+
+                CommunityGroupActivityEditor(
+                    draft: $activityDraft
+                )
 
                 Section("Meet") {
                     TextField(
@@ -5952,42 +5948,9 @@ struct CommunityGroupEventCreateView: View {
                             ? "Creating…"
                             : "Create"
                     ) {
-                        Task {
-                            saving = true
-
-                            let ok =
-                                await groups.createEvent(
-                                    groupID: group.id,
-                                    title: title,
-                                    summary: summary,
-                                    activityType:
-                                        activityType,
-                                    startsAt: startsAt,
-                                    meetingName:
-                                        meetingName,
-                                    imageData: imageData
-                                )
-
-                            saving = false
-
-                            if ok {
-                                dismiss()
-                            } else {
-                                creationError =
-                                    groups.errorMessage
-                                    ?? "ATHLTH could not create the event."
-                            }
-                        }
+                        createEvent()
                     }
-                    .disabled(
-                        title
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            )
-                            .isEmpty ||
-                        saving
-                    )
+                    .disabled(!canCreate)
                 }
             }
             .alert(
@@ -6003,9 +5966,60 @@ struct CommunityGroupEventCreateView: View {
                     }
                 )
             ) {
-                Button("OK", role: .cancel) {}
+                Button(
+                    "OK",
+                    role: .cancel
+                ) {}
             } message: {
                 Text(creationError ?? "")
+            }
+        }
+    }
+
+    private var canCreate: Bool {
+        !title
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
+        activityDraft.validationMessage == nil &&
+        !saving
+    }
+
+    private func createEvent() {
+        if let validation =
+            activityDraft.validationMessage {
+            creationError = validation
+            return
+        }
+
+        let configuration =
+            activityDraft.configuration
+
+        Task {
+            saving = true
+
+            let ok = await groups.createEvent(
+                groupID: group.id,
+                title: title,
+                summary: summary,
+                activityType:
+                    configuration.activityType,
+                startsAt: startsAt,
+                meetingName: meetingName,
+                imageData: imageData,
+                activityConfiguration:
+                    configuration
+            )
+
+            saving = false
+
+            if ok {
+                dismiss()
+            } else {
+                creationError =
+                    groups.errorMessage
+                    ?? "ATHLTH could not create the event."
             }
         }
     }
@@ -6013,7 +6027,8 @@ struct CommunityGroupEventCreateView: View {
 
 struct CommunityGroupChallengeCreateView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var groups: CommunityGroupStore
+    @EnvironmentObject private var groups:
+        CommunityGroupStore
 
     let group: CommunityGroupRecord
 
@@ -6029,6 +6044,8 @@ struct CommunityGroupChallengeCreateView: View {
             value: 7,
             to: Date()
         ) ?? Date().addingTimeInterval(604800)
+    @State private var activityDraft =
+        CommunityGroupActivityDraft()
     @State private var selectedPhoto:
         PhotosPickerItem?
     @State private var imageData: Data?
@@ -6064,13 +6081,20 @@ struct CommunityGroupChallengeCreateView: View {
                         "Title",
                         text: $title
                     )
+
                     TextField(
                         "Description",
                         text: $summary,
                         axis: .vertical
                     )
                     .lineLimit(2...5)
+                }
 
+                CommunityGroupActivityEditor(
+                    draft: $activityDraft
+                )
+
+                Section("Goal") {
                     Picker(
                         "Metric",
                         selection: $metric
@@ -6122,7 +6146,7 @@ struct CommunityGroupChallengeCreateView: View {
 
                 Section {
                     Label(
-                        "Completed member workouts contribute automatically. The same workout is counted only once.",
+                        "Only completed workouts matching the selected activity contribute to this challenge. The same workout is counted once.",
                         systemImage: "bolt.fill"
                     )
                     .font(.caption)
@@ -6148,48 +6172,9 @@ struct CommunityGroupChallengeCreateView: View {
                             ? "Creating…"
                             : "Create"
                     ) {
-                        guard let targetValue else {
-                            return
-                        }
-
-                        Task {
-                            saving = true
-
-                            let ok =
-                                await groups.createChallenge(
-                                    groupID: group.id,
-                                    title: title,
-                                    summary: summary,
-                                    metric: metric,
-                                    targetValue:
-                                        targetValue,
-                                    startsAt: startsAt,
-                                    endsAt: endsAt,
-                                    imageData: imageData
-                                )
-
-                            saving = false
-
-                            if ok {
-                                dismiss()
-                            } else {
-                                creationError =
-                                    groups.errorMessage
-                                    ?? "ATHLTH could not create the challenge."
-                            }
-                        }
+                        createChallenge()
                     }
-                    .disabled(
-                        title
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            )
-                            .isEmpty ||
-                        (targetValue ?? 0) <= 0 ||
-                        endsAt <= startsAt ||
-                        saving
-                    )
+                    .disabled(!canCreate)
                 }
             }
             .alert(
@@ -6205,9 +6190,68 @@ struct CommunityGroupChallengeCreateView: View {
                     }
                 )
             ) {
-                Button("OK", role: .cancel) {}
+                Button(
+                    "OK",
+                    role: .cancel
+                ) {}
             } message: {
                 Text(creationError ?? "")
+            }
+        }
+    }
+
+    private var canCreate: Bool {
+        !title
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
+        (targetValue ?? 0) > 0 &&
+        endsAt > startsAt &&
+        activityDraft.validationMessage == nil &&
+        !saving
+    }
+
+    private func createChallenge() {
+        guard let targetValue else {
+            creationError =
+                "Choose a valid challenge target."
+            return
+        }
+
+        if let validation =
+            activityDraft.validationMessage {
+            creationError = validation
+            return
+        }
+
+        let configuration =
+            activityDraft.configuration
+
+        Task {
+            saving = true
+
+            let ok = await groups.createChallenge(
+                groupID: group.id,
+                title: title,
+                summary: summary,
+                metric: metric,
+                targetValue: targetValue,
+                startsAt: startsAt,
+                endsAt: endsAt,
+                imageData: imageData,
+                activityConfiguration:
+                    configuration
+            )
+
+            saving = false
+
+            if ok {
+                dismiss()
+            } else {
+                creationError =
+                    groups.errorMessage
+                    ?? "ATHLTH could not create the challenge."
             }
         }
     }
