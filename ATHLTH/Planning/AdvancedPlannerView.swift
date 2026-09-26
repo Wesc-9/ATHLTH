@@ -3178,6 +3178,178 @@ struct SessionEditorView: View {
         }
     }
 
+    private var hasLiveTargetAlerts: Bool {
+        heartRateTargetEnabled ||
+        (
+            kind == .running &&
+            targetPaceEnabled &&
+            paceAlertsEnabled
+        )
+    }
+
+    private var estimatedMaximumHeartRate: Double? {
+        guard let dateOfBirth =
+                health.personalDetails.dateOfBirth
+        else {
+            return nil
+        }
+
+        let age = Calendar.current
+            .dateComponents(
+                [.year],
+                from: dateOfBirth,
+                to: Date()
+            )
+            .year ?? 0
+
+        guard age >= 13,
+              age <= 100
+        else {
+            return nil
+        }
+
+        return max(
+            100,
+            208 - (0.7 * Double(age))
+        )
+    }
+
+    private func estimatedHeartRateRange(
+        for zone: Int
+    ) -> (lower: Int, upper: Int)? {
+        guard let maximum =
+                estimatedMaximumHeartRate
+        else {
+            return nil
+        }
+
+        let bounds: (Double, Double)
+
+        switch min(max(zone, 1), 5) {
+        case 1:
+            bounds = (0.50, 0.60)
+        case 2:
+            bounds = (0.60, 0.70)
+        case 3:
+            bounds = (0.70, 0.80)
+        case 4:
+            bounds = (0.80, 0.90)
+        default:
+            bounds = (0.90, 1.00)
+        }
+
+        return (
+            lower:
+                Int(
+                    (maximum * bounds.0)
+                        .rounded()
+                ),
+            upper:
+                Int(
+                    (maximum * bounds.1)
+                        .rounded()
+                )
+        )
+    }
+
+    private var workoutTargetAlertConfigurationForSave:
+        WatchWorkoutTargetAlertConfiguration? {
+        let paceEnabled =
+            kind == .running &&
+            targetPaceEnabled &&
+            paceAlertsEnabled
+
+        let heartRange:
+            (
+                zone: Int?,
+                lower: Double,
+                upper: Double
+            )? = {
+            guard heartRateTargetEnabled else {
+                return nil
+            }
+
+            switch heartRateTargetMode {
+            case .zone:
+                guard let range =
+                        estimatedHeartRateRange(
+                            for: heartRateTargetZone
+                        )
+                else {
+                    return nil
+                }
+
+                return (
+                    zone: heartRateTargetZone,
+                    lower: Double(range.lower),
+                    upper: Double(range.upper)
+                )
+
+            case .custom:
+                let lower =
+                    min(
+                        customHeartRateMinBPM,
+                        customHeartRateMaxBPM
+                    )
+                let upper =
+                    max(
+                        customHeartRateMinBPM,
+                        customHeartRateMaxBPM
+                    )
+
+                return (
+                    zone: nil,
+                    lower: Double(lower),
+                    upper: Double(upper)
+                )
+            }
+        }()
+
+        guard heartRange != nil ||
+                paceEnabled
+        else {
+            return nil
+        }
+
+        return WatchWorkoutTargetAlertConfiguration(
+            heartRateEnabled:
+                heartRange != nil,
+            heartRateZone:
+                heartRange?.zone,
+            heartRateMinimumBPM:
+                heartRange?.lower,
+            heartRateMaximumBPM:
+                heartRange?.upper,
+            paceAlertsEnabled:
+                paceEnabled,
+            paceToleranceSecondsPerKilometer:
+                Double(
+                    max(
+                        paceAlertToleranceSeconds,
+                        0
+                    )
+                ),
+            graceSeconds:
+                TimeInterval(
+                    max(
+                        targetAlertGraceSeconds,
+                        0
+                    )
+                ),
+            repeatSeconds:
+                TimeInterval(
+                    max(
+                        targetAlertRepeatSeconds,
+                        30
+                    )
+                ),
+            delivery:
+                targetAlertDelivery,
+            announceBackInTarget:
+                targetAlertAnnounceBackInTarget
+        )
+    }
+
     private var activeRunningShoes: [ProfileGearItem] {
         gear.items(in: .shoes).filter {
             gear.isActive($0)
@@ -3921,6 +4093,10 @@ struct SessionEditorView: View {
             audioCoachConfiguration:
                 (kind == .running || kind == .walking)
                     ? audioCoachOverride
+                    : nil,
+            targetAlertConfiguration:
+                (kind == .running || kind == .walking)
+                    ? workoutTargetAlertConfigurationForSave
                     : nil
         )
 
