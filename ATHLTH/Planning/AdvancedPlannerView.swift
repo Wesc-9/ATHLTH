@@ -2470,11 +2470,27 @@ struct PlanMetadataEditorView: View {
     }
 }
 
+private enum SessionEditorMode: String, CaseIterable, Identifiable {
+    case basic
+    case advanced
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .basic: return "Basic"
+        case .advanced: return "Advanced"
+        }
+    }
+}
+
 struct SessionEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     let dayID: UUID?
     let planID: UUID?
@@ -2496,6 +2512,16 @@ struct SessionEditorView: View {
 
     @State private var scheduledTimeEnabled = false
     @State private var scheduledTime = Date()
+
+    @State private var editorMode: SessionEditorMode = .basic
+    @State private var selectedGearIDs: Set<UUID> = []
+    @State private var audioCoachOverride:
+        WatchAudioCoachConfiguration?
+    @State private var showingAudioCoachEditor = false
+
+    @State private var targetPaceEnabled = false
+    @State private var targetPaceMinutes = 5
+    @State private var targetPaceSeconds = 0
 
     init(dayID: UUID) {
         self.dayID = dayID
@@ -2531,12 +2557,30 @@ struct SessionEditorView: View {
         _scheduledTime = State(
             initialValue: workout.scheduledStart ?? Date()
         )
+        _selectedGearIDs = State(
+            initialValue: Set(workout.gearIDs ?? [])
+        )
+        _audioCoachOverride = State(
+            initialValue: workout.audioCoachConfiguration
+        )
+
+        if let pace = workout.targetPaceSecondsPerKilometer,
+           pace > 0 {
+            let total = max(Int(pace.rounded()), 0)
+            _targetPaceEnabled = State(initialValue: true)
+            _targetPaceMinutes = State(
+                initialValue: total / 60
+            )
+            _targetPaceSeconds = State(
+                initialValue: total % 60
+            )
+        }
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Workout") {
+                Section {
                     TextField("Title", text: $title)
 
                     Picker("Type", selection: $kind) {
@@ -2549,17 +2593,42 @@ struct SessionEditorView: View {
                         }
                     }
 
-                    Toggle(
-                        "Set a time",
-                        isOn: $scheduledTimeEnabled
-                    )
+                    HStack {
+                        Label("Time", systemImage: "clock")
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
 
-                    if scheduledTimeEnabled {
-                        DatePicker(
-                            "Start",
-                            selection: $scheduledTime,
-                            displayedComponents: .hourAndMinute
-                        )
+                        Spacer()
+
+                        if scheduledTimeEnabled {
+                            DatePicker(
+                                "",
+                                selection: $scheduledTime,
+                                displayedComponents: .hourAndMinute
+                            )
+                            .labelsHidden()
+
+                            Button {
+                                scheduledTimeEnabled = false
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Clear workout time")
+                        } else {
+                            Button("–") {
+                                scheduledTime = Date()
+                                scheduledTimeEnabled = true
+                            }
+                            .font(.headline)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Set workout time")
+                        }
                     }
 
                     Stepper(
@@ -2578,12 +2647,57 @@ struct SessionEditorView: View {
                         )
                     }
 
+                    if kind == .running {
+                        Picker(
+                            "Running shoes",
+                            selection: runningShoeSelection
+                        ) {
+                            Text("–")
+                                .tag(nil as UUID?)
+
+                            ForEach(activeRunningShoes) { shoe in
+                                Text(
+                                    shoe.id ==
+                                        gear.defaultRunningShoe?.id
+                                        ? "\(shoe.name) · Default"
+                                        : shoe.name
+                                )
+                                .tag(shoe.id as UUID?)
+                            }
+                        }
+                    }
+
                     TextField(
                         "Notes",
                         text: $notes,
                         axis: .vertical
                     )
                     .lineLimit(2...6)
+                } header: {
+                    HStack(spacing: 12) {
+                        Text("Workout")
+
+                        Spacer()
+
+                        Picker(
+                            "Editor mode",
+                            selection: $editorMode
+                        ) {
+                            ForEach(
+                                SessionEditorMode.allCases
+                            ) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 170)
+                        .labelsHidden()
+                    }
+                    .textCase(nil)
+                }
+
+                if editorMode == .advanced {
+                    advancedOptions
                 }
 
                 if kind == .strength {
@@ -2656,6 +2770,16 @@ struct SessionEditorView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingAudioCoachEditor) {
+                PlannedAudioCoachEditorView(
+                    configuration: $audioCoachOverride,
+                    defaultConfiguration:
+                        settings.audioCoachConfiguration(
+                            enabled:
+                                settings.audioCoachEnabledByDefault
+                        )
+                )
+            }
             .onChange(of: kind) { _, newKind in
                 guard existingWorkout == nil else { return }
 
@@ -2672,6 +2796,15 @@ struct SessionEditorView: View {
                     previousRouteID: oldRouteID,
                     routeID: newRouteID
                 )
+            }
+            .task {
+                await gear.refresh()
+                applyDefaultRunningShoeIfNeeded()
+            }
+            .onChange(of: kind) { _, newKind in
+                if newKind == .running {
+                    applyDefaultRunningShoeIfNeeded()
+                }
             }
         }
     }
