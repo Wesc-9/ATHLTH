@@ -486,6 +486,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartElapsedTime = 0
         structuredStepStartDistanceMeters = 0
         structuredWorkoutComplete = false
+        plannedRouteLocations = []
+        plannedRouteCumulativeMeters = []
+        plannedRouteGeometryMeters = 0
+        lastOffRouteHapticAt = nil
+        lastLapElapsedTime = 0
+        lastLapDistanceMeters = 0
         speechSynthesizer.stopSpeaking(at: .immediate)
         publish {
             self.state = .idle
@@ -493,6 +499,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.heartRate = 0
             self.activeCalories = 0
             self.distanceMeters = 0
+            self.currentPaceSecondsPerKilometer = nil
+            self.routeProgressPercent = nil
+            self.routeRemainingMeters = nil
+            self.routeDeviationMeters = nil
+            self.lapCount = 0
+            self.currentLapElapsedTime = 0
+            self.currentLapDistanceMeters = 0
             self.averageHeartRate = nil
             self.maxHeartRate = nil
             self.routePoints = []
@@ -514,6 +527,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard !isActive, state != .preparing, state != .ending else { return }
 
         let resolvedRoute = route ?? plannedRoute
+        cachePlannedRouteGeometry(resolvedRoute)
 
         publish {
             self.audioCoachConfiguration = .disabled
@@ -532,6 +546,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.heartRate = 0
             self.activeCalories = 0
             self.distanceMeters = 0
+            self.currentPaceSecondsPerKilometer = nil
+            self.routeProgressPercent =
+                resolvedRoute == nil ? nil : 0
+            self.routeRemainingMeters =
+                resolvedRoute.map {
+                    max(
+                        $0.distanceKilometers * 1_000,
+                        0
+                    )
+                }
+            self.routeDeviationMeters = nil
+            self.lapCount = 0
+            self.currentLapElapsedTime = 0
+            self.currentLapDistanceMeters = 0
             self.averageHeartRate = nil
             self.maxHeartRate = nil
             self.routePoints = []
@@ -541,6 +569,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartElapsedTime = 0
         structuredStepStartDistanceMeters = 0
         structuredWorkoutComplete = false
+        lastLapElapsedTime = 0
+        lastLapDistanceMeters = 0
+        lastOffRouteHapticAt = nil
         resetAudioCoachThresholds()
 
         do {
@@ -721,6 +752,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 guard let self, let builder = self.workoutBuilder else { return }
                 self.publish {
                     self.elapsedTime = builder.elapsedTime
+                    self.currentLapElapsedTime =
+                        max(
+                            builder.elapsedTime -
+                            self.lastLapElapsedTime,
+                            0
+                        )
+                    self.currentLapDistanceMeters =
+                        max(
+                            self.distanceMeters -
+                            self.lastLapDistanceMeters,
+                            0
+                        )
                 }
                 self.evaluateStructuredRunningWorkout()
                 self.evaluateAudioCoach()
@@ -798,13 +841,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         if shouldAnnounce {
+            WKInterfaceDevice.current().play(.click)
             speak(metricsAnnouncement)
         }
     }
 
     private func evaluateStructuredRunningWorkout() {
         guard state == .running,
-              kind == .running,
+              (kind == .running || kind == .walking),
               !structuredWorkoutComplete,
               let step = currentStructuredRunningStep
         else {
@@ -847,6 +891,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         guard workout.steps.indices.contains(nextIndex) else {
             structuredWorkoutComplete = true
+            WKInterfaceDevice.current().play(.success)
             if audioCoachConfiguration.enabled &&
                 audioCoachConfiguration.announceCurrentWorkoutStep {
                 speak(
@@ -868,6 +913,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.structuredStepIndex = nextIndex
         }
 
+        WKInterfaceDevice.current().play(.notification)
         announceCurrentStructuredStep(prefix: "Next")
     }
 
@@ -1028,10 +1074,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if let totalRouteMeters =
                 configuration.routeDistanceMeters,
            totalRouteMeters > 0 {
-            let remainingMeters = max(
-                totalRouteMeters - distanceMeters,
-                0
-            )
+            let remainingMeters =
+                routeRemainingMeters ??
+                max(
+                    totalRouteMeters - distanceMeters,
+                    0
+                )
 
             if configuration
                 .announceRemainingRouteDistance {
