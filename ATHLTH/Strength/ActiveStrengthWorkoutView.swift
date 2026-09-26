@@ -569,22 +569,36 @@ struct ActiveStrengthWorkoutView: View {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     let remaining = max(restEndsAt.timeIntervalSince(context.date), 0)
 
-                    VStack(spacing: 12) {
-                        Text(remaining.clockDuration)
-                            .font(.system(size: 48, weight: .bold, design: .rounded))
-                            .monospacedDigit()
+                    Group {
+                        if remaining > 0 {
+                            VStack(spacing: 12) {
+                                Text(remaining.clockDuration)
+                                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
 
-                        HStack {
-                            Button("+30 sec") {
-                                strength.addRest(seconds: 30)
+                                HStack {
+                                    Button("+30 sec") {
+                                        strength.addRest(seconds: 30)
+                                    }
+                                    .buttonStyle(.bordered)
+
+                                    Button("Skip Rest") {
+                                        strength.skipRest()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(ATHLTHTheme.accent)
+                                }
                             }
-                            .buttonStyle(.bordered)
-
-                            Button("Skip Rest") {
+                        } else {
+                            Label(
+                                "Ready for next set",
+                                systemImage: "checkmark.circle.fill"
+                            )
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .onAppear {
                                 strength.skipRest()
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(ATHLTHTheme.accent)
                         }
                     }
                     .frame(maxWidth: .infinity)
