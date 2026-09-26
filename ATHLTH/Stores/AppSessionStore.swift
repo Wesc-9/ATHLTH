@@ -1258,16 +1258,28 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    @discardableResult
     func createTrainingPlan(
         title: String,
         summary: String,
         weekCount: Int,
         startDate: Date?,
+        endDate: Date? = nil,
         visibility: ProfileVisibility = .privateOnly
-    ) {
+    ) -> TrainingPlan? {
         let resolvedWeekCount = min(max(weekCount, 1), 52)
+        let resolvedStart = Calendar.current.startOfDay(
+            for: startDate ?? Date()
+        )
+        let resolvedEnd = endDate.map {
+            Calendar.current.startOfDay(for: max($0, resolvedStart))
+        } ?? Calendar.current.date(
+            byAdding: .day,
+            value: max(resolvedWeekCount * 7 - 1, 0),
+            to: resolvedStart
+        )
 
-        activePlan = TrainingPlan(
+        let plan = TrainingPlan(
             id: UUID(),
             ownerID: profile.userID,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -1280,10 +1292,18 @@ final class AppSessionStore: ObservableObject {
             tags: [],
             createdAt: Date(),
             updatedAt: Date(),
-            startDate: startDate
+            startDate: resolvedStart,
+            endDate: resolvedEnd
         )
+
+        guard addTrainingPlan(plan) else {
+            return nil
+        }
+
+        return plan
     }
 
+    @discardableResult
     func createSimpleTrainingPlan(
         title: String,
         summary: String,
@@ -1292,7 +1312,7 @@ final class AppSessionStore: ObservableObject {
         visibility: ProfileVisibility = .privateOnly,
         sessionsPerWeek: Int,
         workoutPattern: [WorkoutKind]
-    ) {
+    ) -> TrainingPlan? {
         let resolvedWeekCount = min(max(weekCount, 1), 52)
         let resolvedSessionsPerWeek = min(max(sessionsPerWeek, 2), 6)
         let pattern = workoutPattern.isEmpty
@@ -1380,7 +1400,16 @@ final class AppSessionStore: ObservableObject {
             }
         }
 
-        activePlan = TrainingPlan(
+        let resolvedStart = Calendar.current.startOfDay(
+            for: startDate ?? Date()
+        )
+        let resolvedEnd = Calendar.current.date(
+            byAdding: .day,
+            value: max(resolvedWeekCount * 7 - 1, 0),
+            to: resolvedStart
+        )
+
+        let plan = TrainingPlan(
             id: UUID(),
             ownerID: profile.userID,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -1393,8 +1422,15 @@ final class AppSessionStore: ObservableObject {
             tags: [],
             createdAt: Date(),
             updatedAt: Date(),
-            startDate: startDate
+            startDate: resolvedStart,
+            endDate: resolvedEnd
         )
+
+        guard addTrainingPlan(plan) else {
+            return nil
+        }
+
+        return plan
     }
 
     func replaceActivePlan(with plan: TrainingPlan) {
@@ -1445,22 +1481,14 @@ final class AppSessionStore: ObservableObject {
     }
 
     func setActivePlanWeekCount(_ weekCount: Int) {
-        guard var plan = activePlan else { return }
-
-        let resolved = min(max(weekCount, 1), 52)
-        let current = plan.weeks.count
-
-        if resolved > current {
-            for number in (current + 1)...resolved {
-                plan.weeks.append(makeEmptyWeek(number: number))
-            }
-        } else if resolved < current {
-            plan.weeks = Array(plan.weeks.prefix(resolved))
+        guard let planID = activePlan?.id else {
+            return
         }
 
-        plan.updatedAt = Date()
-        plan.version += 1
-        activePlan = plan
+        _ = setTrainingPlanWeekCount(
+            planID: planID,
+            weekCount: weekCount
+        )
     }
 
     func addWeekToActivePlan() {
@@ -1561,23 +1589,11 @@ final class AppSessionStore: ObservableObject {
     }
 
     func duplicateActivePlan() {
-        guard let source = activePlan else { return }
+        guard let planID = activePlan?.id else {
+            return
+        }
 
-        let duplicate = TrainingPlan(
-            id: UUID(),
-            ownerID: source.ownerID,
-            title: "\(source.title) Copy",
-            summary: source.summary,
-            visibility: .privateOnly,
-            version: 1,
-            weeks: source.weeks,
-            tags: source.tags,
-            spotifyPlaylist: source.spotifyPlaylist,
-            spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
-            createdAt: Date(),
-            updatedAt: Date()
-        )
-        activePlan = duplicate
+        _ = duplicateTrainingPlan(planID)
     }
 
     func setActivePlanSpotifyPlaylist(_ playlist: SpotifyPlaylistReference?) {
@@ -1611,21 +1627,18 @@ final class AppSessionStore: ObservableObject {
         tags: [String],
         startDate: Date?
     ) {
-        guard var plan = activePlan else { return }
+        guard let planID = activePlan?.id else {
+            return
+        }
 
-        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanTitle.isEmpty else { return }
-
-        plan.title = cleanTitle
-        plan.summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        plan.visibility = visibility
-        plan.tags = tags
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-            .filter { !$0.isEmpty }
-        plan.startDate = startDate
-        plan.updatedAt = Date()
-        plan.version += 1
-        activePlan = plan
+        _ = updateTrainingPlanMetadata(
+            planID: planID,
+            title: title,
+            summary: summary,
+            visibility: visibility,
+            tags: tags,
+            startDate: startDate ?? Date()
+        )
     }
 
     func saveActivePlanAsTemplate() {
@@ -1651,19 +1664,27 @@ final class AppSessionStore: ObservableObject {
         persistPlanTemplates()
     }
 
+    @discardableResult
     func usePlanTemplate(
         _ templateID: UUID,
         startDate: Date? = nil
-    ) {
-        guard let template = planTemplates.first(where: { $0.id == templateID }) else {
-            return
+    ) -> TrainingPlan? {
+        guard let template = planTemplates.first(
+            where: { $0.id == templateID }
+        ) else {
+            return nil
         }
 
         let resolvedStartDate = Calendar.current.startOfDay(
             for: startDate ?? Date()
         )
+        let resolvedEndDate = Calendar.current.date(
+            byAdding: .day,
+            value: max(template.weeks.count * 7 - 1, 0),
+            to: resolvedStartDate
+        )
 
-        activePlan = TrainingPlan(
+        let plan = TrainingPlan(
             id: UUID(),
             ownerID: profile.userID,
             title: template.title,
@@ -1673,11 +1694,19 @@ final class AppSessionStore: ObservableObject {
             weeks: template.weeks,
             tags: template.tags,
             spotifyPlaylist: template.spotifyPlaylist,
-            spotifyAutoplayOnWorkoutStart: template.spotifyAutoplayOnWorkoutStart,
+            spotifyAutoplayOnWorkoutStart:
+                template.spotifyAutoplayOnWorkoutStart,
             createdAt: Date(),
             updatedAt: Date(),
-            startDate: resolvedStartDate
+            startDate: resolvedStartDate,
+            endDate: resolvedEndDate
         )
+
+        guard addTrainingPlan(plan) else {
+            return nil
+        }
+
+        return plan
     }
 
     func deletePlanTemplate(_ templateID: UUID) {
