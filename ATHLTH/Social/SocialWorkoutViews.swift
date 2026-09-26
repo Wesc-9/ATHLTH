@@ -863,21 +863,13 @@ private struct HomeActivityOutdoorCard: View {
                     MapPolyline(coordinates: routeCoordinates)
                         .stroke(
                             Color.white.opacity(0.82),
-                            style: StrokeStyle(
-                                lineWidth: 10,
-                                lineCap: .round,
-                                lineJoin: .round
-                            )
+                            lineWidth: 10
                         )
 
                     MapPolyline(coordinates: routeCoordinates)
                         .stroke(
                             ATHLTHTheme.vitality,
-                            style: StrokeStyle(
-                                lineWidth: 5,
-                                lineCap: .round,
-                                lineJoin: .round
-                            )
+                            lineWidth: 5
                         )
 
                     if let start = routeCoordinates.first {
