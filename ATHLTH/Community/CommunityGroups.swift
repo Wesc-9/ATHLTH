@@ -2545,7 +2545,33 @@ struct CommunityGroupDetailView: View {
                 groupUpdateComposer
             }
 
-            let updates = groups.announcements(in: group.id)
+            let pinned = groups.pinnedAnnouncement(
+                in: group.id
+            )
+
+            if let pinned {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(
+                        "Pinned Update",
+                        systemImage: "pin.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 4)
+
+                    groupUpdateCard(
+                        pinned,
+                        isPinned: true
+                    )
+                }
+            }
+
+            let updates = groups.announcements(
+                in: group.id
+            ).filter {
+                $0.id != pinned?.id
+            }
+
             if !updates.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Updates")
@@ -2826,18 +2852,57 @@ struct CommunityGroupDetailView: View {
     }
 
     private func groupUpdateCard(
-        _ update: CommunityGroupAnnouncementRecord
+        _ update: CommunityGroupAnnouncementRecord,
+        isPinned: Bool = false
     ) -> some View {
         ATHLTHCard {
             HStack {
                 Label(
-                    "Group Update",
-                    systemImage: "megaphone.fill"
+                    isPinned
+                        ? "Pinned Update"
+                        : "Group Update",
+                    systemImage:
+                        isPinned
+                            ? "pin.fill"
+                            : "megaphone.fill"
                 )
                 .font(.headline)
-                .foregroundStyle(.indigo)
+                .foregroundStyle(
+                    isPinned
+                        ? ATHLTHTheme.accentDeep
+                        : .indigo
+                )
 
                 Spacer()
+
+                if groups.canManage(currentGroup) {
+                    Menu {
+                        Button {
+                            Task {
+                                _ = await groups.pinAnnouncement(
+                                    groupID: group.id,
+                                    announcementID:
+                                        isPinned
+                                            ? nil
+                                            : update.id
+                                )
+                            }
+                        } label: {
+                            Label(
+                                isPinned
+                                    ? "Unpin Update"
+                                    : "Pin Update",
+                                systemImage:
+                                    isPinned
+                                        ? "pin.slash"
+                                        : "pin"
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 30, height: 30)
+                    }
+                }
 
                 Text(
                     update.createdAt.formatted(
@@ -2954,30 +3019,50 @@ struct CommunityGroupDetailView: View {
                     ContentUnavailableView(
                         "No messages yet",
                         systemImage: "bubble.left.and.bubble.right",
-                        description: Text("Start the group conversation.")
+                        description: Text(
+                            "Start the group conversation."
+                        )
                     )
                     .padding(.vertical, 24)
                 } else {
                     VStack(spacing: 12) {
-                        ForEach(groups.messages(in: group.id)) { message in
+                        ForEach(
+                            groups.messages(in: group.id)
+                        ) { message in
                             messageRow(message)
                         }
                     }
                 }
             }
 
-            HStack(spacing: 10) {
-                TextField("Message group", text: $messageDraft, axis: .vertical)
-                    .lineLimit(1...4)
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 46)
-                    .background(
-                        ATHLTHTheme.card,
-                        in: RoundedRectangle(
-                            cornerRadius: 16,
-                            style: .continuous
+            if !groupMentionSuggestions.isEmpty {
+                ATHLTHMentionSuggestionList(
+                    suggestions: groupMentionSuggestions
+                ) { suggestion in
+                    messageDraft =
+                        ATHLTHMentionSupport.inserting(
+                            suggestion,
+                            into: messageDraft
                         )
+                }
+            }
+
+            HStack(spacing: 10) {
+                TextField(
+                    "Message group",
+                    text: $messageDraft,
+                    axis: .vertical
+                )
+                .lineLimit(1...4)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 46)
+                .background(
+                    ATHLTHTheme.card,
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
                     )
+                )
 
                 Button {
                     let body = messageDraft
@@ -2985,7 +3070,10 @@ struct CommunityGroupDetailView: View {
                     Task {
                         let sent = await groups.sendMessage(
                             groupID: group.id,
-                            senderName: session.profile.displayName,
+                            senderName:
+                                session.profile.username.isEmpty
+                                    ? session.profile.displayName
+                                    : "@\(session.profile.username)",
                             body: body
                         )
                         if !sent {
@@ -3018,64 +3106,132 @@ struct CommunityGroupDetailView: View {
         }
     }
 
+    private var groupMentionSuggestions:
+        [ATHLTHMentionSuggestion] {
+        let candidates = groups.mentionCandidates(
+            in: group.id
+        ).filter {
+            $0.userID != session.profile.userID
+        }
+
+        let role = groups.role(in: currentGroup)
+
+        return ATHLTHMentionSupport.suggestions(
+            in: messageDraft,
+            candidates: candidates,
+            includeEveryone:
+                role == "owner" ||
+                role == "admin"
+        )
+    }
+
     private var events: some View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Group Events")
                         .font(.title3.weight(.bold))
-                    Text("Only members of this group can see these events.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        groups.canCreateGroupContent(
+                            currentGroup
+                        )
+                            ? "Plan meetups and training sessions with the group."
+                            : "Only members allowed by the group settings can create events."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Button {
-                    showingCreateEvent = true
-                } label: {
-                    Image(systemName: "plus")
+                if groups.canCreateGroupContent(
+                    currentGroup
+                ) {
+                    Button {
+                        showingCreateEvent = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
 
             if groups.events(in: group.id).isEmpty {
                 ContentUnavailableView(
                     "No group events",
                     systemImage: "calendar.badge.plus",
-                    description: Text("Create the first event for this group.")
+                    description: Text(
+                        groups.canCreateGroupContent(
+                            currentGroup
+                        )
+                            ? "Create the first event for this group."
+                            : "No events have been scheduled yet."
+                    )
                 )
                 .padding(.vertical, 20)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(groups.events(in: group.id)) { event in
-                        HStack(spacing: 12) {
-                            Image(systemName: eventIcon(event.activityType))
+                    ForEach(
+                        groups.events(in: group.id)
+                    ) { event in
+                        VStack(
+                            alignment: .leading,
+                            spacing: 10
+                        ) {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        eventIcon(
+                                            event.activityType
+                                        )
+                                )
                                 .foregroundStyle(.purple)
                                 .frame(width: 38, height: 38)
                                 .background(
                                     Color.purple.opacity(0.08),
-                                    in: RoundedRectangle(cornerRadius: 12)
+                                    in: RoundedRectangle(
+                                        cornerRadius: 12
+                                    )
                                 )
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(event.title)
-                                    .font(.subheadline.weight(.semibold))
-                                Text(
-                                    event.startsAt.formatted(
-                                        date: .abbreviated,
-                                        time: .shortened
-                                    ) + " · " + event.meetingName
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(event.title)
+                                        .font(
+                                            .subheadline
+                                                .weight(.semibold)
+                                        )
+                                    Text(
+                                        event.startsAt.formatted(
+                                            date: .abbreviated,
+                                            time: .shortened
+                                        ) +
+                                        " · " +
+                                        event.meetingName
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                    if !event.summary.isEmpty {
+                                        Text(event.summary)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                }
+
+                                Spacer()
                             }
 
-                            Spacer()
+                            eventRSVPControls(event)
                         }
                         .padding(.vertical, 10)
 
-                        if event.id != groups.events(in: group.id).last?.id {
+                        if event.id != groups.events(
+                            in: group.id
+                        ).last?.id {
                             Divider()
                         }
                     }
@@ -3085,37 +3241,132 @@ struct CommunityGroupDetailView: View {
         }
     }
 
+    private func eventRSVPControls(
+        _ event: CommunityGroupEventRecord
+    ) -> some View {
+        let current =
+            groups.eventRSVP(
+                eventID: event.id
+            )?.status
+
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                rsvpButton(
+                    event: event,
+                    title: "Going",
+                    status: "going",
+                    selected: current == "going"
+                )
+                rsvpButton(
+                    event: event,
+                    title: "Maybe",
+                    status: "maybe",
+                    selected: current == "maybe"
+                )
+                rsvpButton(
+                    event: event,
+                    title: "Can't go",
+                    status: "not_going",
+                    selected: current == "not_going"
+                )
+            }
+
+            let going = groups.eventRSVPCount(
+                eventID: event.id,
+                status: "going"
+            )
+            let maybe = groups.eventRSVPCount(
+                eventID: event.id,
+                status: "maybe"
+            )
+
+            if going > 0 || maybe > 0 {
+                Text(
+                    "\(going) going · \(maybe) maybe"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.leading, 50)
+    }
+
+    private func rsvpButton(
+        event: CommunityGroupEventRecord,
+        title: String,
+        status: String,
+        selected: Bool
+    ) -> some View {
+        Button {
+            Task {
+                _ = await groups.setEventRSVP(
+                    groupID: group.id,
+                    eventID: event.id,
+                    status: status
+                )
+            }
+        } label: {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .tint(
+            selected
+                ? ATHLTHTheme.accentDeep
+                : .secondary
+        )
+    }
+
     private var challenges: some View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Group Challenges")
                         .font(.title3.weight(.bold))
-                    Text("Every completed member workout can contribute automatically.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        groups.canCreateGroupContent(
+                            currentGroup
+                        )
+                            ? "Create shared goals for the group."
+                            : "Creation is restricted by the group settings."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Button {
-                    showingCreateChallenge = true
-                } label: {
-                    Image(systemName: "plus")
+                if groups.canCreateGroupContent(
+                    currentGroup
+                ) {
+                    Button {
+                        showingCreateChallenge = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
 
             if groups.challenges(in: group.id).isEmpty {
                 ContentUnavailableView(
                     "No group challenges",
                     systemImage: "bolt.badge.plus",
-                    description: Text("Create a collective goal for the group.")
+                    description: Text(
+                        groups.canCreateGroupContent(
+                            currentGroup
+                        )
+                            ? "Create a collective goal for the group."
+                            : "No challenges have been created yet."
+                    )
                 )
                 .padding(.vertical, 20)
             } else {
                 VStack(spacing: 12) {
-                    ForEach(groups.challenges(in: group.id)) { challenge in
+                    ForEach(
+                        groups.challenges(in: group.id)
+                    ) { challenge in
                         groupChallengeCard(challenge)
                     }
                 }
