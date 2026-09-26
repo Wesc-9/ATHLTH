@@ -588,8 +588,10 @@ final class CommunityGroupStore: ObservableObject {
         switch role(in: group) {
         case "owner", "admin":
             return true
-        case "member", "contributor":
+        case "member":
             return group.membersCanCreateContent
+        case "contributor":
+            return false
         default:
             return false
         }
@@ -1224,6 +1226,32 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    func deleteAnnouncement(
+        groupID: UUID,
+        announcementID: UUID
+    ) async -> Bool {
+        guard let group = group(for: groupID),
+              canManage(group)
+        else {
+            return false
+        }
+
+        do {
+            try await client
+                .from("community_group_announcements")
+                .delete()
+                .eq("id", value: announcementID)
+                .eq("group_id", value: groupID)
+                .execute()
+
+            await loadGroupContent(groupID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func pinAnnouncement(
         groupID: UUID,
         announcementID: UUID?
@@ -1452,6 +1480,35 @@ final class CommunityGroupStore: ObservableObject {
                 )
                 .execute()
 
+            await loadGroupContent(groupID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func removeMember(
+        groupID: UUID,
+        userID: UUID
+    ) async -> Bool {
+        guard let group = group(for: groupID),
+              canManage(group),
+              userID != group.creatorID
+        else {
+            return false
+        }
+
+        do {
+            try await client
+                .from("community_group_members")
+                .delete()
+                .eq("group_id", value: groupID)
+                .eq("user_id", value: userID)
+                .neq("role", value: "owner")
+                .execute()
+
+            await refresh()
             await loadGroupContent(groupID)
             return true
         } catch {
@@ -2898,6 +2955,18 @@ struct CommunityGroupDetailView: View {
                                         : "pin"
                             )
                         }
+
+                        Button(
+                            "Delete Update",
+                            role: .destructive
+                        ) {
+                            Task {
+                                _ = await groups.deleteAnnouncement(
+                                    groupID: group.id,
+                                    announcementID: update.id
+                                )
+                            }
+                        }
                     } label: {
                         Image(systemName: "ellipsis")
                             .frame(width: 30, height: 30)
@@ -3613,7 +3682,7 @@ struct CommunityGroupCreateView: View {
 
                     Text(
                         membersCanCreateContent
-                            ? "Members and Contributors can create events and challenges. Owner and Admin can always create them."
+                            ? "Members can create events and challenges. Contributor remains update-only. Owner and Admin can always create them."
                             : "Only Owner and Admin can create events and challenges. Contributor still keeps update-publishing access."
                     )
                     .font(.caption)
@@ -3848,7 +3917,7 @@ struct CommunityGroupSettingsView: View {
 
                     Text(
                         membersCanCreateContent
-                            ? "Members and Contributors can create events and challenges. Owner and Admin can always create them."
+                            ? "Members can create events and challenges. Contributor remains update-only. Owner and Admin can always create them."
                             : "Only Owner and Admin can create events and challenges."
                     )
                     .font(.caption)
@@ -4816,6 +4885,20 @@ struct CommunityGroupMembersView: View {
                         title: "Member",
                         icon: "person.fill"
                     )
+
+                    Divider()
+
+                    Button(
+                        "Remove from Group",
+                        role: .destructive
+                    ) {
+                        Task {
+                            _ = await groups.removeMember(
+                                groupID: group.id,
+                                userID: member.userID
+                            )
+                        }
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .frame(
