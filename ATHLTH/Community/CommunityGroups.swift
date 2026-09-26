@@ -438,28 +438,13 @@ private struct CommunityGroupChallengeWorkoutInsert: Encodable {
     }
 }
 
-private struct CommunityGroupAnnouncementPinUpdate: Encodable {
-    let pinnedAt: Date?
+private struct CommunityGroupAnnouncementPinParams: Encodable {
+    let groupID: UUID
+    let announcementID: UUID?
 
     enum CodingKeys: String, CodingKey {
-        case pinnedAt = "pinned_at"
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(
-            keyedBy: CodingKeys.self
-        )
-
-        if let pinnedAt {
-            try container.encode(
-                pinnedAt,
-                forKey: .pinnedAt
-            )
-        } else {
-            try container.encodeNil(
-                forKey: .pinnedAt
-            )
-        }
+        case groupID = "p_group_id"
+        case announcementID = "p_announcement_id"
     }
 }
 
@@ -586,12 +571,10 @@ final class CommunityGroupStore: ObservableObject {
         _ group: CommunityGroupRecord
     ) -> Bool {
         switch role(in: group) {
-        case "owner", "admin":
+        case "owner", "admin", "contributor":
             return true
         case "member":
             return group.membersCanCreateContent
-        case "contributor":
-            return false
         default:
             return false
         }
@@ -1257,34 +1240,22 @@ final class CommunityGroupStore: ObservableObject {
         announcementID: UUID?
     ) async -> Bool {
         guard let group = group(for: groupID),
-              canManage(group)
+              canPublishUpdates(group)
         else {
             return false
         }
 
         do {
             try await client
-                .from("community_group_announcements")
-                .update(
-                    CommunityGroupAnnouncementPinUpdate(
-                        pinnedAt: nil
-                    )
-                )
-                .eq("group_id", value: groupID)
-                .execute()
-
-            if let announcementID {
-                try await client
-                    .from("community_group_announcements")
-                    .update(
-                        CommunityGroupAnnouncementPinUpdate(
-                            pinnedAt: Date()
+                .rpc(
+                    "set_community_group_announcement_pin",
+                    params:
+                        CommunityGroupAnnouncementPinParams(
+                            groupID: groupID,
+                            announcementID: announcementID
                         )
-                    )
-                    .eq("id", value: announcementID)
-                    .eq("group_id", value: groupID)
-                    .execute()
-            }
+                )
+                .execute()
 
             await loadGroupContent(groupID)
             return true
@@ -2459,79 +2430,108 @@ struct CommunityGroupDetailView: View {
 
                     Spacer()
 
-                    if groups.canManage(currentGroup) {
-                        Menu {
-                            Button {
-                                showingGroupSettings = true
+                    if isMember {
+                        HStack(spacing: 8) {
+                            NavigationLink {
+                                CommunityGroupMembersView(
+                                    group: currentGroup
+                                )
                             } label: {
-                                Label(
-                                    "Group Settings",
-                                    systemImage: "gearshape"
+                                Image(
+                                    systemName:
+                                        "person.2.fill"
+                                )
+                                .font(
+                                    .system(
+                                        size: 14,
+                                        weight: .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                                .frame(
+                                    width: 36,
+                                    height: 36
+                                )
+                                .background(
+                                    Color.white.opacity(0.56),
+                                    in: Circle()
                                 )
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                "Members, \(memberCountText)"
+                            )
 
-                            Button {
-                                showingNotificationSettings = true
-                            } label: {
-                                Label(
-                                    "Notifications",
-                                    systemImage: "bell"
-                                )
-                            }
-
-                            if !groups.isOwner(
-                                of: currentGroup
+                            if groups.canManage(
+                                currentGroup
                             ) {
-                                Button(
-                                    "Leave Group",
-                                    role: .destructive
-                                ) {
-                                    Task {
-                                        await groups.leave(
-                                            currentGroup
+                                Menu {
+                                    Button {
+                                        showingGroupSettings = true
+                                    } label: {
+                                        Label(
+                                            "Group Settings",
+                                            systemImage: "gearshape"
                                         )
                                     }
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Color.white.opacity(0.56),
-                                    in: Circle()
-                                )
-                        }
-                    } else if isMember {
-                        Menu {
-                            Button {
-                                showingNotificationSettings = true
-                            } label: {
-                                Label(
-                                    "Notifications",
-                                    systemImage: "bell"
-                                )
-                            }
 
-                            Button(
-                                "Leave Group",
-                                role: .destructive
-                            ) {
-                                Task {
-                                    await groups.leave(currentGroup)
+                                    Button {
+                                        showingNotificationSettings =
+                                            true
+                                    } label: {
+                                        Label(
+                                            "Notifications",
+                                            systemImage: "bell"
+                                        )
+                                    }
+
+                                    if !groups.isOwner(
+                                        of: currentGroup
+                                    ) {
+                                        Button(
+                                            "Leave Group",
+                                            role: .destructive
+                                        ) {
+                                            Task {
+                                                await groups.leave(
+                                                    currentGroup
+                                                )
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    groupMenuButton
+                                }
+                            } else {
+                                Menu {
+                                    Button {
+                                        showingNotificationSettings =
+                                            true
+                                    } label: {
+                                        Label(
+                                            "Notifications",
+                                            systemImage: "bell"
+                                        )
+                                    }
+
+                                    Button(
+                                        "Leave Group",
+                                        role: .destructive
+                                    ) {
+                                        Task {
+                                            await groups.leave(
+                                                currentGroup
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    groupMenuButton
                                 }
                             }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Color.white.opacity(0.56),
-                                    in: Circle()
-                                )
                         }
+                    }
                     }
                 }
             }
@@ -2557,6 +2557,24 @@ struct CommunityGroupDetailView: View {
             x: 0,
             y: 8
         )
+    }
+
+    private var groupMenuButton: some View {
+        Image(systemName: "ellipsis")
+            .font(
+                .system(
+                    size: 16,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+            .frame(width: 36, height: 36)
+            .background(
+                Color.white.opacity(0.56),
+                in: Circle()
+            )
     }
 
     @ViewBuilder
@@ -2661,29 +2679,43 @@ struct CommunityGroupDetailView: View {
             }
 
             comingUpCard
-
-            membersOverviewCard
+            recentGroupActivityCard
 
             ATHLTHCard {
-                Text("Inside this group")
+                Text("Group Snapshot")
                     .font(.headline)
 
-                HStack(spacing: 8) {
-                    overviewMetric(
-                        icon: "bubble.left.and.bubble.right.fill",
-                        value: "\(groups.messages(in: group.id).count)",
-                        title: "Messages"
-                    )
-                    overviewMetric(
-                        icon: "calendar",
-                        value: "\(groups.events(in: group.id).count)",
-                        title: "Events"
-                    )
-                    overviewMetric(
-                        icon: "bolt.fill",
-                        value: "\(groups.challenges(in: group.id).count)",
-                        title: "Challenges"
-                    )
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        overviewMetric(
+                            icon: "megaphone.fill",
+                            value:
+                                "\(groups.announcements(in: group.id).count)",
+                            title: "Updates"
+                        )
+                        overviewMetric(
+                            icon:
+                                "bubble.left.and.bubble.right.fill",
+                            value:
+                                "\(groups.messages(in: group.id).count)",
+                            title: "Messages"
+                        )
+                    }
+
+                    HStack(spacing: 8) {
+                        overviewMetric(
+                            icon: "calendar",
+                            value:
+                                "\(groups.events(in: group.id).count)",
+                            title: "Events"
+                        )
+                        overviewMetric(
+                            icon: "bolt.fill",
+                            value:
+                                "\(groups.challenges(in: group.id).count)",
+                            title: "Challenges"
+                        )
+                    }
                 }
                 .padding(.top, 10)
             }
@@ -2835,12 +2867,7 @@ struct CommunityGroupDetailView: View {
                                 icon: "calendar",
                                 title: event.title,
                                 detail:
-                                    event.startsAt.formatted(
-                                        date: .abbreviated,
-                                        time: .shortened
-                                    ) +
-                                    " · " +
-                                    event.meetingName,
+                                    comingUpEventDetail(event),
                                 tint: .purple
                             )
                         }
@@ -2861,17 +2888,9 @@ struct CommunityGroupDetailView: View {
                                 icon: "bolt.fill",
                                 title: challenge.title,
                                 detail:
-                                    challenge.startsAt <= Date()
-                                        ? "Active now · ends " +
-                                            challenge.endsAt.formatted(
-                                                date: .abbreviated,
-                                                time: .omitted
-                                            )
-                                        : "Starts " +
-                                            challenge.startsAt.formatted(
-                                                date: .abbreviated,
-                                                time: .shortened
-                                            ),
+                                    comingUpChallengeDetail(
+                                        challenge
+                                    ),
                                 tint: .green
                             )
                         }
@@ -2880,6 +2899,220 @@ struct CommunityGroupDetailView: View {
                 }
                 .padding(.top, 8)
             }
+        }
+    }
+
+    private func comingUpEventDetail(
+        _ event: CommunityGroupEventRecord
+    ) -> String {
+        var parts = [
+            event.startsAt.formatted(
+                date: .abbreviated,
+                time: .shortened
+            ),
+            event.meetingName
+        ]
+
+        let going = groups.eventRSVPCount(
+            eventID: event.id,
+            status: "going"
+        )
+
+        if going > 0 {
+            parts.append("\(going) going")
+        }
+
+        return parts
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+    }
+
+    private func comingUpChallengeDetail(
+        _ challenge: CommunityGroupChallengeRecord
+    ) -> String {
+        let timing =
+            challenge.startsAt <= Date()
+                ? "Active now · ends " +
+                    challenge.endsAt.formatted(
+                        date: .abbreviated,
+                        time: .omitted
+                    )
+                : "Starts " +
+                    challenge.startsAt.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    )
+
+        guard challenge.targetValue > 0 else {
+            return timing
+        }
+
+        let progress = groups.challengeProgress(
+            challenge
+        )
+        let fraction = min(
+            max(
+                progress / challenge.targetValue,
+                0
+            ),
+            1
+        )
+
+        return timing +
+            " · " +
+            String(
+                format: "%.0f%% complete",
+                fraction * 100
+            )
+    }
+
+    private var recentGroupActivityCard: some View {
+        let items = Array(
+            groups.activity(in: group.id).prefix(4)
+        )
+
+        return ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Recent Activity")
+                        .font(.title3.weight(.bold))
+                    Text(
+                        "What has changed in the group lately."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            if items.isEmpty {
+                Text(
+                    "New members, updates, events and challenges will appear here."
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.top, 12)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(items) { item in
+                        recentActivityRow(item)
+
+                        if item.id != items.last?.id {
+                            Divider()
+                                .padding(.leading, 46)
+                        }
+                    }
+                }
+                .padding(.top, 8)
+            }
+        }
+    }
+
+    private func recentActivityRow(
+        _ item: CommunityGroupActivityRecord
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(
+                systemName:
+                    recentActivityIcon(item.kind)
+            )
+            .font(
+                .system(
+                    size: 14,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                recentActivityTint(item.kind)
+            )
+            .frame(width: 34, height: 34)
+            .background(
+                recentActivityTint(item.kind)
+                    .opacity(0.10),
+                in: RoundedRectangle(
+                    cornerRadius: 11,
+                    style: .continuous
+                )
+            )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.headline)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                if let detail = item.detail,
+                   !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                HStack(spacing: 5) {
+                    if let actorID = item.actorID,
+                       let actor = groups.profileCard(
+                           for: actorID
+                       ) {
+                        Text(
+                            actor.usernameLabel.isEmpty
+                                ? actor.resolvedName
+                                : actor.usernameLabel
+                        )
+                    }
+
+                    Text(
+                        item.createdAt.formatted(
+                            date: .abbreviated,
+                            time: .shortened
+                        )
+                    )
+                }
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 9)
+    }
+
+    private func recentActivityIcon(
+        _ kind: String
+    ) -> String {
+        switch kind {
+        case "member_joined":
+            return "person.badge.plus"
+        case "announcement":
+            return "megaphone.fill"
+        case "event_created":
+            return "calendar.badge.plus"
+        case "challenge_created":
+            return "bolt.fill"
+        default:
+            return "bell.fill"
+        }
+    }
+
+    private func recentActivityTint(
+        _ kind: String
+    ) -> Color {
+        switch kind {
+        case "member_joined":
+            return .indigo
+        case "announcement":
+            return .orange
+        case "event_created":
+            return .purple
+        case "challenge_created":
+            return .green
+        default:
+            return ATHLTHTheme.accent
         }
     }
 
@@ -2947,7 +3180,7 @@ struct CommunityGroupDetailView: View {
 
                 Spacer()
 
-                if groups.canManage(currentGroup) {
+                if groups.canPublishUpdates(currentGroup) {
                     Menu {
                         Button {
                             Task {
@@ -2971,15 +3204,17 @@ struct CommunityGroupDetailView: View {
                             )
                         }
 
-                        Button(
-                            "Delete Update",
-                            role: .destructive
-                        ) {
-                            Task {
-                                _ = await groups.deleteAnnouncement(
-                                    groupID: group.id,
-                                    announcementID: update.id
-                                )
+                        if groups.canManage(currentGroup) {
+                            Button(
+                                "Delete Update",
+                                role: .destructive
+                            ) {
+                                Task {
+                                    _ = await groups.deleteAnnouncement(
+                                        groupID: group.id,
+                                        announcementID: update.id
+                                    )
+                                }
                             }
                         }
                     } label: {
@@ -3022,77 +3257,6 @@ struct CommunityGroupDetailView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
             }
-        }
-    }
-
-    private var membersOverviewCard: some View {
-        NavigationLink {
-            CommunityGroupMembersView(
-                group: currentGroup
-            )
-        } label: {
-            ATHLTHCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Members")
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                        Text(memberCountText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: -8) {
-                        ForEach(
-                            Array(
-                                groups.members(in: group.id)
-                                    .prefix(4)
-                            ),
-                            id: \.userID
-                        ) { member in
-                            memberAvatar(member)
-                        }
-                    }
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.bold())
-                        .foregroundStyle(.tertiary)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private func memberAvatar(
-        _ member: CommunityGroupMemberRecord
-    ) -> some View {
-        if let profile = groups.profileCard(
-            for: member.userID
-        ) {
-            CommunityGroupProfileAvatar(
-                profile: profile,
-                size: 34
-            )
-            .overlay {
-                Circle()
-                    .stroke(Color.white, lineWidth: 2)
-            }
-        } else {
-            Image(systemName: "person.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 34, height: 34)
-                .background(
-                    Color(.secondarySystemGroupedBackground),
-                    in: Circle()
-                )
-                .overlay {
-                    Circle()
-                        .stroke(Color.white, lineWidth: 2)
-                }
         }
     }
 
@@ -3203,7 +3367,8 @@ struct CommunityGroupDetailView: View {
             candidates: candidates,
             includeEveryone:
                 role == "owner" ||
-                role == "admin"
+                role == "admin" ||
+                role == "contributor"
         )
     }
 
@@ -3695,8 +3860,8 @@ struct CommunityGroupCreateView: View {
 
                     Text(
                         membersCanCreateContent
-                            ? "Members can create events and challenges. Contributor remains update-only. Owner and Admin can always create them."
-                            : "Only Owner and Admin can create events and challenges. Contributor still keeps update-publishing access."
+                            ? "Members can create events and challenges. Owner, Admin and Contributor can always create them."
+                            : "Only Owner, Admin and Contributor can create events and challenges."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -3704,7 +3869,7 @@ struct CommunityGroupCreateView: View {
 
                 Section {
                     Label(
-                        "Owner has full control. Admin has full management access except deleting the group. Contributor can publish official group updates.",
+                        "Owner has full control. Admin has full management access except deleting the group. Contributor can publish and pin updates, create events and challenges, and use @everyone, but cannot manage members.",
                         systemImage: "person.3.fill"
                     )
                     .font(.caption)
@@ -3930,7 +4095,7 @@ struct CommunityGroupSettingsView: View {
 
                     Text(
                         membersCanCreateContent
-                            ? "Members can create events and challenges. Contributor remains update-only. Owner and Admin can always create them."
+                            ? "Members can create events and challenges. Owner, Admin and Contributor can always create them."
                             : "Only Owner and Admin can create events and challenges."
                     )
                     .font(.caption)
@@ -4481,7 +4646,7 @@ struct CommunityGroupNotificationSettingsView: View {
         case "muted":
             return "No ordinary group activity alerts. Direct @mentions can still alert you if Mentions are enabled globally."
         default:
-            return "Receive official group updates, events and challenges, but not every chat message."
+            return "Receive official group updates, new events and challenges, but not ordinary group chat. Membership actions and direct @mentions can still alert separately when they need your attention."
         }
     }
 }
