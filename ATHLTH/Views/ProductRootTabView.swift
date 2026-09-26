@@ -110,6 +110,8 @@ struct ATHLTHHomeView: View {
     @State private var homeWatchTransferError: String?
     @AppStorage("homeGettingStartedDismissed")
     private var homeGettingStartedDismissed = false
+    @AppStorage("hasEditedATHLTHProfile")
+    private var hasEditedATHLTHProfile = false
 
     var body: some View {
         NavigationStack {
@@ -250,7 +252,8 @@ struct ATHLTHHomeView: View {
                     if shouldShowGettingStarted {
                         HomeGettingStartedCard(
                             hasPlan: session.activePlan != nil,
-                            hasGoal: !goalStore.activeGoals.isEmpty
+                            hasGoal: !goalStore.activeGoals.isEmpty,
+                            hasEditedProfile: hasEditedATHLTHProfile
                         ) {
                             withAnimation(.easeInOut(duration: 0.22)) {
                                 homeGettingStartedDismissed = true
@@ -1142,7 +1145,16 @@ struct ATHLTHHomeView: View {
     }
 
     private var shouldShowGettingStarted: Bool {
-        !homeGettingStartedDismissed
+        guard !homeGettingStartedDismissed else {
+            return false
+        }
+
+        let allSetupGoalsComplete =
+            session.activePlan != nil &&
+            !goalStore.activeGoals.isEmpty &&
+            hasEditedATHLTHProfile
+
+        return !allSetupGoalsComplete
     }
 
     private var readinessTint: Color {
