@@ -14,7 +14,7 @@ struct RecoveryAIInsightCard: View {
                 Image(systemName: "sparkles")
                     .foregroundStyle(.indigo)
 
-                Text("ATHLTH SENSE")
+                Text("ATHLTH COACH")
                     .font(.caption.weight(.bold))
                     .tracking(1.6)
                     .foregroundStyle(.secondary)
