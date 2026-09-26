@@ -15,6 +15,7 @@ struct ATHLTHApp: App {
     @StateObject private var goals = GoalStore()
     @StateObject private var profileGear = ProfileGearStore()
     @StateObject private var notifications = ATHLTHNotificationStore()
+    @StateObject private var calendarSync = AppleCalendarSyncStore()
     @StateObject private var challengeStore = ChallengeStore()
     @StateObject private var social = SocialStore()
     @StateObject private var messaging = MessagingStore()
@@ -46,6 +47,7 @@ struct ATHLTHApp: App {
                 .environmentObject(goals)
                 .environmentObject(profileGear)
                 .environmentObject(notifications)
+                .environmentObject(calendarSync)
                 .environmentObject(challengeStore)
                 .environmentObject(social)
                 .environmentObject(messaging)
@@ -101,6 +103,7 @@ struct AppRootView: View {
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
@@ -143,6 +146,9 @@ struct AppRootView: View {
                 await messaging.refresh()
                 await gear.refresh()
                 await communityGroups.refresh()
+                await calendarSync.syncIfEnabled(
+                    plan: appSession.activePlan
+                )
             }
 
             if health.needsHealthRefreshRecovery {
@@ -190,6 +196,9 @@ struct AppRootView: View {
                 if appSession.signedIn {
                     await refreshSocialCore()
                     await messaging.refresh()
+                    await calendarSync.syncIfEnabled(
+                        plan: appSession.activePlan
+                    )
                 }
 
                 guard health.hasRequestedAuthorization,
@@ -402,6 +411,17 @@ struct AppRootView: View {
                 await syncSocialOwnedData()
             }
         }
+        .onChange(of: appSession.activePlan) { _, plan in
+            guard appSession.signedIn else {
+                return
+            }
+
+            Task {
+                await calendarSync.syncIfEnabled(
+                    plan: plan
+                )
+            }
+        }
         .onChange(of: appSession.profile.presence) { _, presence in
             guard appSession.signedIn,
                   social.privacy?.shareTrainingPresence == true
@@ -461,6 +481,9 @@ struct AppRootView: View {
                 await syncPushPreferences()
                 await submitLatestStoreProofIfPossible()
                 await refreshSocialCore()
+                await calendarSync.syncIfEnabled(
+                    plan: appSession.activePlan
+                )
                 if health.hasRequestedAuthorization {
                     await syncSocialOwnedData()
                 }
