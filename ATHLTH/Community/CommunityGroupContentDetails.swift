@@ -14,6 +14,7 @@ struct CommunityGroupEventDetailView: View {
     let event: CommunityGroupEventRecord
 
     @State private var showingEdit = false
+    @State private var showingManualStrengthResult = false
     @State private var actionMessage: String?
 
     private var current:
@@ -1014,6 +1015,27 @@ struct CommunityGroupChallengeDetailView: View {
                 }
             }
         }
+        .sheet(
+            isPresented:
+                $showingManualStrengthResult
+        ) {
+            CommunityGroupManualStrengthResultView(
+                store: advanced,
+                group: group,
+                challenge: current
+            ) {
+                Task {
+                    await advanced.loadChallenge(
+                        groupID: group.id,
+                        challengeID:
+                            current.id
+                    )
+                    await groups.loadGroupContent(
+                        group.id
+                    )
+                }
+            }
+        }
         .task {
             await advanced.loadChallenge(
                 groupID: group.id,
@@ -1314,6 +1336,27 @@ struct CommunityGroupChallengeDetailView: View {
             )
         case .fastestTime:
             return "Fastest qualifying time"
+        case .strengthVolume:
+            return String(
+                format:
+                    "%.0f kg total volume · %@",
+                current.targetValue,
+                current.scoringMode.title
+            )
+        case .heaviestWeight:
+            return String(
+                format:
+                    "%.1f kg · %@",
+                current.targetValue,
+                current.scoringMode.title
+            )
+        case .strengthReps:
+            return String(
+                format:
+                    "%.0f reps · %@",
+                current.targetValue,
+                current.scoringMode.title
+            )
         }
     }
 
@@ -1407,7 +1450,7 @@ struct CommunityGroupChallengeDetailView: View {
                 .padding(.top, 5)
 
                 Text(
-                    "\(entry.attemptCount) attempt\(entry.attemptCount == 1 ? "" : "s")"
+                    progressAttemptText(entry)
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1437,6 +1480,19 @@ struct CommunityGroupChallengeDetailView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .padding(.top, 6)
+            }
+
+            if supportsManualStrengthResult {
+                Button {
+                    showingManualStrengthResult = true
+                } label: {
+                    Label(
+                        "Log Manual Result",
+                        systemImage: "hand.tap.fill"
+                    )
+                }
+                .buttonStyle(.bordered)
+                .padding(.top, 10)
             }
         }
     }
@@ -1514,7 +1570,9 @@ struct CommunityGroupChallengeDetailView: View {
                                 )
 
                                 Text(
-                                    "\(entry.attemptCount) attempt\(entry.attemptCount == 1 ? "" : "s")"
+                                    leaderboardAttemptText(
+                                        entry
+                                    )
                                 )
                                 .font(.caption2)
                                 .foregroundStyle(
@@ -1603,6 +1661,7 @@ struct CommunityGroupChallengeDetailView: View {
             -> (
                 UUID,
                 Double,
+                Int,
                 Int
             )? in
 
@@ -1648,7 +1707,8 @@ struct CommunityGroupChallengeDetailView: View {
             return (
                 userID,
                 score,
-                attempts.count
+                attempts.count,
+                attempts.filter(\.isManual).count
             )
         }
 
@@ -1681,6 +1741,7 @@ struct CommunityGroupChallengeDetailView: View {
                     profile?.avatarURL,
                 score: item.1,
                 attemptCount: item.2,
+                manualAttemptCount: item.3,
                 rank: index + 1
             )
         }
@@ -1717,7 +1778,61 @@ struct CommunityGroupChallengeDetailView: View {
                 seconds / 60,
                 seconds % 60
             )
+        case .strengthVolume:
+            return String(
+                format: "%.0f kg",
+                score
+            )
+        case .heaviestWeight:
+            return String(
+                format: "%.1f kg",
+                score
+            )
+        case .strengthReps:
+            return "\(Int(score.rounded())) reps"
         }
+    }
+
+    private var supportsManualStrengthResult: Bool {
+        guard current
+            .activityConfiguration?
+            .activityType == "strength",
+              current.resolvedStatus == .live,
+              !current.joinRequired || isJoined
+        else {
+            return false
+        }
+
+        switch current.metric {
+        case .strengthVolume,
+             .heaviestWeight,
+             .strengthReps:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func progressAttemptText(
+        _ entry:
+            CommunityGroupLeaderboardEntry
+    ) -> String {
+        let base =
+            "\(entry.attemptCount) attempt\(entry.attemptCount == 1 ? "" : "s")"
+
+        guard entry.manualAttemptCount > 0 else {
+            return base
+        }
+
+        return base +
+            " · \(entry.manualAttemptCount) Manual"
+    }
+
+    private func leaderboardAttemptText(
+        _ entry:
+            CommunityGroupLeaderboardEntry
+    ) -> String {
+        progressAttemptText(entry)
     }
 }
 
