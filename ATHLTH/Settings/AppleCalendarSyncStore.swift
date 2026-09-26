@@ -10,6 +10,8 @@ final class AppleCalendarSyncStore: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var calendarIdentifier: String?
     @Published private(set) var lastSyncedAt: Date?
+    @Published private(set) var defaultStartHour: Int
+    @Published private(set) var defaultStartMinute: Int
     @Published var errorMessage: String?
 
     let calendarName = "ATHLTH"
@@ -25,6 +27,10 @@ final class AppleCalendarSyncStore: ObservableObject {
             "calendarSync.calendarIdentifier"
         static let lastSyncedAt =
             "calendarSync.lastSyncedAt"
+        static let defaultStartHour =
+            "calendarSync.defaultStartHour"
+        static let defaultStartMinute =
+            "calendarSync.defaultStartMinute"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -45,6 +51,14 @@ final class AppleCalendarSyncStore: ObservableObject {
             defaults.object(
                 forKey: Key.lastSyncedAt
             ) as? Date
+        defaultStartHour =
+            defaults.object(
+                forKey: Key.defaultStartHour
+            ) as? Int ?? 18
+        defaultStartMinute =
+            defaults.object(
+                forKey: Key.defaultStartMinute
+            ) as? Int ?? 0
     }
 
     var hasFullAccess: Bool {
@@ -121,6 +135,37 @@ final class AppleCalendarSyncStore: ObservableObject {
     func disable() {
         isEnabled = false
         persistEnabled()
+    }
+
+    var defaultStartTime: Date {
+        let calendar = Calendar.current
+        let base = calendar.startOfDay(for: Date())
+
+        return calendar.date(
+            bySettingHour: defaultStartHour,
+            minute: defaultStartMinute,
+            second: 0,
+            of: base
+        ) ?? base
+    }
+
+    func setDefaultStartTime(_ date: Date) {
+        let components = Calendar.current.dateComponents(
+            [.hour, .minute],
+            from: date
+        )
+
+        defaultStartHour = components.hour ?? 18
+        defaultStartMinute = components.minute ?? 0
+
+        defaults.set(
+            defaultStartHour,
+            forKey: Key.defaultStartHour
+        )
+        defaults.set(
+            defaultStartMinute,
+            forKey: Key.defaultStartMinute
+        )
     }
 
     func syncIfEnabled(
@@ -458,6 +503,9 @@ final class AppleCalendarSyncStore: ObservableObject {
         event.calendar = calendar
         event.title = session.title
 
+        let hour: Int
+        let minute: Int
+
         if let scheduledStart =
                 session.scheduledStart {
             let time = calendarAPI
@@ -466,49 +514,37 @@ final class AppleCalendarSyncStore: ObservableObject {
                     from: scheduledStart
                 )
 
-            let hour = time.hour ?? 8
-            let minute = time.minute ?? 0
-
-            event.startDate =
-                calendarAPI.date(
-                    bySettingHour: hour,
-                    minute: minute,
-                    second: 0,
-                    of: dayDate
-                ) ?? dayDate
-
-            event.endDate =
-                calendarAPI.date(
-                    byAdding: .minute,
-                    value: max(
-                        session.durationMinutes ??
-                        60,
-                        5
-                    ),
-                    to: event.startDate
-                ) ??
-                event.startDate
-                    .addingTimeInterval(
-                        3_600
-                    )
-            event.isAllDay = false
+            hour = time.hour ?? defaultStartHour
+            minute = time.minute ?? defaultStartMinute
         } else {
-            event.startDate =
-                calendarAPI.startOfDay(
-                    for: dayDate
-                )
-            event.endDate =
-                calendarAPI.date(
-                    byAdding: .day,
-                    value: 1,
-                    to: event.startDate
-                ) ??
-                event.startDate
-                    .addingTimeInterval(
-                        86_400
-                    )
-            event.isAllDay = true
+            hour = defaultStartHour
+            minute = defaultStartMinute
         }
+
+        event.startDate =
+            calendarAPI.date(
+                bySettingHour: hour,
+                minute: minute,
+                second: 0,
+                of: dayDate
+            ) ?? dayDate
+
+        event.endDate =
+            calendarAPI.date(
+                byAdding: .minute,
+                value: max(
+                    session.durationMinutes ??
+                    60,
+                    5
+                ),
+                to: event.startDate
+            ) ??
+            event.startDate
+                .addingTimeInterval(
+                    3_600
+                )
+
+        event.isAllDay = false
 
         event.notes = eventNotes(
             session: session,
