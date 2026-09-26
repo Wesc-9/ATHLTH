@@ -94,6 +94,17 @@ struct ATHLTHSettingsView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            PremiumSettingsRow(
+                                icon: "globe",
+                                title: "Language",
+                                subtitle: "More languages are planned"
+                            ) {
+                                Text("English")
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
                         }
                     }
 
@@ -109,6 +120,26 @@ struct ATHLTHSettingsView: View {
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    settingsSection("Privacy & Visibility") {
+                        PremiumSettingsCard {
+                            NavigationLink {
+                                ATHLTHPrivacyCenterView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "shield.lefthalf.filled",
+                                    title: "Privacy & Visibility",
+                                    subtitle: privacySummary
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(
+                                            ATHLTHTheme.mutedText.opacity(0.72)
+                                        )
                                 }
                             }
                             .buttonStyle(.plain)
@@ -357,19 +388,6 @@ struct ATHLTHSettingsView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                        }
-                    }
-
-                    settingsSection("Language") {
-                        PremiumSettingsCard {
-                            PremiumSettingsRow(
-                            icon: "globe",
-                            title: "Language",
-                            subtitle: "More languages are planned"
-                        ) {
-                                Text("English")
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
                         }
                     }
 

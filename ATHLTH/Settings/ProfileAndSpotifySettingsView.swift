@@ -1037,31 +1037,126 @@ struct ATHLTHPrivacyCenterView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
 
+    @State private var draft: SocialPrivacySettings?
+    @State private var saving = false
+
     var body: some View {
         Form {
-            Section("Profile & Messages") {
-                NavigationLink {
-                    SocialPrivacySettingsView()
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label(
-                            "Social & Messages",
-                            systemImage: "person.2.badge.gearshape"
-                        )
-                        .font(.subheadline.weight(.semibold))
-
-                        Text(
-                            "\(profileVisibilityTitle) profile · \(messagePrivacyTitle)"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            if let binding = draftBinding {
+                Section("Social & Messages") {
+                    Picker(
+                        "Who can view my profile",
+                        selection: binding.profileVisibility
+                    ) {
+                        Text("Private").tag("private")
+                        Text("Friends").tag("friends")
+                        Text("Public").tag("public")
                     }
-                    .padding(.vertical, 3)
-                }
 
-                Text("Profile visibility, discoverability, friend requests, message requests and “Training now” presence are managed together and synced to your ATHLTH account.")
+                    Toggle(
+                        "Appear in search",
+                        isOn: binding.discoverable
+                    )
+
+                    Toggle(
+                        "Allow friend requests",
+                        isOn: binding.allowFriendRequests
+                    )
+
+                    Picker(
+                        "Who can message me",
+                        selection: binding.allowDirectMessages
+                    ) {
+                        Text("Friends + requests").tag("requests")
+                        Text("Friends only").tag("friends")
+                        Text("Nobody").tag("nobody")
+                    }
+
+                    Text(
+                        "Message requests allow one initial message from people who are not yet your friends. Blocking always stops messaging."
+                    )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+
+                Section("What Others Can See") {
+                    Toggle(
+                        "Training now",
+                        isOn: binding.shareTrainingPresence
+                    )
+                    Toggle(
+                        "Performance stats",
+                        isOn: binding.sharePerformanceStats
+                    )
+                    Toggle(
+                        "Trophy cabinet",
+                        isOn: binding.shareTrophyCabinet
+                    )
+                    Toggle(
+                        "Recent activity",
+                        isOn: binding.shareRecentActivity
+                    )
+                    Toggle(
+                        "Running PRs",
+                        isOn: binding.shareRunningPRs
+                    )
+                    Toggle(
+                        "Strength PRs",
+                        isOn: binding.shareStrengthPRs
+                    )
+                    Toggle(
+                        "Completed goals",
+                        isOn: binding.shareGoals
+                    )
+                    Toggle(
+                        "Workout totals",
+                        isOn: binding.shareWorkoutTotals
+                    )
+
+                    Text(
+                        "These controls decide which profile sections are shared with viewers allowed by your profile visibility."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section("Challenges") {
+                    Picker(
+                        "Challenge invites",
+                        selection: binding.allowChallengeInvites
+                    ) {
+                        Text("Friends").tag("friends")
+                        Text("Everyone").tag("everyone")
+                        Text("Nobody").tag("nobody")
+                    }
+                }
+
+                Section {
+                    Button {
+                        Task {
+                            await saveSocialPrivacy()
+                        }
+                    } label: {
+                        HStack {
+                            Text("Save Social & Profile Privacy")
+
+                            Spacer()
+
+                            if saving {
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(saving)
+                }
+            } else {
+                Section("Social & Messages") {
+                    HStack {
+                        Spacer()
+                        ProgressView("Loading privacy settings…")
+                        Spacer()
+                    }
+                }
             }
 
             Section("Activities") {
@@ -1074,9 +1169,11 @@ struct ATHLTHPrivacyCenterView: View {
                     }
                 }
 
-                Text("You can still change visibility during post-workout review before an activity is shared.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "You can still change visibility during post-workout review before an activity is shared."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
                 Label(
                     "Leaderboards only use activity that is already visible to the viewer.",
@@ -1094,24 +1191,32 @@ struct ATHLTHPrivacyCenterView: View {
 
                 Text(
                     settings.hideRouteStartAndEnd
-                        ? "Recommended · On by default. ATHLTH removes roughly 250 m from both ends before a route is shared in Messages."
+                        ? "Recommended · ATHLTH removes roughly 250 m from both ends before a route is shared."
                         : "Shared routes include their full start and end points."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                Label("Routes are shared only when you explicitly choose to share them.", systemImage: "hand.raised.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Label(
+                    "Routes are shared only when you explicitly choose to share them.",
+                    systemImage: "hand.raised.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
-            Section("Health") {
-                Label("Health data is private by default", systemImage: "heart.text.square.fill")
-                    .foregroundStyle(ATHLTHTheme.accent)
+            Section("Health Data") {
+                Label(
+                    "Health data is private by default",
+                    systemImage: "heart.text.square.fill"
+                )
+                .foregroundStyle(ATHLTHTheme.accent)
 
-                Text("Heart rate, sleep, weight and other Apple Health values are never attached automatically when you share a workout, route or plan.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "Heart rate, sleep, weight and other Apple Health values are never attached automatically when you share a workout, route or plan."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Section("Personalization") {
@@ -1119,7 +1224,8 @@ struct ATHLTHPrivacyCenterView: View {
                     "Personalized ATHLTH offers",
                     isOn: Binding(
                         get: {
-                            session.onboardingProfile?.personalizedOfferConsent == .granted
+                            session.onboardingProfile?
+                                .personalizedOfferConsent == .granted
                         },
                         set: { enabled in
                             session.setPersonalizedOfferConsent(
@@ -1129,42 +1235,64 @@ struct ATHLTHPrivacyCenterView: View {
                     )
                 )
 
-                Text("Uses only goals and interests you choose in ATHLTH. Apple Health / HealthKit data is excluded from offer targeting.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "Uses only goals and interests you choose in ATHLTH. Apple Health / HealthKit data is excluded from offer targeting."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Section("Safety") {
                 NavigationLink {
                     BlockedUsersView()
                 } label: {
-                    Label("Blocked users", systemImage: "person.crop.circle.badge.xmark")
+                    Label(
+                        "Blocked users",
+                        systemImage: "person.crop.circle.badge.xmark"
+                    )
                 }
             }
         }
         .navigationTitle("Privacy & Visibility")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await social.refresh()
+            if social.privacy == nil {
+                await social.refresh()
+            }
+
+            draft = social.privacy
         }
     }
 
-    private var profileVisibilityTitle: String {
-        guard let raw = social.privacy?.profileVisibility,
-              let value = ProfileVisibility(rawValue: raw)
-        else {
-            return settings.profileVisibility.title
+    private var draftBinding: Binding<SocialPrivacySettings>? {
+        guard draft != nil else {
+            return nil
         }
-        return value.title
+
+        return Binding(
+            get: { draft! },
+            set: { draft = $0 }
+        )
     }
 
-    private var messagePrivacyTitle: String {
-        switch social.privacy?.allowDirectMessages {
-        case "requests": return "Friends + requests"
-        case "friends": return "Friends only"
-        case "nobody": return "Nobody"
-        default: return "Review"
+    private func saveSocialPrivacy() async {
+        guard let draft else {
+            return
         }
+
+        saving = true
+        await social.updatePrivacy(draft)
+
+        if let visibility = ProfileVisibility(
+            rawValue: draft.profileVisibility
+        ) {
+            settings.profileVisibility = visibility
+        }
+
+        settings.shareTrainingPresence =
+            draft.shareTrainingPresence
+
+        saving = false
     }
 }
 

@@ -6387,10 +6387,10 @@ struct ATHLTHProfileView: View {
 
             ToolbarItemGroup(placement: .topBarTrailing) {
                 NavigationLink {
-                    ATHLTHPrivacyCenterView()
+                    ATHLTHEditProfileView()
                 } label: {
-                    Image(systemName: "shield.lefthalf.filled")
-                        .font(.system(size: 16, weight: .semibold))
+                    Image(systemName: "pencil")
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                         .frame(width: 40, height: 40)
                         .background(
@@ -6399,10 +6399,13 @@ struct ATHLTHProfileView: View {
                         )
                         .overlay {
                             Circle()
-                                .stroke(Color.white.opacity(0.80), lineWidth: 1)
+                                .stroke(
+                                    Color.white.opacity(0.80),
+                                    lineWidth: 1
+                                )
                         }
                 }
-                .accessibilityLabel("Privacy & Visibility")
+                .accessibilityLabel("Edit Profile")
 
                 NavigationLink {
                     ATHLTHSettingsView()
@@ -6517,30 +6520,6 @@ struct ATHLTHProfileView: View {
                     }
 
                     Spacer(minLength: 6)
-
-                    NavigationLink {
-                        ATHLTHEditProfileView()
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(
-                                .system(
-                                    size: 14,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 38, height: 38)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        Color.white.opacity(0.72),
-                                        lineWidth: 0.8
-                                    )
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Edit Profile")
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 72)
