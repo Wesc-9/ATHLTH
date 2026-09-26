@@ -1185,7 +1185,7 @@ struct CommunityPopularRoutesShowcaseCard: View {
                     showsIndicators: false
                 ) {
                     HStack(spacing: 10) {
-                        ForEach(routes.prefix(6)) { route in
+                        ForEach(routes.prefix(3)) { route in
                             routeCard(route)
                         }
                     }
@@ -1475,8 +1475,14 @@ private final class CommunityRouteSnapshotRenderer {
                 )
                 .start()
 
+            let rendererFormat =
+                UIGraphicsImageRendererFormat.default()
+            rendererFormat.scale = 2
+            rendererFormat.opaque = true
+
             let renderer = UIGraphicsImageRenderer(
-                size: options.size
+                size: options.size,
+                format: rendererFormat
             )
 
             let rendered = renderer.image { _ in
