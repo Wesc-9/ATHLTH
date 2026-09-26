@@ -159,75 +159,118 @@ struct SavedRoutesView: View {
     private func routeCard(_ route: TrainingRoute) -> some View {
         ATHLTHCard {
             if route.coordinates.count >= 2 {
-                Map(initialPosition: .region(region(for: route))) {
-                    MapPolyline(
-                        coordinates: route.coordinates.map(\.coordinate)
+                NavigationLink {
+                    RouteDetailView(route: route)
+                } label: {
+                    Map(
+                        initialPosition: .region(
+                            region(for: route)
+                        )
+                    ) {
+                        MapPolyline(
+                            coordinates:
+                                route.coordinates.map(\.coordinate)
+                        )
+                        .stroke(
+                            ATHLTHTheme.accent,
+                            lineWidth: 5
+                        )
+
+                        if let first = route.coordinates.first {
+                            Marker(
+                                route.startName ?? "Start",
+                                coordinate: first.coordinate
+                            )
+                            .tint(ATHLTHTheme.accent)
+                        }
+
+                        if let last = route.coordinates.last {
+                            Marker(
+                                route.endName ?? "Finish",
+                                coordinate: last.coordinate
+                            )
+                            .tint(.red)
+                        }
+                    }
+                    .allowsHitTesting(false)
+                    .frame(height: 155)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
                     )
-                    .stroke(ATHLTHTheme.accent, lineWidth: 5)
-
-                    if let first = route.coordinates.first {
-                        Marker(
-                            route.startName ?? "Start",
-                            coordinate: first.coordinate
+                    .contentShape(
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
                         )
-                        .tint(ATHLTHTheme.accent)
-                    }
-
-                    if let last = route.coordinates.last {
-                        Marker(
-                            route.endName ?? "Finish",
-                            coordinate: last.coordinate
-                        )
-                        .tint(.red)
-                    }
+                    )
                 }
-                .frame(height: 155)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
-                    )
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "Open \(route.title)"
                 )
             }
 
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(route.title)
-                        .font(.headline)
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                NavigationLink {
+                    RouteDetailView(route: route)
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(route.title)
+                                .font(.headline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
 
-                    if let start = route.startName,
-                       let end = route.endName {
-                        Text("\(start) → \(end)")
-                            .font(.caption)
+                            if let start = route.startName,
+                               let end = route.endName {
+                                Text("\(start) → \(end)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+
+                            HStack(spacing: 10) {
+                                Label(
+                                    String(
+                                        format: "%.1f km",
+                                        route.distanceKilometers
+                                    ),
+                                    systemImage: "figure.run"
+                                )
+
+                                if let elevation =
+                                    route.elevationGainMeters {
+                                    Label(
+                                        "\(Int(elevation.rounded())) m",
+                                        systemImage: "mountain.2.fill"
+                                    )
+                                }
+
+                                Label(
+                                    visibilityLabel(
+                                        route.visibility
+                                    ),
+                                    systemImage:
+                                        visibilityIcon(
+                                            route.visibility
+                                        )
+                                )
+                            }
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    HStack(spacing: 10) {
-                        Label(
-                            String(
-                                format: "%.1f km",
-                                route.distanceKilometers
-                            ),
-                            systemImage: "figure.run"
-                        )
-
-                        if let elevation = route.elevationGainMeters {
-                            Label(
-                                "\(Int(elevation.rounded())) m",
-                                systemImage: "mountain.2.fill"
-                            )
                         }
 
-                        Label(
-                            route.visibility.title,
-                            systemImage: visibilityIcon(route.visibility)
-                        )
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.tertiary)
+                            .padding(.top, 3)
                     }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
 
                 Spacer()
 
@@ -341,6 +384,19 @@ struct SavedRoutesView: View {
                 )
             )
         )
+    }
+
+    private func visibilityLabel(
+        _ visibility: ProfileVisibility
+    ) -> String {
+        switch visibility {
+        case .privateOnly:
+            return "Only me"
+        case .friends:
+            return "Friends"
+        case .publicProfile:
+            return "Public"
+        }
     }
 
     private func visibilityIcon(
