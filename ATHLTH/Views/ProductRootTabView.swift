@@ -5026,6 +5026,12 @@ struct ATHLTHRecoveryView: View {
             return "Stress is elevated today"
         }
 
+        if sorenessStore.todayMotivation.map({
+            $0 <= 2
+        }) ?? false {
+            return "Motivation is low today"
+        }
+
         if sorenessStore.highestTodayLevel == .moderate {
             return "Adjust around sore areas"
         }
@@ -5079,6 +5085,12 @@ struct ATHLTHRecoveryView: View {
             return "Your Daily Check-in shows elevated stress. A shorter session, easier intensity or a recovery tool may fit better today."
         }
 
+        if sorenessStore.todayMotivation.map({
+            $0 <= 2
+        }) ?? false {
+            return "Motivation is low in today's check-in. Keep the plan flexible: start easy, reassess after the warm-up, and reduce the session if it still feels off."
+        }
+
         if sorenessStore.highestTodayLevel == .moderate {
             return "Moderate soreness is logged today. You can still train, but reduce load on the affected muscle groups or choose a different focus."
         }
@@ -5110,15 +5122,27 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var guidanceTrainActionTitle: String {
-        if sorenessStore.todayOverallSoreness.map({
-            $0 >= 4
-        }) ?? false ||
-            sorenessStore.todayEnergy.map({
-                $0 <= 2
-            }) ?? false ||
-            sorenessStore.todayStress.map({
+        let highOverallSoreness =
+            sorenessStore.todayOverallSoreness.map {
                 $0 >= 4
-            }) ?? false ||
+            } ?? false
+        let lowEnergy =
+            sorenessStore.todayEnergy.map {
+                $0 <= 2
+            } ?? false
+        let highStress =
+            sorenessStore.todayStress.map {
+                $0 >= 4
+            } ?? false
+        let lowMotivation =
+            sorenessStore.todayMotivation.map {
+                $0 <= 2
+            } ?? false
+
+        if highOverallSoreness ||
+            lowEnergy ||
+            highStress ||
+            lowMotivation ||
             sorenessStore.highestTodayLevel == .high ||
             health.recovery.state == .takeItEasy ||
             health.recovery.state == .recover {
@@ -5129,15 +5153,20 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var recommendedRecoveryTool: RecoveryTool {
-        if sorenessStore.todayStress.map({
-            $0 >= 4
-        }) ?? false {
+        let highStress =
+            sorenessStore.todayStress.map {
+                $0 >= 4
+            } ?? false
+        let highOverallSoreness =
+            sorenessStore.todayOverallSoreness.map {
+                $0 >= 4
+            } ?? false
+
+        if highStress {
             return .breathing
         }
 
-        if sorenessStore.todayOverallSoreness.map({
-            $0 >= 4
-        }) ?? false ||
+        if highOverallSoreness ||
             sorenessStore.highestTodayLevel == .high ||
             sorenessStore.highestTodayLevel == .moderate {
             return .mobility
