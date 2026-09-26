@@ -6682,6 +6682,24 @@ struct CommunityGroupChallengeCreateView: View {
                 CommunityGroupActivityEditor(
                     draft: $activityDraft
                 )
+                .onChange(
+                    of: activityDraft.activityType
+                ) { _, type in
+                    if type == "strength" {
+                        goalPreset = .strengthVolume
+                        target = "5000"
+                    } else if [
+                        CommunityGroupChallengeGoalPreset
+                            .strengthVolume,
+                        .heaviestWeight,
+                        .strengthReps
+                    ].contains(goalPreset) {
+                        goalPreset = .mostDistance
+                        target = "100"
+                    }
+
+                    applyGoalPreset(goalPreset)
+                }
 
                 Section("Goal") {
                     Picker(
@@ -6891,6 +6909,9 @@ struct CommunityGroupChallengeCreateView: View {
         switch activityDraft.activityType {
         case "strength":
             return [
+                .strengthVolume,
+                .heaviestWeight,
+                .strengthReps,
                 .mostCompletions,
                 .mostActiveMinutes,
                 .completeTarget
@@ -6909,7 +6930,10 @@ struct CommunityGroupChallengeCreateView: View {
     private var goalNeedsTarget: Bool {
         switch goalPreset {
         case .mostDistance,
-             .mostActiveMinutes:
+             .mostActiveMinutes,
+             .strengthVolume,
+             .heaviestWeight,
+             .strengthReps:
             return true
         case .fastestTime,
              .mostCompletions,
@@ -6934,6 +6958,12 @@ struct CommunityGroupChallengeCreateView: View {
             return "Each qualifying workout counts as one completion."
         case .mostActiveMinutes:
             return "Active workout minutes are added across qualifying attempts."
+        case .strengthVolume:
+            return "Completed reps × weight are added across qualifying strength workouts."
+        case .heaviestWeight:
+            return "The heaviest completed weight in a qualifying strength workout counts."
+        case .strengthReps:
+            return "Completed reps are added across qualifying strength workouts."
         case .completeTarget:
             return "Participants complete the configured activity target. Progress stops at completion."
         }
