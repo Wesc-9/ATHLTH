@@ -3051,8 +3051,7 @@ struct SessionEditorView: View {
                             $targetAlertDelivery
                     ) {
                         ForEach(
-                            WatchAlertDelivery.allCases,
-                            id: \.self
+                            WatchAlertDelivery.allCases
                         ) { delivery in
                             Text(delivery.title)
                                 .tag(delivery)
