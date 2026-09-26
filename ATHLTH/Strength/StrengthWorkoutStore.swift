@@ -407,7 +407,8 @@ final class StrengthWorkoutStore: ObservableObject {
     func completeCurrentSet(
         reps: Int?,
         weightKilograms: Double?,
-        rpe: Double?
+        rpe: Double?,
+        restSeconds: Int? = nil
     ) {
         guard
             var workout = activeWorkout,
@@ -421,6 +422,9 @@ final class StrengthWorkoutStore: ObservableObject {
         set.completedReps = reps.map { max($0, 0) }
         set.completedWeightKilograms = weightKilograms.map { max($0, 0) }
         set.rpe = rpe
+        if let restSeconds {
+            set.restSeconds = max(restSeconds, 0)
+        }
         set.completedAt = Date()
 
         workout.exercises[currentExerciseIndex].sets[currentSetIndex] = set
@@ -445,11 +449,14 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = workout
     }
 
-    func completeCurrentSetWithoutDetails() {
+    func completeCurrentSetWithoutDetails(
+        restSeconds: Int? = nil
+    ) {
         completeCurrentSet(
             reps: nil,
             weightKilograms: nil,
-            rpe: nil
+            rpe: nil,
+            restSeconds: restSeconds
         )
     }
 
