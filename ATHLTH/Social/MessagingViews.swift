@@ -538,6 +538,8 @@ struct DirectMessageThreadView: View {
                             message: message,
                             friend: friend,
                             currentUserID: messaging.currentUserID,
+                            currentUserProfile:
+                                currentUserProfileCard,
                             onSaveAttachment: {
                                 saveAttachment(message)
                             }
@@ -749,6 +751,12 @@ struct DirectMessageThreadView: View {
                     axis: .vertical
                 )
                     .lineLimit(1...5)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        Task {
+                            await send()
+                        }
+                    }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
@@ -783,6 +791,30 @@ struct DirectMessageThreadView: View {
         ATHLTHMentionSupport.suggestions(
             in: text,
             candidates: [friend]
+        )
+    }
+
+    private var currentUserProfileCard:
+        SocialProfileCard {
+        SocialProfileCard(
+            userID: session.profile.userID,
+            username:
+                session.profile.username.isEmpty
+                    ? nil
+                    : session.profile.username,
+            displayName:
+                session.profile.displayName.isEmpty
+                    ? nil
+                    : session.profile.displayName,
+            bio:
+                session.profile.bio.isEmpty
+                    ? nil
+                    : session.profile.bio,
+            avatarURL:
+                session.profile.avatarURL?
+                    .absoluteString,
+            createdAt: nil,
+            updatedAt: nil
         )
     }
 
@@ -912,6 +944,7 @@ private struct MessageBubble: View {
     let message: DirectMessageRecord
     let friend: SocialProfileCard
     let currentUserID: UUID?
+    let currentUserProfile: SocialProfileCard
     let onSaveAttachment: () -> Void
 
     private var isMine: Bool {
@@ -933,8 +966,10 @@ private struct MessageBubble: View {
     }
 
     var body: some View {
-        HStack(alignment: .bottom) {
-            if isMine {
+        HStack(alignment: .bottom, spacing: 8) {
+            if !isMine {
+                senderAvatar(friend)
+            } else {
                 Spacer(minLength: 48)
             }
 
@@ -1012,10 +1047,31 @@ private struct MessageBubble: View {
                 .foregroundStyle(.tertiary)
             }
 
-            if !isMine {
+            if isMine {
+                senderAvatar(currentUserProfile)
+            } else {
                 Spacer(minLength: 48)
             }
         }
+    }
+
+    private func senderAvatar(
+        _ profile: SocialProfileCard
+    ) -> some View {
+        NavigationLink {
+            FriendProfileView(
+                userID: profile.userID
+            )
+        } label: {
+            SocialAvatar(
+                profile: profile,
+                size: 32
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "Open sender profile"
+        )
     }
 }
 
