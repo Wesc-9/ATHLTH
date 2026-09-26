@@ -1201,6 +1201,92 @@ private struct WatchRunWalkWorkoutPager: View {
                 .watchSurface()
             }
 
+            if let target =
+                    workoutManager.targetAlertConfiguration {
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack {
+                        Label(
+                            "Live targets",
+                            systemImage: "scope"
+                        )
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(WatchTheme.green)
+
+                        Spacer()
+
+                        if let status =
+                                workoutManager.liveTargetStatus {
+                            Text(status)
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(
+                                    status == "On target"
+                                        ? WatchTheme.green
+                                        : .orange
+                                )
+                                .lineLimit(1)
+                        }
+                    }
+
+                    if target.heartRateEnabled,
+                       let minimum =
+                            target.heartRateMinimumBPM,
+                       let maximum =
+                            target.heartRateMaximumBPM {
+                        HStack {
+                            Text(
+                                target.heartRateZone.map {
+                                    "Heart rate · Zone \($0)"
+                                } ??
+                                "Heart rate"
+                            )
+                            .font(.system(size: 9, weight: .semibold))
+
+                            Spacer()
+
+                            Text(
+                                "\(Int(minimum.rounded()))–\(Int(maximum.rounded())) bpm"
+                            )
+                            .font(.system(size: 9, weight: .bold))
+                            .monospacedDigit()
+                        }
+                    }
+
+                    if target.paceAlertsEnabled {
+                        HStack {
+                            Text("Pace alerts")
+                                .font(.system(size: 9, weight: .semibold))
+
+                            Spacer()
+
+                            Text(
+                                "±\(Int(target.paceToleranceSecondsPerKilometer.rounded())) sec/km"
+                            )
+                            .font(.system(size: 9, weight: .bold))
+                        }
+                    }
+
+                    HStack {
+                        Text(
+                            target.delivery.title
+                        )
+                        .font(.system(size: 8))
+                        .foregroundStyle(WatchTheme.muted)
+
+                        Spacer()
+
+                        Text(
+                            target.graceSeconds > 0
+                                ? "after \(Int(target.graceSeconds)) sec"
+                                : "immediately"
+                        )
+                        .font(.system(size: 8))
+                        .foregroundStyle(WatchTheme.muted)
+                    }
+                }
+                .padding(10)
+                .watchSurface()
+            }
+
             if let route =
                     workoutManager.plannedRoute {
                 VStack(alignment: .leading, spacing: 8) {
