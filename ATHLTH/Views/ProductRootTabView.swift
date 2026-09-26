@@ -1825,7 +1825,9 @@ struct ATHLTHHomeView: View {
 
                 // Planned workouts start immediately from Home. Gear can
                 // still be managed afterwards; no setup sheet is required.
-                gear.prepareNextWorkoutGear([])
+                gear.prepareNextWorkoutGear(
+                    Set<UUID>()
+                )
 
                 let routeDistanceMeters =
                     selectedRoute.map {
