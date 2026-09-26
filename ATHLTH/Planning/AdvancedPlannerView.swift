@@ -2484,6 +2484,20 @@ private enum SessionEditorMode: String, CaseIterable, Identifiable {
     }
 }
 
+private enum HeartRateTargetMode: String, CaseIterable, Identifiable {
+    case zone
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .zone: return "Zone"
+        case .custom: return "Custom BPM"
+        }
+    }
+}
+
 struct SessionEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -2491,6 +2505,7 @@ struct SessionEditorView: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var health: HealthKitManager
 
     let dayID: UUID?
     let planID: UUID?
@@ -2523,6 +2538,20 @@ struct SessionEditorView: View {
     @State private var targetPaceEnabled = false
     @State private var targetPaceMinutes = 5
     @State private var targetPaceSeconds = 0
+
+    @State private var heartRateTargetEnabled = false
+    @State private var heartRateTargetMode:
+        HeartRateTargetMode = .zone
+    @State private var heartRateTargetZone = 2
+    @State private var customHeartRateMinBPM = 120
+    @State private var customHeartRateMaxBPM = 150
+    @State private var paceAlertsEnabled = false
+    @State private var paceAlertToleranceSeconds = 15
+    @State private var targetAlertGraceSeconds = 30
+    @State private var targetAlertRepeatSeconds = 120
+    @State private var targetAlertDelivery:
+        WatchAlertDelivery = .haptic
+    @State private var targetAlertAnnounceBackInTarget = true
 
     init(dayID: UUID) {
         self.dayID = dayID
@@ -2564,6 +2593,67 @@ struct SessionEditorView: View {
         _audioCoachOverride = State(
             initialValue: workout.audioCoachConfiguration
         )
+
+        if let target =
+                workout.targetAlertConfiguration {
+            _heartRateTargetEnabled = State(
+                initialValue: target.heartRateEnabled
+            )
+            _heartRateTargetZone = State(
+                initialValue:
+                    min(
+                        max(target.heartRateZone ?? 2, 1),
+                        5
+                    )
+            )
+            _heartRateTargetMode = State(
+                initialValue:
+                    target.heartRateZone == nil
+                        ? .custom
+                        : .zone
+            )
+            _customHeartRateMinBPM = State(
+                initialValue:
+                    Int(
+                        target.heartRateMinimumBPM?
+                            .rounded() ?? 120
+                    )
+            )
+            _customHeartRateMaxBPM = State(
+                initialValue:
+                    Int(
+                        target.heartRateMaximumBPM?
+                            .rounded() ?? 150
+                    )
+            )
+            _paceAlertsEnabled = State(
+                initialValue:
+                    target.paceAlertsEnabled
+            )
+            _paceAlertToleranceSeconds = State(
+                initialValue:
+                    Int(
+                        target
+                            .paceToleranceSecondsPerKilometer
+                            .rounded()
+                    )
+            )
+            _targetAlertGraceSeconds = State(
+                initialValue:
+                    Int(target.graceSeconds.rounded())
+            )
+            _targetAlertRepeatSeconds = State(
+                initialValue:
+                    Int(target.repeatSeconds.rounded())
+            )
+            _targetAlertDelivery = State(
+                initialValue: target.delivery
+            )
+            _targetAlertAnnounceBackInTarget = State(
+                initialValue:
+                    target.announceBackInTarget
+            )
+        }
 
         if let pace = workout.targetPaceSecondsPerKilometer,
            pace > 0 {
