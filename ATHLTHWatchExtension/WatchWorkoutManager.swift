@@ -29,6 +29,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var routeProgressPercent: Double?
     @Published private(set) var routeRemainingMeters: Double?
     @Published private(set) var routeDeviationMeters: Double?
+    @Published private(set) var routeAlertConfiguration:
+        WatchRouteAlertConfiguration = .standard
+    @Published private(set) var targetAlertConfiguration:
+        WatchWorkoutTargetAlertConfiguration?
+    @Published private(set) var liveTargetStatus: String?
     @Published private(set) var lapCount = 0
     @Published private(set) var currentLapElapsedTime: TimeInterval = 0
     @Published private(set) var currentLapDistanceMeters: Double = 0
@@ -69,7 +74,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var plannedRouteLocations: [CLLocation] = []
     private var plannedRouteCumulativeMeters: [Double] = []
     private var plannedRouteGeometryMeters: Double = 0
-    private var lastOffRouteHapticAt: Date?
+    private var offRouteStartedAt: Date?
+    private var lastOffRouteAlertAt: Date?
+    private var routeWasOff = false
+    private var targetViolationStartedAt: Date?
+    private var lastTargetAlertAt: Date?
+    private var targetWasOutside = false
     private var lastLapElapsedTime: TimeInterval = 0
     private var lastLapDistanceMeters: Double = 0
 
@@ -122,10 +132,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.structuredRunningWorkout =
                 workout.steps.isEmpty ? nil : workout
             self.structuredStepIndex = 0
+
+            if let routeAlerts = workout.routeAlerts {
+                self.routeAlertConfiguration =
+                    routeAlerts
+            }
+
+            self.targetAlertConfiguration =
+                workout.targetAlerts
+            self.liveTargetStatus = nil
         }
+
         structuredStepStartElapsedTime = elapsedTime
         structuredStepStartDistanceMeters = distanceMeters
         structuredWorkoutComplete = false
+        offRouteStartedAt = nil
+        lastOffRouteAlertAt = nil
+        routeWasOff = false
+        targetViolationStartedAt = nil
+        lastTargetAlertAt = nil
+        targetWasOutside = false
 
         if isActive,
            !workout.steps.isEmpty {
