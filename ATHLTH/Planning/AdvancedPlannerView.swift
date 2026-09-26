@@ -2623,10 +2623,10 @@ struct PlanMetadataEditorView: View {
     @State private var summary: String
     @State private var visibility: ProfileVisibility
     @State private var tags: String
-    @State private var startDateEnabled: Bool
     @State private var startDate: Date
     @State private var weekCount: Int
     @State private var selectedGoalIDs: Set<UUID> = []
+    @State private var saveError: String?
 
     init(plan: TrainingPlan) {
         self.plan = plan
@@ -2634,9 +2634,28 @@ struct PlanMetadataEditorView: View {
         _summary = State(initialValue: plan.summary)
         _visibility = State(initialValue: plan.visibility)
         _tags = State(initialValue: plan.tags.joined(separator: ", "))
-        _startDateEnabled = State(initialValue: plan.startDate != nil)
-        _startDate = State(initialValue: plan.startDate ?? Date())
+        _startDate = State(
+            initialValue:
+                plan.startDate ??
+                Calendar.current.startOfDay(for: Date())
+        )
         _weekCount = State(initialValue: max(plan.weeks.count, 1))
+    }
+
+    private var resolvedEndDate: Date {
+        Calendar.current.date(
+            byAdding: .day,
+            value: max(weekCount * 7 - 1, 0),
+            to: Calendar.current.startOfDay(for: startDate)
+        ) ?? startDate
+    }
+
+    private var conflictingPlan: TrainingPlan? {
+        session.trainingPlanConflict(
+            startDate: startDate,
+            endDate: resolvedEndDate,
+            excludingPlanID: plan.id
+        )
     }
 
     var body: some View {
@@ -2671,28 +2690,34 @@ struct PlanMetadataEditorView: View {
                         in: 1...52
                     )
 
-                    Toggle("Use calendar start date", isOn: $startDateEnabled)
+                    DatePicker(
+                        "Program starts",
+                        selection: $startDate,
+                        displayedComponents: .date
+                    )
 
-                    if startDateEnabled {
-                        DatePicker(
-                            "Program starts",
-                            selection: $startDate,
-                            displayedComponents: .date
+                    LabeledContent(
+                        "Program ends",
+                        value: resolvedEndDate.formatted(
+                            date: .abbreviated,
+                            time: .omitted
                         )
+                    )
+                }
 
-                        if let endDate = Calendar.current.date(
-                            byAdding: .day,
-                            value: max(weekCount * 7 - 1, 0),
-                            to: Calendar.current.startOfDay(for: startDate)
-                        ) {
-                            LabeledContent(
-                                "Program ends",
-                                value: endDate.formatted(
-                                    date: .abbreviated,
-                                    time: .omitted
-                                )
-                            )
-                        }
+                if let conflict = conflictingPlan {
+                    Section("Schedule Conflict") {
+                        Label(
+                            "Overlaps with \(conflict.title)",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .foregroundStyle(.orange)
+
+                        Text(
+                            "Move this plan so it does not overlap another scheduled plan."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
@@ -2752,18 +2777,29 @@ struct PlanMetadataEditorView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        session.setActivePlanWeekCount(weekCount)
-                        session.updateActivePlanMetadata(
+                        let saved = session.updateTrainingPlan(
+                            planID: plan.id,
                             title: title,
                             summary: summary,
                             visibility: visibility,
                             tags: tags
                                 .split(separator: ",")
                                 .map(String.init),
-                            startDate: startDateEnabled
-                                ? Calendar.current.startOfDay(for: startDate)
-                                : nil
+                            startDate: startDate,
+                            weekCount: weekCount
                         )
+
+                        guard saved else {
+                            if let conflict = conflictingPlan {
+                                saveError =
+                                    "This period overlaps with \(conflict.title). Adjust the dates before saving."
+                            } else {
+                                saveError =
+                                    "ATHLTH could not save the plan. Check the dates and try again."
+                            }
+                            return
+                        }
+
                         goalStore.setLinkedPlan(
                             plan.id,
                             goalIDs: selectedGoalIDs
@@ -2771,10 +2807,30 @@ struct PlanMetadataEditorView: View {
                         dismiss()
                     }
                     .disabled(
-                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        title
+                            .trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
+                            .isEmpty ||
+                        conflictingPlan != nil
                     )
                 }
             }
+        }
+        .alert(
+            "Plan Conflict",
+            isPresented: Binding(
+                get: { saveError != nil },
+                set: { shown in
+                    if !shown {
+                        saveError = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveError ?? "")
         }
     }
 }
