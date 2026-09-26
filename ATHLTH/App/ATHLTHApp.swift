@@ -146,9 +146,7 @@ struct AppRootView: View {
                 await messaging.refresh()
                 await gear.refresh()
                 await communityGroups.refresh()
-                await calendarSync.syncIfEnabled(
-                    plan: appSession.activePlan
-                )
+                await syncCalendarIfAllowed()
             }
 
             if health.needsHealthRefreshRecovery {
@@ -196,9 +194,7 @@ struct AppRootView: View {
                 if appSession.signedIn {
                     await refreshSocialCore()
                     await messaging.refresh()
-                    await calendarSync.syncIfEnabled(
-                        plan: appSession.activePlan
-                    )
+                    await syncCalendarIfAllowed()
                 }
 
                 guard health.hasRequestedAuthorization,
@@ -225,6 +221,10 @@ struct AppRootView: View {
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
             appSession.applyStoreKitEntitlement(entitlement)
+
+            Task {
+                await syncCalendarIfAllowed()
+            }
 
             guard health.hasRequestedAuthorization else {
                 return
@@ -417,7 +417,7 @@ struct AppRootView: View {
             }
 
             Task {
-                await calendarSync.syncIfEnabled(
+                await syncCalendarIfAllowed(
                     plan: plan
                 )
             }
@@ -481,9 +481,7 @@ struct AppRootView: View {
                 await syncPushPreferences()
                 await submitLatestStoreProofIfPossible()
                 await refreshSocialCore()
-                await calendarSync.syncIfEnabled(
-                    plan: appSession.activePlan
-                )
+                await syncCalendarIfAllowed()
                 if health.hasRequestedAuthorization {
                     await syncSocialOwnedData()
                 }
@@ -559,6 +557,18 @@ struct AppRootView: View {
         } message: {
             Text(authCallbackError ?? "Authentication could not be completed.")
         }
+    }
+
+    private func syncCalendarIfAllowed(
+        plan: TrainingPlan? = nil
+    ) async {
+        guard appSession.subscriptionAccess.hasPaidAccess else {
+            return
+        }
+
+        await calendarSync.syncIfEnabled(
+            plan: plan ?? appSession.activePlan
+        )
     }
 
     private func syncAppleHealthProfileDetailsIfNeeded() {
