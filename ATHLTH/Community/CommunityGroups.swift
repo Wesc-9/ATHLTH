@@ -1834,7 +1834,7 @@ struct CommunityGroupDetailView: View {
         if let profile = groups.profileCard(
             for: member.userID
         ) {
-            CommunityAvatar(
+            CommunityGroupProfileAvatar(
                 profile: profile,
                 size: 34
             )
@@ -2486,6 +2486,50 @@ struct CommunityGroupSettingsView: View {
     }
 }
 
+private struct CommunityGroupProfileAvatar: View {
+    let profile: SocialProfileCard
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let value = profile.avatarURL,
+               let url = URL(string: value) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay {
+            Circle()
+                .stroke(
+                    Color.black.opacity(0.06),
+                    lineWidth: 1
+                )
+        }
+    }
+
+    private var placeholder: some View {
+        Circle()
+            .fill(ATHLTHTheme.accentSoft)
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.system(size: size * 0.38))
+                    .foregroundStyle(ATHLTHTheme.accent)
+            }
+    }
+}
+
 struct CommunityGroupActivityPreviewCard: View {
     @EnvironmentObject private var groups: CommunityGroupStore
 
@@ -2760,7 +2804,7 @@ struct CommunityGroupMembersView: View {
             if let profile = groups.profileCard(
                 for: member.userID
             ) {
-                CommunityAvatar(
+                CommunityGroupProfileAvatar(
                     profile: profile,
                     size: 42
                 )
