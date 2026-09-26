@@ -242,10 +242,10 @@ struct CommunityGroupActivityDraft {
                             mode == .route
                                 ? selectedRoute?
                                     .distanceKilometers
-                                : (
-                                    selectedRunningWorkout?
-                                        .estimatedDistanceMeters
-                                ).flatMap { $0 }
+                                : selectedRunningWorkout
+                                    .flatMap {
+                                        $0.estimatedDistanceMeters
+                                    }
                                     .map { $0 / 1_000 }
                         ),
                 route:
