@@ -951,7 +951,7 @@ final class CommunityGroupStore: ObservableObject {
             let resolvedJoinMode =
                 resolvedVisibility == "private" &&
                 joinMode == "open"
-                    ? "approval"
+                    ? "invite_only"
                     : (
                         ["open", "approval", "invite_only"]
                             .contains(joinMode)
@@ -1017,7 +1017,7 @@ final class CommunityGroupStore: ObservableObject {
             let resolvedJoinMode =
                 resolvedVisibility == "private" &&
                 requestedJoinMode == "open"
-                    ? "approval"
+                    ? "invite_only"
                     : requestedJoinMode
 
             let payload = CommunityGroupUpdate(
@@ -3754,7 +3754,7 @@ struct CommunityGroupCreateView: View {
             .onChange(of: visibility) { _, value in
                 if value == "private" &&
                     joinMode == "open" {
-                    joinMode = "approval"
+                    joinMode = "invite_only"
                 }
             }
         }
@@ -3980,7 +3980,7 @@ struct CommunityGroupSettingsView: View {
             .onChange(of: visibility) { _, value in
                 if value == "private" &&
                     joinMode == "open" {
-                    joinMode = "approval"
+                    joinMode = "invite_only"
                 }
             }
             .onChange(of: selectedPhoto) { _, item in
