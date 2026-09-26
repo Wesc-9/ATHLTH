@@ -1598,19 +1598,43 @@ final class AppSessionStore: ObservableObject {
     }
 
     func addWeekToActivePlan() {
-        guard let plan = activePlan else {
+        guard let planID = activePlan?.id else {
             createStarterPlan()
             return
         }
 
+        addWeekToTrainingPlan(planID: planID)
+    }
+
+    func addWeekToTrainingPlan(
+        planID: UUID
+    ) {
+        guard let plan = trainingPlan(withID: planID) else {
+            return
+        }
+
         _ = setTrainingPlanWeekCount(
-            planID: plan.id,
+            planID: planID,
             weekCount: min(plan.weeks.count + 1, 52)
         )
     }
 
     func removeWeekFromActivePlan(_ weekID: UUID) {
-        guard var plan = activePlan,
+        guard let planID = activePlan?.id else {
+            return
+        }
+
+        removeWeekFromTrainingPlan(
+            planID: planID,
+            weekID: weekID
+        )
+    }
+
+    func removeWeekFromTrainingPlan(
+        planID: UUID,
+        weekID: UUID
+    ) {
+        guard var plan = trainingPlan(withID: planID),
               plan.weeks.count > 1,
               let index = plan.weeks.firstIndex(
                 where: { $0.id == weekID }
@@ -1636,21 +1660,47 @@ final class AppSessionStore: ObservableObject {
 
         plan.updatedAt = Date()
         plan.version += 1
-        activePlan = plan
+        replaceTrainingPlan(plan)
     }
 
-    func addSession(_ session: PlannedSession, toDay dayID: UUID) {
-        guard var plan = activePlan else { return }
+    func addSession(
+        _ session: PlannedSession,
+        toDay dayID: UUID
+    ) {
+        guard let planID = activePlan?.id else {
+            return
+        }
+
+        addSession(
+            session,
+            toDay: dayID,
+            inPlan: planID
+        )
+    }
+
+    func addSession(
+        _ session: PlannedSession,
+        toDay dayID: UUID,
+        inPlan planID: UUID
+    ) {
+        guard var plan = trainingPlan(withID: planID) else {
+            return
+        }
 
         for weekIndex in plan.weeks.indices {
-            guard let dayIndex = plan.weeks[weekIndex].days.firstIndex(where: { $0.id == dayID }) else {
+            guard let dayIndex = plan.weeks[weekIndex].days.firstIndex(
+                where: { $0.id == dayID }
+            ) else {
                 continue
             }
 
-            plan.weeks[weekIndex].days[dayIndex].sessions.append(session)
+            plan.weeks[weekIndex]
+                .days[dayIndex]
+                .sessions
+                .append(session)
             plan.updatedAt = Date()
             plan.version += 1
-            activePlan = plan
+            replaceTrainingPlan(plan)
             return
         }
     }
@@ -1659,44 +1709,74 @@ final class AppSessionStore: ObservableObject {
         _ updatedSession: PlannedSession,
         inPlan planID: UUID
     ) {
-        guard var plan = activePlan,
-              plan.id == planID
-        else {
+        guard var plan = trainingPlan(withID: planID) else {
             return
         }
 
         for weekIndex in plan.weeks.indices {
             for dayIndex in plan.weeks[weekIndex].days.indices {
                 guard let sessionIndex =
-                    plan.weeks[weekIndex].days[dayIndex].sessions.firstIndex(
-                        where: { $0.id == updatedSession.id }
-                    )
+                    plan.weeks[weekIndex]
+                        .days[dayIndex]
+                        .sessions
+                        .firstIndex(
+                            where: {
+                                $0.id == updatedSession.id
+                            }
+                        )
                 else {
                     continue
                 }
 
-                plan.weeks[weekIndex].days[dayIndex].sessions[sessionIndex] =
-                    updatedSession
+                plan.weeks[weekIndex]
+                    .days[dayIndex]
+                    .sessions[sessionIndex] = updatedSession
                 plan.updatedAt = Date()
                 plan.version += 1
-                activePlan = plan
+                replaceTrainingPlan(plan)
                 return
             }
         }
     }
 
-    func removeSession(_ sessionID: UUID, fromDay dayID: UUID) {
-        guard var plan = activePlan else { return }
+    func removeSession(
+        _ sessionID: UUID,
+        fromDay dayID: UUID
+    ) {
+        guard let planID = activePlan?.id else {
+            return
+        }
+
+        removeSession(
+            sessionID,
+            fromDay: dayID,
+            inPlan: planID
+        )
+    }
+
+    func removeSession(
+        _ sessionID: UUID,
+        fromDay dayID: UUID,
+        inPlan planID: UUID
+    ) {
+        guard var plan = trainingPlan(withID: planID) else {
+            return
+        }
 
         for weekIndex in plan.weeks.indices {
-            guard let dayIndex = plan.weeks[weekIndex].days.firstIndex(where: { $0.id == dayID }) else {
+            guard let dayIndex = plan.weeks[weekIndex].days.firstIndex(
+                where: { $0.id == dayID }
+            ) else {
                 continue
             }
 
-            plan.weeks[weekIndex].days[dayIndex].sessions.removeAll { $0.id == sessionID }
+            plan.weeks[weekIndex]
+                .days[dayIndex]
+                .sessions
+                .removeAll { $0.id == sessionID }
             plan.updatedAt = Date()
             plan.version += 1
-            activePlan = plan
+            replaceTrainingPlan(plan)
             return
         }
     }
