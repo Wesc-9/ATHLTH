@@ -558,7 +558,7 @@ struct CommunityGroupCohostPickerView: View {
                                 groups.profileCard(
                                     for: member.userID
                                 ) {
-                                CommunityGroupProfileAvatar(
+                                CommunityContentAvatar(
                                     profile: profile,
                                     size: 40
                                 )
