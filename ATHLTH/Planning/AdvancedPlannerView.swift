@@ -3666,7 +3666,7 @@ struct SessionEditorView: View {
                     ? distanceKilometers
                     : nil,
             targetPaceSecondsPerKilometer:
-                (kind == .running || kind == .walking) &&
+                kind == .running &&
                 targetPaceEnabled
                     ? Double(
                         targetPaceMinutes * 60 +
