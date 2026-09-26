@@ -3034,7 +3034,7 @@ struct CommunityGroupActivityPreviewCard: View {
 
             if groups.communityActivity.isEmpty {
                 Text(
-                    "Group joins, admin updates, events and challenges will appear here."
+                    "Group joins, updates, events and challenges will appear here."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -3176,76 +3176,6 @@ private struct CommunityGroupActivityRow: View {
             return .green
         default:
             return ATHLTHTheme.accent
-        }
-    }
-}
-
-struct CommunityGroupAnnouncementCreateView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var groups: CommunityGroupStore
-
-    let group: CommunityGroupRecord
-
-    @State private var bodyText = ""
-    @State private var saving = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Group Update") {
-                    TextEditor(text: $bodyText)
-                        .frame(minHeight: 150)
-
-                    Text("\(bodyText.count)/1200")
-                        .font(.caption2)
-                        .foregroundStyle(
-                            bodyText.count > 1200
-                                ? .red
-                                : .secondary
-                        )
-                }
-
-                Section {
-                    Text(
-                        "This is an announcement, not a chat message. Members will see it in the group Overview and Community Activity."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
-            .navigationTitle("Post Group Update")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Posting…" : "Post") {
-                        Task {
-                            saving = true
-                            let ok = await groups.postAnnouncement(
-                                groupID: group.id,
-                                body: bodyText
-                            )
-                            saving = false
-
-                            if ok {
-                                dismiss()
-                            }
-                        }
-                    }
-                    .disabled(
-                        bodyText.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).isEmpty ||
-                        bodyText.count > 1200 ||
-                        saving
-                    )
-                }
-            }
         }
     }
 }
