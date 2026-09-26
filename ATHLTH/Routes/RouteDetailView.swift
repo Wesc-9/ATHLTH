@@ -633,11 +633,7 @@ struct RouteDetailView: View {
                             .frame(maxWidth: .infinity)
                         }
                     }
-                    .buttonStyle(
-                        isOwner || savedCopy != nil
-                            ? .borderedProminent
-                            : .bordered
-                    )
+                    .buttonStyle(.borderedProminent)
                     .tint(ATHLTHTheme.accent)
                     .controlSize(.large)
                     .disabled(
