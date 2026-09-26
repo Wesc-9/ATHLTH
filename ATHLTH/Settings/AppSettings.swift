@@ -259,6 +259,13 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
 
+    @Published var routeAlertsEnabled: Bool { didSet { persist() } }
+    @Published var routeAlertDeviationMeters: Double { didSet { persist() } }
+    @Published var routeAlertGraceSeconds: Int { didSet { persist() } }
+    @Published var routeAlertRepeatSeconds: Int { didSet { persist() } }
+    @Published var routeAlertDelivery: WatchAlertDelivery { didSet { persist() } }
+    @Published var routeAlertAnnounceBackOnRoute: Bool { didSet { persist() } }
+
     @Published var audioCoachEnabledByDefault: Bool { didSet { persist() } }
     @Published var audioCoachLanguage: WatchAudioCoachLanguage { didSet { persist() } }
     @Published var audioCoachDistanceTriggerEnabled: Bool { didSet { persist() } }
@@ -390,6 +397,33 @@ final class AppSettingsStore: ObservableObject {
         audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
         hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
 
+        routeAlertsEnabled =
+            defaults.object(
+                forKey: "settings.routeAlerts.enabled"
+            ) as? Bool ?? true
+        routeAlertDeviationMeters =
+            defaults.object(
+                forKey: "settings.routeAlerts.deviationMeters"
+            ) as? Double ?? 80
+        routeAlertGraceSeconds =
+            defaults.object(
+                forKey: "settings.routeAlerts.graceSeconds"
+            ) as? Int ?? 10
+        routeAlertRepeatSeconds =
+            defaults.object(
+                forKey: "settings.routeAlerts.repeatSeconds"
+            ) as? Int ?? 120
+        routeAlertDelivery =
+            WatchAlertDelivery(
+                rawValue: defaults.string(
+                    forKey: "settings.routeAlerts.delivery"
+                ) ?? ""
+            ) ?? .both
+        routeAlertAnnounceBackOnRoute =
+            defaults.object(
+                forKey: "settings.routeAlerts.announceBackOnRoute"
+            ) as? Bool ?? true
+
         audioCoachEnabledByDefault =
             defaults.object(
                 forKey: "settings.audioCoach.enabledByDefault"
@@ -505,6 +539,31 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
 
         defaults.set(
+            routeAlertsEnabled,
+            forKey: "settings.routeAlerts.enabled"
+        )
+        defaults.set(
+            routeAlertDeviationMeters,
+            forKey: "settings.routeAlerts.deviationMeters"
+        )
+        defaults.set(
+            routeAlertGraceSeconds,
+            forKey: "settings.routeAlerts.graceSeconds"
+        )
+        defaults.set(
+            routeAlertRepeatSeconds,
+            forKey: "settings.routeAlerts.repeatSeconds"
+        )
+        defaults.set(
+            routeAlertDelivery.rawValue,
+            forKey: "settings.routeAlerts.delivery"
+        )
+        defaults.set(
+            routeAlertAnnounceBackOnRoute,
+            forKey: "settings.routeAlerts.announceBackOnRoute"
+        )
+
+        defaults.set(
             audioCoachEnabledByDefault,
             forKey: "settings.audioCoach.enabledByDefault"
         )
@@ -578,6 +637,34 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(watchConnected, forKey: "settings.watchConnected")
         defaults.set(spotifyConnected, forKey: "settings.spotifyConnected")
         defaults.set(homeAssistantConnected, forKey: "settings.homeAssistantConnected")
+    }
+
+    var routeAlertConfiguration: WatchRouteAlertConfiguration {
+        WatchRouteAlertConfiguration(
+            enabled: routeAlertsEnabled,
+            deviationMeters:
+                min(
+                    max(routeAlertDeviationMeters, 20),
+                    500
+                ),
+            graceSeconds:
+                TimeInterval(
+                    min(
+                        max(routeAlertGraceSeconds, 0),
+                        120
+                    )
+                ),
+            repeatSeconds:
+                TimeInterval(
+                    min(
+                        max(routeAlertRepeatSeconds, 30),
+                        600
+                    )
+                ),
+            delivery: routeAlertDelivery,
+            announceBackOnRoute:
+                routeAlertAnnounceBackOnRoute
+        )
     }
 
     func audioCoachConfiguration(
