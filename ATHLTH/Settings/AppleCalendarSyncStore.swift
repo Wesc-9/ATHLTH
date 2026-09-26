@@ -501,7 +501,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         let calendarAPI = Calendar.current
 
         event.calendar = calendar
-        event.title = session.title
+        event.title = "\(plan.title): \(session.title)"
 
         let hour: Int
         let minute: Int
