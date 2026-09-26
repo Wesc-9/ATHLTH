@@ -143,6 +143,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         sendStrengthCommand(
             WatchStrengthCommand(
+                id: UUID(),
                 workoutID: snapshot.workoutID,
                 kind: .updateDraft,
                 reps: snapshot.draftReps,
@@ -164,6 +165,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         sendStrengthCommand(
             WatchStrengthCommand(
+                id: UUID(),
                 workoutID: snapshot.workoutID,
                 kind: .completeSet,
                 reps: snapshot.draftReps,
@@ -184,6 +186,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         sendStrengthCommand(
             WatchStrengthCommand(
+                id: UUID(),
                 workoutID: snapshot.workoutID,
                 kind: .skipRest,
                 reps: nil,
@@ -202,6 +205,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         sendStrengthCommand(
             WatchStrengthCommand(
+                id: UUID(),
                 workoutID: snapshot.workoutID,
                 kind: .addRest,
                 reps: nil,
@@ -220,6 +224,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         sendStrengthCommand(
             WatchStrengthCommand(
+                id: UUID(),
                 workoutID: snapshot.workoutID,
                 kind: .nextExercise,
                 reps: nil,
@@ -234,6 +239,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func requestStrengthSnapshot() {
         sendStrengthCommand(
             WatchStrengthCommand(
+                id: UUID(),
                 workoutID: strengthSession?.workoutID,
                 kind: .requestSnapshot,
                 reps: nil,
