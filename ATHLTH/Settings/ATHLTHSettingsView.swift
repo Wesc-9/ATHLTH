@@ -2148,7 +2148,7 @@ private struct ATHLTHTrainingSettingsView: View {
                     ) {
                         ForEach(
                             WatchAlertDelivery.allCases,
-                            id: .self
+                            id: \.self
                         ) { delivery in
                             Text(delivery.title)
                                 .tag(delivery)
