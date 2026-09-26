@@ -657,6 +657,9 @@ struct ATHLTHCommunityView: View {
             officialChallengeRefresh
         )
 
+        await officialChallenges.syncCompletionState(
+            workouts: health.workouts
+        )
         challenges.refreshStatuses()
     }
 }
