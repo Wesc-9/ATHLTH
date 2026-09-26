@@ -215,7 +215,19 @@ final class RouteAttemptStore: ObservableObject {
             .prefix(80)
 
         do {
-            for workout in candidates {
+            let existing = try await service.load(
+                routeID: route.id
+            )
+            attempts = existing
+
+            let existingWorkoutIDs = Set(
+                existing
+                    .filter { $0.userID == userID }
+                    .map(\.workoutID)
+            )
+
+            for workout in candidates
+            where !existingWorkoutIDs.contains(workout.id) {
                 guard let analysis = await health.routePerformance(
                     for: workout,
                     against: route
@@ -246,7 +258,9 @@ final class RouteAttemptStore: ObservableObject {
                 )
             }
 
-            attempts = try await service.load(routeID: route.id)
+            attempts = try await service.load(
+                routeID: route.id
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
