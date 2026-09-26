@@ -193,6 +193,16 @@ final class RouteDiscoveryStore: ObservableObject {
         }
     }
 
+    func remove(routeID: UUID) async {
+        do {
+            try await service.remove(routeID: routeID)
+            routes.removeAll { $0.id == routeID }
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func syncOwnedPublicRoutes(
         _ ownedRoutes: [TrainingRoute]
     ) async {
