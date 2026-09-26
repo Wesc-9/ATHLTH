@@ -74,7 +74,8 @@ final class APNsPushManager: ObservableObject {
         workoutUpdates: Bool,
         friendActivity: Bool,
         challenges: Bool,
-        messages: Bool
+        messages: Bool,
+        mentions: Bool
     ) async {
         guard let userID = client.auth.currentUser?.id else { return }
 
@@ -82,7 +83,8 @@ final class APNsPushManager: ObservableObject {
             workoutRemindersEnabled: workoutUpdates,
             friendActivityNotificationsEnabled: friendActivity,
             challengeNotificationsEnabled: challenges,
-            messageNotificationsEnabled: messages
+            messageNotificationsEnabled: messages,
+            mentionNotificationsEnabled: mentions
         )
 
         do {
@@ -144,6 +146,7 @@ private struct NotificationPreferenceWrite: Encodable {
     let friendActivityNotificationsEnabled: Bool
     let challengeNotificationsEnabled: Bool
     let messageNotificationsEnabled: Bool
+    let mentionNotificationsEnabled: Bool
 
     enum CodingKeys: String, CodingKey {
         case workoutRemindersEnabled = "workout_reminders_enabled"
@@ -153,6 +156,8 @@ private struct NotificationPreferenceWrite: Encodable {
             "challenge_notifications_enabled"
         case messageNotificationsEnabled =
             "message_notifications_enabled"
+        case mentionNotificationsEnabled =
+            "mention_notifications_enabled"
     }
 }
 
