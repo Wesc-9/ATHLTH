@@ -349,6 +349,15 @@ extension WatchRouteStore: WCSessionDelegate {
         handleWorkoutCommand(userInfo)
     }
 
+    func session(
+        _ session: WCSession,
+        didReceiveApplicationContext applicationContext: [String: Any]
+    ) {
+        _ = handleWorkoutConfiguration(
+            applicationContext
+        )
+    }
+
 
     func sessionReachabilityDidChange(_ session: WCSession) {
         DispatchQueue.main.async { [weak self] in
