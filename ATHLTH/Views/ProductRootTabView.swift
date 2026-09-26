@@ -1467,6 +1467,25 @@ struct ATHLTHHomeView: View {
                     .tint(ATHLTHTheme.accentDeep)
                     .disabled(homeDirectStartInProgress)
                     .padding(.top, 10)
+                } else if homeRequiresAppleWatch(
+                    workout
+                ) {
+                    Label(
+                        "Apple Watch Required",
+                        systemImage: "lock.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .background(
+                        Color.black.opacity(0.045),
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+                    .padding(.top, 10)
                 } else {
                     NavigationLink {
                         PlannedWorkoutDetailView(
@@ -1557,14 +1576,12 @@ struct ATHLTHHomeView: View {
                     homeQuickStartButton(
                         title: "Run",
                         icon: "figure.run",
-                        tint: .green
+                        tint: .green,
+                        enabled:
+                            settings.trainingDeviceProvider == .appleWatch &&
+                            watchConnection.isReady
                     ) {
-                        if settings.trainingDeviceProvider == .appleWatch &&
-                            watchConnection.isReady {
-                            pendingHomeQuickStartKind = .running
-                        } else {
-                            onSelectTab(1)
-                        }
+                        pendingHomeQuickStartKind = .running
                     }
 
                     homeQuickStartButton(
@@ -1674,6 +1691,19 @@ struct ATHLTHHomeView: View {
         }
     }
 
+    private func homeRequiresAppleWatch(
+        _ workout: PlannedSession
+    ) -> Bool {
+        guard workout.kind == .running ||
+                workout.kind == .walking
+        else {
+            return false
+        }
+
+        return settings.trainingDeviceProvider != .appleWatch ||
+            !watchConnection.isReady
+    }
+
     private func homeCanStartDirectly(
         _ workout: PlannedSession
     ) -> Bool {
@@ -1700,12 +1730,22 @@ struct ATHLTHHomeView: View {
         title: String,
         icon: String,
         tint: Color,
+        enabled: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: icon)
-                Text(title)
+                Image(
+                    systemName:
+                        enabled
+                            ? icon
+                            : "lock.fill"
+                )
+                Text(
+                    enabled
+                        ? title
+                        : "\(title) · Watch"
+                )
             }
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(ATHLTHTheme.primaryText)
@@ -1727,6 +1767,8 @@ struct ATHLTHHomeView: View {
             }
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.62)
     }
 
     private func startHomeWorkout(
@@ -3372,17 +3414,7 @@ struct ATHLTHTrainView: View {
     }
 
     private var quickStartKinds: [WorkoutKind] {
-        switch settings.trainingDeviceProvider {
-        case .appleWatch:
-            return [.running, .walking, .strength]
-        case .garmin:
-            return [.strength]
-        case .none:
-            // Outdoor quick capture currently requires a supported wearable.
-            // Keep the iPhone-native strength flow available and avoid
-            // presenting dead or empty wearable-only choices.
-            return [.strength]
-        }
+        [.running, .walking, .strength]
     }
 
     private var customQuickStartAvailable: Bool {
@@ -3399,10 +3431,14 @@ struct ATHLTHTrainView: View {
     private func quickStartSubtitle(
         _ kind: WorkoutKind
     ) -> String {
-        if settings.trainingDeviceProvider == .appleWatch &&
-            !watchConnection.isReady &&
-            kind != .strength {
-            return "Connect Watch"
+        if kind == .running || kind == .walking {
+            if settings.trainingDeviceProvider != .appleWatch {
+                return "Apple Watch required"
+            }
+
+            if !watchConnection.isReady {
+                return "Connect Watch"
+            }
         }
 
         switch kind {
@@ -3428,7 +3464,8 @@ struct ATHLTHTrainView: View {
 
         switch settings.trainingDeviceProvider {
         case .appleWatch:
-            return !watchConnection.workoutLaunchInProgress
+            return watchConnection.isReady &&
+                !watchConnection.workoutLaunchInProgress
         case .garmin, .none:
             return false
         }
