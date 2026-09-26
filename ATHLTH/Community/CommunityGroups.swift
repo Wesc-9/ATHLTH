@@ -866,10 +866,40 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
-    func challengeProgress(_ challenge: CommunityGroupChallengeRecord) -> Double {
-        challengeWorkouts
-            .filter { $0.challengeID == challenge.id }
-            .reduce(0) { $0 + $1.contribution }
+    func challengeProgress(
+        _ challenge: CommunityGroupChallengeRecord
+    ) -> Double {
+        let values = challengeWorkouts.filter {
+            $0.challengeID == challenge.id &&
+            $0.verificationStatus != "unverified"
+        }
+
+        switch challenge.scoringMode {
+        case .cumulative:
+            return values.reduce(0) {
+                $0 + $1.contribution
+            }
+
+        case .bestAttempt:
+            let scores = values.map(\.contribution)
+            guard !scores.isEmpty else {
+                return 0
+            }
+
+            if challenge.prefersLowerLeaderboardScore {
+                return scores.min() ?? 0
+            }
+
+            return scores.max() ?? 0
+
+        case .completeTarget:
+            return min(
+                values.reduce(0) {
+                    $0 + $1.contribution
+                },
+                challenge.targetValue
+            )
+        }
     }
 
     func refresh() async {
@@ -2112,57 +2142,224 @@ final class CommunityGroupStore: ObservableObject {
     ) async {
         guard let userID = currentUserID,
               !joinedGroupIDs.isEmpty
-        else { return }
+        else {
+            return
+        }
 
         do {
             let activeChallenges: [CommunityGroupChallengeRecord] =
                 try await client
                     .from("community_group_challenges")
                     .select()
-                    .lte("starts_at", value: workout.endDate)
-                    .gte("ends_at", value: workout.startDate)
+                    .lte(
+                        "starts_at",
+                        value: workout.endDate
+                    )
+                    .gte(
+                        "ends_at",
+                        value: workout.startDate
+                    )
+                    .neq("status", value: "cancelled")
                     .execute()
                     .value
 
-            let writes = activeChallenges.compactMap { challenge
-                -> CommunityGroupChallengeWorkoutInsert? in
+            guard !activeChallenges.isEmpty else {
+                return
+            }
+
+            let participations:
+                [CommunityGroupChallengeParticipantRecord] =
+                    try await client
+                        .from(
+                            "community_group_challenge_participants"
+                        )
+                        .select()
+                        .eq("user_id", value: userID)
+                        .execute()
+                        .value
+
+            let joinedChallengeIDs = Set(
+                participations
+                    .filter { $0.status == "joined" }
+                    .map(\.challengeID)
+            )
+
+            let existingAttempts:
+                [CommunityGroupChallengeWorkoutRecord] =
+                    try await client
+                        .from(
+                            "community_group_challenge_workouts"
+                        )
+                        .select()
+                        .eq("user_id", value: userID)
+                        .execute()
+                        .value
+
+            var writes:
+                [CommunityGroupChallengeWorkoutInsert] = []
+
+            for challenge in activeChallenges {
                 guard challengeMatchesWorkout(
                     challenge,
                     workout: workout
                 ) else {
-                    return nil
+                    continue
                 }
 
-                let contribution: Double
+                if challenge.joinRequired &&
+                    !joinedChallengeIDs.contains(
+                        challenge.id
+                    ) {
+                    continue
+                }
+
+                if let limit = challenge.attemptLimit {
+                    let attemptCount =
+                        existingAttempts.filter {
+                            $0.challengeID ==
+                                challenge.id
+                        }.count
+
+                    if attemptCount >= limit {
+                        continue
+                    }
+                }
+
+                var contribution: Double
 
                 switch challenge.metric {
                 case .distanceKM:
-                    contribution = (workout.distanceMeters ?? 0) / 1_000
+                    contribution =
+                        (workout.distanceMeters ?? 0) /
+                        1_000
+
                 case .workouts:
                     contribution = 1
+
                 case .activeMinutes:
-                    contribution = max(workout.duration / 60, 0)
+                    contribution = max(
+                        workout.duration / 60,
+                        0
+                    )
+
+                case .fastestTime:
+                    let targetMeters =
+                        challenge
+                            .activityConfiguration?
+                            .distanceKilometers
+                            .map { $0 * 1_000 }
+
+                    if let targetMeters,
+                       let verifiedDuration =
+                        await HealthKitManager.shared
+                            .groupChallengeFastestSegmentDuration(
+                                workoutID: workout.id,
+                                targetDistanceMeters:
+                                    targetMeters
+                            ) {
+                        contribution = verifiedDuration
+                    } else if let targetMeters,
+                              (workout.distanceMeters ?? 0) >=
+                                targetMeters {
+                        contribution = workout.duration
+                    } else if targetMeters == nil {
+                        contribution = workout.duration
+                    } else {
+                        continue
+                    }
                 }
 
-                guard contribution > 0 else { return nil }
+                guard contribution > 0 else {
+                    continue
+                }
 
-                return CommunityGroupChallengeWorkoutInsert(
-                    challengeID: challenge.id,
-                    userID: userID,
-                    workoutID: workout.id,
-                    contribution: contribution
+                var routeMatch: Double?
+                var verificationStatus =
+                    "not_required"
+
+                if challenge
+                    .routeVerificationEnabled {
+                    guard let route =
+                        challenge
+                            .activityConfiguration?
+                            .route
+                    else {
+                        verificationStatus =
+                            "unverified"
+                        writes.append(
+                            CommunityGroupChallengeWorkoutInsert(
+                                challengeID:
+                                    challenge.id,
+                                userID: userID,
+                                workoutID: workout.id,
+                                contribution:
+                                    contribution,
+                                routeMatchPercent: nil,
+                                verificationStatus:
+                                    verificationStatus
+                            )
+                        )
+                        continue
+                    }
+
+                    routeMatch =
+                        await HealthKitManager.shared
+                            .groupChallengeRouteMatchPercent(
+                                workoutID: workout.id,
+                                referenceCoordinates:
+                                    route.coordinates,
+                                toleranceMeters:
+                                    Double(
+                                        challenge
+                                            .routeToleranceMeters
+                                    )
+                            )
+
+                    verificationStatus =
+                        (routeMatch ?? 0) >= 90
+                            ? "verified"
+                            : "unverified"
+                }
+
+                writes.append(
+                    CommunityGroupChallengeWorkoutInsert(
+                        challengeID: challenge.id,
+                        userID: userID,
+                        workoutID: workout.id,
+                        contribution: contribution,
+                        routeMatchPercent:
+                            routeMatch,
+                        verificationStatus:
+                            verificationStatus
+                    )
                 )
             }
 
-            guard !writes.isEmpty else { return }
+            guard !writes.isEmpty else {
+                return
+            }
 
             try await client
-                .from("community_group_challenge_workouts")
+                .from(
+                    "community_group_challenge_workouts"
+                )
                 .upsert(
                     writes,
-                    onConflict: "challenge_id,user_id,workout_id"
+                    onConflict:
+                        "challenge_id,user_id,workout_id"
                 )
                 .execute()
+
+            for challenge in activeChallenges
+            where writes.contains(
+                where: {
+                    $0.challengeID == challenge.id
+                }
+            ) {
+                await loadGroupContent(
+                    challenge.groupID
+                )
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
