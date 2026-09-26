@@ -1135,48 +1135,85 @@ struct ProfileGearSummaryView: View {
     @EnvironmentObject private var gear: ProfileGearStore
 
     var body: some View {
-        NavigationLink {
-            ProfileGearManagerView()
-        } label: {
-            ATHLTHCard {
-                HStack {
-                    Text("My Gear")
-                        .font(.title3.weight(.bold))
+        ATHLTHCard {
+            HStack {
+                Text("My Gear")
+                    .font(.title3.weight(.bold))
 
-                    Spacer()
+                Spacer()
 
-                    Text("Edit")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
-                }
-
-                HStack(alignment: .top, spacing: 6) {
-                    ForEach(ProfileGearCategory.allCases) { category in
-                        gearSlot(category)
+                NavigationLink {
+                    ProfileGearManagerView()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Edit")
+                        Image(systemName: "chevron.right")
                     }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accent)
                 }
-                .padding(.top, 8)
+                .buttonStyle(.plain)
             }
+
+            HStack(alignment: .top, spacing: 6) {
+                ForEach(ProfileGearCategory.allCases) { category in
+                    gearSlot(category)
+                }
+            }
+            .padding(.top, 8)
         }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private func gearSlot(_ category: ProfileGearCategory) -> some View {
+    private func gearSlot(
+        _ category: ProfileGearCategory
+    ) -> some View {
         let item = gear.featuredItem(in: category)
 
+        if let item {
+            NavigationLink {
+                ProfileGearDetailView(item: item)
+            } label: {
+                gearSlotContent(
+                    category: category,
+                    item: item
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                "Open \(item.name)"
+            )
+        } else {
+            NavigationLink {
+                ProfileGearEditorView(category: category)
+            } label: {
+                gearSlotContent(
+                    category: category,
+                    item: nil
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                "Add \(category.shortTitle)"
+            )
+        }
+    }
+
+    private func gearSlotContent(
+        category: ProfileGearCategory,
+        item: ProfileGearItem?
+    ) -> some View {
         VStack(spacing: 5) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(
-                        item == nil
-                            ? Color.primary.opacity(0.028)
-                            : ATHLTHTheme.surfaceSage.opacity(0.58)
-                    )
+                RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+                .fill(
+                    item == nil
+                        ? Color.primary.opacity(0.028)
+                        : ATHLTHTheme.surfaceSage.opacity(0.58)
+                )
 
                 if let item,
                    let value = item.imageURL,
@@ -1198,7 +1235,12 @@ struct ProfileGearSummaryView: View {
 
                 if item == nil {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(
+                            .system(
+                                size: 13,
+                                weight: .semibold
+                            )
+                        )
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                         .background(Color.white, in: Circle())
                         .offset(x: 19, y: -19)
@@ -1233,6 +1275,7 @@ struct ProfileGearSummaryView: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
     }
 
     private func shoeSummary(
@@ -1264,7 +1307,9 @@ struct ProfileGearSummaryView: View {
         return "\(distance) · \(percentage)%"
     }
 
-    private func gearIcon(_ category: ProfileGearCategory) -> some View {
+    private func gearIcon(
+        _ category: ProfileGearCategory
+    ) -> some View {
         ProfileGearCategoryIcon(
             category: category,
             size: 20
