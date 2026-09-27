@@ -120,6 +120,10 @@ jobs:
           openssl pkey -in "$KEY_PATH" -check -noout >/dev/null
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      - name: Prepare ephemeral App Store signing
+        shell: bash
+        run: bash scripts/prepare_ephemeral_app_store_signing.sh
+
       - name: Archive without creating development certificates
         shell: bash
         run: |
@@ -188,9 +192,20 @@ jobs:
             <key>destination</key>
             <string>export</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
             <key>teamID</key>
             <string>$APPLE_TEAM_ID</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.wesc9.athlth</key>
+              <string>$PROFILE_MAIN_NAME</string>
+              <key>com.wesc9.athlth.widgets</key>
+              <string>$PROFILE_WIDGET_NAME</string>
+              <key>com.wesc9.athlth.watchkitapp</key>
+              <string>$PROFILE_WATCH_NAME</string>
+            </dict>
             <key>manageAppVersionAndBuildNumber</key>
             <false/>
             <key>uploadSymbols</key>
@@ -207,11 +222,7 @@ jobs:
             -exportArchive \
             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
             -exportPath "$RUNNER_TEMP/validation-export" \
-            -exportOptionsPlist "$RUNNER_TEMP/ValidationExportOptions.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -exportOptionsPlist "$RUNNER_TEMP/ValidationExportOptions.plist"
 
           IPA=$(find "$RUNNER_TEMP/validation-export" -maxdepth 1 -name '*.ipa' -print -quit)
           test -n "$IPA"
@@ -297,9 +308,20 @@ jobs:
             <key>destination</key>
             <string>upload</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
             <key>teamID</key>
             <string>$APPLE_TEAM_ID</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.wesc9.athlth</key>
+              <string>$PROFILE_MAIN_NAME</string>
+              <key>com.wesc9.athlth.widgets</key>
+              <string>$PROFILE_WIDGET_NAME</string>
+              <key>com.wesc9.athlth.watchkitapp</key>
+              <string>$PROFILE_WATCH_NAME</string>
+            </dict>
             <key>manageAppVersionAndBuildNumber</key>
             <false/>
             <key>uploadSymbols</key>
@@ -344,6 +366,11 @@ jobs:
           - Main tab hero, scrolling and Progress visual refinements
           EOF
           fi
+
+      - name: Clean up ephemeral App Store signing
+        if: always()
+        shell: bash
+        run: bash scripts/cleanup_ephemeral_app_store_signing.sh
 
       - name: Upload diagnostics
         if: failure()
