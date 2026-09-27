@@ -1331,10 +1331,12 @@ private final class HomeActivityRouteSnapshotRenderer {
                         size: options.size
                     )
 
-                    UIColor.black
-                        .withAlphaComponent(0.12)
-                        .setFill()
-                    context.fill(bounds)
+                    context.cgContext.setFillColor(
+                        UIColor.black
+                            .withAlphaComponent(0.12)
+                            .cgColor
+                    )
+                    context.cgContext.fill(bounds)
 
                     guard points.count >= 2
                     else {
@@ -1835,7 +1837,7 @@ private struct HomeActivityMuscleArtwork: View {
             "upper back"
         ) {
             Capsule()
-                .fill(active.opacity(0.88))
+                .fill(active)
                 .frame(
                     width: width * 0.12,
                     height: height * 0.24
@@ -1847,7 +1849,7 @@ private struct HomeActivityMuscleArtwork: View {
                 )
 
             Capsule()
-                .fill(active.opacity(0.88))
+                .fill(active)
                 .frame(
                     width: width * 0.12,
                     height: height * 0.24
@@ -1898,7 +1900,7 @@ private struct HomeActivityMuscleArtwork: View {
                 cornerRadius: width * 0.05,
                 style: .continuous
             )
-            .fill(active.opacity(0.78))
+            .fill(active)
             .frame(
                 width: width * 0.18,
                 height: height * 0.20
@@ -1915,7 +1917,7 @@ private struct HomeActivityMuscleArtwork: View {
             "gluteus"
         ) {
             Ellipse()
-                .fill(active.opacity(0.78))
+                .fill(active)
                 .frame(
                     width: width * 0.15,
                     height: height * 0.10
@@ -1926,7 +1928,7 @@ private struct HomeActivityMuscleArtwork: View {
                 )
 
             Ellipse()
-                .fill(active.opacity(0.78))
+                .fill(active)
                 .frame(
                     width: width * 0.15,
                     height: height * 0.10
@@ -1970,7 +1972,7 @@ private struct HomeActivityMuscleArtwork: View {
             "hamstring"
         ) {
             Capsule()
-                .fill(active.opacity(0.72))
+                .fill(active)
                 .frame(
                     width: width * 0.075,
                     height: height * 0.18
@@ -1981,7 +1983,7 @@ private struct HomeActivityMuscleArtwork: View {
                 )
 
             Capsule()
-                .fill(active.opacity(0.72))
+                .fill(active)
                 .frame(
                     width: width * 0.075,
                     height: height * 0.18
