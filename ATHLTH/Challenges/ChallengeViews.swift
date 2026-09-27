@@ -551,6 +551,7 @@ struct ChallengeCreationView: View {
         ChallengeAttemptPolicy = .best
     @State private var attemptLimit = 0
     @State private var allowTreadmill = false
+    @State private var allowTargetGhost = true
     @State private var advancedRules = false
 
     @State private var heartRateZone = 5
@@ -663,6 +664,7 @@ struct ChallengeCreationView: View {
                 if enabled {
                     gpsRequired = true
                     allowTreadmill = false
+        allowTargetGhost = true
                 } else {
                     selectedRouteID = nil
                 }
@@ -1071,6 +1073,21 @@ struct ChallengeCreationView: View {
                             }
                         }
                         .pickerStyle(.segmented)
+
+                        Divider()
+
+                        Toggle(
+                            "Allow target ghost",
+                            isOn: $allowTargetGhost
+                        )
+
+                        Text(
+                            allowTargetGhost
+                                ? "Participants may use a synthetic pace ghost to target a chosen finish time on this route."
+                                : "Participants must run the challenge route without a synthetic target-time pacer."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                     .padding()
                     .challengeCard()
@@ -1845,6 +1862,12 @@ struct ChallengeCreationView: View {
                             "Direction",
                             routeDirection.title
                         )
+                        reviewRow(
+                            "Target ghost",
+                            allowTargetGhost
+                                ? "Allowed"
+                                : "Disabled"
+                        )
                     }
                 } else {
                     reviewRow("Course", "Run Anywhere")
@@ -2141,6 +2164,11 @@ struct ChallengeCreationView: View {
                 sport == .running &&
                 !usesSpecificRoute
                     ? allowTreadmill
+                    : nil,
+            allowTargetGhost:
+                sport == .running &&
+                usesSpecificRoute
+                    ? allowTargetGhost
                     : nil,
             exerciseName: sport == .strength && scoring != .workoutVolume
                 ? exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2697,12 +2725,16 @@ struct ChallengeDetailView: View {
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
     @StateObject private var locationStore = ChallengeLocationStore()
 
     let challengeID: UUID
 
     @State private var showingManualStrengthAttempt = false
     @State private var showingCancel = false
+    @State private var showingChallengeTargetGhost = false
 
     private var challenge: ATHLTHChallenge? {
         challenges.challenge(id: challengeID)
@@ -2732,6 +2764,15 @@ struct ChallengeDetailView: View {
 
                         leaderboardCard(challenge)
                         rulesCard(challenge)
+
+                        if challenge.sport == .running,
+                           challenge.rules.route != nil,
+                           challenge.rules.targetGhostAllowed,
+                           challenge.status == .active,
+                           currentParticipant?.state == .creator ||
+                           currentParticipant?.state == .accepted {
+                            targetGhostCard(challenge)
+                        }
 
                         if let meetup = challenge.rules.meetup {
                             meetupCard(challenge, meetup: meetup)
@@ -2797,6 +2838,23 @@ struct ChallengeDetailView: View {
                             displayName: session.profile.displayName,
                             maximumHeartRateBPM: maxHR
                         )
+                    }
+                }
+                .sheet(
+                    isPresented:
+                        $showingChallengeTargetGhost
+                ) {
+                    if let route =
+                        targetGhostRoute(
+                            challenge
+                        ) {
+                        NavigationStack {
+                            TargetGhostSetupView(
+                                route: route,
+                                challengeTitle:
+                                    challenge.title
+                            )
+                        }
                     }
                 }
                 .sheet(isPresented: $showingManualStrengthAttempt) {
@@ -3031,6 +3089,102 @@ struct ChallengeDetailView: View {
         .challengeCard()
     }
 
+    private func targetGhostCard(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            "timer.circle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text("Target Ghost")
+                            .font(.headline)
+
+                        Text(
+                            "Set your own finish time and follow a synthetic pacer around the challenge route."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+
+                Button {
+                    showingChallengeTargetGhost = true
+                } label: {
+                    Label(
+                        "Set target time",
+                        systemImage:
+                            "figure.run"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.vitality)
+                .disabled(
+                    settings.trainingDeviceProvider !=
+                        .appleWatch ||
+                    !watchConnection.isReady
+                )
+            }
+        }
+    }
+
+    private func targetGhostRoute(
+        _ challenge: ATHLTHChallenge
+    ) -> TrainingRoute? {
+        guard let snapshot =
+                challenge.rules.route,
+              snapshot.coordinates.count >= 2
+        else {
+            return nil
+        }
+
+        return TrainingRoute(
+            id:
+                snapshot.routeID ??
+                challenge.id,
+            ownerID:
+                challenge.creatorID,
+            title:
+                snapshot.title,
+            visibility:
+                challenge.visibility,
+            coordinates:
+                snapshot.coordinates,
+            distanceKilometers:
+                snapshot.distanceKilometers,
+            elevationGainMeters: nil,
+            importedFilename: nil,
+            createdAt:
+                challenge.createdAt,
+            startName:
+                "Challenge start",
+            endName:
+                "Challenge finish",
+            expectedTravelTimeSeconds:
+                nil,
+            routeSource:
+                "challenge_target_ghost",
+            sharedSourceOwnerID:
+                challenge.creatorID,
+            sharedSourceRouteID:
+                snapshot.routeID
+        )
+    }
+
     private func rulesCard(_ challenge: ATHLTHChallenge) -> some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
@@ -3078,6 +3232,13 @@ struct ChallengeDetailView: View {
                         direction.title
                     )
                 }
+
+                ruleRow(
+                    "Target ghost",
+                    challenge.rules.targetGhostAllowed
+                        ? "Allowed"
+                        : "Disabled by creator"
+                )
             } else if challenge.sport == .running {
                 ruleRow("Course", "Run Anywhere")
 
