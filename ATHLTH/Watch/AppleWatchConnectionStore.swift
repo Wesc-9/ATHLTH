@@ -54,7 +54,7 @@ private struct IncomingWatchPayload: Sendable {
 }
 
 @MainActor
-final class AppleWatchConnectionStore: NSObject, ObservableObject {
+final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Sendable {
     @Published private(set) var state: AppleWatchConnectionState = .checking
     @Published private(set) var lastCompletedWorkout: WatchWorkoutResult?
     @Published private(set) var lastStrengthCommand: WatchStrengthCommand?
@@ -244,9 +244,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
                 payload,
                 replyHandler: nil
             ) { [weak self] error in
-                DispatchQueue.main.async {
-                    self?.workoutLaunchError =
-                        error.localizedDescription
+                let message = error.localizedDescription
+                Task { @MainActor [weak self] in
+                    self?.workoutLaunchError = message
                 }
             }
         } else {
@@ -325,9 +325,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
     }
 
     func clearStrengthCommand() {
-        DispatchQueue.main.async { [weak self] in
-            self?.lastStrengthCommand = nil
-        }
+        lastStrengthCommand = nil
     }
 
     private func sendWatchPayload<T: Encodable>(
@@ -363,9 +361,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
     }
 
     func clearCompletedWorkout() {
-        DispatchQueue.main.async { [weak self] in
-            self?.lastCompletedWorkout = nil
-        }
+        lastCompletedWorkout = nil
     }
 
     func sendWorkoutCommand(_ command: WatchWorkoutCommand) {
@@ -384,8 +380,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
 
         if session.isReachable {
             session.sendMessage(payload, replyHandler: nil) { [weak self] error in
-                DispatchQueue.main.async {
-                    self?.workoutLaunchError = error.localizedDescription
+                let message = error.localizedDescription
+                Task { @MainActor [weak self] in
+                    self?.workoutLaunchError = message
                 }
             }
         } else {
