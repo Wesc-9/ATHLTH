@@ -284,13 +284,13 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func skipToNext() {
-        appRemote?.playerAPI?.skipToNext { [weak self] _, error in
+        appRemote?.playerAPI?.skip(toNext: { [weak self] _, error in
             Task { @MainActor in
                 if let error {
                     self?.lastErrorMessage = error.localizedDescription
                 }
             }
-        }
+        })
     }
 
     func stopPreviewPlaybackState() {
