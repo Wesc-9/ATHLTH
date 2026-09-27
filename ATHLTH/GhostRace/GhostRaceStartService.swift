@@ -238,18 +238,26 @@ enum GhostRaceStartService {
                     .running
                 )
 
+            var standardAudioCoach =
+                settings.audioCoachConfiguration(
+                    enabled:
+                        settings
+                            .audioCoachEnabledByDefault,
+                    routeDistanceMeters:
+                        raceRoute
+                            .distanceKilometers *
+                            1_000
+                )
+
+            // Ghost Race has its own cadence. Keep the selected language
+            // available on Watch, but avoid overlapping spoken intervals.
+            if settings.ghostRaceAudioEnabled {
+                standardAudioCoach.enabled = false
+            }
+
             watchConnection
                 .sendAudioCoachConfiguration(
-                    settings
-                        .audioCoachConfiguration(
-                            enabled:
-                                settings
-                                    .audioCoachEnabledByDefault,
-                            routeDistanceMeters:
-                                raceRoute
-                                    .distanceKilometers *
-                                    1_000
-                        )
+                    standardAudioCoach
                 )
 
             watchConnection
