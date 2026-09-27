@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.3.8
+      - release/v1.4.2
     paths:
       - .github/release-trigger
 
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   validate-release:
-    runs-on: macos-26
+    runs-on: xcode-27
     env:
       APPLE_TEAM_ID: D3AX7B6RMW
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -35,9 +35,9 @@ jobs:
             fi
           done
 
-      - name: Select Xcode 26.6
+      - name: Select Xcode 27
         run: |
-          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
           xcodebuild -version
 
       - name: Install XcodeGen
@@ -51,6 +51,10 @@ jobs:
           test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png
           test -s ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png
           test -s ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+
+      - name: Optimize hero assets for runtime memory
+        shell: bash
+        run: bash scripts/optimize_hero_assets.sh
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -85,16 +89,23 @@ jobs:
           set -euo pipefail
           IOS_APP="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app"
           WATCH_APP="$IOS_APP/Watch/ATHLTH.app"
+          WIDGET_APP="$IOS_APP/PlugIns/ATHLTHWidgets.appex"
           test -d "$IOS_APP"
           test -d "$WATCH_APP"
+          test -d "$WIDGET_APP"
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$IOS_APP/Info.plist")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_APP/Info.plist")
+          WIDGET_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WIDGET_APP/Info.plist")
           IOS_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$IOS_APP/Info.plist")
           WATCH_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$WATCH_APP/Info.plist")
+          WIDGET_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$WIDGET_APP/Info.plist")
           echo "iPhone: $IOS_VERSION ($IOS_BUILD)"
           echo "Watch:  $WATCH_VERSION ($WATCH_BUILD)"
+          echo "Widget: $WIDGET_VERSION ($WIDGET_BUILD)"
           test "$IOS_BUILD" = "$WATCH_BUILD"
+          test "$IOS_BUILD" = "$WIDGET_BUILD"
           test "$IOS_VERSION" = "$WATCH_VERSION"
+          test "$IOS_VERSION" = "$WIDGET_VERSION"
           test "$IOS_BUILD" -gt 1
 
       - name: Seed archive entitlements with ad-hoc signatures
@@ -103,7 +114,9 @@ jobs:
           set -euo pipefail
           IOS_APP="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app"
           WATCH_APP="$IOS_APP/Watch/ATHLTH.app"
+          WIDGET_APP="$IOS_APP/PlugIns/ATHLTHWidgets.appex"
           codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTHWatchExtension/ATHLTHWatchExtension.entitlements" "$WATCH_APP"
+          codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTHWidgets/ATHLTHWidgets.entitlements" "$WIDGET_APP"
           codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTH/Resources/ATHLTH.entitlements" "$IOS_APP"
           echo "Archive Watch entitlements after ad-hoc signing:"
           codesign -d --entitlements :- "$WATCH_APP" 2>/dev/null
@@ -156,18 +169,26 @@ jobs:
           unzip -q "$IPA" -d "$RUNNER_TEMP/ipa"
           APP=$(find "$RUNNER_TEMP/ipa/Payload" -maxdepth 1 -name '*.app' -print -quit)
           WATCH_APP=$(find "$APP/Watch" -maxdepth 1 -name '*.app' -print -quit)
+          WIDGET_APP=$(find "$APP/PlugIns" -maxdepth 1 -name 'ATHLTHWidgets.appex' -print -quit)
+          test -n "$WATCH_APP"
+          test -n "$WIDGET_APP"
           codesign --verify --deep --strict "$APP"
           codesign --verify --strict "$WATCH_APP"
+          codesign --verify --strict "$WIDGET_APP"
 
           IOS_ENT="$RUNNER_TEMP/ios-entitlements.plist"
           WATCH_ENT="$RUNNER_TEMP/watch-entitlements.plist"
+          WIDGET_ENT="$RUNNER_TEMP/widget-entitlements.plist"
           codesign -d --entitlements :- "$APP" > "$IOS_ENT" 2>/dev/null
           codesign -d --entitlements :- "$WATCH_APP" > "$WATCH_ENT" 2>/dev/null
+          codesign -d --entitlements :- "$WIDGET_APP" > "$WIDGET_ENT" 2>/dev/null
 
           echo "iPhone signed entitlements:"
           plutil -p "$IOS_ENT"
           echo "Watch signed entitlements:"
           plutil -p "$WATCH_ENT"
+          echo "Widget signed entitlements:"
+          plutil -p "$WIDGET_ENT"
 
           IOS_PROFILE="$RUNNER_TEMP/ios-profile.plist"
           WATCH_PROFILE="$RUNNER_TEMP/watch-profile.plist"
@@ -182,6 +203,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit.background-delivery" "$IOS_ENT" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.applesignin:0" "$IOS_ENT" | grep -qx "Default"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$IOS_ENT" | grep -qx "group.com.wesc9.athlth"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$WIDGET_ENT" | grep -qx "group.com.wesc9.athlth"
 
           /usr/libexec/PlistBuddy -c "Print :WKCompanionAppBundleIdentifier" "$WATCH_APP/Info.plist" | grep -qx "com.wesc9.athlth"
           /usr/libexec/PlistBuddy -c "Print :WKBackgroundModes:0" "$WATCH_APP/Info.plist" | grep -qx "workout-processing"
@@ -194,6 +217,9 @@ jobs:
 
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_APP/Info.plist")
+          WIDGET_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WIDGET_APP/Info.plist")
           echo "Exported iPhone CFBundleVersion: $IOS_BUILD"
           echo "Exported Watch CFBundleVersion: $WATCH_BUILD"
+          echo "Exported Widget CFBundleVersion: $WIDGET_BUILD"
           test "$IOS_BUILD" = "$WATCH_BUILD"
+          test "$IOS_BUILD" = "$WIDGET_BUILD"
