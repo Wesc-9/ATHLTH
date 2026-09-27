@@ -2175,6 +2175,26 @@ struct TrainingPlanCreationView: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Delete \(plan.title)?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Program", role: .destructive) {
+                goalStore.setLinkedPlan(
+                    plan.id,
+                    goalIDs: []
+                )
+                session.deleteTrainingPlan(plan.id)
+                dismiss()
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "This removes the program and its remaining schedule. Completed workout history is kept."
+            )
+        }
         .alert(
             "Plan Conflict",
             isPresented: Binding(
@@ -2733,6 +2753,7 @@ struct PlanMetadataEditorView: View {
     @State private var weekCount: Int
     @State private var selectedGoalIDs: Set<UUID> = []
     @State private var saveError: String?
+    @State private var showingDeleteConfirmation = false
 
     init(plan: TrainingPlan) {
         self.plan = plan
@@ -2865,6 +2886,22 @@ struct PlanMetadataEditorView: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label(
+                            "Delete Program",
+                            systemImage: "trash"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                } footer: {
+                    Text(
+                        "Deleting the program removes its remaining plan and schedule. Completed workout history is kept."
+                    )
                 }
             }
             .navigationTitle("Edit Program")
