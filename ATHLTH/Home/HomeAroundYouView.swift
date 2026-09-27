@@ -1,9 +1,10 @@
-import CoreLocation
+@preconcurrency import CoreLocation
 import MapKit
 import SwiftUI
 import UIKit
 
-final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDelegate {
+@MainActor
+final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDelegate, @unchecked Sendable {
     @Published private(set) var location: CLLocation?
     @Published private(set) var authorizationStatus: CLAuthorizationStatus
     @Published private(set) var isUpdating = false
@@ -62,20 +63,21 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
         isUpdating = false
     }
 
-    func locationManagerDidChangeAuthorization(
+    nonisolated func locationManagerDidChangeAuthorization(
         _ manager: CLLocationManager
     ) {
-        DispatchQueue.main.async { [weak self] in
+        let status = manager.authorizationStatus
+
+        Task { @MainActor [weak self] in
             guard let self else { return }
 
-            self.authorizationStatus = manager.authorizationStatus
+            self.authorizationStatus = status
 
             if self.canShowUserLocation {
                 self.errorMessage = nil
                 self.isUpdating = true
-                manager.requestLocation()
-            } else if manager.authorizationStatus == .denied ||
-                        manager.authorizationStatus == .restricted {
+                self.manager.requestLocation()
+            } else if status == .denied || status == .restricted {
                 self.isUpdating = false
                 self.errorMessage =
                     "Location access is off. Enable it in iOS Settings to show nearby routes and events."
@@ -83,20 +85,40 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
         }
     }
 
-    func locationManager(
+    nonisolated func locationManager(
         _ manager: CLLocationManager,
         didUpdateLocations locations: [CLLocation]
     ) {
         guard let newest = locations.last else { return }
 
-        DispatchQueue.main.async { [weak self] in
-            self?.location = newest
+        let latitude = newest.coordinate.latitude
+        let longitude = newest.coordinate.longitude
+        let altitude = newest.altitude
+        let horizontalAccuracy = newest.horizontalAccuracy
+        let verticalAccuracy = newest.verticalAccuracy
+        let course = newest.course
+        let speed = newest.speed
+        let timestamp = newest.timestamp
+
+        Task { @MainActor [weak self] in
+            self?.location = CLLocation(
+                coordinate: CLLocationCoordinate2D(
+                    latitude: latitude,
+                    longitude: longitude
+                ),
+                altitude: altitude,
+                horizontalAccuracy: horizontalAccuracy,
+                verticalAccuracy: verticalAccuracy,
+                course: course,
+                speed: speed,
+                timestamp: timestamp
+            )
             self?.isUpdating = false
             self?.errorMessage = nil
         }
     }
 
-    func locationManager(
+    nonisolated func locationManager(
         _ manager: CLLocationManager,
         didFailWithError error: Error
     ) {
@@ -105,9 +127,11 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
             return
         }
 
-        DispatchQueue.main.async { [weak self] in
+        let message = error.localizedDescription
+
+        Task { @MainActor [weak self] in
             self?.isUpdating = false
-            self?.errorMessage = error.localizedDescription
+            self?.errorMessage = message
         }
     }
 }
