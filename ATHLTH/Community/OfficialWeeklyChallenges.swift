@@ -1307,25 +1307,51 @@ struct OfficialWeeklyChallengeCard: View {
                         }
                         .buttonStyle(.plain)
                     } else {
-                        Button {
-                            Task {
-                                await store.join(challenge)
-                                await store.syncCompletionState(
-                                    workouts: health.workouts
+                        HStack(spacing: 9) {
+                            NavigationLink {
+                                OfficialWeeklyChallengeDetailView(
+                                    challengeID: challenge.id
                                 )
+                            } label: {
+                                Text("Details")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 14)
+                                    .frame(height: 42)
+                                    .background(
+                                        Color.black.opacity(0.28),
+                                        in: Capsule()
+                                    )
+                                    .overlay {
+                                        Capsule()
+                                            .stroke(
+                                                Color.white.opacity(0.32),
+                                                lineWidth: 0.8
+                                            )
+                                    }
                             }
-                        } label: {
-                            HStack(spacing: 7) {
-                                Text("Join Challenge")
-                                Image(systemName: "arrow.right")
+                            .buttonStyle(.plain)
+
+                            Button {
+                                Task {
+                                    await store.join(challenge)
+                                    await store.syncCompletionState(
+                                        workouts: health.workouts
+                                    )
+                                }
+                            } label: {
+                                HStack(spacing: 7) {
+                                    Text("Join Challenge")
+                                    Image(systemName: "arrow.right")
+                                }
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .padding(.horizontal, 17)
+                                .frame(height: 42)
+                                .background(.white, in: Capsule())
                             }
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                            .padding(.horizontal, 17)
-                            .frame(height: 42)
-                            .background(.white, in: Capsule())
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
