@@ -9,6 +9,9 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: 2.55.2
+  SpotifyiOS:
+    url: https://github.com/spotify/ios-sdk
+    from: 5.0.1
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -28,6 +31,7 @@ targets:
       - target: ATHLTHWidgets
         embed: true
       - package: Supabase
+      - package: SpotifyiOS
     info:
       path: ATHLTH/Resources/Info.plist
       properties:
@@ -61,6 +65,10 @@ targets:
           - CFBundleURLName: com.wesc9.athlth.auth
             CFBundleURLSchemes:
               - athlth
+        LSApplicationQueriesSchemes:
+          - spotify
+        ATHLTHSpotifyClientID: "$(ATHLTH_SPOTIFY_CLIENT_ID)"
+        ATHLTHSpotifyRedirectURI: "athlth://spotify-callback"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth
