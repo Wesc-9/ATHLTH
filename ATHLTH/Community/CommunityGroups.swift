@@ -70,6 +70,51 @@ struct CommunityGroupAnnouncementRecord:
     }
 }
 
+struct CommunityGroupAnnouncementReactionRecord:
+    Codable,
+    Hashable
+{
+    let announcementID: UUID
+    let groupID: UUID
+    let userID: UUID
+    let reaction: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case announcementID = "announcement_id"
+        case groupID = "group_id"
+        case userID = "user_id"
+        case reaction
+        case createdAt = "created_at"
+    }
+}
+
+struct CommunityGroupLeaderboardEntry:
+    Codable,
+    Identifiable,
+    Hashable
+{
+    var id: UUID { userID }
+
+    let userID: UUID
+    let workoutCount: Int
+    let messageCount: Int
+    let likesGiven: Int
+    let eventsJoined: Int
+    let challengesJoined: Int
+    let score: Int
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case workoutCount = "workout_count"
+        case messageCount = "message_count"
+        case likesGiven = "likes_given"
+        case eventsJoined = "events_joined"
+        case challengesJoined = "challenges_joined"
+        case score
+    }
+}
+
 struct CommunityGroupActivityRecord:
     Codable,
     Identifiable,
@@ -422,6 +467,38 @@ private struct CommunityGroupAnnouncementInsert: Encodable {
     }
 }
 
+private struct CommunityGroupAnnouncementReactionInsert: Encodable {
+    let announcementID: UUID
+    let groupID: UUID
+    let userID: UUID
+    let reaction: String
+
+    enum CodingKeys: String, CodingKey {
+        case announcementID = "announcement_id"
+        case groupID = "group_id"
+        case userID = "user_id"
+        case reaction
+    }
+}
+
+private struct CommunityGroupLeaderboardParams: Encodable {
+    let groupID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case groupID = "p_group_id"
+    }
+}
+
+private struct CommunityGroupWorkoutActivityParams: Encodable {
+    let workoutID: UUID
+    let completedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case workoutID = "p_workout_id"
+        case completedAt = "p_completed_at"
+    }
+}
+
 private struct CommunityGroupMemberInsert: Encodable {
     let groupID: UUID
     let userID: UUID
@@ -688,6 +765,7 @@ final class CommunityGroupStore: ObservableObject {
     @Published private(set) var ownMemberships: [CommunityGroupMemberRecord] = []
     @Published private(set) var membersByGroup: [UUID: [CommunityGroupMemberRecord]] = [:]
     @Published private(set) var announcementsByGroup: [UUID: [CommunityGroupAnnouncementRecord]] = [:]
+    @Published private(set) var announcementReactionsByGroup: [UUID: [CommunityGroupAnnouncementReactionRecord]] = [:]
     @Published private(set) var activityByGroup: [UUID: [CommunityGroupActivityRecord]] = [:]
     @Published private(set) var communityActivity: [CommunityGroupActivityRecord] = []
     @Published private(set) var profileCardsByID: [UUID: SocialProfileCard] = [:]
@@ -700,6 +778,7 @@ final class CommunityGroupStore: ObservableObject {
     @Published private(set) var ownInvites: [CommunityGroupInviteRecord] = []
     @Published private(set) var notificationPreferencesByGroup: [UUID: CommunityGroupNotificationPreferenceRecord] = [:]
     @Published private(set) var eventRSVPsByGroup: [UUID: [CommunityGroupEventRSVPRecord]] = [:]
+    @Published private(set) var leaderboardByGroup: [UUID: [CommunityGroupLeaderboardEntry]] = [:]
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
@@ -810,6 +889,38 @@ final class CommunityGroupStore: ObservableObject {
         in groupID: UUID
     ) -> [CommunityGroupAnnouncementRecord] {
         announcementsByGroup[groupID] ?? []
+    }
+
+    func announcementLikeCount(
+        _ announcementID: UUID,
+        in groupID: UUID
+    ) -> Int {
+        announcementReactionsByGroup[groupID]?
+            .filter {
+                $0.announcementID == announcementID &&
+                $0.reaction == "like"
+            }
+            .count ?? 0
+    }
+
+    func hasLikedAnnouncement(
+        _ announcementID: UUID,
+        in groupID: UUID
+    ) -> Bool {
+        guard let currentUserID else { return false }
+
+        return announcementReactionsByGroup[groupID]?
+            .contains {
+                $0.announcementID == announcementID &&
+                $0.userID == currentUserID &&
+                $0.reaction == "like"
+            } ?? false
+    }
+
+    func leaderboard(
+        in groupID: UUID
+    ) -> [CommunityGroupLeaderboardEntry] {
+        leaderboardByGroup[groupID] ?? []
     }
 
     func activity(
@@ -945,6 +1056,8 @@ final class CommunityGroupStore: ObservableObject {
             ownJoinRequests = []
             ownInvites = []
             notificationPreferencesByGroup = [:]
+            announcementReactionsByGroup = [:]
+            leaderboardByGroup = [:]
             return
         }
 
@@ -1010,6 +1123,7 @@ final class CommunityGroupStore: ObservableObject {
             groups = try await groupsQuery
             ownMemberships = try await membershipsQuery
             communityActivity = try await activityQuery
+                .filter { $0.kind != "announcement" }
             ownInvites = try await invitesQuery
             ownJoinRequests = try await joinRequestsQuery
 
@@ -1151,6 +1265,16 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
                 .value
 
+            async let reactionsQuery:
+                [CommunityGroupAnnouncementReactionRecord] = client
+                    .from("community_group_announcement_reactions")
+                    .select()
+                    .eq("group_id", value: groupID)
+                    .order("created_at", ascending: false)
+                    .limit(1_000)
+                    .execute()
+                    .value
+
             async let activityQuery: [CommunityGroupActivityRecord] = client
                 .from("community_group_activity")
                 .select()
@@ -1186,24 +1310,40 @@ final class CommunityGroupStore: ObservableObject {
                     .execute()
                     .value
 
+            async let leaderboardQuery:
+                [CommunityGroupLeaderboardEntry] = client
+                    .rpc(
+                        "get_community_group_leaderboard",
+                        params: CommunityGroupLeaderboardParams(
+                            groupID: groupID
+                        )
+                    )
+                    .execute()
+                    .value
+
             let loadedMembers = try await membersQuery
             let loadedMessages = try await messagesQuery
             let loadedEvents = try await eventsQuery
             let loadedChallenges = try await challengesQuery
             let loadedAnnouncements = try await announcementsQuery
+            let loadedReactions = try await reactionsQuery
             let loadedActivity = try await activityQuery
             let loadedProfiles = try await profilesQuery
             let loadedJoinRequests = try await joinRequestsQuery
             let loadedEventRSVPs = try await eventRSVPsQuery
+            let loadedLeaderboard = try await leaderboardQuery
 
             membersByGroup[groupID] = loadedMembers
             messagesByGroup[groupID] = loadedMessages
             eventsByGroup[groupID] = loadedEvents
             challengesByGroup[groupID] = loadedChallenges
             announcementsByGroup[groupID] = loadedAnnouncements
+            announcementReactionsByGroup[groupID] = loadedReactions
             activityByGroup[groupID] = loadedActivity
+                .filter { $0.kind != "announcement" }
             joinRequestsByGroup[groupID] = loadedJoinRequests
             eventRSVPsByGroup[groupID] = loadedEventRSVPs
+            leaderboardByGroup[groupID] = loadedLeaderboard
 
             for profile in loadedProfiles {
                 profileCardsByID[profile.userID] = profile
@@ -1584,6 +1724,8 @@ final class CommunityGroupStore: ObservableObject {
 
             membersByGroup[group.id] = nil
             announcementsByGroup[group.id] = nil
+            announcementReactionsByGroup[group.id] = nil
+            leaderboardByGroup[group.id] = nil
             activityByGroup[group.id] = nil
             messagesByGroup[group.id] = nil
             eventsByGroup[group.id] = nil
@@ -1635,6 +1777,110 @@ final class CommunityGroupStore: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    func toggleAnnouncementLike(
+        groupID: UUID,
+        announcementID: UUID
+    ) async -> Bool {
+        guard let userID = currentUserID,
+              joinedGroupIDs.contains(groupID) ||
+                groups.first(where: {
+                    $0.id == groupID &&
+                    $0.creatorID == userID
+                }) != nil
+        else {
+            return false
+        }
+
+        do {
+            if hasLikedAnnouncement(
+                announcementID,
+                in: groupID
+            ) {
+                try await client
+                    .from(
+                        "community_group_announcement_reactions"
+                    )
+                    .delete()
+                    .eq(
+                        "announcement_id",
+                        value: announcementID
+                    )
+                    .eq("user_id", value: userID)
+                    .eq("reaction", value: "like")
+                    .execute()
+            } else {
+                try await client
+                    .from(
+                        "community_group_announcement_reactions"
+                    )
+                    .insert(
+                        CommunityGroupAnnouncementReactionInsert(
+                            announcementID: announcementID,
+                            groupID: groupID,
+                            userID: userID,
+                            reaction: "like"
+                        )
+                    )
+                    .execute()
+            }
+
+            await refreshAnnouncementReactions(groupID)
+            await refreshLeaderboard(groupID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func refreshAnnouncementReactions(
+        _ groupID: UUID
+    ) async {
+        do {
+            let rows:
+                [CommunityGroupAnnouncementReactionRecord] =
+                    try await client
+                        .from(
+                            "community_group_announcement_reactions"
+                        )
+                        .select()
+                        .eq("group_id", value: groupID)
+                        .order(
+                            "created_at",
+                            ascending: false
+                        )
+                        .limit(1_000)
+                        .execute()
+                        .value
+
+            announcementReactionsByGroup[groupID] = rows
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func refreshLeaderboard(
+        _ groupID: UUID
+    ) async {
+        do {
+            let rows: [CommunityGroupLeaderboardEntry] =
+                try await client
+                    .rpc(
+                        "get_community_group_leaderboard",
+                        params:
+                            CommunityGroupLeaderboardParams(
+                                groupID: groupID
+                            )
+                    )
+                    .execute()
+                    .value
+
+            leaderboardByGroup[groupID] = rows
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -1966,6 +2212,8 @@ final class CommunityGroupStore: ObservableObject {
             await refresh()
             membersByGroup[group.id] = nil
             announcementsByGroup[group.id] = nil
+            announcementReactionsByGroup[group.id] = nil
+            leaderboardByGroup[group.id] = nil
             activityByGroup[group.id] = nil
             messagesByGroup[group.id] = nil
             eventsByGroup[group.id] = nil
@@ -2007,6 +2255,7 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
 
             await refreshMessages(groupID)
+            await refreshLeaderboard(groupID)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -2368,6 +2617,22 @@ final class CommunityGroupStore: ObservableObject {
         }
 
         do {
+            do {
+                try await client
+                    .rpc(
+                        "record_community_group_workout",
+                        params:
+                            CommunityGroupWorkoutActivityParams(
+                                workoutID: workout.id,
+                                completedAt: workout.endDate
+                            )
+                    )
+                    .execute()
+            } catch {
+                // Club leaderboard tracking is additive and must never
+                // block existing challenge workout processing.
+            }
+
             let activeChallenges: [CommunityGroupChallengeRecord] =
                 try await client
                     .from("community_group_challenges")
@@ -3665,7 +3930,7 @@ struct CommunityGroupDetailView: View {
             if let pinned {
                 VStack(alignment: .leading, spacing: 10) {
                     Label(
-                        "Pinned Update",
+                        "Pinned Post",
                         systemImage: "pin.fill"
                     )
                     .font(.caption.weight(.semibold))
@@ -3687,7 +3952,7 @@ struct CommunityGroupDetailView: View {
 
             if !updates.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Updates")
+                    Text("Club Posts")
                         .font(.headline)
                         .frame(
                             maxWidth: .infinity,
@@ -3704,45 +3969,197 @@ struct CommunityGroupDetailView: View {
             comingUpCard
             recentGroupActivityCard
 
-            ATHLTHCard {
-                Text("Group Snapshot")
-                    .font(.headline)
+            clubLeaderboardCard
+        }
+    }
 
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        overviewMetric(
-                            icon: "megaphone.fill",
-                            value:
-                                "\(groups.announcements(in: group.id).count)",
-                            title: "Updates"
-                        )
-                        overviewMetric(
-                            icon:
-                                "bubble.left.and.bubble.right.fill",
-                            value:
-                                "\(groups.messages(in: group.id).count)",
-                            title: "Messages"
-                        )
-                    }
+    private var clubLeaderboardCard: some View {
+        let entries = groups.leaderboard(
+            in: group.id
+        )
 
-                    HStack(spacing: 8) {
-                        overviewMetric(
-                            icon: "calendar",
-                            value:
-                                "\(groups.events(in: group.id).count)",
-                            title: "Events"
-                        )
-                        overviewMetric(
-                            icon: "bolt.fill",
-                            value:
-                                "\(groups.challenges(in: group.id).count)",
-                            title: "Challenges"
-                        )
+        return ATHLTHCard {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Club Leaderboard")
+                        .font(.title3.weight(.bold))
+                    Text(
+                        "Last 7 days · training, participation and Club activity."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            if entries.isEmpty {
+                Text(
+                    "Leaderboard activity will appear as members train and take part in the Club."
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.top, 12)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(
+                        Array(
+                            entries
+                                .prefix(5)
+                                .enumerated()
+                        ),
+                        id: \.element.id
+                    ) { index, entry in
+                        HStack(spacing: 11) {
+                            Text("\(index + 1)")
+                                .font(
+                                    .caption
+                                        .weight(.bold)
+                                )
+                                .frame(
+                                    width: 30,
+                                    height: 30
+                                )
+                                .background(
+                                    index < 3
+                                        ? ATHLTHTheme.accent
+                                            .opacity(0.14)
+                                        : Color.secondary
+                                            .opacity(0.08),
+                                    in: Circle()
+                                )
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+                                HStack(spacing: 6) {
+                                    Text(
+                                        leaderboardDisplayName(
+                                            for: entry.userID
+                                        )
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(.semibold)
+                                    )
+
+                                    if entry.userID ==
+                                        session.profile.userID {
+                                        Text("You")
+                                            .font(
+                                                .caption2
+                                                    .weight(.bold)
+                                            )
+                                            .foregroundStyle(
+                                                ATHLTHTheme
+                                                    .accentDeep
+                                            )
+                                    }
+                                }
+
+                                Text(
+                                    leaderboardActivitySummary(
+                                        entry
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Text(
+                                "\(entry.score) pts"
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                        }
+                        .padding(.vertical, 9)
+
+                        if entry.id !=
+                            entries.prefix(5).last?.id {
+                            Divider()
+                                .padding(.leading, 41)
+                        }
                     }
                 }
-                .padding(.top, 10)
+                .padding(.top, 8)
             }
+
+            Text(
+                "Scoring: workouts, events and challenges +5. Chat and likes +1, capped at 5 per day each."
+            )
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .padding(.top, 10)
         }
+    }
+
+    private func leaderboardDisplayName(
+        for userID: UUID
+    ) -> String {
+        guard let profile = groups.profileCard(
+            for: userID
+        ) else {
+            return "Club member"
+        }
+
+        return profile.usernameLabel.isEmpty
+            ? profile.resolvedName
+            : profile.usernameLabel
+    }
+
+    private func leaderboardActivitySummary(
+        _ entry: CommunityGroupLeaderboardEntry
+    ) -> String {
+        var parts: [String] = []
+
+        if entry.workoutCount > 0 {
+            parts.append(
+                "\(entry.workoutCount) workout" +
+                (entry.workoutCount == 1 ? "" : "s")
+            )
+        }
+
+        if entry.messageCount > 0 {
+            parts.append(
+                "\(entry.messageCount) chat"
+            )
+        }
+
+        if entry.likesGiven > 0 {
+            parts.append(
+                "\(entry.likesGiven) like" +
+                (entry.likesGiven == 1 ? "" : "s")
+            )
+        }
+
+        if entry.eventsJoined > 0 {
+            parts.append(
+                "\(entry.eventsJoined) event" +
+                (entry.eventsJoined == 1 ? "" : "s")
+            )
+        }
+
+        if entry.challengesJoined > 0 {
+            parts.append(
+                "\(entry.challengesJoined) challenge" +
+                (entry.challengesJoined == 1
+                    ? ""
+                    : "s")
+            )
+        }
+
+        return parts.isEmpty
+            ? "No activity yet"
+            : parts.joined(separator: " · ")
     }
 
     private var groupUpdateComposer: some View {
@@ -3761,7 +4178,7 @@ struct CommunityGroupDetailView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Group update")
+                    Text("Club Post")
                         .font(.subheadline.weight(.semibold))
                     Text("Visible to every group member")
                         .font(.caption2)
@@ -3773,7 +4190,7 @@ struct CommunityGroupDetailView: View {
 
             HStack(alignment: .bottom, spacing: 10) {
                 TextField(
-                    "Share an update…",
+                    "Share a Club post…",
                     text: $updateDraft,
                     axis: .vertical
                 )
@@ -4020,7 +4437,9 @@ struct CommunityGroupDetailView: View {
 
     private var recentGroupActivityCard: some View {
         let items = Array(
-            groups.activity(in: group.id).prefix(4)
+            groups.activity(in: group.id)
+                .filter { $0.kind != "announcement" }
+                .prefix(4)
         )
 
         return ATHLTHCard {
@@ -4040,7 +4459,7 @@ struct CommunityGroupDetailView: View {
 
             if items.isEmpty {
                 Text(
-                    "New members, updates, events and challenges will appear here."
+                    "New members, events and challenges will appear here."
                 )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -4212,12 +4631,21 @@ struct CommunityGroupDetailView: View {
         _ update: CommunityGroupAnnouncementRecord,
         isPinned: Bool = false
     ) -> some View {
-        ATHLTHCard {
+        let likeCount = groups.announcementLikeCount(
+            update.id,
+            in: group.id
+        )
+        let liked = groups.hasLikedAnnouncement(
+            update.id,
+            in: group.id
+        )
+
+        return ATHLTHCard {
             HStack {
                 Label(
                     isPinned
-                        ? "Pinned Update"
-                        : "Group Update",
+                        ? "Pinned Post"
+                        : "Club Post",
                     systemImage:
                         isPinned
                             ? "pin.fill"
@@ -4247,8 +4675,8 @@ struct CommunityGroupDetailView: View {
                         } label: {
                             Label(
                                 isPinned
-                                    ? "Unpin Update"
-                                    : "Pin Update",
+                                    ? "Unpin Post"
+                                    : "Pin Post",
                                 systemImage:
                                     isPinned
                                         ? "pin.slash"
@@ -4258,7 +4686,7 @@ struct CommunityGroupDetailView: View {
 
                         if groups.canManage(currentGroup) {
                             Button(
-                                "Delete Update",
+                                "Delete Post",
                                 role: .destructive
                             ) {
                                 Task {
@@ -4309,6 +4737,49 @@ struct CommunityGroupDetailView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
             }
+
+            Button {
+                Task {
+                    _ = await groups
+                        .toggleAnnouncementLike(
+                            groupID: group.id,
+                            announcementID: update.id
+                        )
+                }
+            } label: {
+                Label(
+                    likeCount == 0
+                        ? "Like"
+                        : "\(likeCount)",
+                    systemImage:
+                        liked
+                            ? "hand.thumbsup.fill"
+                            : "hand.thumbsup"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    liked
+                        ? ATHLTHTheme.accentDeep
+                        : .secondary
+                )
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    liked
+                        ? ATHLTHTheme.accent
+                            .opacity(0.12)
+                        : Color.secondary
+                            .opacity(0.07),
+                    in: Capsule()
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                liked
+                    ? "Remove thumbs up"
+                    : "Give thumbs up"
+            )
+            .padding(.top, 9)
         }
     }
 
@@ -6106,7 +6577,7 @@ struct CommunityGroupActivityCenterView: View {
                     "No group activity yet",
                     systemImage: "bell.badge",
                     description: Text(
-                        "Updates from your groups will appear here."
+                        "Club activity will appear here."
                     )
                 )
                 .listRowBackground(Color.clear)
@@ -6241,7 +6712,7 @@ struct CommunityGroupNotificationSettingsView: View {
 
                     Text(
                         enabled
-                            ? "Receive group chat, update, event and challenge notifications."
+                            ? "Receive Club post, chat, event and challenge notifications."
                             : "Group activity notifications are off."
                     )
                     .font(.caption)
