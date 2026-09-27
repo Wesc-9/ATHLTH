@@ -1484,6 +1484,12 @@ struct ATHLTHAccountSecurityView: View {
 
 
 struct SpotifySettingsView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
+
+    @State private var showingPlaylistPreview = false
+    @State private var previewSelection: SpotifyPlaylistReference?
+
     var body: some View {
         Form {
             Section {
@@ -1500,20 +1506,153 @@ struct SpotifySettingsView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Spotify")
                             .font(.headline)
-                        Text("Integration planned")
+                        Text(spotify.connectionState.title)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(
+                                spotify.isConnected
+                                    ? ATHLTHTheme.accentDeep
+                                    : .secondary
+                            )
+                    }
+
+                    Spacer()
+
+                    if spotify.connectionState == .connecting ||
+                        spotify.isRefreshingPlaylists {
+                        ProgressView()
+                            .controlSize(.small)
                     }
                 }
             }
 
-            Section("Planned integration") {
-                Text("Spotify authorization and training-plan playlist playback are not enabled yet. ATHLTH will add the real connection flow before this setting becomes interactive.")
+            if !spotify.isConfigured {
+                Section("Developer Setup") {
+                    Label(
+                        "Spotify client ID is not configured for this build.",
+                        systemImage: "wrench.and.screwdriver"
+                    )
+                    .font(.subheadline)
+
+                    Text(
+                        spotify.setupMessage
+                            ?? "Configure Spotify before connecting an account."
+                    )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                    Text("Redirect URI: athlth://spotify-callback")
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                }
+            } else if spotify.isConnected {
+                Section("Workout Playback") {
+                    Toggle(
+                        "Start linked playlist with workout",
+                        isOn: $settings.spotifyAutoplayLinkedPlaylists
+                    )
+
+                    Button {
+                        previewSelection = spotify.playlists.first
+                        showingPlaylistPreview = true
+                    } label: {
+                        HStack {
+                            Label(
+                                "Browse Spotify playlists",
+                                systemImage: "music.note.list"
+                            )
+                            Spacer()
+                            Text("\(spotify.playlists.count)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(
+                        "A program can link one Spotify playlist. On iPhone, ATHLTH can wake Spotify and start that playlist when the workout begins. Apple Watch workouts never wait for Spotify."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Button {
+                        Task {
+                            await spotify.refreshPlaylists()
+                        }
+                    } label: {
+                        Label(
+                            "Refresh Playlists",
+                            systemImage: "arrow.clockwise"
+                        )
+                    }
+
+                    Button(role: .destructive) {
+                        spotify.disconnect()
+                        settings.spotifyConnected = false
+                    } label: {
+                        Label(
+                            "Disconnect Spotify",
+                            systemImage: "link.badge.minus"
+                        )
+                    }
+                }
+            } else {
+                Section("Connect") {
+                    Button {
+                        spotify.connect()
+                    } label: {
+                        Label(
+                            "Connect Spotify",
+                            systemImage: "link"
+                        )
+                    }
+                    .disabled(spotify.connectionState == .connecting)
+
+                    Text(
+                        "ATHLTH requests only the Spotify access needed to read your playlists and control playback you start from a workout."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            if let error = spotify.lastErrorMessage,
+               !error.isEmpty {
+                Section("Status") {
+                    Label(
+                        error,
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                }
+            }
+
+            Section("Apple Watch") {
+                Text(
+                    "Watch-only training stays independent. ATHLTH will not show an “open Spotify first” prompt and will never block Start Workout because Spotify is unavailable."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Spotify")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingPlaylistPreview) {
+            SpotifyPlaylistPickerView(
+                title: "Spotify Playlists",
+                selection: $previewSelection
+            )
+        }
+        .task {
+            settings.spotifyConnected = spotify.isConnected
+
+            if spotify.isConnected &&
+                spotify.playlists.isEmpty {
+                await spotify.refreshPlaylists()
+            }
+        }
+        .onChange(of: spotify.connectionState) { _, _ in
+            settings.spotifyConnected = spotify.isConnected
+        }
     }
 }
