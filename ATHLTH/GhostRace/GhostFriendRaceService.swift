@@ -372,13 +372,22 @@ final class SupabaseGhostFriendRaceService {
                     .prefix(160)
             )
 
+        let defaultTitle =
+            String(
+                format:
+                    "%.1f km Ghost Race",
+                sanitized.distanceMeters /
+                    1_000
+            )
+
         let payload =
             GhostFriendRaceInsert(
                 senderID: senderID,
                 recipientID: recipientID,
                 title:
-                    cleanTitle.isEmpty
-                        ? "Ghost Race"
+                    cleanTitle.isEmpty ||
+                    cleanTitle == "Ghost Race"
+                        ? defaultTitle
                         : cleanTitle,
                 referenceDurationSeconds:
                     sanitized
@@ -547,19 +556,9 @@ final class GhostFriendRaceStore:
                     .missingRoute
             }
 
-            let distanceText =
-                String(
-                    format:
-                        "%.1f km",
-                    reference
-                        .routeDistanceMeters /
-                        1_000
-                )
-
             try await service.send(
                 to: friend.userID,
-                title:
-                    "\(distanceText) · \(friend.resolvedName)",
+                title: "Ghost Race",
                 reference: reference,
                 hideStartAndEnd:
                     settings
