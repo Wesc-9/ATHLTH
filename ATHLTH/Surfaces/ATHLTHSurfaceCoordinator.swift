@@ -5,6 +5,7 @@ import WidgetKit
 @MainActor
 enum ATHLTHSurfaceCoordinator {
     private static var lastWidgetReloadAt: Date?
+    private static var lastSnapshotWriteAt: Date?
 
     static func publishSnapshot(
         health: HealthKitManager,
@@ -54,7 +55,11 @@ enum ATHLTHSurfaceCoordinator {
         let previous =
             ATHLTHSurfaceSharedStore.load()
 
-        ATHLTHSurfaceSharedStore.save(surfaceSnapshot)
+        let workoutTransition =
+            previous.activeWorkout?.state !=
+                surfaceSnapshot.activeWorkout?.state ||
+            (previous.activeWorkout == nil) !=
+                (surfaceSnapshot.activeWorkout == nil)
 
         let surfaceChanged =
             previous.recoveryScore !=
@@ -70,11 +75,21 @@ enum ATHLTHSurfaceCoordinator {
             previous.primaryGoalProgress !=
                 surfaceSnapshot.primaryGoalProgress
 
-        let workoutTransition =
-            previous.activeWorkout?.state !=
-                surfaceSnapshot.activeWorkout?.state ||
-            (previous.activeWorkout == nil) !=
-                (surfaceSnapshot.activeWorkout == nil)
+        let shouldWriteLiveSnapshot =
+            surfaceSnapshot.activeWorkout != nil &&
+            (
+                lastSnapshotWriteAt.map {
+                    Date().timeIntervalSince($0) >= 3
+                } ?? true
+            )
+
+        if surfaceChanged ||
+            workoutTransition ||
+            surfaceSnapshot.activeWorkout == nil ||
+            shouldWriteLiveSnapshot {
+            ATHLTHSurfaceSharedStore.save(surfaceSnapshot)
+            lastSnapshotWriteAt = Date()
+        }
 
         let shouldReloadForAge =
             lastWidgetReloadAt.map {
