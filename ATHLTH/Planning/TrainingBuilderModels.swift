@@ -414,3 +414,29 @@ struct CoachPlanChangeProposal: Identifiable, Codable, Hashable {
         plan.id == planID && plan.version == planVersion
     }
 }
+
+
+struct CoachPlanAdaptationRecord: Identifiable, Codable, Hashable {
+    let id: UUID
+    var proposal: CoachPlanChangeProposal
+    let planBefore: TrainingPlan
+    let planAfter: TrainingPlan
+    let appliedAt: Date
+    var revertedAt: Date?
+
+    init(
+        id: UUID = UUID(),
+        proposal: CoachPlanChangeProposal,
+        planBefore: TrainingPlan,
+        planAfter: TrainingPlan,
+        appliedAt: Date = Date(),
+        revertedAt: Date? = nil
+    ) {
+        self.id = id
+        self.proposal = proposal
+        self.planBefore = planBefore
+        self.planAfter = planAfter
+        self.appliedAt = appliedAt
+        self.revertedAt = revertedAt
+    }
+}
