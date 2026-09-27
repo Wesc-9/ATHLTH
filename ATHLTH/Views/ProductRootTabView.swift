@@ -2900,10 +2900,10 @@ private struct ATHLTHTrainSectionSwitcher: View {
                 )
             }
         }
-        .padding(5)
+        .padding(4)
         .background(
-            ATHLTHTheme.accentDeep.opacity(0.045),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            Color.white.opacity(0.56),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -3173,17 +3173,55 @@ struct ATHLTHTrainView: View {
 
     @ViewBuilder
     private var todayContent: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("TODAY")
+                .font(.caption2.weight(.bold))
+                .tracking(2.4)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Text("Ready for today?")
+                .font(
+                    .system(
+                        size: 30,
+                        weight: .bold,
+                        design: .serif
+                    )
+                )
+
+            Text(
+                session.activePlan == nil
+                    ? "Start freely or build a plan around what you want to achieve."
+                    : "Your plan, quick starts and training tools in one place."
+            )
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
         if let plan = session.activePlan {
             todaysPlanCard(plan)
         } else {
             noActivePlanCard
         }
 
-        ATHLTHCard {
-            ATHLTHSectionHeader(
-                title: "Quick Start",
-                actionTitle: "Get moving now"
-            )
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("QUICK START")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.8)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text("Move now")
+                        .font(.title3.weight(.bold))
+                }
+
+                Spacer()
+
+                Text("No plan needed")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
 
             HStack(spacing: 8) {
                 quickStartTile(
@@ -3222,7 +3260,22 @@ struct ATHLTHTrainView: View {
                     showingCustomQuickStart = true
                 }
             }
-            .padding(.top, 10)
+            .padding(.top, 2)
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.78),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.86), lineWidth: 0.8)
         }
 
         NavigationLink {
