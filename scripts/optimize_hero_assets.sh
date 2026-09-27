@@ -2,18 +2,44 @@
 set -euo pipefail
 
 # Connect manually uploaded tab artwork before compiling the asset catalogue.
-# Empty image sets are intentional until replacement JPGs have been uploaded.
+# Accept PNG/JPG/JPEG and preserve the filename that was actually uploaded.
+# An empty image set remains valid and falls back gracefully until artwork exists.
 python3 - <<'PY_ASSETS'
 import json
 from pathlib import Path
+
+SUPPORTED = {".png", ".jpg", ".jpeg"}
+
 for name in ("HomeHero", "TrainHero", "ProgressHero", "RecoveryHero", "CommunityHero"):
     folder = Path("ATHLTH/Assets.xcassets") / (name + ".imageset")
     image = {"idiom": "universal"}
-    if (folder / (name + ".jpg")).is_file():
-        image["filename"] = name + ".jpg"
-    (folder / "Contents.json").write_text(json.dumps({
-        "images": [image], "info": {"author": "xcode", "version": 1}
-    }, indent=2) + "\n")
+
+    candidates = sorted(
+        (
+            path for path in folder.iterdir()
+            if path.is_file()
+            and path.name != "Contents.json"
+            and path.suffix.lower() in SUPPORTED
+        ),
+        key=lambda path: (
+            path.stem.lower() != name.lower(),
+            path.name.lower(),
+        ),
+    )
+
+    if candidates:
+        image["filename"] = candidates[0].name
+
+    (folder / "Contents.json").write_text(
+        json.dumps(
+            {
+                "images": [image],
+                "info": {"author": "xcode", "version": 1},
+            },
+            indent=2,
+        )
+        + "\n"
+    )
 PY_ASSETS
 
 
@@ -46,7 +72,25 @@ resize_if_needed() {
 # displays need at Retina scale while dramatically reducing decoded memory.
 resize_if_needed   "ATHLTH/Assets.xcassets/OnboardingHero.imageset/ATHLTH_hero_4x_3764x6688.png"   3200
 
-for file in   "ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg"   "ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg"   "ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg"   "ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg"   "ATHLTH/Assets.xcassets/CommunityHero.imageset/CommunityHero.jpg"   "ATHLTH/Assets.xcassets/ProfileHero.imageset/ProfileHero.jpg"   "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset/StrengthPostWorkoutHero.jpg"
+for folder in \
+  "ATHLTH/Assets.xcassets/HomeHero.imageset" \
+  "ATHLTH/Assets.xcassets/TrainHero.imageset" \
+  "ATHLTH/Assets.xcassets/RecoveryHero.imageset" \
+  "ATHLTH/Assets.xcassets/ProgressHero.imageset" \
+  "ATHLTH/Assets.xcassets/CommunityHero.imageset"
+do
+  while IFS= read -r file; do
+    resize_if_needed "$file" 2400
+  done < <(
+    find "$folder" -maxdepth 1 -type f \
+      \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) \
+      -print
+  )
+done
+
+for file in \
+  "ATHLTH/Assets.xcassets/ProfileHero.imageset/ProfileHero.jpg" \
+  "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset/StrengthPostWorkoutHero.jpg"
 do
   resize_if_needed "$file" 2400
 done
