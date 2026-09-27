@@ -677,6 +677,39 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.audioCoach.announceRemainingStepDistance"
         )
 
+        defaults.set(
+            ghostRaceAudioEnabled,
+            forKey: "settings.ghostRace.audio.enabled"
+        )
+        defaults.set(
+            ghostRaceAudioDistanceIntervalKilometers,
+            forKey: "settings.ghostRace.audio.distanceKilometers"
+        )
+        defaults.set(
+            ghostRaceAudioTimeIntervalMinutes,
+            forKey: "settings.ghostRace.audio.timeMinutes"
+        )
+        defaults.set(
+            ghostRaceAudioUseDistance,
+            forKey: "settings.ghostRace.audio.useDistance"
+        )
+        defaults.set(
+            ghostRaceAudioUseTime,
+            forKey: "settings.ghostRace.audio.useTime"
+        )
+        defaults.set(
+            ghostRaceAudioAnnounceLeadChanges,
+            forKey: "settings.ghostRace.audio.leadChanges"
+        )
+        defaults.set(
+            ghostRaceAudioLeadChangeMeters,
+            forKey: "settings.ghostRace.audio.leadChangeMeters"
+        )
+        defaults.set(
+            ghostRaceAudioDelivery.rawValue,
+            forKey: "settings.ghostRace.audio.delivery"
+        )
+
         defaults.set(workoutRemindersEnabled, forKey: "settings.workoutReminders")
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
         defaults.set(challengeNotificationsEnabled, forKey: "settings.challengeNotifications")
