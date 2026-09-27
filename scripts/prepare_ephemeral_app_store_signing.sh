@@ -130,15 +130,20 @@ create_profile() {
     --output "$lookup" \
     --header "Authorization: Bearer $TOKEN" \
     --data-urlencode "filter[identifier]=$identifier" \
-    --data-urlencode "limit=1" \
+    --data-urlencode "limit=200" \
     "https://api.appstoreconnect.apple.com/v1/bundleIds"
 
   local bundle_id
-  bundle_id="$(python - "$lookup" <<'PY'
+  bundle_id="$(python - "$lookup" "$identifier" <<'PY'
 import json, sys
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
+path, identifier = sys.argv[1:3]
+with open(path, "r", encoding="utf-8") as handle:
     data = json.load(handle).get("data", [])
-print(data[0]["id"] if data else "")
+matches = [
+    item for item in data
+    if item.get("attributes", {}).get("identifier") == identifier
+]
+print(matches[0]["id"] if matches else "")
 PY
   )"
 
