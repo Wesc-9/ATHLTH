@@ -4,6 +4,8 @@ import WidgetKit
 
 @MainActor
 enum ATHLTHSurfaceCoordinator {
+    private static var lastWidgetReloadAt: Date?
+
     static func publishSnapshot(
         health: HealthKitManager,
         session: AppSessionStore,
@@ -49,13 +51,47 @@ enum ATHLTHSurfaceCoordinator {
             updatedAt: Date()
         )
 
+        let previous =
+            ATHLTHSurfaceSharedStore.load()
+
         ATHLTHSurfaceSharedStore.save(surfaceSnapshot)
-        WidgetCenter.shared.reloadTimelines(
-            ofKind: "ATHLTHHomeWidget"
-        )
-        WidgetCenter.shared.reloadTimelines(
-            ofKind: "ATHLTHLockScreenWidget"
-        )
+
+        let surfaceChanged =
+            previous.recoveryScore !=
+                surfaceSnapshot.recoveryScore ||
+            previous.recoveryState !=
+                surfaceSnapshot.recoveryState ||
+            previous.nextWorkoutTitle !=
+                surfaceSnapshot.nextWorkoutTitle ||
+            previous.nextWorkoutDate !=
+                surfaceSnapshot.nextWorkoutDate ||
+            previous.primaryGoalTitle !=
+                surfaceSnapshot.primaryGoalTitle ||
+            previous.primaryGoalProgress !=
+                surfaceSnapshot.primaryGoalProgress
+
+        let workoutTransition =
+            previous.activeWorkout?.state !=
+                surfaceSnapshot.activeWorkout?.state ||
+            (previous.activeWorkout == nil) !=
+                (surfaceSnapshot.activeWorkout == nil)
+
+        let shouldReloadForAge =
+            lastWidgetReloadAt.map {
+                Date().timeIntervalSince($0) >= 300
+            } ?? true
+
+        if surfaceChanged ||
+            workoutTransition ||
+            shouldReloadForAge {
+            WidgetCenter.shared.reloadTimelines(
+                ofKind: "ATHLTHHomeWidget"
+            )
+            WidgetCenter.shared.reloadTimelines(
+                ofKind: "ATHLTHLockScreenWidget"
+            )
+            lastWidgetReloadAt = Date()
+        }
     }
 
     static func syncLiveActivity(
@@ -123,6 +159,9 @@ enum ATHLTHSurfaceCoordinator {
 private final class ATHLTHLiveActivityController {
     static let shared = ATHLTHLiveActivityController()
 
+    private var lastUpdateAt: Date?
+    private var lastPhase: WatchWorkoutMirrorState?
+
     private init() {}
 
     func sync(
@@ -151,6 +190,23 @@ private final class ATHLTHLiveActivityController {
             state: contentState,
             staleDate: Date().addingTimeInterval(90)
         )
+
+        let phaseChanged =
+            lastPhase != snapshot.state
+        let updateIsDue =
+            lastUpdateAt.map {
+                Date().timeIntervalSince($0) >= 5
+            } ?? true
+
+        if !phaseChanged &&
+            !updateIsDue &&
+            snapshot.state != .completed &&
+            snapshot.state != .failed {
+            return
+        }
+
+        lastPhase = snapshot.state
+        lastUpdateAt = Date()
 
         switch snapshot.state {
         case .preparing, .running, .paused, .ending:
