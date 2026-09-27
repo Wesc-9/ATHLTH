@@ -25,6 +25,8 @@ targets:
     dependencies:
       - target: ATHLTHWatchApp
         embed: true
+      - target: ATHLTHWidgets
+        embed: true
       - package: Supabase
     info:
       path: ATHLTH/Resources/Info.plist
@@ -38,6 +40,7 @@ targets:
         NSCalendarsFullAccessUsageDescription: "ATHLTH creates a dedicated training calendar and keeps your planned workouts synchronized with Calendar."
         NSCalendarsUsageDescription: "ATHLTH uses calendar access to show your planned workouts in a dedicated ATHLTH calendar."
         ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true
         ATHLTHLegalOperatorName: "$(ATHLTH_LEGAL_OPERATOR_NAME)"
         ATHLTHPrivacyContactEmail: "$(ATHLTH_PRIVACY_CONTACT_EMAIL)"
         ATHLTHSupportURL: "$(ATHLTH_SUPPORT_URL)"
@@ -77,6 +80,35 @@ targets:
     scheme:
       testTargets:
         - ATHLTHTests
+
+  ATHLTHWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: ATHLTHWidgets
+        excludes:
+          - ATHLTHWidgets.entitlements
+          - Info.plist
+      - path: Shared/ATHLTHSurfaceSnapshot.swift
+      - path: ATHLTH/Surfaces/ATHLTHWorkoutActivityAttributes.swift
+    info:
+      path: ATHLTHWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: ATHLTH
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.widgets
+        PRODUCT_NAME: ATHLTHWidgets
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: ATHLTHWidgets/ATHLTHWidgets.entitlements
+        CODE_SIGN_STYLE: Automatic
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
 
   ATHLTHTests:
     type: bundle.unit-test
