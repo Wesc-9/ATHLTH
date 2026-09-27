@@ -79,6 +79,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var plannedRouteGeometryMeters: Double = 0
     private var ghostRaceConfiguration:
         WatchGhostRaceTransfer?
+    private var nextGhostDistanceAnnouncementMeters: Double?
+    private var nextGhostTimeAnnouncementSeconds: TimeInterval?
+    private var lastGhostAnnouncedLeadMeters: Double?
+    private var lastGhostLeadAlertAt: Date?
+    private var lastGhostLeadSign = 0
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
@@ -168,6 +173,37 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         _ ghost: WatchGhostRaceTransfer?
     ) {
         ghostRaceConfiguration = ghost
+        lastGhostAnnouncedLeadMeters = nil
+        lastGhostLeadAlertAt = nil
+        lastGhostLeadSign = 0
+
+        if let interval =
+                ghost?.audio?.distanceIntervalMeters,
+           interval > 0 {
+            nextGhostDistanceAnnouncementMeters =
+                (
+                    floor(
+                        max(distanceMeters, 0) /
+                        interval
+                    ) + 1
+                ) * interval
+        } else {
+            nextGhostDistanceAnnouncementMeters = nil
+        }
+
+        if let interval =
+                ghost?.audio?.timeIntervalSeconds,
+           interval > 0 {
+            nextGhostTimeAnnouncementSeconds =
+                (
+                    floor(
+                        max(elapsedTime, 0) /
+                        interval
+                    ) + 1
+                ) * interval
+        } else {
+            nextGhostTimeAnnouncementSeconds = nil
+        }
 
         publish {
             self.ghostRaceTitle = ghost?.title
@@ -533,6 +569,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         plannedRouteCumulativeMeters = []
         plannedRouteGeometryMeters = 0
         ghostRaceConfiguration = nil
+        nextGhostDistanceAnnouncementMeters = nil
+        nextGhostTimeAnnouncementSeconds = nil
+        lastGhostAnnouncedLeadMeters = nil
+        lastGhostLeadAlertAt = nil
+        lastGhostLeadSign = 0
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
@@ -1478,14 +1519,229 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
         }
 
+        let distanceDelta =
+            userDistance -
+            ghostAtTime.cumulativeMeters
+        let timeDelta =
+            nearest.elapsedTime -
+            self.elapsedTime
+
         publish {
             self.ghostDistanceDeltaMeters =
-                userDistance -
-                ghostAtTime.cumulativeMeters
+                distanceDelta
             self.ghostTimeDeltaSeconds =
-                nearest.elapsedTime -
-                self.elapsedTime
+                timeDelta
         }
+
+        evaluateGhostRaceCoach(
+            configuration:
+                ghost.audio,
+            userDistance:
+                userDistance,
+            distanceDelta:
+                distanceDelta,
+            timeDelta:
+                timeDelta
+        )
+    }
+
+    private func evaluateGhostRaceCoach(
+        configuration:
+            WatchGhostRaceAudioConfiguration?,
+        userDistance: Double,
+        distanceDelta: Double,
+        timeDelta: TimeInterval
+    ) {
+        guard state == .running,
+              let configuration,
+              configuration.enabled
+        else {
+            return
+        }
+
+        var periodicAnnouncement = false
+
+        if let interval =
+                configuration.distanceIntervalMeters,
+           interval > 0,
+           let next =
+                nextGhostDistanceAnnouncementMeters,
+           userDistance >= next {
+            periodicAnnouncement = true
+
+            var updatedNext = next
+            repeat {
+                updatedNext += interval
+            } while userDistance >= updatedNext
+
+            nextGhostDistanceAnnouncementMeters =
+                updatedNext
+        }
+
+        if let interval =
+                configuration.timeIntervalSeconds,
+           interval > 0,
+           let next =
+                nextGhostTimeAnnouncementSeconds,
+           elapsedTime >= next {
+            periodicAnnouncement = true
+
+            var updatedNext = next
+            repeat {
+                updatedNext += interval
+            } while elapsedTime >= updatedNext
+
+            nextGhostTimeAnnouncementSeconds =
+                updatedNext
+        }
+
+        if periodicAnnouncement {
+            announceGhostRaceLead(
+                distanceDelta:
+                    distanceDelta,
+                timeDelta:
+                    timeDelta,
+                delivery:
+                    configuration.delivery
+            )
+            lastGhostAnnouncedLeadMeters =
+                distanceDelta
+            lastGhostLeadAlertAt = Date()
+            lastGhostLeadSign =
+                ghostLeadSign(
+                    distanceDelta
+                )
+            return
+        }
+
+        guard configuration
+            .announceLeadChanges,
+              elapsedTime >= 20
+        else {
+            return
+        }
+
+        let currentSign =
+            ghostLeadSign(
+                distanceDelta
+            )
+        let signChanged =
+            currentSign != 0 &&
+            lastGhostLeadSign != 0 &&
+            currentSign !=
+                lastGhostLeadSign
+
+        let movedEnough =
+            lastGhostAnnouncedLeadMeters.map {
+                abs(
+                    distanceDelta - $0
+                ) >=
+                max(
+                    configuration
+                        .leadChangeThresholdMeters,
+                    10
+                )
+            } ?? false
+
+        let cooldownSatisfied =
+            lastGhostLeadAlertAt.map {
+                Date().timeIntervalSince($0) >=
+                    30
+            } ?? true
+
+        guard cooldownSatisfied &&
+                (signChanged || movedEnough)
+        else {
+            if lastGhostAnnouncedLeadMeters == nil {
+                lastGhostAnnouncedLeadMeters =
+                    distanceDelta
+                lastGhostLeadSign =
+                    currentSign
+            }
+            return
+        }
+
+        announceGhostRaceLead(
+            distanceDelta:
+                distanceDelta,
+            timeDelta:
+                timeDelta,
+            delivery:
+                configuration.delivery
+        )
+
+        lastGhostAnnouncedLeadMeters =
+            distanceDelta
+        lastGhostLeadAlertAt = Date()
+        lastGhostLeadSign =
+            currentSign
+    }
+
+    private func announceGhostRaceLead(
+        distanceDelta: Double,
+        timeDelta: TimeInterval,
+        delivery: WatchAlertDelivery
+    ) {
+        let meters =
+            abs(distanceDelta)
+        let seconds =
+            abs(timeDelta)
+
+        let english: String
+        let norwegian: String
+
+        if meters < 8 {
+            english =
+                "Ghost Race. Neck and neck."
+            norwegian =
+                "Spøkelsesløp. Helt jevnt."
+        } else if distanceDelta > 0 {
+            english =
+                "Ghost Race. You are " +
+                spokenDistance(meters) +
+                " ahead. About " +
+                spokenDuration(seconds) +
+                " ahead."
+            norwegian =
+                "Spøkelsesløp. Du er " +
+                spokenDistance(meters) +
+                " foran. Omtrent " +
+                spokenDuration(seconds) +
+                " foran."
+        } else {
+            english =
+                "Ghost Race. Your ghost is " +
+                spokenDistance(meters) +
+                " ahead. About " +
+                spokenDuration(seconds) +
+                " behind."
+            norwegian =
+                "Spøkelsesløp. Spøkelset er " +
+                spokenDistance(meters) +
+                " foran. Omtrent " +
+                spokenDuration(seconds) +
+                " bak."
+        }
+
+        deliverWorkoutAlert(
+            english: english,
+            norwegian: norwegian,
+            delivery: delivery,
+            haptic:
+                distanceDelta >= 0
+                    ? .success
+                    : .notification
+        )
+    }
+
+    private func ghostLeadSign(
+        _ distanceDelta: Double
+    ) -> Int {
+        if abs(distanceDelta) < 8 {
+            return 0
+        }
+
+        return distanceDelta > 0 ? 1 : -1
     }
 
     private func evaluateRouteAlert(
