@@ -1401,12 +1401,12 @@ struct OfficialWeeklyChallengeCard: View {
 
                     progressRing
                         .padding(.trailing, 16)
-                        .padding(.bottom, 72)
+                        .padding(.bottom, 58)
                 }
             }
             .allowsHitTesting(false)
         }
-        .frame(height: 258)
+        .frame(height: 218)
         .frame(maxWidth: .infinity)
         .clipShape(
             RoundedRectangle(
