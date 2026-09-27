@@ -239,8 +239,28 @@ struct AppRootView: View {
                 from: challengeStore.challenges,
                 currentUserID: appSession.profile.userID
             )
-            await refreshTrophiesAndNotifications()
-            await syncSocialOwnedData()
+            let startupUserID =
+                appSession.profile.userID
+
+            // Trophies and owned social snapshots are valuable but not needed
+            // to make Home interactive. Let the first frame and gestures win,
+            // then refresh these secondary surfaces shortly afterwards.
+            Task { @MainActor in
+                try? await Task.sleep(
+                    for: .milliseconds(700)
+                )
+
+                guard appSession.signedIn,
+                      appSession.profile.userID ==
+                        startupUserID
+                else {
+                    return
+                }
+
+                await refreshTrophiesAndNotifications()
+                await syncSocialOwnedData()
+            }
+
             lastFullLifecycleRefreshAt = Date()
         }
         .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) { IPhoneWorkoutView() }
