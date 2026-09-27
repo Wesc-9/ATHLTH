@@ -153,7 +153,8 @@ struct AppRootView: View {
         TimeInterval = 90
 
     private var lifecycleContent: some View {
-        Group {
+        AnyView(
+            Group {
             if appSession.previewModeEnabled {
                 AnyView(ProductRootTabView())
             } else if appSession.signedIn && !startupAuthenticationResolved {
@@ -331,6 +332,7 @@ struct AppRootView: View {
                 )
             }
         }
+        )
         .onChange(of: health.recovery) { _, _ in
             publishATHLTHSurfaces()
         }
