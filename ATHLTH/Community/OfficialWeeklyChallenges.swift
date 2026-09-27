@@ -1486,6 +1486,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 ScrollView {
                     VStack(spacing: 18) {
                         premiumHeroCard(challenge)
+                        challengeOverviewSection(challenge)
                         progressSection(challenge)
                         countedWorkoutsSection
                         rulesSection(challenge)
@@ -1633,40 +1634,23 @@ struct OfficialWeeklyChallengeDetailView: View {
                     }
                 }
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ],
-                    spacing: 10
-                ) {
-                    OfficialWeeklyChallengeStatTile(
-                        icon: "chart.bar.fill",
-                        title: "Progress",
-                        value: progressPercentText(for: challenge),
-                        detail: resolvedProgressText(for: challenge)
+                HStack(spacing: 9) {
+                    OfficialWeeklyChallengeCompactStat(
+                        icon: challenge.kind.icon,
+                        title: "TARGET",
+                        value: compactTargetText(for: challenge)
                     )
 
-                    OfficialWeeklyChallengeStatTile(
-                        icon: "flag.checkered",
-                        title: "Remaining",
-                        value: remainingText(for: challenge),
-                        detail: remainingDetail(for: challenge)
-                    )
-
-                    OfficialWeeklyChallengeStatTile(
+                    OfficialWeeklyChallengeCompactStat(
                         icon: "calendar",
-                        title: "Time left",
-                        value: shortTimeRemaining(for: challenge),
-                        detail: dateRangeText(for: challenge)
+                        title: "TIME",
+                        value: shortTimeRemaining(for: challenge)
                     )
 
-                    OfficialWeeklyChallengeStatTile(
+                    OfficialWeeklyChallengeCompactStat(
                         icon: "person.3.fill",
-                        title: "Community",
-                        value: "\(store.participantCount(for: challenge.id))",
-                        detail:
-                            "\(store.completedCount(for: challenge.id)) completed"
+                        title: "JOINED",
+                        value: "\(store.participantCount(for: challenge.id))"
                     )
                 }
 
@@ -1761,6 +1745,100 @@ struct OfficialWeeklyChallengeDetailView: View {
             radius: 24,
             x: 0,
             y: 12
+        )
+    }
+
+    private func challengeOverviewSection(
+        _ challenge: OfficialWeeklyChallenge
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("THIS WEEK'S FOCUS")
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.8)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    Text(challengeFocusTitle(for: challenge))
+                        .font(
+                            .system(
+                                size: 25,
+                                weight: .semibold,
+                                design: .serif
+                            )
+                        )
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                }
+
+                Spacer()
+
+                Image(systemName: challenge.kind.icon)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        ATHLTHTheme.accent.opacity(0.10),
+                        in: Circle()
+                    )
+            }
+
+            Text(challengeFocusDescription(for: challenge))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                OfficialWeeklyChallengeInsightTile(
+                    eyebrow: "GOAL",
+                    value: compactTargetText(for: challenge),
+                    detail: challenge.kind == .distance
+                        ? "Run or walk"
+                        : "This week"
+                )
+
+                OfficialWeeklyChallengeInsightTile(
+                    eyebrow: "WINDOW",
+                    value: shortTimeRemaining(for: challenge),
+                    detail: dateRangeText(for: challenge)
+                )
+
+                OfficialWeeklyChallengeInsightTile(
+                    eyebrow: "COMMUNITY",
+                    value: "\(store.participantCount(for: challenge.id))",
+                    detail:
+                        "\(store.completedCount(for: challenge.id)) finished"
+                )
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    ATHLTHTheme.champagneSoft.opacity(0.58)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.70),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.045),
+            radius: 14,
+            y: 7
         )
     }
 
@@ -2134,6 +2212,51 @@ struct OfficialWeeklyChallengeDetailView: View {
         return "\(start) – \(end)"
     }
 
+    private func compactTargetText(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        switch challenge.kind {
+        case .distance:
+            return String(format: "%.0f km", challenge.targetValue)
+        case .sessions:
+            return "\(Int(challenge.targetValue.rounded()))×"
+        case .minutes:
+            return "\(Int(challenge.targetValue.rounded())) min"
+        case .streak:
+            return "\(Int(challenge.targetValue.rounded())) days"
+        }
+    }
+
+    private func challengeFocusTitle(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        switch challenge.kind {
+        case .distance:
+            return "Build distance, one session at a time"
+        case .sessions:
+            return "Consistency wins the week"
+        case .minutes:
+            return "Make time for movement"
+        case .streak:
+            return "Keep the streak alive"
+        }
+    }
+
+    private func challengeFocusDescription(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        switch challenge.kind {
+        case .distance:
+            return "Every qualifying run and walk moves you toward the weekly target. Pace it your way and let ATHLTH track the total."
+        case .sessions:
+            return "Stack qualifying workouts across the challenge window and build a repeatable training rhythm."
+        case .minutes:
+            return "Your qualifying training minutes add up automatically throughout the week."
+        case .streak:
+            return "Complete qualifying activity on separate days and keep your momentum moving forward."
+        }
+    }
+
     private func ruleDescription(
         for challenge: OfficialWeeklyChallenge
     ) -> String {
@@ -2146,6 +2269,89 @@ struct OfficialWeeklyChallengeDetailView: View {
             return "Qualifying workout minutes inside the challenge window count toward the target."
         case .streak:
             return "Complete qualifying activity on separate days to build the required streak."
+        }
+    }
+}
+
+private struct OfficialWeeklyChallengeCompactStat: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+
+                Text(title)
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.7)
+            }
+            .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.white.opacity(0.70),
+            in: RoundedRectangle(
+                cornerRadius: 15,
+                style: .continuous
+            )
+        )
+    }
+}
+
+private struct OfficialWeeklyChallengeInsightTile: View {
+    let eyebrow: String
+    let value: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(eyebrow)
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.9)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+
+            Text(detail)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .frame(minHeight: 24, alignment: .topLeading)
+        }
+        .padding(11)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 92,
+            alignment: .topLeading
+        )
+        .background(
+            Color.white.opacity(0.72),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.68), lineWidth: 0.7)
         }
     }
 }
