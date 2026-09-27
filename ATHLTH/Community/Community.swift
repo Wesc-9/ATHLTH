@@ -83,15 +83,22 @@ struct CommunityEventRecord: Identifiable, Codable, Hashable {
     }
 }
 
+enum CommunityEventAttendance: String, Codable, Hashable {
+    case going
+    case maybe
+}
+
 struct CommunityEventParticipantRecord: Codable, Hashable {
     let eventID: UUID
     let userID: UUID
     let joinedAt: Date
+    let attendanceStatus: CommunityEventAttendance
 
     enum CodingKeys: String, CodingKey {
         case eventID = "event_id"
         case userID = "user_id"
         case joinedAt = "joined_at"
+        case attendanceStatus = "attendance_status"
     }
 }
 
@@ -104,7 +111,9 @@ struct CommunityEventItem: Identifiable, Hashable {
     let participantProfiles: [SocialProfileCard]
 
     var participantCount: Int {
-        1 + participantRows.count
+        1 + participantRows.filter {
+            $0.attendanceStatus == .going
+        }.count
     }
 }
 
@@ -165,10 +174,12 @@ private struct CommunityEventWrite: Encodable {
 private struct CommunityParticipantWrite: Encodable {
     let eventID: UUID
     let userID: UUID
+    let attendanceStatus: String
 
     enum CodingKeys: String, CodingKey {
         case eventID = "event_id"
         case userID = "user_id"
+        case attendanceStatus = "attendance_status"
     }
 }
 
@@ -285,20 +296,38 @@ final class SupabaseCommunityService {
         }
     }
 
-    func join(eventID: UUID) async throws {
+    func setAttendance(
+        eventID: UUID,
+        status: CommunityEventAttendance
+    ) async throws {
         guard let currentUserID else {
             throw CommunityEventError.notAuthenticated
         }
 
         try await client
             .from("community_event_participants")
-            .insert(
+            .upsert(
                 CommunityParticipantWrite(
                     eventID: eventID,
-                    userID: currentUserID
+                    userID: currentUserID,
+                    attendanceStatus: status.rawValue
                 )
             )
             .execute()
+    }
+
+    func join(eventID: UUID) async throws {
+        try await setAttendance(
+            eventID: eventID,
+            status: .going
+        )
+    }
+
+    func maybe(eventID: UUID) async throws {
+        try await setAttendance(
+            eventID: eventID,
+            status: .maybe
+        )
     }
 
     func leave(eventID: UUID) async throws {
@@ -430,6 +459,15 @@ final class CommunityEventStore: ObservableObject {
         }
     }
 
+    func maybe(_ item: CommunityEventItem) async {
+        do {
+            try await service.maybe(eventID: item.id)
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func leave(_ item: CommunityEventItem) async {
         do {
             try await service.leave(eventID: item.id)
@@ -452,9 +490,22 @@ final class CommunityEventStore: ObservableObject {
         events.first { $0.id == id }
     }
 
+    func attendance(
+        for item: CommunityEventItem
+    ) -> CommunityEventAttendance? {
+        guard let currentUserID else { return nil }
+
+        return item.participantRows.first {
+            $0.userID == currentUserID
+        }?.attendanceStatus
+    }
+
     func isJoined(_ item: CommunityEventItem) -> Bool {
-        guard let currentUserID else { return false }
-        return item.participantRows.contains { $0.userID == currentUserID }
+        attendance(for: item) == .going
+    }
+
+    func isMaybe(_ item: CommunityEventItem) -> Bool {
+        attendance(for: item) == .maybe
     }
 }
 
@@ -1102,30 +1153,64 @@ struct CommunityEventDetailView: View {
             }
             .buttonStyle(.bordered)
             .padding(.top, 4)
-        } else if community.isJoined(item) {
-            Button {
-                Task { await community.leave(item) }
-            } label: {
-                Label("Joined · Leave", systemImage: "checkmark.circle.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .padding(.top, 4)
         } else {
-            Button {
-                Task { await community.join(item) }
-            } label: {
-                Label("Join Event", systemImage: "person.badge.plus")
+            HStack(spacing: 10) {
+                Button {
+                    Task {
+                        if community.isJoined(item) {
+                            await community.leave(item)
+                        } else {
+                            await community.join(item)
+                        }
+                    }
+                } label: {
+                    Label(
+                        community.isJoined(item)
+                            ? "Deltar"
+                            : "Delta",
+                        systemImage:
+                            community.isJoined(item)
+                                ? "checkmark.circle.fill"
+                                : "person.badge.plus"
+                    )
                     .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(
+                    community.isJoined(item)
+                        ? .bordered
+                        : .borderedProminent
+                )
+                .tint(ATHLTHTheme.accent)
+                .disabled(
+                    !community.isJoined(item) &&
+                    item.event.maxParticipants.map {
+                        item.participantCount >= $0
+                    } ?? false
+                )
+
+                Button {
+                    Task {
+                        if community.isMaybe(item) {
+                            await community.leave(item)
+                        } else {
+                            await community.maybe(item)
+                        }
+                    }
+                } label: {
+                    Label(
+                        community.isMaybe(item)
+                            ? "Kanskje"
+                            : "Kanskje",
+                        systemImage:
+                            community.isMaybe(item)
+                                ? "questionmark.circle.fill"
+                                : "questionmark.circle"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accent)
             .padding(.top, 4)
-            .disabled(
-                item.event.maxParticipants.map {
-                    item.participantCount >= $0
-                } ?? false
-            )
         }
     }
 
