@@ -6073,12 +6073,14 @@ struct ATHLTHProgressView: View {
             grouping: .day
         )
 
-        async let records = health.personalRecords()
-        async let history = health.workoutHistory()
-
+        // Load the shared workout history once. personalRecords() then reuses
+        // HealthKitManager's historical cache instead of issuing a second
+        // unbounded workout query at the same time.
+        workoutHistory =
+            (try? await health.workoutHistory()) ?? []
+        personalRecords =
+            (try? await health.personalRecords()) ?? []
         consistencySnapshot = try? await consistencyData
-        personalRecords = (try? await records) ?? []
-        workoutHistory = (try? await history) ?? []
     }
 
     private func loadProgressData() async {
