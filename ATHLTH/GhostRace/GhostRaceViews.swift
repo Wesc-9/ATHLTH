@@ -25,6 +25,7 @@ struct GhostRaceHubView: View {
                 hero
                 modeOverview
                 audioCoachCard
+                targetGhostSection
                 pastSelfSection
                 routeSection
                 friendSection
@@ -140,9 +141,9 @@ struct GhostRaceHubView: View {
             )
 
             modeTile(
-                title: "Your best",
-                subtitle: "Saved routes",
-                icon: "medal.fill"
+                title: "Target time",
+                subtitle: "Set finish goal",
+                icon: "timer.circle.fill"
             )
 
             modeTile(
@@ -295,6 +296,77 @@ struct GhostRaceHubView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 }
+            }
+        }
+    }
+
+    private var targetGhostSection: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            "timer.circle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .vitalitySoft,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 14
+                            )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text("Target time ghost")
+                            .font(.headline)
+
+                        Text(
+                            "Choose a route and a finish time. ATHLTH creates a synthetic pacer to follow all the way to the finish."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+                }
+
+                NavigationLink {
+                    TargetGhostRoutePickerView()
+                } label: {
+                    Label(
+                        "Choose route & target time",
+                        systemImage:
+                            "arrow.right.circle.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.vitality
+                )
+                .controlSize(.large)
             }
         }
     }
