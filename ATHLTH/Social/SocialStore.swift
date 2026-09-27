@@ -247,7 +247,7 @@ final class SocialStore: ObservableObject {
     /// relationships, privacy, inbox, challenges and workout sessions; Home
     /// only needs the activity feed for its Activity Center.
     func refreshHomeFeed(force: Bool = false) async {
-        guard service.currentUserID != nil else {
+        guard let currentUserID = service.currentUserID else {
             feed = []
             return
         }
