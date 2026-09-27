@@ -271,34 +271,132 @@ struct OnboardingFlowView: View {
         proxy: GeometryProxy
     ) -> some View {
         let foregroundWidth: CGFloat = 560
-        let spacerMinimum: CGFloat = 170
+        let compactHeight =
+            proxy.size.height < 720
+        let narrowWidth =
+            proxy.size.width < 380
+        let horizontalPadding: CGFloat =
+            narrowWidth ? 16 : 24
+        let brandTopPadding: CGFloat =
+            compactHeight ? 8 : 18
+        let spacerMinimum: CGFloat =
+            compactHeight ? 36 : 150
 
         ZStack {
             accountForegroundGradients
 
-            VStack(spacing: 0) {
-                accountBrand
-                    .padding(.top, 18)
+            // Small iPhones (SE-class) do not have enough vertical room for
+            // the fixed login composition used on larger phones. Prefer the
+            // full composition when it fits, then fall back to a scrollable
+            // version instead of allowing the controls to be pushed offscreen.
+            ViewThatFits(in: .vertical) {
+                VStack(spacing: 0) {
+                    accountBrand
+                        .padding(
+                            .top,
+                            brandTopPadding
+                        )
 
-                Spacer(minLength: spacerMinimum)
+                    Spacer(
+                        minLength:
+                            spacerMinimum
+                    )
 
-                accountSignInPanel
+                    accountSignInPanel
 
-                if let authenticationError {
-                    accountAuthenticationError(authenticationError)
+                    if let authenticationError {
+                        accountAuthenticationError(
+                            authenticationError
+                        )
+                    }
+
+                    accountLegal
+                        .padding(
+                            .top,
+                            compactHeight
+                                ? 12
+                                : 18
+                        )
+                        .padding(
+                            .bottom,
+                            max(
+                                proxy
+                                    .safeAreaInsets
+                                    .bottom +
+                                    8,
+                                12
+                            )
+                        )
                 }
+                .frame(
+                    maxWidth:
+                        foregroundWidth
+                )
+                .padding(
+                    .horizontal,
+                    horizontalPadding
+                )
+                .frame(
+                    width:
+                        proxy.size.width,
+                    height:
+                        proxy.size.height
+                )
 
-                accountLegal
-                    .padding(.top, 18)
-                    .padding(.bottom, 12)
+                ScrollView {
+                    VStack(spacing: 18) {
+                        accountBrand
+
+                        accountSignInPanel
+
+                        if let authenticationError {
+                            accountAuthenticationError(
+                                authenticationError
+                            )
+                        }
+
+                        accountLegal
+                    }
+                    .frame(
+                        maxWidth:
+                            foregroundWidth
+                    )
+                    .padding(
+                        .horizontal,
+                        horizontalPadding
+                    )
+                    .padding(
+                        .top,
+                        max(
+                            proxy
+                                .safeAreaInsets
+                                .top +
+                                10,
+                            16
+                        )
+                    )
+                    .padding(
+                        .bottom,
+                        max(
+                            proxy
+                                .safeAreaInsets
+                                .bottom +
+                                18,
+                            24
+                        )
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .scrollIndicators(.hidden)
             }
-            .frame(maxWidth: foregroundWidth)
-            .padding(.horizontal, 24)
-            .frame(
-                width: proxy.size.width,
-                height: proxy.size.height
-            )
         }
+        .frame(
+            width: proxy.size.width,
+            height: proxy.size.height
+        )
     }
 
     @ViewBuilder
