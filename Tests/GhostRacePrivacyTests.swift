@@ -25,12 +25,12 @@ final class GhostRacePrivacyTests: XCTestCase {
             1_600
         )
         XCTAssertEqual(
-            payload.points.first?.cumulativeMeters,
+            payload.points.first!.cumulativeMeters,
             0,
             accuracy: 0.001
         )
         XCTAssertEqual(
-            payload.points.first?.elapsedTime,
+            payload.points.first!.elapsedTime,
             0,
             accuracy: 0.001
         )
