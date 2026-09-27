@@ -82,22 +82,33 @@ final class GhostReplaySimulatorStore: ObservableObject {
                     realDelta *
                     max(self.playbackSpeed, 1)
 
+                let runnerMultiplier =
+                    max(
+                        self.runnerSpeedMultiplier,
+                        0.5
+                    )
+                let expectedRunnerDuration =
+                    max(
+                        reference.durationSeconds /
+                            runnerMultiplier,
+                        1
+                    )
+                let simulationLimit =
+                    max(
+                        expectedRunnerDuration + 60,
+                        reference.durationSeconds + 60
+                    )
+
                 self.elapsedTime =
                     min(
                         self.elapsedTime + replayDelta,
-                        max(
-                            reference.durationSeconds,
-                            1
-                        )
+                        simulationLimit
                     )
 
                 let runnerReferenceTime =
                     min(
                         self.elapsedTime *
-                            max(
-                                self.runnerSpeedMultiplier,
-                                0.5
-                            ),
+                            runnerMultiplier,
                         max(
                             reference.durationSeconds,
                             0
@@ -111,11 +122,11 @@ final class GhostReplaySimulatorStore: ObservableObject {
                     )
 
                 let completed =
-                    self.elapsedTime >=
-                        reference.durationSeconds ||
                     runnerPoint.cumulativeMeters >=
                         reference.routeDistanceMeters *
-                        0.995
+                        0.995 ||
+                    self.elapsedTime >=
+                        simulationLimit
 
                 let newSnapshot =
                     WatchWorkoutLiveSnapshot(
