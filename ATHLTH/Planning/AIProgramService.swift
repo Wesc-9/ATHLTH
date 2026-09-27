@@ -229,6 +229,7 @@ struct AIProgramDraftExercise: Codable, Hashable {
     }
 }
 
+@MainActor
 final class AIProgramService {
     private let client: SupabaseClient
 
