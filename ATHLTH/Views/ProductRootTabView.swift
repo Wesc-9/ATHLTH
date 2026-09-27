@@ -4181,19 +4181,42 @@ struct ATHLTHRecoveryView: View {
     @State private var selectedRecoveryTool: RecoveryTool?
 
     var body: some View {
-        NavigationStack {
+        let useImmersiveRecoveryHero =
+            UIDevice.current.userInterfaceIdiom == .pad ||
+            UIScreen.main.bounds.width >= 390
+
+        return NavigationStack {
             ATHLTHPinnedHeroLayout(
                 accent: Color.blue.opacity(0.70),
-                softTransition: true
+                softTransition: true,
+                immersiveTransition: useImmersiveRecoveryHero
             ) {
                 ATHLTHTabHero(
                     imageName: "RecoveryHero",
-                        title: "Recovery",
-                        subtitle: "Understand your body. Make better decisions. Stay in the game.",
-                        height: 190,
-                        alignment: .leading,
-                        focalOffsetX: 14,
-                    focalOffsetY: 16
+                    title: "Recovery",
+                    subtitle: "Understand your body. Make better decisions. Stay in the game.",
+                    height:
+                        useImmersiveRecoveryHero
+                            ? 238
+                            : 190,
+                    alignment: .leading,
+                    focalOffsetX:
+                        useImmersiveRecoveryHero
+                            ? 8
+                            : 14,
+                    focalOffsetY:
+                        useImmersiveRecoveryHero
+                            ? 8
+                            : 16,
+                    titleFontSize:
+                        useImmersiveRecoveryHero
+                            ? 31
+                            : 30,
+                    copyWidthFraction:
+                        useImmersiveRecoveryHero
+                            ? 0.72
+                            : 0.82,
+                    immersiveCopy: useImmersiveRecoveryHero
                 )
             } content: {
                 LazyVStack(spacing: 16) {
