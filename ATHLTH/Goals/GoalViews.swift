@@ -862,7 +862,14 @@ struct GoalCreationView: View {
                     Image(systemName: "chevron.right")
                 }
                 .padding()
-                .goalCard()
+                .background(
+                    Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                }
             }
             .buttonStyle(.plain)
 
