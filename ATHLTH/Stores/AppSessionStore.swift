@@ -2103,20 +2103,42 @@ final class AppSessionStore: ObservableObject {
         _ = duplicateTrainingPlan(planID)
     }
 
-    func setActivePlanSpotifyPlaylist(_ playlist: SpotifyPlaylistReference?) {
-        guard var plan = activePlan else { return }
+    @discardableResult
+    func setTrainingPlanSpotify(
+        planID: UUID,
+        playlist: SpotifyPlaylistReference?,
+        autoplay: Bool
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID) else {
+            return false
+        }
+
         plan.spotifyPlaylist = playlist
+        plan.spotifyAutoplayOnWorkoutStart = autoplay
         plan.updatedAt = Date()
         plan.version += 1
-        activePlan = plan
+        replaceTrainingPlan(plan)
+        return true
+    }
+
+    func setActivePlanSpotifyPlaylist(_ playlist: SpotifyPlaylistReference?) {
+        guard let planID = activePlan?.id else { return }
+        _ = setTrainingPlanSpotify(
+            planID: planID,
+            playlist: playlist,
+            autoplay:
+                activePlan?.spotifyAutoplayOnWorkoutStart
+                ?? true
+        )
     }
 
     func setActivePlanSpotifyAutoplay(_ enabled: Bool) {
-        guard var plan = activePlan else { return }
-        plan.spotifyAutoplayOnWorkoutStart = enabled
-        plan.updatedAt = Date()
-        plan.version += 1
-        activePlan = plan
+        guard let activePlan else { return }
+        _ = setTrainingPlanSpotify(
+            planID: activePlan.id,
+            playlist: activePlan.spotifyPlaylist,
+            autoplay: enabled
+        )
     }
 
     func setPlanVisibility(_ visibility: ProfileVisibility) {
