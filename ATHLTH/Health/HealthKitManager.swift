@@ -53,7 +53,10 @@ final class HealthKitManager: ObservableObject {
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
+    private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var profilePerformanceCache: (stats: ProfilePerformanceStats, generatedAt: Date)?
+    private var personalRecordsCache: (records: [HealthPersonalRecord], generatedAt: Date)?
+    private var trophySnapshotCache: (snapshot: TrophyHealthSnapshot, generatedAt: Date)?
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
     private let currentAuthorizationVersion = 2
@@ -350,6 +353,18 @@ final class HealthKitManager: ObservableObject {
         }
     }
 
+    func refreshIfStale(
+        maxAge: TimeInterval = 60
+    ) async {
+        if let lastSuccessfulRefreshAt,
+           Date().timeIntervalSince(lastSuccessfulRefreshAt) < maxAge,
+           hasReadableHealthData {
+            return
+        }
+
+        await refreshAll()
+    }
+
     func refreshAll() async {
         guard healthDataAvailable,
               !isRefreshing,
@@ -372,40 +387,61 @@ final class HealthKitManager: ObservableObject {
         let start = Calendar.current.date(byAdding: .month, value: -3, to: end)
             ?? end.addingTimeInterval(-7_776_000)
 
+        let previousWorkoutIDs = Set(workouts.map(\.id))
+        let previousSleepDuration = sleep.totalAsleep
+
+        // These HealthKit reads are independent. Starting them together keeps
+        // launch/tab refresh latency close to the slowest query instead of
+        // adding every query's latency together.
+        async let workoutsTask = fetchWorkouts(
+            startDate: start,
+            endDate: end,
+            limit: 100
+        )
+        async let sleepTask = fetchLatestSleep()
+        async let heartTask = fetchHeartSummary()
+        async let trainingTask = fetchTrainingSummary()
+
         var completedRead = false
         var failures: [String] = []
 
         do {
-            let fetched = try await fetchWorkouts(
-                startDate: start,
-                endDate: end,
-                limit: 100
-            )
-            workouts = fetched.map(WorkoutSummary.init)
+            let fetched = try await workoutsTask
+            let summaries = fetched.map(WorkoutSummary.init)
+            workouts = summaries
             workoutObjects = fetched.reduce(into: [:]) { result, workout in
                 result[workout.uuid] = workout
             }
+
+            if Set(summaries.map(\.id)) != previousWorkoutIDs {
+                invalidateWorkoutDerivedCaches()
+            }
+
             completedRead = true
         } catch {
             failures.append("Workouts: \(error.localizedDescription)")
         }
 
         do {
-            sleep = try await fetchLatestSleep()
+            let fetchedSleep = try await sleepTask
+            sleep = fetchedSleep
+            if fetchedSleep.totalAsleep != previousSleepDuration {
+                trophySnapshotCache = nil
+            }
             completedRead = true
         } catch {
             failures.append("Sleep: \(error.localizedDescription)")
         }
 
         do {
-            heart = try await fetchHeartSummary()
+            heart = try await heartTask
             completedRead = true
         } catch {
             failures.append("Heart: \(error.localizedDescription)")
         }
 
         do {
-            training = try await fetchTrainingSummary()
+            training = try await trainingTask
             completedRead = true
         } catch {
             failures.append("Activity: \(error.localizedDescription)")
@@ -503,6 +539,7 @@ final class HealthKitManager: ObservableObject {
                 workouts.removeAll { $0.id == summary.id }
                 workouts.append(summary)
                 workouts.sort { $0.startDate > $1.startDate }
+                invalidateWorkoutDerivedCaches()
             }
 
             return workout?.uuid
@@ -514,7 +551,7 @@ final class HealthKitManager: ObservableObject {
     }
 
     func workoutHistory() async throws -> [WorkoutSummary] {
-        let fetched = try await fetchAllWorkouts()
+        let fetched = try await fetchAllWorkoutsCached()
 
         for workout in fetched {
             workoutObjects[workout.uuid] = workout
@@ -705,7 +742,12 @@ final class HealthKitManager: ObservableObject {
     }
 
     func trophySnapshot() async throws -> TrophyHealthSnapshot {
-        let workouts = try await fetchAllWorkouts()
+        if let cached = trophySnapshotCache,
+           Date().timeIntervalSince(cached.generatedAt) < 900 {
+            return cached.snapshot
+        }
+
+        let workouts = try await fetchAllWorkoutsCached()
             .sorted { $0.startDate < $1.startDate }
 
         let workoutThresholds = [10, 50, 100, 250]
@@ -805,7 +847,7 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
-        return TrophyHealthSnapshot(
+        let snapshot = TrophyHealthSnapshot(
             workoutCount: workouts.count,
             workoutCountReachedAt: workoutCountReachedAt,
             totalRunningDistanceMeters: cumulativeRunDistance,
@@ -819,6 +861,9 @@ final class HealthKitManager: ObservableObject {
             qualifyingSleepNights: qualifyingSleepDays.count,
             qualifyingSleepNightsReachedAt: qualifyingSleepNightsReachedAt
         )
+
+        trophySnapshotCache = (snapshot, Date())
+        return snapshot
     }
 
     func challengeRunningEvidence(
@@ -1519,7 +1564,9 @@ final class HealthKitManager: ObservableObject {
             return cached.stats
         }
 
-        let allWorkouts = try await fetchAllWorkouts()
+        let allWorkouts = try await fetchAllWorkoutsCached(
+            forceRefresh: forceRefresh
+        )
         let workoutsByDate = allWorkouts.sorted { $0.startDate < $1.startDate }
 
         let longestWorkout = allWorkouts.max { lhs, rhs in
@@ -1630,8 +1677,18 @@ final class HealthKitManager: ObservableObject {
         return stats
     }
 
-    func personalRecords() async throws -> [HealthPersonalRecord] {
-        let workouts = try await fetchAllWorkouts()
+    func personalRecords(
+        forceRefresh: Bool = false
+    ) async throws -> [HealthPersonalRecord] {
+        if !forceRefresh,
+           let cached = personalRecordsCache,
+           Date().timeIntervalSince(cached.generatedAt) < 600 {
+            return cached.records
+        }
+
+        let workouts = try await fetchAllWorkoutsCached(
+            forceRefresh: forceRefresh
+        )
         var records: [HealthPersonalRecord] = []
 
         if let workout = workouts
@@ -1777,6 +1834,7 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
+        personalRecordsCache = (records, Date())
         return records
     }
 
@@ -2579,6 +2637,32 @@ final class HealthKitManager: ObservableObject {
         case .hiking:
             return workout.workoutActivityType == .hiking
         }
+    }
+
+    private func invalidateWorkoutDerivedCaches() {
+        allWorkoutsCache = nil
+        profilePerformanceCache = nil
+        personalRecordsCache = nil
+        trophySnapshotCache = nil
+    }
+
+    private func fetchAllWorkoutsCached(
+        forceRefresh: Bool = false
+    ) async throws -> [HKWorkout] {
+        if !forceRefresh,
+           let cached = allWorkoutsCache,
+           Date().timeIntervalSince(cached.generatedAt) < 600 {
+            return cached.workouts
+        }
+
+        let fetched = try await fetchAllWorkouts()
+        allWorkoutsCache = (fetched, Date())
+
+        for workout in fetched {
+            workoutObjects[workout.uuid] = workout
+        }
+
+        return fetched
     }
 
     private func fetchAllWorkouts() async throws -> [HKWorkout] {
