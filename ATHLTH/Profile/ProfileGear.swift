@@ -112,8 +112,10 @@ enum ShoeUseType: String, Codable, CaseIterable, Identifiable {
 struct ProfileGearDetailRecord: Codable, Hashable {
     let gearID: UUID
     let userID: UUID
+    var catalogItemID: UUID?
     var brand: String?
     var model: String?
+    var variantLabel: String?
     var colorName: String?
     var purchasedAt: String?
     var firstUsedAt: String?
@@ -131,8 +133,10 @@ struct ProfileGearDetailRecord: Codable, Hashable {
     enum CodingKeys: String, CodingKey {
         case gearID = "gear_id"
         case userID = "user_id"
+        case catalogItemID = "catalog_item_id"
         case brand
         case model
+        case variantLabel = "variant_label"
         case colorName = "color_name"
         case purchasedAt = "purchased_at"
         case firstUsedAt = "first_used_at"
@@ -158,8 +162,10 @@ struct ProfileGearDetailRecord: Codable, Hashable {
 }
 
 struct ProfileGearDetailDraft: Hashable {
+    var catalogItemID: UUID?
     var brand = ""
     var model = ""
+    var variantLabel = ""
     var colorName = ""
     var purchasedAt: Date?
     var firstUsedAt: Date?
@@ -180,8 +186,10 @@ struct ProfileGearDetailDraft: Hashable {
             return
         }
 
+        catalogItemID = record.catalogItemID
         brand = record.brand ?? ""
         model = record.model ?? ""
+        variantLabel = record.variantLabel ?? ""
         colorName = record.colorName ?? ""
         purchasedAt = record.purchasedDate
         firstUsedAt = record.firstUsedDate
@@ -199,8 +207,10 @@ struct ProfileGearDetailDraft: Hashable {
 private struct ProfileGearDetailWrite: Encodable {
     let gearID: UUID
     let userID: UUID
+    let catalogItemID: UUID?
     let brand: String?
     let model: String?
+    let variantLabel: String?
     let colorName: String?
     let purchasedAt: String?
     let firstUsedAt: String?
@@ -217,8 +227,10 @@ private struct ProfileGearDetailWrite: Encodable {
     enum CodingKeys: String, CodingKey {
         case gearID = "gear_id"
         case userID = "user_id"
+        case catalogItemID = "catalog_item_id"
         case brand
         case model
+        case variantLabel = "variant_label"
         case colorName = "color_name"
         case purchasedAt = "purchased_at"
         case firstUsedAt = "first_used_at"
@@ -997,8 +1009,10 @@ final class ProfileGearStore: ObservableObject {
         let payload = ProfileGearDetailWrite(
             gearID: gearID,
             userID: userID,
+            catalogItemID: draft.catalogItemID,
             brand: draft.brand.gearNilIfEmpty,
             model: draft.model.gearNilIfEmpty,
+            variantLabel: draft.variantLabel.gearNilIfEmpty,
             colorName: draft.colorName.gearNilIfEmpty,
             purchasedAt: GearDateCodec.string(from: draft.purchasedAt),
             firstUsedAt: GearDateCodec.string(from: draft.firstUsedAt),
