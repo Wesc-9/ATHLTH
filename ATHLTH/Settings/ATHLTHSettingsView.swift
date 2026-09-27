@@ -604,6 +604,26 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
+                    if session.currentRole.canAccessControlCenter {
+                        settingsSection("Developer Tools") {
+                            PremiumSettingsCard {
+                                NavigationLink {
+                                    AdminAIUsageView()
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "sparkles.rectangle.stack",
+                                        title: "AI Usage",
+                                        subtitle: "Live Groq quota and prompt-saving status"
+                                    ) {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
                     #if DEBUG
                     if session.currentRole.canAccessControlCenter {
                         settingsSection("Admin") {
