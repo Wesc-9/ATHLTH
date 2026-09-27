@@ -33,6 +33,8 @@ struct AIProgramBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var health: HealthKitManager
 
     let mode: AIProgramGenerationMode
 
@@ -969,6 +971,7 @@ struct AIProgramBuilderView: View {
         isGenerating = true
         defer { isGenerating = false }
 
+        let requestOwnerID = session.profile.userID
         let request = AIProgramRequest(
             mode: mode.rawValue,
             startDate: ISO8601DateFormatter().string(from: startDate),
@@ -976,7 +979,7 @@ struct AIProgramBuilderView: View {
             sessionsPerWeek: sessionsPerWeek,
             preferredDays: availableDays.sorted(),
             sessionDurationMinutes: sessionDurationMinutes,
-            userNotes: coachContext + "\nAdditional preferences: " + String(userNotes.prefix(700)),
+            userNotes: historyContext + String(coachContext.prefix(1900)) + "\nAdditional preferences: " + String(userNotes.prefix(500)),
             goals: selectedGoals.isEmpty
                 ? [AIProgramGoalInput(focus: trainingFocus)]
                 : selectedGoals.map(AIProgramGoalInput.init),
@@ -984,11 +987,29 @@ struct AIProgramBuilderView: View {
         )
 
         do {
-            preview = try await service.generate(request)
+            let result = try await service.generate(request)
+            guard session.signedIn, session.profile.userID == requestOwnerID else { return }
+            preview = result
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private var historyContext: String {
+        guard session.signedIn,
+              AccountLocalStorage.read(Bool.self, name: "coachHistoryConsent", userID: session.profile.userID) == true else { return "" }
+        let cutoff = Date().addingTimeInterval(-28 * 86400)
+        let workouts = health.workouts.filter { $0.startDate >= cutoff }
+        let local = strength.workoutHistory.filter { $0.isFinished && $0.startedAt >= cutoff }
+        let linkedIDs = Set(workouts.map(\.id))
+        let additionalStrength = local.filter { log in
+            guard let id = log.healthMetrics.healthKitWorkoutUUID else { return true }
+            return !linkedIDs.contains(id)
+        }
+        let minutes = workouts.reduce(0.0) { $0 + $1.duration } / 60
+        let kilometers = workouts.reduce(0.0) { $0 + ($1.distanceMeters ?? 0) } / 1000
+        return "Consented 28-day training summary (available records only): \(workouts.count) Apple Health workouts, \(Int(minutes)) minutes, \(String(format: "%.1f", kilometers)) km; \(additionalStrength.count) additional ATHLTH strength sessions. Missing records do not imply inactivity. Use this to suggest a gradual plan, not to diagnose readiness.\n"
     }
 
     private var existingDays: [AIProgramExistingDay] {

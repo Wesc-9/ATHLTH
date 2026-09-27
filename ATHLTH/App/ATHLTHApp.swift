@@ -12,6 +12,8 @@ struct ATHLTHApp: App {
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
     @StateObject private var goals = GoalStore()
+    @StateObject private var trainingBackups = TrainingBackupStore()
+    @StateObject private var phoneWorkout = IPhoneWorkoutStore()
     @StateObject private var profileGear = ProfileGearStore()
     @StateObject private var notifications = ATHLTHNotificationStore()
     @StateObject private var calendarSync = AppleCalendarSyncStore()
@@ -45,6 +47,8 @@ struct ATHLTHApp: App {
                 .environmentObject(settings)
                 .environmentObject(strengthWorkout)
                 .environmentObject(goals)
+                .environmentObject(trainingBackups)
+                .environmentObject(phoneWorkout)
                 .environmentObject(profileGear)
                 .environmentObject(notifications)
                 .environmentObject(calendarSync)
@@ -128,6 +132,8 @@ struct AppRootView: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
+    @EnvironmentObject private var trainingBackups: TrainingBackupStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
@@ -225,7 +231,17 @@ struct AppRootView: View {
             publishATHLTHSurfaces()
             lastFullLifecycleRefreshAt = Date()
         }
+        .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) { IPhoneWorkoutView() }
+        .overlay(alignment: .top) {
+            if appSession.signedIn, phoneWorkout.active != nil {
+                Button { phoneWorkout.showingWorkout = true } label: {
+                    Label("Return to iPhone workout", systemImage: "figure.run")
+                        .padding(10).background(.regularMaterial, in: Capsule())
+                }.padding(.top, 4)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
+            phoneWorkout.checkpoint()
             guard phase == .active else { return }
 
             // Only touch WatchConnectivity when Apple Watch is the selected
@@ -713,8 +729,21 @@ struct AppRootView: View {
             }
         }
         .onChange(of: appSession.signedIn ? appSession.profile.userID : nil, initial: true) { _, userID in
+            phoneWorkout.switchAccount(userID)
+            trainingBackups.switchAccount(userID)
+            goals.switchAccount(userID)
+            strengthWorkout.switchAccount(userID)
             exerciseLibrary.switchAccount(userID)
             runningWorkoutLibrary.switchAccount(userID)
+        }
+        .task(id: appSession.signedIn ? appSession.profile.userID : nil) {
+            guard appSession.signedIn else { return }
+            let userID = appSession.profile.userID
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled, appSession.signedIn, appSession.profile.userID == userID else { return }
+                await trainingBackups.backUp(userID: userID)
+            }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
             guard signedIn else { return }

@@ -4,8 +4,26 @@ import Foundation
 final class GoalStore: ObservableObject {
     @Published private(set) var goals: [ATHLTHGoal] = []
 
-    init() {
-        goals = Self.loadGoals()
+    private var accountID: UUID?
+    @Published private(set) var hasLegacyGoals = false
+
+    init() {}
+
+    func switchAccount(_ userID: UUID?) {
+        guard accountID != userID else { return }
+        accountID = userID
+        goals = userID.flatMap { AccountLocalStorage.read([ATHLTHGoal].self, name: "goals", userID: $0) } ?? []
+        hasLegacyGoals = userID != nil && UserDefaults.standard.string(forKey: "legacy.goalsClaimedBy") == nil && !Self.loadGoals().isEmpty
+    }
+
+    func restoreLegacyGoals() {
+        guard let accountID, hasLegacyGoals else { return }
+        let ids = Set(goals.map(\.id))
+        goals += Self.loadGoals().filter { !ids.contains($0.id) }
+        normalizePrimaryGoal()
+        persist()
+        UserDefaults.standard.set(accountID.uuidString, forKey: "legacy.goalsClaimedBy")
+        hasLegacyGoals = false
     }
 
     var activeGoals: [ATHLTHGoal] {
@@ -305,20 +323,8 @@ final class GoalStore: ObservableObject {
     }
 
     private func persist() {
-        guard let url = Self.goalsURL else { return }
-
-        do {
-            let directory = url.deletingLastPathComponent()
-            try FileManager.default.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true
-            )
-
-            let data = try JSONEncoder().encode(goals)
-            try data.write(to: url, options: .atomic)
-        } catch {
-            return
-        }
+        guard let accountID else { return }
+        AccountLocalStorage.write(goals, name: "goals", userID: accountID)
     }
 
     private static func loadGoals() -> [ATHLTHGoal] {

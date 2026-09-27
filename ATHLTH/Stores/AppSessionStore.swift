@@ -10,7 +10,7 @@ enum TrainingPlanTimingStatus: String, CaseIterable, Identifiable {
 }
 
 
-private struct AccountTrainingContent: Codable {
+struct AccountTrainingContent: Codable {
     var activePlan: TrainingPlan?
     var scheduledPlans: [TrainingPlan]
     var planTemplates: [TrainingPlan]
@@ -434,10 +434,14 @@ final class AppSessionStore: ObservableObject {
 
     func clearAfterAccountDeletion() {
         let deletedID = localAccountID
+        if let deletedID { defaults.set(true, forKey: AccountLocalStorage.key("deleted", userID: deletedID)) }
         clearAfterSignOut()
         if let deletedID {
             defaults.removeObject(forKey: AccountLocalStorage.key("training", userID: deletedID))
             defaults.removeObject(forKey: AccountLocalStorage.key("coach", userID: deletedID))
+            for name in ["goals", "strengthHistory", "strengthActive", "phoneHistory", "phoneActive", "coachHistoryConsent"] {
+                defaults.removeObject(forKey: AccountLocalStorage.key(name, userID: deletedID))
+            }
             AccountLocalStorage.write([RunningWorkoutTemplate](), name: "runningLibrary", userID: deletedID, defaults: defaults)
             AccountLocalStorage.write([Exercise](), name: "exerciseLibrary", userID: deletedID, defaults: defaults)
             defaults.set(true, forKey: AccountLocalStorage.key("legacyMigrated", userID: deletedID))
@@ -2033,6 +2037,12 @@ final class AppSessionStore: ObservableObject {
             savedRoutes: savedRoutes, onboardingProfile: onboardingProfile
         )
         AccountLocalStorage.write(content, name: "training", userID: userID, defaults: defaults)
+    }
+
+    func reloadTrainingContent() {
+        guard signedIn else { return }
+        localAccountID = nil
+        activateLocalAccount(profile.userID)
     }
 
     private func activateLocalAccount(_ userID: UUID) {

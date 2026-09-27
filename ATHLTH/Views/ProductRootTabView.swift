@@ -2916,6 +2916,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
@@ -3457,6 +3458,7 @@ struct ATHLTHTrainView: View {
         _ kind: WorkoutKind
     ) -> String {
         if kind == .running || kind == .walking {
+            if settings.trainingDeviceProvider == .none { return "Record with iPhone" }
             if settings.trainingDeviceProvider != .appleWatch {
                 return "Apple Watch required"
             }
@@ -3479,6 +3481,7 @@ struct ATHLTHTrainView: View {
     }
 
     private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
+        guard phoneWorkout.active == nil else { return false }
         if kind == .strength {
             return strengthWorkout.activeWorkout == nil
         }
@@ -3491,7 +3494,9 @@ struct ATHLTHTrainView: View {
         case .appleWatch:
             return watchConnection.isReady &&
                 !watchConnection.workoutLaunchInProgress
-        case .garmin, .none:
+        case .none:
+            return (kind == .running || kind == .walking) && strengthWorkout.activeWorkout == nil
+        case .garmin:
             return false
         }
     }
@@ -3585,6 +3590,11 @@ struct ATHLTHTrainView: View {
     private func startRunQuickWorkout(
         _ configuration: RunQuickStartConfiguration
     ) {
+        if settings.trainingDeviceProvider == .none {
+            guard configuration.mode == .free else { return }
+            phoneWorkout.start(walking: false)
+            return
+        }
         guard settings.trainingDeviceProvider == .appleWatch,
               watchConnection.isReady
         else {
@@ -3659,6 +3669,10 @@ struct ATHLTHTrainView: View {
     private func startWalkQuickWorkout(
         _ configuration: WalkQuickStartConfiguration
     ) {
+        if settings.trainingDeviceProvider == .none {
+            phoneWorkout.start(walking: true)
+            return
+        }
         guard settings.trainingDeviceProvider == .appleWatch,
               watchConnection.isReady
         else {

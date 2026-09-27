@@ -1296,7 +1296,7 @@ struct OnboardingFlowView: View {
 
                 deviceChoiceCard(
                     provider: .none,
-                    title: "No watch",
+                    title: "iPhone",
                     subtitle: "Use ATHLTH with your iPhone and Apple Health when available.",
                     icon: "iphone",
                     status: settings.trainingDeviceProvider == .none
@@ -1861,7 +1861,7 @@ struct OnboardingFlowView: View {
         case .garmin:
             return "Garmin selected · authorization pending"
         case .none:
-            return "No watch · iPhone/manual mode"
+            return "iPhone · carry it throughout your workout"
         }
     }
 

@@ -28,6 +28,16 @@ struct ATHLTHSettingsView: View {
                     header
                         .padding(.bottom, 24)
 
+                    settingsSection("Training data") {
+                        PremiumSettingsCard {
+                            NavigationLink { TrainingDataSettingsView() } label: {
+                                PremiumSettingsRow(icon: "icloud", title: "Training data & Coach", subtitle: "Cloud backup, restore and history sharing") {
+                                    Image(systemName: "chevron.right")
+                                }
+                            }
+                        }
+                    }
+
                     settingsSection("App") {
                         PremiumSettingsCard {
                             Menu {
@@ -833,7 +843,7 @@ struct ATHLTHSettingsView: View {
         case .garmin:
             return "Garmin Connect prepared · authorization pending"
         case .none:
-            return "ATHLTH works without a watch"
+            return "Record runs and walks with your iPhone"
         }
     }
 
@@ -2010,10 +2020,10 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                             )
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("No watch required")
+                            Text("Record with iPhone")
                                 .font(.headline)
                             Text(
-                                "ATHLTH can still use your iPhone and available Apple Health data. You can connect a watch later."
+                                "Carry your iPhone throughout the workout. Free runs and walks record time, GPS distance and pace. Guided routes and structured intervals currently require Apple Watch."
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -2172,7 +2182,7 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
             return "Garmin Connect integration will be available later"
 
         case .none:
-            return "Use ATHLTH with iPhone and Apple Health"
+            return "Carry your iPhone throughout the workout to record time, GPS distance and pace."
         }
     }
 }

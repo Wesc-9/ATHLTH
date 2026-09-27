@@ -182,6 +182,7 @@ struct RunQuickStartSheet: View {
     @State private var didLoadAudioCoachDefaults = false
 
     private var canStart: Bool {
+        if trainingDeviceProvider == .none { return mode == .free }
         guard trainingDeviceProvider == .appleWatch,
               watchConnected
         else {
@@ -211,6 +212,7 @@ struct RunQuickStartSheet: View {
                         activity: .running
                     )
 
+                    if trainingDeviceProvider == .appleWatch {
                     ATHLTHPlusFeatureGate(
                         feature: .audioCoach,
                         title: "Audio Coach · ATHLTH+",
@@ -227,6 +229,7 @@ struct RunQuickStartSheet: View {
                         )
                     }
 
+                    }
                     ATHLTHCard {
                         WorkoutFriendPicker(
                             selectedFriendIDs: $selectedFriendIDs
@@ -318,7 +321,7 @@ struct RunQuickStartSheet: View {
                         .font(.title3.weight(.bold))
 
                     Text(
-                        watchConnected
+                        (trainingDeviceProvider == .appleWatch && watchConnected)
                             ? "Apple Watch is ready. Choose a free run, route or structured workout."
                             : deviceStatusText
                     )
@@ -569,6 +572,7 @@ struct RunQuickStartSheet: View {
     }
 
     private var startButtonTitle: String {
+        if trainingDeviceProvider == .none { return mode == .free ? "Start on iPhone" : "Apple Watch Required" }
         if !watchConnected {
             return "Apple Watch Required"
         }
@@ -587,7 +591,7 @@ struct RunQuickStartSheet: View {
         case .garmin:
             return "Garmin live launch is not available yet."
         case .none:
-            return "Choose Apple Watch as your training device for live run capture."
+            return "Carry your iPhone throughout the run. iPhone supports Free Run; guided routes and structured intervals currently require Apple Watch."
         }
     }
 
@@ -658,7 +662,7 @@ struct WalkQuickStartSheet: View {
                                     .font(.title3.weight(.bold))
 
                                 Text(
-                                    watchConnected
+                                    (trainingDeviceProvider == .appleWatch && watchConnected)
                                         ? "Start immediately and let ATHLTH record time, distance, GPS and available heart-rate data."
                                         : deviceStatusText
                                 )
@@ -675,6 +679,7 @@ struct WalkQuickStartSheet: View {
                         activity: .walking
                     )
 
+                    if trainingDeviceProvider == .appleWatch {
                     ATHLTHPlusFeatureGate(
                         feature: .audioCoach,
                         title: "Audio Coach · ATHLTH+",
@@ -688,6 +693,7 @@ struct WalkQuickStartSheet: View {
                         )
                     }
 
+                    }
                     ATHLTHCard {
                         WorkoutFriendPicker(
                             selectedFriendIDs: $selectedFriendIDs
@@ -712,7 +718,7 @@ struct WalkQuickStartSheet: View {
                         dismiss()
                     } label: {
                         Label(
-                            watchConnected
+                            (watchConnected || trainingDeviceProvider == .none)
                                 ? "Start Walk"
                                 : "Apple Watch Required",
                             systemImage: "play.fill"
@@ -724,8 +730,7 @@ struct WalkQuickStartSheet: View {
                     .controlSize(.large)
                     .tint(ATHLTHTheme.accent)
                     .disabled(
-                        trainingDeviceProvider != .appleWatch ||
-                        !watchConnected
+                        trainingDeviceProvider != .none && (trainingDeviceProvider != .appleWatch || !watchConnected)
                     )
                 }
                 .padding()
@@ -763,7 +768,7 @@ struct WalkQuickStartSheet: View {
         case .garmin:
             return "Garmin live launch is not available yet."
         case .none:
-            return "Choose Apple Watch as your training device for live walk capture."
+            return "Carry your iPhone throughout the walk to record GPS distance and pace."
         }
     }
 }

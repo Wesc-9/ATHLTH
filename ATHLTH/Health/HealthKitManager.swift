@@ -153,7 +153,7 @@ final class HealthKitManager: ObservableObject {
     }
 
     private var shareTypes: Set<HKSampleType> {
-        [HKObjectType.workoutType()]
+        [HKObjectType.workoutType(), HKSeriesType.workoutRoute()]
     }
 
     var canWriteWorkouts: Bool {

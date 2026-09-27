@@ -2,19 +2,67 @@ import Foundation
 
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
-    @Published private(set) var activeWorkout: StrengthWorkoutLog?
-    @Published private(set) var currentExerciseIndex = 0
-    @Published private(set) var currentSetIndex = 0
-    @Published private(set) var restEndsAt: Date?
-    @Published private(set) var draftReps = 8
-    @Published private(set) var draftWeightKilograms = 20.0
-    @Published private(set) var draftRestSeconds = 90
-    @Published private(set) var draftRPE = 8.0
+    @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { persistCheckpoint() } }
+    @Published private(set) var currentExerciseIndex = 0 { didSet { persistCheckpoint() } }
+    @Published private(set) var currentSetIndex = 0 { didSet { persistCheckpoint() } }
+    @Published private(set) var restEndsAt: Date? { didSet { persistCheckpoint() } }
+    @Published private(set) var draftReps = 8 { didSet { persistCheckpoint() } }
+    @Published private(set) var draftWeightKilograms = 20.0 { didSet { persistCheckpoint() } }
+    @Published private(set) var draftRestSeconds = 90 { didSet { persistCheckpoint() } }
+    @Published private(set) var draftRPE = 8.0 { didSet { persistCheckpoint() } }
     @Published private(set) var completedWorkout: StrengthWorkoutLog?
     @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
 
-    init() {
-        workoutHistory = Self.loadWorkoutHistory()
+    private var accountID: UUID?
+    private var loadingAccount = false
+    @Published private(set) var hasLegacyHistory = false
+
+    private struct Checkpoint: Codable {
+        var workout: StrengthWorkoutLog?
+        var exerciseIndex: Int
+        var setIndex: Int
+        var restEndsAt: Date?
+        var reps: Int
+        var weight: Double
+        var rest: Int
+        var rpe: Double
+    }
+
+    init() {}
+
+    func switchAccount(_ userID: UUID?) {
+        guard accountID != userID else { return }
+        loadingAccount = true
+        defer { loadingAccount = false }
+        accountID = userID
+        completedWorkout = nil
+        workoutHistory = userID.flatMap { AccountLocalStorage.read([StrengthWorkoutLog].self, name: "strengthHistory", userID: $0) } ?? []
+        let checkpoint = userID.flatMap { AccountLocalStorage.read(Checkpoint.self, name: "strengthActive", userID: $0) }
+        activeWorkout = checkpoint?.workout
+        if let workout = activeWorkout, workoutHistory.contains(where: { $0.id == workout.id }) { activeWorkout = nil }
+        currentExerciseIndex = checkpoint?.exerciseIndex ?? 0
+        currentSetIndex = checkpoint?.setIndex ?? 0
+        restEndsAt = checkpoint?.restEndsAt
+        draftReps = checkpoint?.reps ?? 8
+        draftWeightKilograms = checkpoint?.weight ?? 20
+        draftRestSeconds = checkpoint?.rest ?? 90
+        draftRPE = checkpoint?.rpe ?? 8
+        hasLegacyHistory = userID != nil && UserDefaults.standard.string(forKey: "legacy.strengthClaimedBy") == nil && !Self.loadWorkoutHistory().isEmpty
+    }
+
+    func restoreLegacyHistory() {
+        guard let accountID, hasLegacyHistory else { return }
+        let ids = Set(workoutHistory.map(\.id))
+        workoutHistory += Self.loadWorkoutHistory().filter { !ids.contains($0.id) }
+        workoutHistory.sort { $0.startedAt > $1.startedAt }
+        persistWorkoutHistory()
+        UserDefaults.standard.set(accountID.uuidString, forKey: "legacy.strengthClaimedBy")
+        hasLegacyHistory = false
+    }
+
+    private func persistCheckpoint() {
+        guard let accountID, !loadingAccount else { return }
+        AccountLocalStorage.write(Checkpoint(workout: activeWorkout, exerciseIndex: currentExerciseIndex, setIndex: currentSetIndex, restEndsAt: restEndsAt, reps: draftReps, weight: draftWeightKilograms, rest: draftRestSeconds, rpe: draftRPE), name: "strengthActive", userID: accountID)
     }
 
     func trophySnapshot() -> TrophyStrengthSnapshot {
@@ -704,19 +752,8 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     private func persistWorkoutHistory() {
-        guard let url = Self.workoutHistoryURL else { return }
-
-        do {
-            let directory = url.deletingLastPathComponent()
-            try FileManager.default.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true
-            )
-            let data = try JSONEncoder().encode(workoutHistory)
-            try data.write(to: url, options: .atomic)
-        } catch {
-            return
-        }
+        guard let accountID else { return }
+        AccountLocalStorage.write(workoutHistory, name: "strengthHistory", userID: accountID)
     }
 
     private static func loadWorkoutHistory() -> [StrengthWorkoutLog] {

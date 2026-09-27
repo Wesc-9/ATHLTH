@@ -140,7 +140,7 @@ enum TrainingDeviceProvider: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .appleWatch: return "Apple Watch"
         case .garmin: return "Garmin"
-        case .none: return "No watch"
+        case .none: return "iPhone"
         }
     }
 
@@ -151,7 +151,7 @@ enum TrainingDeviceProvider: String, CaseIterable, Identifiable, Codable {
         case .garmin:
             return "Coming soon · Garmin Connect"
         case .none:
-            return "Use ATHLTH and iPhone without a wearable"
+            return "Record outdoor runs and walks. Carry your iPhone throughout the workout."
         }
     }
 
