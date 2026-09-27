@@ -1534,9 +1534,8 @@ struct OfficialWeeklyChallengeDetailView: View {
         Group {
             if let challenge {
                 ScrollView {
-                    VStack(spacing: 18) {
+                    VStack(spacing: 16) {
                         premiumHeroCard(challenge)
-                        challengeOverviewSection(challenge)
                         progressSection(challenge)
                         leaderboardSection(challenge)
                         countedWorkoutsSection
@@ -1586,7 +1585,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 OfficialWeeklyChallengeArtwork(
                     challenge: challenge
                 )
-                .frame(height: 330)
+                .frame(height: 224)
                 .clipped()
 
                 LinearGradient(
@@ -1640,7 +1639,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                     Text(challenge.title)
                         .font(
                             .system(
-                                size: 40,
+                                size: 34,
                                 weight: .semibold,
                                 design: .serif
                             )
@@ -1678,7 +1677,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 .padding(20)
             }
 
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(
@@ -1817,6 +1816,19 @@ struct OfficialWeeklyChallengeDetailView: View {
                     )
                 }
 
+                HStack(spacing: 8) {
+                    Capsule()
+                        .fill(ATHLTHTheme.accentDeep.opacity(0.18))
+                        .frame(width: 28, height: 3)
+
+                    Text("MAKE THIS WEEK COUNT")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.72))
+
+                    Spacer()
+                }
+
                 Button {
                     Task {
                         if store.isJoined(challenge.id) {
@@ -1907,6 +1919,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 }
             }
             .padding(20)
+            .padding(.top, 8)
             .background(
                 LinearGradient(
                     colors: [
@@ -1918,6 +1931,17 @@ struct OfficialWeeklyChallengeDetailView: View {
                     endPoint: .bottomTrailing
                 )
             )
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 26,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 26,
+                    style: .continuous
+                )
+            )
+            .offset(y: -18)
+            .padding(.bottom, -18)
         }
         .clipShape(
             RoundedRectangle(
