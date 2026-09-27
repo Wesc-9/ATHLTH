@@ -1265,16 +1265,6 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
                 .value
 
-            async let reactionsQuery:
-                [CommunityGroupAnnouncementReactionRecord] = client
-                    .from("community_group_announcement_reactions")
-                    .select()
-                    .eq("group_id", value: groupID)
-                    .order("created_at", ascending: false)
-                    .limit(1_000)
-                    .execute()
-                    .value
-
             async let activityQuery: [CommunityGroupActivityRecord] = client
                 .from("community_group_activity")
                 .select()
@@ -1310,40 +1300,25 @@ final class CommunityGroupStore: ObservableObject {
                     .execute()
                     .value
 
-            async let leaderboardQuery:
-                [CommunityGroupEngagementLeaderboardEntry] = client
-                    .rpc(
-                        "get_community_group_leaderboard",
-                        params: CommunityGroupLeaderboardParams(
-                            groupID: groupID
-                        )
-                    )
-                    .execute()
-                    .value
-
             let loadedMembers = try await membersQuery
             let loadedMessages = try await messagesQuery
             let loadedEvents = try await eventsQuery
             let loadedChallenges = try await challengesQuery
             let loadedAnnouncements = try await announcementsQuery
-            let loadedReactions = try await reactionsQuery
             let loadedActivity = try await activityQuery
             let loadedProfiles = try await profilesQuery
             let loadedJoinRequests = try await joinRequestsQuery
             let loadedEventRSVPs = try await eventRSVPsQuery
-            let loadedLeaderboard = try await leaderboardQuery
 
             membersByGroup[groupID] = loadedMembers
             messagesByGroup[groupID] = loadedMessages
             eventsByGroup[groupID] = loadedEvents
             challengesByGroup[groupID] = loadedChallenges
             announcementsByGroup[groupID] = loadedAnnouncements
-            announcementReactionsByGroup[groupID] = loadedReactions
             activityByGroup[groupID] = loadedActivity
                 .filter { $0.kind != "announcement" }
             joinRequestsByGroup[groupID] = loadedJoinRequests
             eventRSVPsByGroup[groupID] = loadedEventRSVPs
-            leaderboardByGroup[groupID] = loadedLeaderboard
 
             for profile in loadedProfiles {
                 profileCardsByID[profile.userID] = profile
@@ -1366,6 +1341,15 @@ final class CommunityGroupStore: ObservableObject {
                 contentsOf: allContributions.filter {
                     challengeIDs.contains($0.challengeID)
                 }
+            )
+
+            await refreshAnnouncementReactions(
+                groupID,
+                reportErrors: false
+            )
+            await refreshLeaderboard(
+                groupID,
+                reportErrors: false
             )
             errorMessage = nil
         } catch {
@@ -1837,7 +1821,8 @@ final class CommunityGroupStore: ObservableObject {
     }
 
     func refreshAnnouncementReactions(
-        _ groupID: UUID
+        _ groupID: UUID,
+        reportErrors: Bool = true
     ) async {
         do {
             let rows:
@@ -1858,12 +1843,15 @@ final class CommunityGroupStore: ObservableObject {
 
             announcementReactionsByGroup[groupID] = rows
         } catch {
-            errorMessage = error.localizedDescription
+            if reportErrors {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     func refreshLeaderboard(
-        _ groupID: UUID
+        _ groupID: UUID,
+        reportErrors: Bool = true
     ) async {
         do {
             let rows: [CommunityGroupEngagementLeaderboardEntry] =
@@ -1880,7 +1868,9 @@ final class CommunityGroupStore: ObservableObject {
 
             leaderboardByGroup[groupID] = rows
         } catch {
-            errorMessage = error.localizedDescription
+            if reportErrors {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
