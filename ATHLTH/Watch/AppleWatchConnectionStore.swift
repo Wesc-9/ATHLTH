@@ -1,7 +1,7 @@
 import Combine
 import Foundation
-import HealthKit
-import WatchConnectivity
+@preconcurrency import HealthKit
+@preconcurrency import WatchConnectivity
 
 enum AppleWatchConnectionState: Equatable {
     case checking
@@ -41,6 +41,7 @@ enum AppleWatchWorkoutLaunchError: LocalizedError {
     }
 }
 
+@MainActor
 final class AppleWatchConnectionStore: NSObject, ObservableObject {
     @Published private(set) var state: AppleWatchConnectionState = .checking
     @Published private(set) var lastCompletedWorkout: WatchWorkoutResult?
