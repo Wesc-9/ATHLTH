@@ -113,22 +113,25 @@ jobs:
           set -euo pipefail
           IOS_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/Info.plist"
           WATCH_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/Watch/ATHLTH.app/Info.plist"
+          WIDGET_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/PlugIns/ATHLTHWidgets.appex/Info.plist"
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$IOS_PLIST")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_PLIST")
+          WIDGET_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WIDGET_PLIST")
           INTERFACE_STYLE=$(/usr/libexec/PlistBuddy -c "Print :UIUserInterfaceStyle" "$IOS_PLIST")
           echo "iPhone CFBundleVersion: $IOS_BUILD"
           echo "Watch CFBundleVersion: $WATCH_BUILD"
+          echo "Widget CFBundleVersion: $WIDGET_BUILD"
           echo "iPhone UIUserInterfaceStyle: $INTERFACE_STYLE"
           if [ "$INTERFACE_STYLE" != "Light" ]; then
             echo "::error::ATHLTH 1.4.2 must archive with UIUserInterfaceStyle=Light."
             exit 1
           fi
-          if [ "$IOS_BUILD" -le 1 ] || [ "$WATCH_BUILD" -le 1 ]; then
-            echo "::error::Both iPhone and Watch bundle versions must be greater than 1."
+          if [ "$IOS_BUILD" -le 1 ] || [ "$WATCH_BUILD" -le 1 ] || [ "$WIDGET_BUILD" -le 1 ]; then
+            echo "::error::iPhone, Watch and Widget bundle versions must be greater than 1."
             exit 1
           fi
-          if [ "$IOS_BUILD" != "$WATCH_BUILD" ]; then
-            echo "::error::iPhone and Watch bundle versions must match."
+          if [ "$IOS_BUILD" != "$WATCH_BUILD" ] || [ "$IOS_BUILD" != "$WIDGET_BUILD" ]; then
+            echo "::error::iPhone, Watch and Widget bundle versions must match."
             exit 1
           fi
 
@@ -138,7 +141,10 @@ jobs:
           set -euo pipefail
           IOS_APP="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app"
           WATCH_APP="$IOS_APP/Watch/ATHLTH.app"
+          WIDGET_APP="$IOS_APP/PlugIns/ATHLTHWidgets.appex"
+          test -d "$WIDGET_APP"
           codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTHWatchExtension/ATHLTHWatchExtension.entitlements" "$WATCH_APP"
+          codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTHWidgets/ATHLTHWidgets.entitlements" "$WIDGET_APP"
           codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTH/Resources/ATHLTH.entitlements" "$IOS_APP"
 
       - name: Create validation export options
@@ -185,18 +191,25 @@ jobs:
           unzip -q "$IPA" -d "$RUNNER_TEMP/validation-ipa"
           APP=$(find "$RUNNER_TEMP/validation-ipa/Payload" -maxdepth 1 -name '*.app' -print -quit)
           WATCH_APP=$(find "$APP/Watch" -maxdepth 1 -name '*.app' -print -quit)
+          WIDGET_APP=$(find "$APP/PlugIns" -maxdepth 1 -name 'ATHLTHWidgets.appex' -print -quit)
           test -n "$APP"
           test -n "$WATCH_APP"
+          test -n "$WIDGET_APP"
 
           codesign --verify --deep --strict "$APP"
           codesign --verify --strict "$WATCH_APP"
+          codesign --verify --strict "$WIDGET_APP"
 
           IOS_ENT="$RUNNER_TEMP/validation-ios-entitlements.plist"
           WATCH_ENT="$RUNNER_TEMP/validation-watch-entitlements.plist"
+          WIDGET_ENT="$RUNNER_TEMP/validation-widget-entitlements.plist"
           codesign -d --entitlements :- "$APP" > "$IOS_ENT" 2>/dev/null
           codesign -d --entitlements :- "$WATCH_APP" > "$WATCH_ENT" 2>/dev/null
+          codesign -d --entitlements :- "$WIDGET_APP" > "$WIDGET_ENT" 2>/dev/null
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$IOS_ENT" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$IOS_ENT" | grep -qx "group.com.wesc9.athlth"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$WIDGET_ENT" | grep -qx "group.com.wesc9.athlth"
 
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_APP/Info.plist")
@@ -218,16 +231,21 @@ jobs:
           unzip -q "$IPA" -d "$RUNNER_TEMP/capability-check"
           APP=$(find "$RUNNER_TEMP/capability-check/Payload" -maxdepth 1 -name '*.app' -print -quit)
           WATCH_APP=$(find "$APP/Watch" -maxdepth 1 -name '*.app' -print -quit)
+          WIDGET_APP=$(find "$APP/PlugIns" -maxdepth 1 -name 'ATHLTHWidgets.appex' -print -quit)
 
           IOS_ENT="$RUNNER_TEMP/capability-ios-entitlements.plist"
           WATCH_ENT="$RUNNER_TEMP/capability-watch-entitlements.plist"
+          WIDGET_ENT="$RUNNER_TEMP/capability-widget-entitlements.plist"
           codesign -d --entitlements :- "$APP" > "$IOS_ENT" 2>/dev/null
           codesign -d --entitlements :- "$WATCH_APP" > "$WATCH_ENT" 2>/dev/null
+          codesign -d --entitlements :- "$WIDGET_APP" > "$WIDGET_ENT" 2>/dev/null
 
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$IOS_ENT" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit.background-delivery" "$IOS_ENT" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.applesignin:0" "$IOS_ENT" | grep -qx "Default"
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$IOS_ENT" | grep -qx "group.com.wesc9.athlth"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$WIDGET_ENT" | grep -qx "group.com.wesc9.athlth"
 
           /usr/libexec/PlistBuddy -c "Print :WKCompanionAppBundleIdentifier" "$WATCH_APP/Info.plist" | grep -qx "com.wesc9.athlth"
           /usr/libexec/PlistBuddy -c "Print :WKBackgroundModes:0" "$WATCH_APP/Info.plist" | grep -qx "workout-processing"
