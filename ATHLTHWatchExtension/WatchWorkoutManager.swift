@@ -34,6 +34,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var targetAlertConfiguration:
         WatchWorkoutTargetAlertConfiguration?
     @Published private(set) var liveTargetStatus: String?
+    @Published private(set) var ghostRaceTitle: String?
+    @Published private(set) var ghostDistanceDeltaMeters: Double?
+    @Published private(set) var ghostTimeDeltaSeconds: TimeInterval?
     @Published private(set) var lapCount = 0
     @Published private(set) var currentLapElapsedTime: TimeInterval = 0
     @Published private(set) var currentLapDistanceMeters: Double = 0
@@ -74,6 +77,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var plannedRouteLocations: [CLLocation] = []
     private var plannedRouteCumulativeMeters: [Double] = []
     private var plannedRouteGeometryMeters: Double = 0
+    private var ghostRaceConfiguration:
+        WatchGhostRaceTransfer?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
@@ -156,6 +161,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if isActive,
            !workout.steps.isEmpty {
             announceCurrentStructuredStep(prefix: "Starting")
+        }
+    }
+
+    func configureGhostRace(
+        _ ghost: WatchGhostRaceTransfer?
+    ) {
+        ghostRaceConfiguration = ghost
+
+        publish {
+            self.ghostRaceTitle = ghost?.title
+            self.ghostDistanceDeltaMeters = nil
+            self.ghostTimeDeltaSeconds = nil
         }
     }
 
@@ -515,6 +532,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         plannedRouteLocations = []
         plannedRouteCumulativeMeters = []
         plannedRouteGeometryMeters = 0
+        ghostRaceConfiguration = nil
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
@@ -537,6 +555,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.routeAlertConfiguration = .standard
             self.targetAlertConfiguration = nil
             self.liveTargetStatus = nil
+            self.ghostRaceTitle = nil
+            self.ghostDistanceDeltaMeters = nil
+            self.ghostTimeDeltaSeconds = nil
             self.lapCount = 0
             self.currentLapElapsedTime = 0
             self.currentLapDistanceMeters = 0
@@ -1378,11 +1399,93 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 nearestDistance
         }
 
+        updateGhostRace(
+            traveledAlongRoute:
+                traveledAlongRoute
+        )
+
         evaluateRouteAlert(
             deviationMeters: nearestDistance,
             horizontalAccuracy:
                 location.horizontalAccuracy
         )
+    }
+
+    private func updateGhostRace(
+        traveledAlongRoute: Double
+    ) {
+        guard let ghost =
+                ghostRaceConfiguration,
+              !ghost.points.isEmpty
+        else {
+            return
+        }
+
+        let targetTime =
+            max(elapsedTime, 0)
+
+        var timeLow = 0
+        var timeHigh =
+            ghost.points.count - 1
+
+        while timeLow < timeHigh {
+            let mid =
+                (timeLow + timeHigh + 1) / 2
+
+            if ghost.points[mid]
+                .elapsedTime <= targetTime {
+                timeLow = mid
+            } else {
+                timeHigh = mid - 1
+            }
+        }
+
+        let ghostAtTime =
+            ghost.points[timeLow]
+
+        let userDistance =
+            min(
+                max(
+                    traveledAlongRoute,
+                    0
+                ),
+                max(
+                    ghost.routeDistanceMeters,
+                    1
+                )
+            )
+
+        var nearest =
+            ghost.points[0]
+        var nearestDifference =
+            abs(
+                nearest.cumulativeMeters -
+                userDistance
+            )
+
+        for point in ghost.points {
+            let difference =
+                abs(
+                    point.cumulativeMeters -
+                    userDistance
+                )
+
+            if difference <
+                nearestDifference {
+                nearest = point
+                nearestDifference =
+                    difference
+            }
+        }
+
+        publish {
+            self.ghostDistanceDeltaMeters =
+                userDistance -
+                ghostAtTime.cumulativeMeters
+            self.ghostTimeDeltaSeconds =
+                nearest.elapsedTime -
+                self.elapsedTime
+        }
     }
 
     private func evaluateRouteAlert(
