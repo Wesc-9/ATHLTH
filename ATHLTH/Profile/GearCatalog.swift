@@ -30,7 +30,9 @@ struct GearCatalogEntry: Codable, Identifiable, Hashable {
             in: .whitespacesAndNewlines
         )
 
-        if cleanModel.localizedCaseInsensitiveHasPrefix(cleanBrand) {
+        if cleanModel
+            .lowercased()
+            .hasPrefix(cleanBrand.lowercased()) {
             return cleanModel
         }
 
