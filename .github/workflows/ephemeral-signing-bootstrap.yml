@@ -137,7 +137,7 @@ jobs:
           KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
           KEYCHAIN_PATH="$RUNNER_TEMP/athlth-signing.keychain-db"
 
-          openssl pkcs12 -export \
+          openssl pkcs12 -export -legacy \
             -inkey "$RUNNER_TEMP/athlth-dist.key" \
             -in "$RUNNER_TEMP/athlth-dist.pem" \
             -out "$RUNNER_TEMP/athlth-dist.p12" \
