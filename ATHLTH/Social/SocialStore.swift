@@ -93,7 +93,8 @@ final class SocialStore: ObservableObject {
 
     func refresh(
         challengeStore: ChallengeStore? = nil,
-        notificationStore: ATHLTHNotificationStore? = nil
+        notificationStore: ATHLTHNotificationStore? = nil,
+        deliverSystemAlertsForImportedInbox: Bool = true
     ) async {
         guard let currentUserID = service.currentUserID else {
             reset()
@@ -158,7 +159,10 @@ final class SocialStore: ObservableObject {
             }
 
             if let notificationStore {
-                importInboxEvents(into: notificationStore)
+                importInboxEvents(
+                    into: notificationStore,
+                    deliverSystemAlerts: deliverSystemAlertsForImportedInbox
+                )
             }
 
             errorMessage = nil
@@ -1171,7 +1175,8 @@ final class SocialStore: ObservableObject {
     }
 
     private func importInboxEvents(
-        into notificationStore: ATHLTHNotificationStore
+        into notificationStore: ATHLTHNotificationStore,
+        deliverSystemAlerts: Bool
     ) {
         for event in inboxEvents {
             notificationStore.add(
@@ -1190,6 +1195,7 @@ final class SocialStore: ObservableObject {
                     socialEntityID: event.entityID
                 ),
                 deliverSystemAlert:
+                    deliverSystemAlerts &&
                     event.pushNotifiedAt == nil &&
                     event.createdAt >= activationDate
             )
