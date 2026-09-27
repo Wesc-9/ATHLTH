@@ -85,7 +85,11 @@ final class RecoveryAIService {
         bypassCache: Bool = false
     ) async throws -> RecoveryAIInsight {
         let signature = try contextSignature(context)
-        let cacheKey = "athlth.recoveryAIInsight.current"
+        let userScope =
+            client.auth.currentUser?.id.uuidString
+            ?? "signed-out"
+        let cacheKey =
+            "athlth.recoveryAIInsight.\(userScope)"
 
         if !bypassCache,
            let data = UserDefaults.standard.data(
