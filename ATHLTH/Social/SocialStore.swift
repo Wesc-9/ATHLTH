@@ -145,7 +145,10 @@ final class SocialStore: ObservableObject {
             )
 
             self.privacy = privacy
-            self.feed = feed
+            self.feed = feed.filter { item in
+                item.activity.actorID == currentUserID ||
+                followingIDs.contains(item.activity.actorID)
+            }
             blockedUsers = blocked
             inboxEvents = inbox
             applyWorkoutSessions(
@@ -710,7 +713,10 @@ final class SocialStore: ObservableObject {
                 workoutSessionID: resolvedSession?.id
             )
 
-            feed = try await service.loadFeed()
+            feed = try await service.loadFeed().filter { item in
+                item.activity.actorID == currentUserID ||
+                followingIDs.contains(item.activity.actorID)
+            }
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -771,7 +777,10 @@ final class SocialStore: ObservableObject {
                 workoutSessionID: linkedSession?.id
             )
 
-            feed = try await service.loadFeed()
+            feed = try await service.loadFeed().filter { item in
+                item.activity.actorID == currentUserID ||
+                followingIDs.contains(item.activity.actorID)
+            }
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -907,7 +916,12 @@ final class SocialStore: ObservableObject {
         }
 
         if !records.isEmpty {
-            feed = (try? await service.loadFeed()) ?? feed
+            if let refreshedFeed = try? await service.loadFeed() {
+                feed = refreshedFeed.filter { item in
+                    item.activity.actorID == currentUserID ||
+                    followingIDs.contains(item.activity.actorID)
+                }
+            }
         }
     }
 
@@ -950,7 +964,12 @@ final class SocialStore: ObservableObject {
         }
 
         if !records.isEmpty {
-            feed = (try? await service.loadFeed()) ?? feed
+            if let refreshedFeed = try? await service.loadFeed() {
+                feed = refreshedFeed.filter { item in
+                    item.activity.actorID == currentUserID ||
+                    followingIDs.contains(item.activity.actorID)
+                }
+            }
         }
     }
 
