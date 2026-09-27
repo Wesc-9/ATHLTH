@@ -94,6 +94,12 @@ struct AdvancedPlannerView: View {
                 .environmentObject(session)
             }
         }
+        .sheet(isPresented: $showingSpotifyPlaylistPicker) {
+            SpotifyPlaylistPickerView(
+                title: "Program Playlist",
+                selection: $selectedSpotifyPlaylist
+            )
+        }
         .confirmationDialog(
             weekPendingRemoval.map {
                 "Remove W\($0.weekNumber)?"
@@ -2754,6 +2760,7 @@ struct PlanMetadataEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     let plan: TrainingPlan
 
@@ -2764,6 +2771,9 @@ struct PlanMetadataEditorView: View {
     @State private var startDate: Date
     @State private var weekCount: Int
     @State private var selectedGoalIDs: Set<UUID> = []
+    @State private var selectedSpotifyPlaylist: SpotifyPlaylistReference?
+    @State private var spotifyAutoplay: Bool
+    @State private var showingSpotifyPlaylistPicker = false
     @State private var saveError: String?
     @State private var showingDeleteConfirmation = false
 
@@ -2779,6 +2789,10 @@ struct PlanMetadataEditorView: View {
                 Calendar.current.startOfDay(for: Date())
         )
         _weekCount = State(initialValue: max(plan.weeks.count, 1))
+        _selectedSpotifyPlaylist =
+            State(initialValue: plan.spotifyPlaylist)
+        _spotifyAutoplay =
+            State(initialValue: plan.spotifyAutoplayOnWorkoutStart)
     }
 
     private var resolvedEndDate: Date {
@@ -2892,6 +2906,63 @@ struct PlanMetadataEditorView: View {
                     }
                 }
 
+                Section("Spotify") {
+                    if spotify.isConnected {
+                        Button {
+                            showingSpotifyPlaylistPicker = true
+                        } label: {
+                            LabeledContent {
+                                Text(
+                                    selectedSpotifyPlaylist?.name
+                                        ?? "None"
+                                )
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            } label: {
+                                Label(
+                                    "Workout playlist",
+                                    systemImage: "music.note.list"
+                                )
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        if selectedSpotifyPlaylist != nil {
+                            Toggle(
+                                "Start playlist with workouts",
+                                isOn: $spotifyAutoplay
+                            )
+                        }
+
+                        Text(
+                            "The linked playlist is used when a workout from this program starts on iPhone. Watch-only starts never wait for Spotify."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    } else if spotify.isConfigured {
+                        Button {
+                            spotify.connect()
+                        } label: {
+                            Label(
+                                "Connect Spotify",
+                                systemImage: "link"
+                            )
+                        }
+
+                        Text(
+                            "Connect Spotify to attach a playlist to this program."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    } else {
+                        Text(
+                            "Spotify needs a client ID before playlists can be linked."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
                 Section {
                     Text(
                         "Changing a program creates a new local version. Shared-program sync can use this version number later."
@@ -2959,6 +3030,13 @@ struct PlanMetadataEditorView: View {
                             plan.id,
                             goalIDs: selectedGoalIDs
                         )
+
+                        _ = session.setTrainingPlanSpotify(
+                            planID: plan.id,
+                            playlist: selectedSpotifyPlaylist,
+                            autoplay: spotifyAutoplay
+                        )
+
                         dismiss()
                     }
                     .disabled(
