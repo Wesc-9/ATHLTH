@@ -1285,7 +1285,7 @@ struct OfficialWeeklyChallengeCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(challenge.title)
-                        .font(.system(size: 29, weight: .bold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.78)
@@ -1401,12 +1401,12 @@ struct OfficialWeeklyChallengeCard: View {
 
                     progressRing
                         .padding(.trailing, 16)
-                        .padding(.bottom, 58)
+                        .padding(.bottom, 48)
                 }
             }
             .allowsHitTesting(false)
         }
-        .frame(height: 218)
+        .frame(height: 168)
         .frame(maxWidth: .infinity)
         .clipShape(
             RoundedRectangle(
