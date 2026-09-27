@@ -24,6 +24,7 @@ struct CoachPlanAdaptationRequest: Encodable {
     let planTitle: String
     let planStartDate: String?
     let planEndDate: String?
+    let today: String
     let days: [CoachPlanAdaptationDayInput]
     let goals: [AIProgramGoalInput]
     let recentTraining: [String]
@@ -161,6 +162,7 @@ final class CoachPlanAdaptationService {
             planEndDate: plan.endDate.map {
                 dayFormatter.string(from: $0)
             },
+            today: dayFormatter.string(from: Date()),
             days: days,
             goals: goals.prefix(8).map(AIProgramGoalInput.init),
             recentTraining: Array(recentTraining.prefix(20)),
