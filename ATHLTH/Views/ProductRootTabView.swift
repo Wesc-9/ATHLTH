@@ -11,7 +11,37 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
 
-    @State private var selectedTab = 0
+    @State private var selectedTab: Int
+
+    init() {
+        let prefix =
+            "--athlth-compatibility-tab="
+        let requestedTab =
+            ProcessInfo.processInfo.arguments
+                .first(
+                    where: {
+                        $0.hasPrefix(prefix)
+                    }
+                )
+                .flatMap {
+                    Int(
+                        $0.dropFirst(
+                            prefix.count
+                        )
+                    )
+                }
+
+        _selectedTab = State(
+            initialValue:
+                min(
+                    max(
+                        requestedTab ?? 0,
+                        0
+                    ),
+                    4
+                )
+        )
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
