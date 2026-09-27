@@ -179,6 +179,70 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    /// Launch/Home bootstrap that loads only the relationship state needed
+    /// to scope the feed, privacy, inbox and the small Activity Center page.
+    /// Community performs the heavier relationship/session refresh on demand.
+    func refreshHomeContext(
+        notificationStore: ATHLTHNotificationStore? = nil,
+        deliverSystemAlertsForImportedInbox: Bool = true,
+        force: Bool = false
+    ) async {
+        guard let currentUserID = service.currentUserID else {
+            reset()
+            return
+        }
+
+        if !force,
+           let lastHomeFeedRefreshAt,
+           Date().timeIntervalSince(lastHomeFeedRefreshAt) < 120,
+           !feed.isEmpty,
+           privacy != nil {
+            return
+        }
+
+        guard !isHomeFeedRefreshing else { return }
+
+        isHomeFeedRefreshing = true
+        defer { isHomeFeedRefreshing = false }
+
+        do {
+            async let followingTask = service.loadFollowing(
+                for: currentUserID
+            )
+            async let privacyTask = service.loadPrivacySettings()
+            async let feedTask = service.loadFeed(limit: 18)
+            async let inboxTask = service.loadInboxEvents()
+
+            let followingRows = try await followingTask
+            let loadedPrivacy = try await privacyTask
+            let loadedFeed = try await feedTask
+            let loadedInbox = try await inboxTask
+
+            followingIDs = Set(followingRows.map(\.followingID))
+            privacy = loadedPrivacy
+            feed = loadedFeed.filter { item in
+                item.activity.actorID == currentUserID ||
+                followingIDs.contains(item.activity.actorID)
+            }
+            inboxEvents = loadedInbox
+            lastHomeFeedRefreshAt = Date()
+
+            if let notificationStore {
+                importInboxEvents(
+                    into: notificationStore,
+                    deliverSystemAlerts:
+                        deliverSystemAlertsForImportedInbox
+                )
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            // Keep the last cached Home content. A full Community refresh can
+            // surface a detailed error if the backend remains unavailable.
+        }
+    }
+
     /// Lightweight Home refresh. The full social refresh fans out across
     /// relationships, privacy, inbox, challenges and workout sessions; Home
     /// only needs the activity feed for its Activity Center.
@@ -201,6 +265,15 @@ final class SocialStore: ObservableObject {
         defer { isHomeFeedRefreshing = false }
 
         do {
+            if followingIDs.isEmpty {
+                let followingRows = try await service.loadFollowing(
+                    for: currentUserID
+                )
+                followingIDs = Set(
+                    followingRows.map(\.followingID)
+                )
+            }
+
             let refreshedFeed = try await service.loadFeed(limit: 18)
             feed = refreshedFeed.filter { item in
                 item.activity.actorID == currentUserID ||
