@@ -102,7 +102,7 @@ struct TrophySeriesDefinition: Identifiable, Hashable {
     let stages: [TrophyStageDefinition]
 }
 
-struct TrophyHealthSnapshot: Hashable {
+struct TrophyHealthSnapshot: Hashable, Codable {
     let workoutCount: Int
     let workoutCountReachedAt: [Int: Date]
 
