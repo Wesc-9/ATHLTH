@@ -1625,6 +1625,7 @@ struct TrainingPlanManagerView: View {
     @State private var showingAllPlans = false
     @State private var programToStart: TrainingPlan?
     @State private var aiMode: AIProgramGenerationMode?
+    @State private var showingPlanAdaptation = false
     @State private var showingAISubscriptionOffer = false
 
     init(onOpenCalendar: @escaping () -> Void = {}) {
@@ -1712,6 +1713,15 @@ struct TrainingPlanManagerView: View {
 
                     if session.activePlan != nil {
                         Button {
+                            openPlanAdaptation()
+                        } label: {
+                            Label(
+                                "Adapt plan",
+                                systemImage: "arrow.triangle.2.circlepath"
+                            )
+                        }
+
+                        Button {
                             openAI(.complete)
                         } label: {
                             Label(
@@ -1786,6 +1796,9 @@ struct TrainingPlanManagerView: View {
         .sheet(item: $aiMode) { mode in
             AIProgramBuilderView(mode: mode)
         }
+        .sheet(isPresented: $showingPlanAdaptation) {
+            CoachPlanAdaptationView()
+        }
         .sheet(isPresented: $showingAISubscriptionOffer) {
             SubscriptionOfferView {
                 session.applyStoreKitEntitlement(
@@ -1818,6 +1831,15 @@ struct TrainingPlanManagerView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(ATHLTHTheme.accent)
+    }
+
+    private func openPlanAdaptation() {
+        guard session.canAccess(.aiTrainingPrograms) else {
+            showingAISubscriptionOffer = true
+            return
+        }
+
+        showingPlanAdaptation = true
     }
 
     private func openAI(_ mode: AIProgramGenerationMode) {
