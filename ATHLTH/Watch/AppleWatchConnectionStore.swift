@@ -259,6 +259,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    func sendGhostRace(
+        _ ghost: WatchGhostRaceTransfer
+    ) {
+        sendWatchPayload(
+            ghost,
+            kind: .ghostRace
+        )
+    }
+
     func sendStrengthSnapshot(
         _ snapshot: WatchStrengthSessionSnapshot
     ) {
