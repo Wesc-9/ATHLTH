@@ -311,7 +311,12 @@ struct ATHLTHProfileSetupView: View {
     }
 
     private var broadestProfileVisibility: ProfileVisibility {
+        // Section choices must not downgrade the existing profile audience.
+        let profileVisibility = social.privacy.flatMap {
+            ProfileVisibility(rawValue: $0.profileVisibility)
+        } ?? settings.profileVisibility
         let values = [
+            profileVisibility,
             trainingFocusVisibility,
             trainingStatusVisibility,
             performanceVisibility,

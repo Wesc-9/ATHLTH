@@ -1159,13 +1159,12 @@ struct SocialPrivacySettingsView: View {
         Form {
             if let binding = draftBinding {
                 Section("Profile") {
-                    Picker("Who can view my profile", selection: binding.profileVisibility) {
+                    Picker("Profile visibility", selection: binding.profileVisibility) {
                         Text("Private").tag("private")
                         Text("Friends").tag("friends")
                         Text("Public").tag("public")
                     }
 
-                    Toggle("Appear in search", isOn: binding.discoverable)
                     Toggle("Allow friend requests", isOn: binding.allowFriendRequests)
                 }
 

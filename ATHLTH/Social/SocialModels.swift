@@ -159,7 +159,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
     static func fallback(userID: UUID) -> SocialPrivacySettings {
         SocialPrivacySettings(
             userID: userID,
-            profileVisibility: "private",
+            profileVisibility: "public",
             discoverable: true,
             allowFriendRequests: true,
             allowDirectMessages: "requests",

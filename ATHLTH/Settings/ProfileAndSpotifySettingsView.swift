@@ -1050,18 +1050,13 @@ struct ATHLTHPrivacyCenterView: View {
             if let binding = draftBinding {
                 Section("Social & Messages") {
                     Picker(
-                        "Who can view my profile",
+                        "Profile visibility",
                         selection: binding.profileVisibility
                     ) {
                         Text("Private").tag("private")
                         Text("Friends").tag("friends")
                         Text("Public").tag("public")
                     }
-
-                    Toggle(
-                        "Appear in search",
-                        isOn: binding.discoverable
-                    )
 
                     Toggle(
                         "Allow friend requests",

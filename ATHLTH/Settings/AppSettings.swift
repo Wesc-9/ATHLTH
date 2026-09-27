@@ -327,7 +327,7 @@ final class AppSettingsStore: ObservableObject {
 
         appearance = .light
 
-        profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .privateOnly
+        profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .publicProfile
         defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .privateOnly
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? false
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
@@ -339,12 +339,7 @@ final class AppSettingsStore: ObservableObject {
         profileSetupCompleted = resolvedProfileSetupCompleted
 
         if !resolvedProfileSetupCompleted {
-            profileVisibility = .privateOnly
             defaultActivityVisibility = .privateOnly
-            defaults.set(
-                ProfileVisibility.privateOnly.rawValue,
-                forKey: "settings.profileVisibility"
-            )
             defaults.set(
                 ProfileVisibility.privateOnly.rawValue,
                 forKey: "settings.defaultActivityVisibility"

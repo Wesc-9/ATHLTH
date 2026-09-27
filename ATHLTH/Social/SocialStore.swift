@@ -387,6 +387,12 @@ final class SocialStore: ObservableObject {
     }
 
     func updatePrivacy(_ updated: SocialPrivacySettings) async {
+        var updated = updated
+        // Public profiles are searchable without a separate setting.
+        // Preserve explicit search opt-outs on existing non-public profiles.
+        if updated.profileVisibility == "public" {
+            updated.discoverable = true
+        }
         privacy = updated
         errorMessage = nil
 
