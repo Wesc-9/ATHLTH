@@ -756,8 +756,8 @@ private struct HomeActivityOutdoorCard: View {
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.94),
-                        Color.white.opacity(0.63),
+                        Color.white.opacity(0.90),
+                        Color.white.opacity(0.52),
                         Color.clear
                     ],
                     startPoint: .leading,
@@ -766,30 +766,31 @@ private struct HomeActivityOutdoorCard: View {
 
                 LinearGradient(
                     colors: [
+                        Color.white.opacity(0.04),
                         Color.clear,
-                        Color.black.opacity(0.10),
-                        Color.black.opacity(0.52)
+                        Color.black.opacity(0.34)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .top, spacing: 10) {
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 9) {
                             activityBadge
 
                             HStack(spacing: 10) {
                                 Image(systemName: workout.activity.icon)
-                                    .font(.system(size: 17, weight: .semibold))
+                                    .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(ATHLTHTheme.primaryText)
-                                    .frame(width: 42, height: 42)
-                                    .background(
-                                        Color.white.opacity(0.86),
-                                        in: Circle()
-                                    )
+                                    .frame(width: 40, height: 40)
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .overlay {
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
+                                    }
 
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: 1) {
                                     Text(activityTitle)
                                         .font(.headline)
                                         .foregroundStyle(ATHLTHTheme.primaryText)
@@ -802,7 +803,7 @@ private struct HomeActivityOutdoorCard: View {
                                     )
                                     .font(.caption)
                                     .foregroundStyle(
-                                        ATHLTHTheme.primaryText.opacity(0.67)
+                                        ATHLTHTheme.primaryText.opacity(0.68)
                                     )
                                 }
                             }
@@ -824,20 +825,21 @@ private struct HomeActivityOutdoorCard: View {
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                                 .frame(width: 36, height: 36)
-                                .background(
-                                    Color.white.opacity(0.86),
-                                    in: Circle()
-                                )
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
+                                }
                         }
                         .buttonStyle(.plain)
                     }
 
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(workout.title)
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.system(size: 25, weight: .bold, design: .rounded))
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .lineLimit(2)
-                            .minimumScaleFactor(0.78)
+                            .minimumScaleFactor(0.80)
 
                         Text(outdoorDescription)
                             .font(.subheadline)
@@ -847,7 +849,7 @@ private struct HomeActivityOutdoorCard: View {
                             .lineLimit(2)
                     }
 
-                    Spacer(minLength: 18)
+                    Spacer(minLength: 16)
                 }
                 .padding(16)
 
@@ -876,12 +878,11 @@ private struct HomeActivityOutdoorCard: View {
                             }
                         }
                     }
-                    .padding(16)
-                    .padding(.bottom, 8)
+                    .padding(15)
                     .allowsHitTesting(false)
                 }
             }
-            .frame(height: 248)
+            .frame(height: 252)
             .clipped()
 
             VStack(spacing: 10) {
@@ -976,33 +977,17 @@ private struct HomeActivityOutdoorCard: View {
                                         : "Insight"
                                 )
                                 .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
+                                .foregroundStyle(ATHLTHTheme.mutedText)
 
                                 if aiInsight != nil ||
                                     isAIInsightLoading {
                                     Text("ATHLTH+")
-                                        .font(
-                                            .system(
-                                                size: 8,
-                                                weight: .bold
-                                            )
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme.accentDeep
-                                        )
-                                        .padding(
-                                            .horizontal,
-                                            5
-                                        )
-                                        .padding(
-                                            .vertical,
-                                            2
-                                        )
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
                                         .background(
-                                            ATHLTHTheme
-                                                .champagneSoft,
+                                            ATHLTHTheme.champagneSoft,
                                             in: Capsule()
                                         )
                                 }
@@ -1012,21 +997,12 @@ private struct HomeActivityOutdoorCard: View {
                                 aiInsight == nil {
                                 HStack(spacing: 7) {
                                     ProgressView()
-                                        .controlSize(
-                                            .mini
-                                        )
+                                        .controlSize(.mini)
                                     Text(
                                         "Analyzing route, effort and heart-rate response…"
                                     )
-                                    .font(
-                                        .caption.weight(
-                                            .medium
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .primaryText
-                                    )
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
                                 }
                             } else {
                                 Text(
@@ -1035,10 +1011,8 @@ private struct HomeActivityOutdoorCard: View {
                                     } ?? insightText
                                 )
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-                                .lineLimit(3)
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .lineLimit(2)
                             }
                         }
 
@@ -1051,7 +1025,7 @@ private struct HomeActivityOutdoorCard: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
                     .background(
-                        Color.white.opacity(0.96),
+                        Color.white.opacity(0.94),
                         in: RoundedRectangle(
                             cornerRadius: 15,
                             style: .continuous
@@ -1065,14 +1039,15 @@ private struct HomeActivityOutdoorCard: View {
             .background(
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.73),
-                        Color.black.opacity(0.59)
+                        Color(red: 0.12, green: 0.17, blue: 0.17).opacity(0.93),
+                        Color(red: 0.18, green: 0.23, blue: 0.22).opacity(0.91)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
         }
+        .background(Color.white.opacity(0.72))
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 24,
@@ -1084,13 +1059,13 @@ private struct HomeActivityOutdoorCard: View {
                 cornerRadius: 24,
                 style: .continuous
             )
-            .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
+            .stroke(Color.white.opacity(0.84), lineWidth: 0.8)
         }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.08),
-            radius: 14,
+            color: Color.black.opacity(0.10),
+            radius: 18,
             x: 0,
-            y: 7
+            y: 9
         )
     }
 
@@ -1558,7 +1533,7 @@ private final class HomeActivityRouteSnapshotRenderer {
         options.size =
             CGSize(width: 520, height: 320)
         options.scale = 2
-        options.mapType = .hybrid
+        options.mapType = .satellite
         options.pointOfInterestFilter =
             .excludingAll
         options.traitCollection =
@@ -1599,12 +1574,37 @@ private final class HomeActivityRouteSnapshotRenderer {
                         size: options.size
                     )
 
-                    context.cgContext.setFillColor(
-                        UIColor.black
-                            .withAlphaComponent(0.12)
-                            .cgColor
-                    )
-                    context.cgContext.fill(bounds)
+                    let overlayColors = [
+                        UIColor(
+                            red: 0.93,
+                            green: 0.96,
+                            blue: 0.91,
+                            alpha: 0.18
+                        ).cgColor,
+                        UIColor(
+                            red: 0.10,
+                            green: 0.18,
+                            blue: 0.17,
+                            alpha: 0.10
+                        ).cgColor
+                    ] as CFArray
+
+                    if let gradient =
+                        CGGradient(
+                            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                            colors: overlayColors,
+                            locations: [0, 1]
+                        ) {
+                        context.cgContext.drawLinearGradient(
+                            gradient,
+                            start: CGPoint(x: 0, y: 0),
+                            end: CGPoint(
+                                x: bounds.maxX,
+                                y: bounds.maxY
+                            ),
+                            options: []
+                        )
+                    }
 
                     guard points.count >= 2
                     else {
@@ -1651,25 +1651,35 @@ private final class HomeActivityRouteSnapshotRenderer {
                     }
 
                     UIColor.black
-                        .withAlphaComponent(0.30)
+                        .withAlphaComponent(0.24)
                         .setStroke()
-                    routePath.lineWidth = 14
+                    routePath.lineWidth = 18
                     routePath.stroke()
 
                     UIColor.white
-                        .withAlphaComponent(0.92)
+                        .withAlphaComponent(0.86)
                         .setStroke()
-                    routePath.lineWidth = 9
+                    routePath.lineWidth = 13
                     routePath.stroke()
 
                     UIColor(
-                        red: 0.25,
-                        green: 0.95,
+                        red: 0.36,
+                        green: 0.96,
                         blue: 0.68,
                         alpha: 1
                     )
                     .setStroke()
-                    routePath.lineWidth = 5
+                    routePath.lineWidth = 8
+                    routePath.stroke()
+
+                    UIColor(
+                        red: 0.70,
+                        green: 1.00,
+                        blue: 0.82,
+                        alpha: 0.72
+                    )
+                    .setStroke()
+                    routePath.lineWidth = 3
                     routePath.stroke()
 
                     if let first =
