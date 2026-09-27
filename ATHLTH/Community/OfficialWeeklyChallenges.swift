@@ -1190,6 +1190,8 @@ struct OfficialWeeklyChallengeCard: View {
     let challenge: OfficialWeeklyChallenge
     let profiles: [SocialProfileCard]
 
+    @State private var showingDetails = false
+
     private var joined: Bool {
         store.isJoined(challenge.id)
     }
@@ -1390,6 +1392,20 @@ struct OfficialWeeklyChallengeCard: View {
             radius: 14,
             y: 7
         )
+        .contentShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .onTapGesture {
+            showingDetails = true
+        }
+        .navigationDestination(isPresented: $showingDetails) {
+            OfficialWeeklyChallengeDetailView(
+                challengeID: challenge.id
+            )
+        }
         .task(id: health.workouts.map(\.id)) {
             guard joined else { return }
             await store.syncCompletionState(
