@@ -24,8 +24,6 @@ final class AppleCalendarSyncStore: ObservableObject {
         let plan: TrainingPlan?
         let communityEvents: [CommunityEventItem]
         let challenges: [ATHLTHChallenge]
-        let officialChallenges: [OfficialWeeklyChallenge]
-        let joinedOfficialChallengeIDs: Set<UUID>
         let currentUserID: UUID?
     }
 
@@ -117,8 +115,6 @@ final class AppleCalendarSyncStore: ObservableObject {
         plan: TrainingPlan?,
         communityEvents: [CommunityEventItem] = [],
         challenges: [ATHLTHChallenge] = [],
-        officialChallenges: [OfficialWeeklyChallenge] = [],
-        joinedOfficialChallengeIDs: Set<UUID> = [],
         currentUserID: UUID? = nil
     ) async {
         errorMessage = nil
@@ -141,9 +137,6 @@ final class AppleCalendarSyncStore: ObservableObject {
                 plan: plan,
                 communityEvents: communityEvents,
                 challenges: challenges,
-                officialChallenges: officialChallenges,
-                joinedOfficialChallengeIDs:
-                    joinedOfficialChallengeIDs,
                 currentUserID: currentUserID
             )
         } catch {
@@ -194,8 +187,6 @@ final class AppleCalendarSyncStore: ObservableObject {
         plan: TrainingPlan?,
         communityEvents: [CommunityEventItem] = [],
         challenges: [ATHLTHChallenge] = [],
-        officialChallenges: [OfficialWeeklyChallenge] = [],
-        joinedOfficialChallengeIDs: Set<UUID> = [],
         currentUserID: UUID? = nil
     ) async {
         guard isEnabled else {
@@ -214,9 +205,6 @@ final class AppleCalendarSyncStore: ObservableObject {
             plan: plan,
             communityEvents: communityEvents,
             challenges: challenges,
-            officialChallenges: officialChallenges,
-            joinedOfficialChallengeIDs:
-                joinedOfficialChallengeIDs,
             currentUserID: currentUserID
         )
     }
@@ -225,8 +213,6 @@ final class AppleCalendarSyncStore: ObservableObject {
         plan: TrainingPlan?,
         communityEvents: [CommunityEventItem] = [],
         challenges: [ATHLTHChallenge] = [],
-        officialChallenges: [OfficialWeeklyChallenge] = [],
-        joinedOfficialChallengeIDs: Set<UUID> = [],
         currentUserID: UUID? = nil
     ) async {
         let snapshot = CalendarSyncSnapshot(
@@ -274,10 +260,6 @@ final class AppleCalendarSyncStore: ObservableObject {
                     pendingSnapshot.communityEvents,
                 challenges:
                     pendingSnapshot.challenges,
-                officialChallenges:
-                    pendingSnapshot.officialChallenges,
-                joinedOfficialChallengeIDs:
-                    pendingSnapshot.joinedOfficialChallengeIDs,
                 currentUserID:
                     pendingSnapshot.currentUserID
             )
