@@ -3145,6 +3145,49 @@ struct ATHLTHTrainView: View {
             .padding(.top, 10)
         }
 
+        NavigationLink {
+            GhostRaceHubView()
+        } label: {
+            ATHLTHCard {
+                HStack(spacing: 14) {
+                    Image(systemName: "figure.run.circle.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .frame(width: 52, height: 52)
+                        .background(
+                            ATHLTHTheme.vitalitySoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("GHOST RACE")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.5)
+                            .foregroundStyle(ATHLTHTheme.vitality)
+
+                        Text("Race Yourself")
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text("Follow a live ghost from a previous run or race your best route attempt.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+
         if !session.savedWorkoutTemplates.isEmpty {
             ATHLTHCard {
                 ATHLTHSectionHeader(
