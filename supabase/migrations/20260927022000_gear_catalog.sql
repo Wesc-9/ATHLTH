@@ -1,3 +1,23 @@
+create schema if not exists private;
+
+create or replace function private.is_app_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.account_roles ar
+    where ar.user_id = (select auth.uid())
+      and ar.role in ('admin', 'owner')
+  );
+$$;
+
+revoke all on function private.is_app_admin() from public;
+grant execute on function private.is_app_admin() to authenticated;
+
 create table if not exists public.gear_catalog (
   id uuid primary key default gen_random_uuid(),
   category text not null check (category in ('watch','shoes','headphones','other')),
