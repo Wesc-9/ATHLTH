@@ -162,11 +162,15 @@ struct ATHLTHHomeView: View {
     private var hasEditedATHLTHProfile = false
 
     var body: some View {
-        NavigationStack {
+        let useImmersiveHomeHero =
+            UIDevice.current.userInterfaceIdiom == .pad ||
+            UIScreen.main.bounds.width >= 390
+
+        return NavigationStack {
             ATHLTHPinnedHeroLayout(
                 accent: ATHLTHTheme.premiumGold.opacity(0.70),
                 softTransition: true,
-                immersiveTransition: true
+                immersiveTransition: useImmersiveHomeHero
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
@@ -176,13 +180,28 @@ struct ATHLTHHomeView: View {
                             session.profile.presence.state == .training
                                 ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
                                 : "Today, training and recovery at a glance.",
-                        height: 242,
+                        height:
+                            useImmersiveHomeHero
+                                ? 242
+                                : 190,
                         alignment: .leading,
-                        focalOffsetX: 10,
-                        focalOffsetY: 8,
-                        titleFontSize: 30,
-                        copyWidthFraction: 0.76,
-                        immersiveCopy: true
+                        focalOffsetX:
+                            useImmersiveHomeHero
+                                ? 10
+                                : 18,
+                        focalOffsetY:
+                            useImmersiveHomeHero
+                                ? 8
+                                : 14,
+                        titleFontSize:
+                            useImmersiveHomeHero
+                                ? 30
+                                : 27,
+                        copyWidthFraction:
+                            useImmersiveHomeHero
+                                ? 0.76
+                                : 0.86,
+                        immersiveCopy: useImmersiveHomeHero
                     )
 
                     HStack(spacing: 8) {
