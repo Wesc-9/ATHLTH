@@ -20,6 +20,7 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var accountService: SupabaseAccountService
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var step: OnboardingStep = .account
     @State private var username = ""
@@ -48,6 +49,11 @@ struct OnboardingFlowView: View {
 
     private let usernameService = SupabaseUsernameAvailabilityService()
 
+    private var usesWideTabletLayout: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad &&
+        horizontalSizeClass == .regular
+    }
+
     var body: some View {
         ZStack {
             if step == .account {
@@ -72,10 +78,20 @@ struct OnboardingFlowView: View {
                         VStack(spacing: 22) {
                             content
                         }
-                        .padding(.horizontal, 24)
+                        .padding(
+                            .horizontal,
+                            usesWideTabletLayout
+                                ? 36
+                                : 24
+                        )
                         .padding(.top, 16)
                         .padding(.bottom, 28)
-                        .frame(maxWidth: 680)
+                        .frame(
+                            maxWidth:
+                                usesWideTabletLayout
+                                    ? 760
+                                    : 680
+                        )
                         .frame(maxWidth: .infinity)
                     }
                     .scrollDismissesKeyboard(.interactively)
@@ -257,7 +273,8 @@ struct OnboardingFlowView: View {
 
     private var accountStep: some View {
         GeometryReader { proxy in
-            if proxy.size.width >= 700 {
+            if UIDevice.current.userInterfaceIdiom == .pad &&
+                proxy.size.width >= 700 {
                 iPadAccountStep(proxy: proxy)
             } else {
                 iPhoneAccountStep(proxy: proxy)
@@ -2019,9 +2036,16 @@ struct OnboardingFlowView: View {
                 EmptyView()
             }
         }
+        .frame(
+            maxWidth:
+                usesWideTabletLayout
+                    ? 760
+                    : .infinity
+        )
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 18)
+        .frame(maxWidth: .infinity)
         .background(OnboardingTheme.card.opacity(0.97))
         .overlay(alignment: .top) {
             Rectangle()
