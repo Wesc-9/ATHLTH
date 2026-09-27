@@ -981,6 +981,81 @@ private struct WatchRunWalkWorkoutPager: View {
             .padding(.vertical, 11)
             .watchSurface(radius: 18)
 
+            if workoutManager.ghostRaceTitle != nil {
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack {
+                        Label(
+                            "GHOST RACE",
+                            systemImage: "figure.run"
+                        )
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(WatchTheme.green)
+
+                        Spacer()
+
+                        if let timeDelta =
+                                workoutManager
+                                    .ghostTimeDeltaSeconds {
+                            Text(
+                                ghostTimeText(timeDelta)
+                            )
+                            .font(.system(size: 10, weight: .bold))
+                            .monospacedDigit()
+                        }
+                    }
+
+                    if let distanceDelta =
+                            workoutManager
+                                .ghostDistanceDeltaMeters {
+                        Text(
+                            ghostDistanceText(distanceDelta)
+                        )
+                        .font(
+                            .system(
+                                size: 17,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .minimumScaleFactor(0.72)
+
+                        HStack {
+                            Text("YOU")
+                            Spacer()
+                            Text("GHOST")
+                        }
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(WatchTheme.muted)
+
+                        GeometryReader { proxy in
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    .fill(
+                                        WatchTheme.muted
+                                            .opacity(0.20)
+                                    )
+                                Capsule()
+                                    .fill(WatchTheme.green)
+                                    .frame(
+                                        width:
+                                            proxy.size.width *
+                                            ghostProgressWidth(
+                                                distanceDelta
+                                            )
+                                    )
+                            }
+                        }
+                        .frame(height: 5)
+                    } else {
+                        Text("Finding both runners on the route…")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(WatchTheme.muted)
+                    }
+                }
+                .padding(10)
+                .watchSurface()
+            }
+
             HStack(spacing: 7) {
                 runMetric(
                     title: "DISTANCE",
@@ -1661,6 +1736,55 @@ private struct WatchRunWalkWorkoutPager: View {
             .foregroundStyle(WatchTheme.muted)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 8)
+    }
+
+    private func ghostDistanceText(
+        _ delta: Double
+    ) -> String {
+        let meters =
+            Int(abs(delta).rounded())
+
+        if meters < 8 {
+            return "Neck and neck"
+        }
+
+        return delta >= 0
+            ? "You +\(meters) m"
+            : "Ghost +\(meters) m"
+    }
+
+    private func ghostTimeText(
+        _ delta: TimeInterval
+    ) -> String {
+        let seconds =
+            Int(abs(delta).rounded())
+        let prefix =
+            delta >= 0 ? "−" : "+"
+
+        return prefix +
+            String(
+                format: "%d:%02d",
+                seconds / 60,
+                seconds % 60
+            )
+    }
+
+    private func ghostProgressWidth(
+        _ delta: Double
+    ) -> Double {
+        let normalized =
+            min(
+                abs(delta) / 150,
+                1
+            )
+
+        if abs(delta) < 8 {
+            return 0.5
+        }
+
+        return delta >= 0
+            ? 0.5 + normalized * 0.5
+            : 0.5 - normalized * 0.5
     }
 
     private func paceText(
