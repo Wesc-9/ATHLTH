@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.4.2
+      - release/v1.4.3
     paths:
       - .github/testflight-trigger
 
@@ -155,7 +155,7 @@ jobs:
           echo "Widget CFBundleVersion: $WIDGET_BUILD"
           echo "iPhone UIUserInterfaceStyle: $INTERFACE_STYLE"
           if [ "$INTERFACE_STYLE" != "Light" ]; then
-            echo "::error::ATHLTH 1.4.2 must archive with UIUserInterfaceStyle=Light."
+            echo "::error::ATHLTH 1.4.3 must archive with UIUserInterfaceStyle=Light."
             exit 1
           fi
           if [ "$IOS_BUILD" -le 1 ] || [ "$WATCH_BUILD" -le 1 ] || [ "$WIDGET_BUILD" -le 1 ]; then
@@ -351,14 +351,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view "v1.4.2" >/dev/null 2>&1; then
+          if gh release view "v1.4.3" >/dev/null 2>&1; then
             echo "GitHub release v1.4.0 already exists; TestFlight build uploaded without recreating the release."
           else
-            gh release create "v1.4.2" \
+            gh release create "v1.4.3" \
               --target "$GITHUB_SHA" \
-              --title "ATHLTH 1.4.2" \
+              --title "ATHLTH 1.4.3" \
               --notes-file - <<'EOF'
-          ATHLTH 1.4.2
+          ATHLTH 1.4.3
 
           - Community groups, activity center, route/challenge improvements
           - Recovery redesign with Last Night, Daily Check-in and actionable guidance
