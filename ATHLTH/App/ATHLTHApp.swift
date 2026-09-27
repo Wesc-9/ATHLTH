@@ -101,6 +101,7 @@ struct AppRootView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var subscriptionBackend: SubscriptionBackendService
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var gear: ProfileGearStore
@@ -149,6 +150,7 @@ struct AppRootView: View {
             await subscriptionStore.start()
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
             await submitLatestStoreProofIfPossible()
+            publishATHLTHSurfaces()
 
             if appSession.signedIn {
                 await APNsPushManager.shared.syncCurrentToken()
@@ -195,6 +197,7 @@ struct AppRootView: View {
             )
             await refreshTrophiesAndNotifications()
             await syncSocialOwnedData()
+            publishATHLTHSurfaces()
             lastFullLifecycleRefreshAt = Date()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -286,6 +289,21 @@ struct AppRootView: View {
                     allowed: settings.backgroundHealthSyncEnabled
                 )
             }
+        }
+        .onChange(of: health.recovery) { _, _ in
+            publishATHLTHSurfaces()
+        }
+        .onChange(of: appSession.activePlan) { _, _ in
+            publishATHLTHSurfaces()
+        }
+        .onChange(of: goals.goals) { _, _ in
+            publishATHLTHSurfaces()
+        }
+        .onChange(of: workoutMirroring.snapshot) { _, snapshot in
+            publishATHLTHSurfaces()
+            ATHLTHSurfaceCoordinator.syncLiveActivity(
+                with: snapshot
+            )
         }
         .onChange(of: settings.trainingDeviceProvider) { _, provider in
             if provider == .appleWatch {
@@ -901,6 +919,15 @@ struct AppRootView: View {
             challenges: challengeStore.challenges,
             currentUserID:
                 appSession.profile.userID
+        )
+    }
+
+    private func publishATHLTHSurfaces() {
+        ATHLTHSurfaceCoordinator.publishSnapshot(
+            health: health,
+            session: appSession,
+            goals: goals,
+            workout: workoutMirroring.snapshot
         )
     }
 
