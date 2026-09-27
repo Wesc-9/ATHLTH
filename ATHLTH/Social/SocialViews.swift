@@ -12,7 +12,7 @@ enum SocialHubTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .feed: return "Feed"
-        case .friends: return "Friends"
+        case .friends: return "Following"
         case .messages: return "Messages"
         case .requests: return "Requests"
         case .discover: return "Discover"
@@ -28,9 +28,9 @@ struct ProfileFriendsSection: View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Friends")
+                    Text("Following")
                         .font(.title3.weight(.bold))
-                    Text("Train, compare and challenge each other.")
+                    Text("See training from athletes you follow.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -62,7 +62,7 @@ struct ProfileFriendsSection: View {
                 }
             }
 
-            if social.friends.isEmpty {
+            if social.following.isEmpty {
                 NavigationLink {
                     SocialHubView(initialTab: .discover)
                 } label: {
@@ -94,7 +94,7 @@ struct ProfileFriendsSection: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
-                        ForEach(social.friends.prefix(6)) { friend in
+                        ForEach(social.following.prefix(6)) { friend in
                             NavigationLink {
                                 FriendProfileView(userID: friend.userID)
                             } label: {
@@ -246,7 +246,7 @@ struct SocialHubView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("\(social.friends.count) Friends")
+                    Text("\(social.following.count) Following")
                         .font(.title3.bold())
                     Spacer()
                     Button {
@@ -257,20 +257,20 @@ struct SocialHubView: View {
                     }
                 }
 
-                if social.friends.isEmpty {
+                if social.following.isEmpty {
                     ContentUnavailableView(
-                        "No friends yet",
+                        "Not following anyone yet",
                         systemImage: "person.2",
                         description: Text("Find people by their ATHLTH username.")
                     )
                     .padding(.vertical, 50)
                 } else {
-                    ForEach(social.friends) { friend in
+                    ForEach(social.following) { friend in
                         NavigationLink {
                             FriendProfileView(userID: friend.userID)
                         } label: {
                             SocialProfileRow(profile: friend) {
-                                Text("Friends")
+                                Text("Following")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(ATHLTHTheme.accent)
                             }
@@ -1467,7 +1467,7 @@ struct SocialPrivacySettingsView: View {
                 Section("Profile") {
                     Picker("Profile visibility", selection: binding.profileVisibility) {
                         Text("Private").tag("private")
-                        Text("Friends").tag("friends")
+                        Text("Followers").tag("friends")
                         Text("Public").tag("public")
                     }
 
