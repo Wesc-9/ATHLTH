@@ -22,6 +22,7 @@ struct RouteDetailView: View {
     @State private var watchError: String?
     @State private var startingRoute = false
     @State private var startingGhostAttemptID: UUID?
+    @State private var showingTargetGhost = false
 
     private var currentRoute: TrainingRoute {
         session.savedRoutes.first {
@@ -183,6 +184,16 @@ struct RouteDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Choose the name shown in Routes and challenges.")
+        }
+        .sheet(
+            isPresented:
+                $showingTargetGhost
+        ) {
+            NavigationStack {
+                TargetGhostSetupView(
+                    route: currentRoute
+                )
+            }
         }
         .sheet(isPresented: $showingFullLeaderboard) {
             NavigationStack {
@@ -445,7 +456,28 @@ struct RouteDetailView: View {
                         )
                     }
 
-                    if let best = ownBest {
+                    Button {
+                    showingTargetGhost = true
+                } label: {
+                    Label(
+                        "Race Target Time",
+                        systemImage:
+                            "timer.circle.fill"
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(
+                    settings
+                        .trainingDeviceProvider !=
+                        .appleWatch ||
+                    !watchConnection.isReady
+                )
+
+                if let best = ownBest {
                         HStack {
                             Label(
                                 "Best: \(clock(best.durationSeconds))",
