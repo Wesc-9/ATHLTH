@@ -788,7 +788,11 @@ struct ATHLTHCommunityView: View {
         async let eventRefresh: Void =
             community.refresh(force: force)
         async let socialRefresh: Void =
-            social.refresh(challengeStore: challenges)
+            force
+                ? social.refresh(challengeStore: challenges)
+                : social.refreshIfStale(
+                    challengeStore: challenges
+                )
         async let groupRefresh: Void =
             groups.refresh(force: force)
         async let routeRefresh: Void =
