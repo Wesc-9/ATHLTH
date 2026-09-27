@@ -4,7 +4,7 @@ import SwiftUI
 
 enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
     case all = "All"
-    case friends = "Friends"
+    case users = "Users"
     case events = "Events"
     case groups = "Groups"
 
@@ -13,7 +13,7 @@ enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .all: return "sparkles"
-        case .friends: return "person.2.fill"
+        case .users: return "person.2.fill"
         case .events: return "calendar"
         case .groups: return "person.3.fill"
         }
@@ -81,17 +81,19 @@ struct ATHLTHGlobalSearchView: View {
             .searchable(
                 text: $query,
                 placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Friends, events, groups and more"
+                prompt: "Users, events, groups and more"
             )
             .focused($searchFocused)
             .onSubmit(of: .search) {
                 rememberSearch(query)
             }
             .task {
+                async let socialRefresh: Void = social.refresh()
                 async let routeRefresh: Void = routes.refresh()
                 async let eventRefresh: Void = community.refresh()
                 async let groupRefresh: Void = groups.refresh()
                 _ = await (
+                    socialRefresh,
                     routeRefresh,
                     eventRefresh,
                     groupRefresh
@@ -165,7 +167,7 @@ struct ATHLTHGlobalSearchView: View {
                         Text("Find anything in ATHLTH")
                             .font(.headline)
                         Text(
-                            "Search friends, local groups, upcoming events, routes and challenges."
+                            "Search users, local groups, upcoming events, routes and challenges."
                         )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -333,7 +335,7 @@ struct ATHLTHGlobalSearchView: View {
 
     @ViewBuilder
     private var searchResults: some View {
-        let friends = matchingFriends
+        let users = matchingUsers
         let eventResults = matchingEvents
         let groupResults = matchingGroups
         let routeResults = matchingRoutes
@@ -352,9 +354,9 @@ struct ATHLTHGlobalSearchView: View {
             ContentUnavailableView.search(text: query)
                 .padding(.vertical, 80)
         } else {
-            if (scope == .all || scope == .friends) && !friends.isEmpty {
-                resultSection("FRIENDS") {
-                    ForEach(friends.prefix(8)) { profile in
+            if (scope == .all || scope == .users) && !users.isEmpty {
+                resultSection("USERS") {
+                    ForEach(users.prefix(12)) { profile in
                         NavigationLink {
                             FriendProfileView(userID: profile.userID)
                         } label: {
@@ -376,7 +378,7 @@ struct ATHLTHGlobalSearchView: View {
 
                                 Spacer()
 
-                                Text("Friend")
+                                Text(userRelationshipLabel(profile))
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(
                                         ATHLTHTheme.accentDeep
@@ -517,13 +519,13 @@ struct ATHLTHGlobalSearchView: View {
     private var visibleResultCount: Int {
         switch scope {
         case .all:
-            return matchingFriends.count +
+            return matchingUsers.count +
                 matchingEvents.count +
                 matchingGroups.count +
                 matchingRoutes.count +
                 matchingChallenges.count
-        case .friends:
-            return matchingFriends.count
+        case .users:
+            return matchingUsers.count
         case .events:
             return matchingEvents.count
         case .groups:
@@ -531,11 +533,41 @@ struct ATHLTHGlobalSearchView: View {
         }
     }
 
-    private var matchingFriends: [SocialProfileCard] {
-        social.friends.filter {
-            $0.resolvedName.lowercased().contains(normalizedQuery) ||
-            $0.usernameLabel.lowercased().contains(normalizedQuery)
+    private var matchingUsers: [SocialProfileCard] {
+        var seen = Set<UUID>()
+
+        return (social.visibleProfiles + social.discoverResults)
+            .filter { profile in
+                guard profile.userID != social.currentUserID,
+                      seen.insert(profile.userID).inserted
+                else {
+                    return false
+                }
+
+                return profile.resolvedName.lowercased()
+                    .contains(normalizedQuery) ||
+                    profile.usernameLabel.lowercased()
+                    .contains(normalizedQuery)
+            }
+            .sorted {
+                $0.resolvedName.localizedCaseInsensitiveCompare(
+                    $1.resolvedName
+                ) == .orderedAscending
+            }
+    }
+
+    private func userRelationshipLabel(
+        _ profile: SocialProfileCard
+    ) -> String {
+        if social.isFollowing(profile.userID) {
+            return "Following"
         }
+
+        if profile.isPrivateProfile {
+            return "Private"
+        }
+
+        return "User"
     }
 
     private var matchingGroups: [CommunityGroupRecord] {
