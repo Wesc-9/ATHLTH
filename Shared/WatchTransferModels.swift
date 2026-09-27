@@ -290,6 +290,13 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var averageHeartRate: Double?
     var maxHeartRate: Double?
     var routePointCount: Int
+
+    // Optional live GPS position used by iPhone-only presentation features
+    // such as Ghost Race. Older persisted/transferred snapshots decode
+    // without these fields, so this remains backwards compatible.
+    var currentLatitude: Double? = nil
+    var currentLongitude: Double? = nil
+    var routeProgressPercent: Double? = nil
 }
 
 struct WatchWorkoutMirrorCommand: Codable, Hashable {
