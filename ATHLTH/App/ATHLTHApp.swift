@@ -155,13 +155,13 @@ struct AppRootView: View {
     private var lifecycleContent: some View {
         Group {
             if appSession.previewModeEnabled {
-                ProductRootTabView()
+                AnyView(ProductRootTabView())
             } else if appSession.signedIn && !startupAuthenticationResolved {
                 ATHLTHLaunchGateView()
             } else if !appSession.signedIn || !appSession.onboardingCompleted {
                 OnboardingFlowView()
             } else {
-                ProductRootTabView()
+                AnyView(ProductRootTabView())
             }
         }
         .task {
