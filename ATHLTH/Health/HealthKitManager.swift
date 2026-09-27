@@ -1,7 +1,19 @@
 import Combine
 import CoreLocation
 import Foundation
-import HealthKit
+@preconcurrency import HealthKit
+
+private final class HealthObserverCompletion: @unchecked Sendable {
+    private let handler: () -> Void
+
+    init(_ handler: @escaping () -> Void) {
+        self.handler = handler
+    }
+
+    func call() {
+        handler()
+    }
+}
 
 @MainActor
 final class HealthKitManager: ObservableObject {
@@ -320,14 +332,16 @@ final class HealthKitManager: ObservableObject {
                     return
                 }
 
+                let completion = HealthObserverCompletion(completionHandler)
+
                 Task { @MainActor [weak self] in
                     guard let self else {
-                        completionHandler()
+                        completion.call()
                         return
                     }
 
                     await self.refreshAll()
-                    completionHandler()
+                    completion.call()
                 }
             }
 
