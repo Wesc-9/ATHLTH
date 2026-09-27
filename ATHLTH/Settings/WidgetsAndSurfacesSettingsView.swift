@@ -88,7 +88,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
 
                     Spacer(minLength: 8)
 
-                    Text("Planned")
+                    Text(surface.statusTitle)
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.vitality)
                         .padding(.horizontal, 9)
@@ -247,12 +247,12 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 .foregroundStyle(ATHLTHTheme.accentDeep)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Settings hub ready")
+                Text("Available in iOS")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
                 Text(
-                    "These entries are intentionally marked Planned until their iOS integrations are implemented. Nothing here pretends a widget, Live Activity, Siri shortcut or Lock Screen widget is already active."
+                    "Add ATHLTH from the Home Screen or Lock Screen widget gallery. Live Activity starts automatically for supported active workouts when Live Activities are allowed in iOS. ATHLTH recovery, next-workout and goal actions are available to Siri and the Shortcuts app."
                 )
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -291,6 +291,17 @@ private enum ATHLTHExternalSurface: String, CaseIterable, Identifiable {
         }
     }
 
+    var statusTitle: String {
+        switch self {
+        case .homeScreen, .lockScreen:
+            return "Ready"
+        case .liveActivity:
+            return "Automatic"
+        case .siriShortcuts:
+            return "Available"
+        }
+    }
+
     var subtitle: String {
         switch self {
         case .homeScreen:
@@ -298,7 +309,7 @@ private enum ATHLTHExternalSurface: String, CaseIterable, Identifiable {
         case .liveActivity:
             return "Follow an active workout from the Lock Screen and Dynamic Island."
         case .siriShortcuts:
-            return "Ask for insights, start workouts and use ATHLTH from Shortcuts."
+            return "Ask for recovery, your next workout and goal progress with Siri or Shortcuts."
         case .lockScreen:
             return "Surface recovery, the next session and live workout status without opening the app."
         }
