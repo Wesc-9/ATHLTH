@@ -21,63 +21,92 @@ jobs:
           ref: release/v1.4.3
           fetch-depth: 0
 
-      - name: Preserve master artwork outside app target
+      - name: Install image optimizer
+        run: python3 -m pip install --quiet pillow
+
+      - name: Optimize runtime hero artwork
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p DesignMasters/Heroes
-          assets=(
-            "ATHLTH/Assets.xcassets/OnboardingHero.imageset/ATHLTH_hero_4x_3764x6688.png"
-            "ATHLTH/Assets.xcassets/HomeHero.imageset/home.png"
-            "ATHLTH/Assets.xcassets/TrainHero.imageset/train.png"
-            "ATHLTH/Assets.xcassets/RecoveryHero.imageset/recovery.png"
-            "ATHLTH/Assets.xcassets/ProgressHero.imageset/progress.png"
-            "ATHLTH/Assets.xcassets/CommunityHero.imageset/community.png"
-            "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset/StrengthPostWorkoutHero.jpg"
-          )
+          python3 <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import json
 
-          for asset in "${assets[@]}"; do
-            [ -f "$asset" ] || continue
-            destination="DesignMasters/Heroes/$(basename "$asset")"
-            if [ ! -f "$destination" ]; then
-              cp "$asset" "$destination"
-            fi
-          done
+          mappings = [
+              ("ATHLTH_hero_4x_3764x6688.png", "ATHLTH/Assets.xcassets/OnboardingHero.imageset"),
+              ("home.png", "ATHLTH/Assets.xcassets/HomeHero.imageset"),
+              ("train.png", "ATHLTH/Assets.xcassets/TrainHero.imageset"),
+              ("recovery.png", "ATHLTH/Assets.xcassets/RecoveryHero.imageset"),
+              ("progress.png", "ATHLTH/Assets.xcassets/ProgressHero.imageset"),
+              ("community.png", "ATHLTH/Assets.xcassets/CommunityHero.imageset"),
+              ("StrengthPostWorkoutHero.jpg", "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset"),
+          ]
 
-      - name: Resize runtime artwork
-        shell: bash
-        run: |
-          set -euo pipefail
+          masters = Path("DesignMasters/Heroes")
 
-          # 3000 px is comfortably above the physical render size needed by
-          # current iPhone and iPad layouts while avoiding huge decode buffers.
-          assets=(
-            "ATHLTH/Assets.xcassets/OnboardingHero.imageset/ATHLTH_hero_4x_3764x6688.png"
-            "ATHLTH/Assets.xcassets/HomeHero.imageset/home.png"
-            "ATHLTH/Assets.xcassets/TrainHero.imageset/train.png"
-            "ATHLTH/Assets.xcassets/RecoveryHero.imageset/recovery.png"
-            "ATHLTH/Assets.xcassets/ProgressHero.imageset/progress.png"
-            "ATHLTH/Assets.xcassets/CommunityHero.imageset/community.png"
-            "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset/StrengthPostWorkoutHero.jpg"
-          )
+          for master_name, imageset_name in mappings:
+              source = masters / master_name
+              imageset = Path(imageset_name)
+              if not source.exists() or not imageset.exists():
+                  continue
 
-          for asset in "${assets[@]}"; do
-            [ -f "$asset" ] || continue
-            sips -Z 3000 "$asset" >/dev/null
-          done
+              with Image.open(source) as original:
+                  image = original.copy()
+                  image.thumbnail((3000, 3000), Image.Resampling.LANCZOS)
+
+                  has_alpha = image.mode in ("RGBA", "LA")
+                  if has_alpha:
+                      alpha = image.getchannel("A")
+                      has_alpha = alpha.getextrema()[0] < 255
+
+                  if has_alpha:
+                      output_name = source.stem + ".png"
+                      output = imageset / output_name
+                      image.save(output, "PNG", optimize=True, compress_level=9)
+                  else:
+                      output_name = source.stem + ".jpg"
+                      output = imageset / output_name
+                      if image.mode not in ("RGB", "L"):
+                          image = image.convert("RGB")
+                      image.save(
+                          output,
+                          "JPEG",
+                          quality=90,
+                          optimize=True,
+                          progressive=True,
+                          subsampling=1,
+                      )
+
+              contents_path = imageset / "Contents.json"
+              contents = json.loads(contents_path.read_text())
+              for entry in contents.get("images", []):
+                  if entry.get("filename"):
+                      entry["filename"] = output_name
+              contents_path.write_text(
+                  json.dumps(contents, indent=2) + "\n"
+              )
+
+              for candidate in imageset.iterdir():
+                  if (
+                      candidate.name != "Contents.json"
+                      and candidate.name != output_name
+                      and candidate.suffix.lower() in {".png", ".jpg", ".jpeg"}
+                  ):
+                      candidate.unlink()
+          PY
 
       - name: Commit optimized runtime assets
         shell: bash
         run: |
           set -euo pipefail
-
-          if git diff --quiet && [ -z "$(git status --porcelain DesignMasters)" ]; then
+          if git diff --quiet; then
             echo "Hero assets already optimized."
             exit 0
           fi
 
           git config user.name "ATHLTH Performance Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add ATHLTH/Assets.xcassets DesignMasters/Heroes
-          git commit -m "Optimize runtime hero image assets"
+          git add ATHLTH/Assets.xcassets
+          git commit -m "Optimize runtime hero image encoding"
           git push origin HEAD:release/v1.4.3
