@@ -1,10 +1,10 @@
 import AppIntents
 
 struct ATHLTHRecoveryIntent: AppIntent {
-    static var title: LocalizedStringResource =
+    static let title: LocalizedStringResource =
         "Check ATHLTH recovery"
 
-    static var description = IntentDescription(
+    static let description = IntentDescription(
         "Hear your latest ATHLTH recovery status."
     )
 
@@ -27,10 +27,10 @@ struct ATHLTHRecoveryIntent: AppIntent {
 }
 
 struct ATHLTHNextWorkoutIntent: AppIntent {
-    static var title: LocalizedStringResource =
+    static let title: LocalizedStringResource =
         "Check next ATHLTH workout"
 
-    static var description = IntentDescription(
+    static let description = IntentDescription(
         "Hear the next workout in your ATHLTH training plan."
     )
 
@@ -65,10 +65,10 @@ struct ATHLTHNextWorkoutIntent: AppIntent {
 }
 
 struct ATHLTHGoalIntent: AppIntent {
-    static var title: LocalizedStringResource =
+    static let title: LocalizedStringResource =
         "Check ATHLTH goal"
 
-    static var description = IntentDescription(
+    static let description = IntentDescription(
         "Hear progress toward your primary ATHLTH goal."
     )
 
