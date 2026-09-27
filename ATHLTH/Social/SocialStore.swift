@@ -373,6 +373,51 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func loadFollowOverview(
+        for userID: UUID
+    ) async -> SocialFollowOverview {
+        do {
+            async let followerRowsTask = service.loadFollowers(for: userID)
+            async let followingRowsTask = service.loadFollowing(for: userID)
+
+            let followerRows = try await followerRowsTask
+            let followingRows = try await followingRowsTask
+
+            let cardByID = Dictionary(
+                uniqueKeysWithValues:
+                    visibleProfiles.map { ($0.userID, $0) }
+            )
+
+            let followerProfiles = followerRows
+                .compactMap { cardByID[$0.followerID] }
+                .sorted {
+                    $0.resolvedName.localizedCaseInsensitiveCompare(
+                        $1.resolvedName
+                    ) == .orderedAscending
+                }
+
+            let followingProfiles = followingRows
+                .compactMap { cardByID[$0.followingID] }
+                .sorted {
+                    $0.resolvedName.localizedCaseInsensitiveCompare(
+                        $1.resolvedName
+                    ) == .orderedAscending
+                }
+
+            return SocialFollowOverview(
+                followerCount: followerRows.count,
+                followingCount: followingRows.count,
+                followers: followerProfiles,
+                following: followingProfiles
+            )
+        } catch is CancellationError {
+            return .empty
+        } catch {
+            guard !Task.isCancelled else { return .empty }
+            return .empty
+        }
+    }
+
     func setReaction(
         activityID: UUID,
         reaction: SocialActivityReaction?
