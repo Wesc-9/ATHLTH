@@ -239,6 +239,7 @@ struct ATHLTHTabHero: View {
     var focalOffsetY: CGFloat = 16
     var titleFontSize: CGFloat = 30
     var copyWidthFraction: CGFloat = 0.74
+    var immersiveCopy: Bool = false
 
     // Extra artwork that sits behind the pinned content sheet. It does not
     // participate in layout, so the hero/content boundary stays exactly where
@@ -256,28 +257,56 @@ struct ATHLTHTabHero: View {
             let isVeryNarrowPhone =
                 proxy.size.width < 360
             let imageScale: CGFloat =
-                isTablet
-                    ? 1.04
+                immersiveCopy
+                    ? (
+                        isTablet
+                            ? 1.01
+                            : (
+                                isNarrowPhone
+                                    ? 1.03
+                                    : 1.05
+                            )
+                    )
                     : (
-                        isNarrowPhone
-                            ? 1.08
-                            : 1.12
+                        isTablet
+                            ? 1.04
+                            : (
+                                isNarrowPhone
+                                    ? 1.08
+                                    : 1.12
+                            )
                     )
             let horizontalOffset =
-                isTablet
-                    ? focalOffsetX * 0.4
+                immersiveCopy
+                    ? (
+                        isTablet
+                            ? focalOffsetX * 0.28
+                            : focalOffsetX * 0.55
+                    )
                     : (
-                        isNarrowPhone
-                            ? focalOffsetX * 0.72
-                            : focalOffsetX
+                        isTablet
+                            ? focalOffsetX * 0.4
+                            : (
+                                isNarrowPhone
+                                    ? focalOffsetX * 0.72
+                                    : focalOffsetX
+                            )
                     )
             let verticalOffset =
-                isTablet
-                    ? focalOffsetY * 0.35
+                immersiveCopy
+                    ? (
+                        isTablet
+                            ? focalOffsetY * 0.20
+                            : focalOffsetY * 0.42
+                    )
                     : (
-                        isNarrowPhone
-                            ? focalOffsetY * 0.72
-                            : focalOffsetY
+                        isTablet
+                            ? focalOffsetY * 0.35
+                            : (
+                                isNarrowPhone
+                                    ? focalOffsetY * 0.72
+                                    : focalOffsetY
+                            )
                     )
             let copyFraction =
                 isNarrowPhone
@@ -347,13 +376,26 @@ struct ATHLTHTabHero: View {
 
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.48),
-                        Color.black.opacity(0.16),
+                        Color.black.opacity(immersiveCopy ? 0.58 : 0.48),
+                        Color.black.opacity(immersiveCopy ? 0.22 : 0.16),
                         Color.clear
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
+
+                if immersiveCopy {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.46),
+                            .init(color: Color.black.opacity(0.05), location: 0.68),
+                            .init(color: ATHLTHTheme.canvasTop.opacity(0.30), location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
+                }
 
                 LinearGradient(
                     colors: [
@@ -517,9 +559,9 @@ struct ATHLTHTabHero: View {
                 )
                 .padding(
                     .top,
-                    isNarrowPhone
-                        ? 44
-                        : 48
+                    immersiveCopy
+                        ? (isNarrowPhone ? 48 : 54)
+                        : (isNarrowPhone ? 44 : 48)
                 )
                 .padding(.bottom, bottomInset)
                 .frame(
@@ -611,13 +653,18 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
 
     let accent: Color
     let softTransition: Bool
+    let immersiveTransition: Bool
     private let hero: Hero
     private let content: Content
 
     // Tab heroes reserve extra space below their copy for the fade and overlap.
     // Other screens retain their existing layout.
-    private var sheetOverlap: CGFloat { softTransition ? 24 : 8 }
-    private let sheetCornerRadius: CGFloat = 30
+    private var sheetOverlap: CGFloat {
+        immersiveTransition ? 38 : (softTransition ? 24 : 8)
+    }
+    private var sheetCornerRadius: CGFloat {
+        immersiveTransition ? 36 : 30
+    }
 
     private var usesTabletContentWidth: Bool {
         UIDevice.current.userInterfaceIdiom == .pad &&
@@ -633,11 +680,13 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     init(
         accent: Color,
         softTransition: Bool = false,
+        immersiveTransition: Bool = false,
         @ViewBuilder hero: () -> Hero,
         @ViewBuilder content: () -> Content
     ) {
         self.accent = accent
         self.softTransition = softTransition
+        self.immersiveTransition = immersiveTransition
         self.hero = hero()
         self.content = content()
     }
@@ -648,19 +697,33 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
 
             VStack(spacing: -sheetOverlap) {
                 hero
-                    .environment(\.athlthHeroBottomInset, softTransition ? 40 : 16)
+                    .environment(
+                        \.athlthHeroBottomInset,
+                        immersiveTransition
+                            ? 58
+                            : (softTransition ? 40 : 16)
+                    )
                     .overlay(alignment: .bottom) {
-                        if softTransition {
+                        if softTransition || immersiveTransition {
                             LinearGradient(
-                                stops: [
-                                    .init(color: .clear, location: 0),
-                                    .init(color: ATHLTHTheme.canvasTop.opacity(0.18), location: 0.35),
-                                    .init(color: ATHLTHTheme.canvasTop.opacity(0.86), location: 0.80),
-                                    .init(color: ATHLTHTheme.canvasTop, location: 1)
-                                ],
-                                startPoint: .top, endPoint: .bottom
+                                stops: immersiveTransition
+                                    ? [
+                                        .init(color: .clear, location: 0),
+                                        .init(color: ATHLTHTheme.canvasTop.opacity(0.10), location: 0.22),
+                                        .init(color: ATHLTHTheme.canvasTop.opacity(0.52), location: 0.58),
+                                        .init(color: ATHLTHTheme.canvasTop.opacity(0.92), location: 0.84),
+                                        .init(color: ATHLTHTheme.canvasTop, location: 1)
+                                    ]
+                                    : [
+                                        .init(color: .clear, location: 0),
+                                        .init(color: ATHLTHTheme.canvasTop.opacity(0.18), location: 0.35),
+                                        .init(color: ATHLTHTheme.canvasTop.opacity(0.86), location: 0.80),
+                                        .init(color: ATHLTHTheme.canvasTop, location: 1)
+                                    ],
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
-                            .frame(height: 40)
+                            .frame(height: immersiveTransition ? 82 : 40)
                             .allowsHitTesting(false)
                         }
                     }
@@ -695,8 +758,12 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    ATHLTHTheme.canvasTop.opacity(0.99),
-                                    ATHLTHTheme.surfaceStone.opacity(0.98),
+                                    ATHLTHTheme.canvasTop.opacity(
+                                        immersiveTransition ? 0.965 : 0.99
+                                    ),
+                                    ATHLTHTheme.surfaceStone.opacity(
+                                        immersiveTransition ? 0.965 : 0.98
+                                    ),
                                     ATHLTHTheme.canvasBottom.opacity(0.96)
                                 ],
                                 startPoint: .top,
@@ -714,18 +781,51 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                             radius: sheetCornerRadius
                         )
                         .stroke(
-                            Color.white.opacity(softTransition ? 0 : 0.70),
+                            Color.white.opacity(
+                                immersiveTransition || softTransition
+                                    ? 0
+                                    : 0.70
+                            ),
                             lineWidth: 0.8
                         )
                         .allowsHitTesting(false)
                     }
+                    .overlay(alignment: .top) {
+                        if immersiveTransition {
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.38),
+                                    Color.white.opacity(0.08),
+                                    Color.clear
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 42)
+                            .clipShape(
+                                ATHLTHTopRoundedSheetShape(
+                                    radius: sheetCornerRadius
+                                )
+                            )
+                            .allowsHitTesting(false)
+                        }
+                    }
                     .shadow(
-                        color: ATHLTHTheme.accentDeep.opacity(softTransition ? 0.045 : 0.075),
-                        radius: 20,
+                        color: ATHLTHTheme.accentDeep.opacity(
+                            immersiveTransition
+                                ? 0.065
+                                : (softTransition ? 0.045 : 0.075)
+                        ),
+                        radius: immersiveTransition ? 28 : 20,
                         x: 0,
-                        y: softTransition ? 4 : -4
+                        y: immersiveTransition ? -2 : (softTransition ? 4 : -4)
                     )
-                    .padding(.horizontal, softTransition ? 10 : 0)
+                    .padding(
+                        .horizontal,
+                        immersiveTransition
+                            ? 8
+                            : (softTransition ? 10 : 0)
+                    )
                 }
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
