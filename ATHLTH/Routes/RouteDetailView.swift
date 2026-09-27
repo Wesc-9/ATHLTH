@@ -7,6 +7,7 @@ struct RouteDetailView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var ghostRace: GhostRaceStore
 
     @StateObject private var attempts = RouteAttemptStore()
     @StateObject private var discovery = RouteDiscoveryStore()
@@ -20,6 +21,7 @@ struct RouteDetailView: View {
     @State private var watchMessage: String?
     @State private var watchError: String?
     @State private var startingRoute = false
+    @State private var startingGhostAttemptID: UUID?
 
     private var currentRoute: TrainingRoute {
         session.savedRoutes.first {
@@ -616,6 +618,64 @@ struct RouteDetailView: View {
                     .controlSize(.large)
                 }
 
+                if let best = ownBest {
+                    Button {
+                        Task {
+                            await startGhostRace(
+                                attempt: best
+                            )
+                        }
+                    } label: {
+                        if startingGhostAttemptID == best.id {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            Label(
+                                "Race Your Best",
+                                systemImage: "medal.fill"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.vitality)
+                    .controlSize(.large)
+                    .disabled(
+                        startingGhostAttemptID != nil ||
+                        settings.trainingDeviceProvider != .appleWatch ||
+                        !watchConnection.isReady
+                    )
+                }
+
+                if let latest = ownLatest,
+                   latest.id != ownBest?.id {
+                    Button {
+                        Task {
+                            await startGhostRace(
+                                attempt: latest
+                            )
+                        }
+                    } label: {
+                        if startingGhostAttemptID == latest.id {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            Label(
+                                "Race Last Attempt",
+                                systemImage: "clock.arrow.circlepath"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .disabled(
+                        startingGhostAttemptID != nil ||
+                        settings.trainingDeviceProvider != .appleWatch ||
+                        !watchConnection.isReady
+                    )
+                }
+
                 if settings.trainingDeviceProvider == .appleWatch {
                     Button {
                         Task {
@@ -977,6 +1037,38 @@ struct RouteDetailView: View {
 
         session.deleteSavedRoute(currentRoute.id)
         dismiss()
+    }
+
+    @MainActor
+    private func startGhostRace(
+        attempt: RouteAttemptRecord
+    ) async {
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady
+        else {
+            watchError =
+                "Connect Apple Watch before starting a Ghost Race."
+            return
+        }
+
+        startingGhostAttemptID = attempt.id
+        defer {
+            startingGhostAttemptID = nil
+        }
+
+        do {
+            try await GhostRaceStartService.start(
+                attempt: attempt,
+                route: currentRoute,
+                health: health,
+                ownerID: session.profile.userID,
+                ghostRace: ghostRace,
+                watchConnection: watchConnection,
+                settings: settings
+            )
+        } catch {
+            watchError = error.localizedDescription
+        }
     }
 
     private func startRouteOnWatch() async {
