@@ -149,6 +149,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var homeStreakDays: [Date]?
     @State private var showingGlobalSearch = false
@@ -1991,6 +1992,7 @@ struct ATHLTHHomeView: View {
                 }
 
                 session.beginTrainingStatus(for: workout)
+                startSpotifyForPlannedWorkoutIfNeeded(workout)
 
                 // No success modal: the Home card/live mirror becomes the
                 // confirmation that the planned workout has started.
@@ -2047,6 +2049,7 @@ struct ATHLTHHomeView: View {
                         trackingMode: trackingMode,
                         captureDevice: .appleWatch
                     )
+                    startSpotifyForPlannedWorkoutIfNeeded(workout)
                     showingHomeStrengthWorkout = true
                 } catch {
                     homeWatchTransferError =
@@ -2061,8 +2064,31 @@ struct ATHLTHHomeView: View {
                 trackingMode: trackingMode,
                 captureDevice: .iPhone
             )
+            startSpotifyForPlannedWorkoutIfNeeded(workout)
             homeDirectStartInProgress = false
             showingHomeStrengthWorkout = true
+        }
+    }
+
+    private func startSpotifyForPlannedWorkoutIfNeeded(
+        _ workout: PlannedSession
+    ) {
+        guard settings.spotifyAutoplayLinkedPlaylists,
+              let plan =
+                session.trainingPlan(
+                    containingSessionID: workout.id
+                ),
+              plan.spotifyAutoplayOnWorkoutStart,
+              let playlist = plan.spotifyPlaylist
+        else {
+            return
+        }
+
+        Task { @MainActor in
+            await spotifyPlayback.startLinkedPlaylist(
+                playlist,
+                settings: settings
+            )
         }
     }
 
@@ -2923,6 +2949,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var selectedSection = 0
     @State private var watchTransferMessage: String?
@@ -3033,6 +3060,7 @@ struct ATHLTHTrainView: View {
                                     trackingMode: trackingMode,
                                     captureDevice: .appleWatch
                                 )
+                                startTrainSpotifyForPlannedWorkoutIfNeeded(workout)
                                 showingStrengthWorkout = true
                             } catch {
                                 watchTransferError = error.localizedDescription
@@ -3045,6 +3073,7 @@ struct ATHLTHTrainView: View {
                                 trackingMode: trackingMode,
                                 captureDevice: .iPhone
                             )
+                            startTrainSpotifyForPlannedWorkoutIfNeeded(workout)
                             showingStrengthWorkout = true
                         }
                     }
@@ -3562,6 +3591,28 @@ struct ATHLTHTrainView: View {
 
         case .none:
             EmptyView()
+        }
+    }
+
+    private func startTrainSpotifyForPlannedWorkoutIfNeeded(
+        _ workout: PlannedSession
+    ) {
+        guard settings.spotifyAutoplayLinkedPlaylists,
+              let plan =
+                session.trainingPlan(
+                    containingSessionID: workout.id
+                ),
+              plan.spotifyAutoplayOnWorkoutStart,
+              let playlist = plan.spotifyPlaylist
+        else {
+            return
+        }
+
+        Task { @MainActor in
+            await spotifyPlayback.startLinkedPlaylist(
+                playlist,
+                settings: settings
+            )
         }
     }
 
