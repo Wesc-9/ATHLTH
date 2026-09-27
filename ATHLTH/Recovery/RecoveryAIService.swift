@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Supabase
 
@@ -60,6 +61,12 @@ private struct RecoveryAIRequest: Encodable {
     let question: String?
 }
 
+private struct RecoveryAIInsightCacheEntry: Codable {
+    let signature: String
+    let createdAt: Date
+    let insight: RecoveryAIInsight
+}
+
 private struct RecoveryAIAnswer: Decodable {
     let answer: String
 }
@@ -74,18 +81,63 @@ final class RecoveryAIService {
     }
 
     func generate(
-        _ context: RecoveryAIContext
+        _ context: RecoveryAIContext,
+        bypassCache: Bool = false
     ) async throws -> RecoveryAIInsight {
-        try await client.functions.invoke(
-            "recovery-sense",
-            options: FunctionInvokeOptions(
-                body: RecoveryAIRequest(
-                    mode: "insight",
-                    context: context,
-                    question: nil
+        let signature = try contextSignature(context)
+        let cacheKey = "athlth.recoveryAIInsight.current"
+
+        if !bypassCache,
+           let data = UserDefaults.standard.data(
+               forKey: cacheKey
+           ),
+           let cached = try? JSONDecoder().decode(
+               RecoveryAIInsightCacheEntry.self,
+               from: data
+           ),
+           cached.signature == signature,
+           Date().timeIntervalSince(cached.createdAt) <
+                6 * 60 * 60 {
+            return cached.insight
+        }
+
+        let insight: RecoveryAIInsight =
+            try await client.functions.invoke(
+                "recovery-sense",
+                options: FunctionInvokeOptions(
+                    body: RecoveryAIRequest(
+                        mode: "insight",
+                        context: context,
+                        question: nil
+                    )
                 )
             )
-        )
+
+        if let data = try? JSONEncoder().encode(
+            RecoveryAIInsightCacheEntry(
+                signature: signature,
+                createdAt: Date(),
+                insight: insight
+            )
+        ) {
+            UserDefaults.standard.set(
+                data,
+                forKey: cacheKey
+            )
+        }
+
+        return insight
+    }
+
+    private func contextSignature(
+        _ context: RecoveryAIContext
+    ) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(context)
+        return SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 
     func ask(
