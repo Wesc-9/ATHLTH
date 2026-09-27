@@ -55,6 +55,8 @@ final class HealthKitManager: ObservableObject {
     private var observerQueries: [HKObserverQuery] = []
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var profilePerformanceCache: (stats: ProfilePerformanceStats, generatedAt: Date)?
+    private var recoveryTrendCache:
+        [Int: (snapshot: RecoveryTrendSnapshot, generatedAt: Date)] = [:]
     private var personalRecordsCache: (records: [HealthPersonalRecord], generatedAt: Date)?
     private var trophySnapshotCache: (snapshot: TrophyHealthSnapshot, generatedAt: Date)?
     private var trophyCacheLatestWorkoutID: UUID?
@@ -410,6 +412,7 @@ final class HealthKitManager: ObservableObject {
 
         isRefreshing = true
         authorizationError = nil
+        recoveryTrendCache.removeAll()
         defer {
             isRefreshing = false
             defaults.set(false, forKey: refreshInProgressKey)
@@ -692,8 +695,14 @@ final class HealthKitManager: ObservableObject {
     func recoveryTrendSnapshot(
         days: Int = 14
     ) async -> RecoveryTrendSnapshot {
-        let calendar = Calendar.current
         let resolvedDays = min(max(days, 7), 14)
+
+        if let cached = recoveryTrendCache[resolvedDays],
+           Date().timeIntervalSince(cached.generatedAt) < 120 {
+            return cached.snapshot
+        }
+
+        let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let trendStart = calendar.date(
             byAdding: .day,
@@ -795,7 +804,7 @@ final class HealthKitManager: ObservableObject {
                 ? chronicMinutes / 4
                 : nil
 
-        return RecoveryTrendSnapshot(
+        let snapshot = RecoveryTrendSnapshot(
             days: trendDays,
             trainingLoad: RecoveryTrainingLoadSummary(
                 acuteMinutes: acuteMinutes,
@@ -803,6 +812,12 @@ final class HealthKitManager: ObservableObject {
                     chronicWeeklyAverage
             )
         )
+
+        recoveryTrendCache[resolvedDays] = (
+            snapshot,
+            Date()
+        )
+        return snapshot
     }
 
     func trophySnapshot() async throws -> TrophyHealthSnapshot {
