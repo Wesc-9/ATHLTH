@@ -23,7 +23,12 @@ struct ATHLTHEditProfileView: View {
     private var hasEditedATHLTHProfile = false
 
     var body: some View {
-        Form {
+        let photoButtonTitle =
+            selectedAvatarData == nil
+            ? "Choose Photo"
+            : "Change Photo"
+
+        return Form {
             Section {
                 VStack(spacing: 14) {
                     avatarPreview
@@ -34,7 +39,7 @@ struct ATHLTHEditProfileView: View {
                             matching: .images
                         ) {
                             Label(
-                                selectedAvatarData == nil ? "Choose Photo" : "Change Photo",
+                                photoButtonTitle,
                                 systemImage: "photo"
                             )
                         }
