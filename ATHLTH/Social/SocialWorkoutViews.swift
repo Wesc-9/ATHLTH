@@ -1,5 +1,6 @@
 import MapKit
 import SwiftUI
+import UIKit
 
 struct WorkoutFriendPicker: View {
     @EnvironmentObject private var social: SocialStore
@@ -766,6 +767,36 @@ private struct HomeActivityOutdoorCard: View {
                     Spacer(minLength: 38)
                 }
                 .padding(16)
+
+                if routeCoordinates.count >= 2 {
+                    VStack {
+                        Spacer()
+
+                        HStack {
+                            Spacer()
+
+                            VStack(alignment: .trailing, spacing: 7) {
+                                Label(
+                                    distanceText,
+                                    systemImage:
+                                        "point.topleft.down.to.point.bottomright.curvepath"
+                                )
+                                .homeRouteGlassPill()
+
+                                if let ascentText {
+                                    Label(
+                                        ascentText,
+                                        systemImage: "mountain.2.fill"
+                                    )
+                                    .homeRouteGlassPill()
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .padding(.bottom, 8)
+                    .allowsHitTesting(false)
+                }
             }
             .frame(height: 265)
             .clipped()
@@ -900,59 +931,10 @@ private struct HomeActivityOutdoorCard: View {
     @ViewBuilder
     private var mapBackground: some View {
         if routeCoordinates.count >= 2 || singleLocation != nil {
-            Map(initialPosition: .region(mapRegion)) {
-                if routeCoordinates.count >= 2 {
-                    MapPolyline(coordinates: routeCoordinates)
-                        .stroke(
-                            Color.white.opacity(0.82),
-                            lineWidth: 10
-                        )
-
-                    MapPolyline(coordinates: routeCoordinates)
-                        .stroke(
-                            ATHLTHTheme.vitality,
-                            lineWidth: 5
-                        )
-
-                    if let start = routeCoordinates.first {
-                        Annotation("", coordinate: start) {
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 12, height: 12)
-                                .overlay {
-                                    Circle()
-                                        .stroke(
-                                            ATHLTHTheme.vitality,
-                                            lineWidth: 3
-                                        )
-                                }
-                        }
-                    }
-
-                    if let finish = routeCoordinates.last {
-                        Annotation("", coordinate: finish) {
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 12, height: 12)
-                                .overlay {
-                                    Circle()
-                                        .stroke(
-                                            ATHLTHTheme.accentDeep,
-                                            lineWidth: 3
-                                        )
-                                }
-                        }
-                    }
-                } else if let singleLocation {
-                    Marker(
-                        "Workout",
-                        coordinate: singleLocation.coordinate
-                    )
-                    .tint(ATHLTHTheme.vitality)
-                }
-            }
-            .mapStyle(.standard(elevation: .realistic))
-            .allowsHitTesting(false)
+            HomeActivityRouteArtwork(
+                coordinates: routeCoordinates,
+                singleLocation: singleLocation?.coordinate
+            )
         } else {
             ZStack {
                 LinearGradient(
@@ -1089,6 +1071,33 @@ private struct HomeActivityOutdoorCard: View {
         return "\(Int(value.rounded())) bpm"
     }
 
+    private var ascentText: String? {
+        guard let route = detail?.route,
+              route.count >= 2
+        else {
+            return nil
+        }
+
+        var gain = 0.0
+        var previousAltitude = route[0].altitude
+
+        for point in route.dropFirst() {
+            let delta = point.altitude - previousAltitude
+
+            if delta > 0, delta < 100 {
+                gain += delta
+            }
+
+            previousAltitude = point.altitude
+        }
+
+        guard gain >= 5 else {
+            return nil
+        }
+
+        return "\(Int(gain.rounded())) m ascent"
+    }
+
     private var insightText: String {
         var parts: [String] = []
 
@@ -1142,6 +1151,1034 @@ private struct HomeActivityOutdoorCard: View {
         Rectangle()
             .fill(Color.white.opacity(0.22))
             .frame(width: 1, height: 34)
+    }
+}
+
+private struct HomeActivityRouteArtwork: View {
+    let coordinates: [CLLocationCoordinate2D]
+    let singleLocation: CLLocationCoordinate2D?
+
+    @State private var image: UIImage?
+
+    private var cacheKey: String {
+        HomeActivityRouteSnapshotRenderer.cacheKey(
+            coordinates: coordinates,
+            singleLocation: singleLocation
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.16),
+                    ATHLTHTheme.vitalitySoft,
+                    ATHLTHTheme.cardWarm
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .transition(.opacity)
+            } else {
+                HomeActivityFlowLines()
+                    .stroke(
+                        ATHLTHTheme.vitality.opacity(0.78),
+                        style: StrokeStyle(
+                            lineWidth: 7,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+                    .padding(30)
+
+                ProgressView()
+                    .tint(ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .clipped()
+        .task(id: cacheKey) {
+            image =
+                await HomeActivityRouteSnapshotRenderer
+                    .shared
+                    .image(
+                        coordinates: coordinates,
+                        singleLocation: singleLocation
+                    )
+        }
+    }
+}
+
+@MainActor
+private final class HomeActivityRouteSnapshotRenderer {
+    static let shared =
+        HomeActivityRouteSnapshotRenderer()
+
+    private let cache =
+        NSCache<NSString, UIImage>()
+
+    private init() {
+        cache.countLimit = 12
+        cache.totalCostLimit =
+            32 * 1_024 * 1_024
+    }
+
+    static func cacheKey(
+        coordinates: [CLLocationCoordinate2D],
+        singleLocation: CLLocationCoordinate2D?
+    ) -> String {
+        let points: [CLLocationCoordinate2D]
+
+        if !coordinates.isEmpty {
+            points = sampled(
+                coordinates,
+                maximumCount: 14
+            )
+        } else if let singleLocation {
+            points = [singleLocation]
+        } else {
+            return "activity-route-empty"
+        }
+
+        return points.map {
+            String(
+                format: "%.5f,%.5f",
+                $0.latitude,
+                $0.longitude
+            )
+        }
+        .joined(separator: "|")
+    }
+
+    func image(
+        coordinates: [CLLocationCoordinate2D],
+        singleLocation: CLLocationCoordinate2D?
+    ) async -> UIImage? {
+        let key = Self.cacheKey(
+            coordinates: coordinates,
+            singleLocation: singleLocation
+        ) as NSString
+
+        if let cached = cache.object(
+            forKey: key
+        ) {
+            return cached
+        }
+
+        let points: [CLLocationCoordinate2D]
+
+        if coordinates.count >= 2 {
+            points = Self.sampled(
+                coordinates,
+                maximumCount: 220
+            )
+        } else if let singleLocation {
+            points = [singleLocation]
+        } else {
+            return nil
+        }
+
+        let options =
+            MKMapSnapshotter.Options()
+        options.region =
+            Self.region(for: points)
+        options.size =
+            CGSize(width: 520, height: 320)
+        options.scale = 2
+        options.mapType = .hybrid
+        options.pointOfInterestFilter =
+            .excludingAll
+        options.traitCollection =
+            UITraitCollection(
+                userInterfaceStyle: .light
+            )
+
+        do {
+            let snapshot =
+                try await MKMapSnapshotter(
+                    options: options
+                )
+                .start()
+
+            let format =
+                UIGraphicsImageRendererFormat
+                    .default()
+            format.scale = 2
+            format.opaque = true
+
+            let renderer =
+                UIGraphicsImageRenderer(
+                    size: options.size,
+                    format: format
+                )
+
+            let rendered =
+                renderer.image { context in
+                    snapshot.image.draw(
+                        in: CGRect(
+                            origin: .zero,
+                            size: options.size
+                        )
+                    )
+
+                    let bounds = CGRect(
+                        origin: .zero,
+                        size: options.size
+                    )
+
+                    UIColor.black
+                        .withAlphaComponent(0.12)
+                        .setFill()
+                    context.fill(bounds)
+
+                    guard points.count >= 2
+                    else {
+                        if let point =
+                            points.first {
+                            let location =
+                                snapshot.point(
+                                    for: point
+                                )
+                            Self.drawEndpoint(
+                                at: location,
+                                fill:
+                                    UIColor.systemGreen
+                            )
+                        }
+                        return
+                    }
+
+                    let routePath =
+                        UIBezierPath()
+                    routePath.lineCapStyle =
+                        .round
+                    routePath.lineJoinStyle =
+                        .round
+
+                    for (
+                        index,
+                        coordinate
+                    ) in points.enumerated() {
+                        let point =
+                            snapshot.point(
+                                for: coordinate
+                            )
+
+                        if index == 0 {
+                            routePath.move(
+                                to: point
+                            )
+                        } else {
+                            routePath.addLine(
+                                to: point
+                            )
+                        }
+                    }
+
+                    UIColor.black
+                        .withAlphaComponent(0.30)
+                        .setStroke()
+                    routePath.lineWidth = 14
+                    routePath.stroke()
+
+                    UIColor.white
+                        .withAlphaComponent(0.92)
+                        .setStroke()
+                    routePath.lineWidth = 9
+                    routePath.stroke()
+
+                    UIColor(
+                        red: 0.25,
+                        green: 0.95,
+                        blue: 0.68,
+                        alpha: 1
+                    )
+                    .setStroke()
+                    routePath.lineWidth = 5
+                    routePath.stroke()
+
+                    if let first =
+                        points.first {
+                        Self.drawEndpoint(
+                            at:
+                                snapshot.point(
+                                    for: first
+                                ),
+                            fill:
+                                UIColor.systemGreen
+                        )
+                    }
+
+                    if let last =
+                        points.last {
+                        Self.drawEndpoint(
+                            at:
+                                snapshot.point(
+                                    for: last
+                                ),
+                            fill:
+                                UIColor.systemBlue
+                        )
+                    }
+                }
+
+            cache.setObject(
+                rendered,
+                forKey: key,
+                cost: Int(
+                    rendered.size.width *
+                    rendered.size.height *
+                    rendered.scale *
+                    rendered.scale *
+                    4
+                )
+            )
+
+            return rendered
+        } catch {
+            return nil
+        }
+    }
+
+    private static func drawEndpoint(
+        at point: CGPoint,
+        fill: UIColor
+    ) {
+        let outer =
+            CGRect(
+                x: point.x - 8,
+                y: point.y - 8,
+                width: 16,
+                height: 16
+            )
+        UIColor.white.setFill()
+        UIBezierPath(
+            ovalIn: outer
+        ).fill()
+
+        let inner =
+            CGRect(
+                x: point.x - 4.5,
+                y: point.y - 4.5,
+                width: 9,
+                height: 9
+            )
+        fill.setFill()
+        UIBezierPath(
+            ovalIn: inner
+        ).fill()
+    }
+
+    private static func sampled(
+        _ values: [CLLocationCoordinate2D],
+        maximumCount: Int
+    ) -> [CLLocationCoordinate2D] {
+        guard values.count > maximumCount,
+              maximumCount > 2
+        else {
+            return values
+        }
+
+        let lastIndex = values.count - 1
+        let step =
+            Double(lastIndex) /
+            Double(maximumCount - 1)
+
+        return (0..<maximumCount).map {
+            index in
+            values[
+                min(
+                    Int(
+                        (
+                            Double(index) *
+                            step
+                        )
+                        .rounded()
+                    ),
+                    lastIndex
+                )
+            ]
+        }
+    }
+
+    private static func region(
+        for points: [CLLocationCoordinate2D]
+    ) -> MKCoordinateRegion {
+        guard let first = points.first else {
+            return MKCoordinateRegion(
+                center:
+                    CLLocationCoordinate2D(
+                        latitude: 63.4305,
+                        longitude: 10.3951
+                    ),
+                span: MKCoordinateSpan(
+                    latitudeDelta: 0.08,
+                    longitudeDelta: 0.08
+                )
+            )
+        }
+
+        var minLatitude = first.latitude
+        var maxLatitude = first.latitude
+        var minLongitude = first.longitude
+        var maxLongitude = first.longitude
+
+        for point in points.dropFirst() {
+            minLatitude =
+                min(
+                    minLatitude,
+                    point.latitude
+                )
+            maxLatitude =
+                max(
+                    maxLatitude,
+                    point.latitude
+                )
+            minLongitude =
+                min(
+                    minLongitude,
+                    point.longitude
+                )
+            maxLongitude =
+                max(
+                    maxLongitude,
+                    point.longitude
+                )
+        }
+
+        return MKCoordinateRegion(
+            center:
+                CLLocationCoordinate2D(
+                    latitude:
+                        (
+                            minLatitude +
+                            maxLatitude
+                        ) / 2,
+                    longitude:
+                        (
+                            minLongitude +
+                            maxLongitude
+                        ) / 2
+                ),
+            span: MKCoordinateSpan(
+                latitudeDelta: max(
+                    (
+                        maxLatitude -
+                        minLatitude
+                    ) * 1.48,
+                    0.009
+                ),
+                longitudeDelta: max(
+                    (
+                        maxLongitude -
+                        minLongitude
+                    ) * 1.48,
+                    0.009
+                )
+            )
+        )
+    }
+}
+
+private struct HomeActivityMuscleArtwork: View {
+    let muscleGroups: [String]
+
+    private var normalized:
+        Set<String> {
+        Set(
+            muscleGroups.map {
+                $0
+                    .lowercased()
+                    .replacingOccurrences(
+                        of: "_",
+                        with: " "
+                    )
+            }
+        )
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width =
+                geometry.size.width
+            let height =
+                geometry.size.height
+
+            ZStack {
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.indigo
+                                .opacity(0.055),
+                            ATHLTHTheme.cardWarm
+                                .opacity(0.30),
+                            Color.white
+                                .opacity(0.88)
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    )
+                )
+
+                bodyBase(
+                    width: width,
+                    height: height
+                )
+
+                muscleHighlights(
+                    width: width,
+                    height: height
+                )
+
+                bodyDetailLines(
+                    width: width,
+                    height: height
+                )
+            }
+        }
+        .accessibilityElement(
+            children: .ignore
+        )
+        .accessibilityLabel(
+            normalized.isEmpty
+                ? "Muscle focus illustration"
+                : "Muscle focus: " +
+                    normalized
+                        .sorted()
+                        .joined(
+                            separator: ", "
+                        )
+        )
+    }
+
+    @ViewBuilder
+    private func bodyBase(
+        width: CGFloat,
+        height: CGFloat
+    ) -> some View {
+        let base =
+            Color(
+                red: 0.78,
+                green: 0.79,
+                blue: 0.82
+            )
+
+        Circle()
+            .fill(base.opacity(0.72))
+            .frame(
+                width: width * 0.18,
+                height: width * 0.18
+            )
+            .position(
+                x: width * 0.50,
+                y: height * 0.11
+            )
+
+        Capsule()
+            .fill(base.opacity(0.65))
+            .frame(
+                width: width * 0.09,
+                height: height * 0.09
+            )
+            .position(
+                x: width * 0.50,
+                y: height * 0.22
+            )
+
+        HomeActivityTorsoShape()
+            .fill(base.opacity(0.72))
+            .frame(
+                width: width * 0.50,
+                height: height * 0.43
+            )
+            .position(
+                x: width * 0.50,
+                y: height * 0.43
+            )
+
+        Capsule()
+            .fill(base.opacity(0.68))
+            .frame(
+                width: width * 0.12,
+                height: height * 0.39
+            )
+            .rotationEffect(.degrees(9))
+            .position(
+                x: width * 0.25,
+                y: height * 0.43
+            )
+
+        Capsule()
+            .fill(base.opacity(0.68))
+            .frame(
+                width: width * 0.12,
+                height: height * 0.39
+            )
+            .rotationEffect(.degrees(-9))
+            .position(
+                x: width * 0.75,
+                y: height * 0.43
+            )
+
+        Capsule()
+            .fill(base.opacity(0.67))
+            .frame(
+                width: width * 0.16,
+                height: height * 0.36
+            )
+            .rotationEffect(.degrees(2))
+            .position(
+                x: width * 0.42,
+                y: height * 0.79
+            )
+
+        Capsule()
+            .fill(base.opacity(0.67))
+            .frame(
+                width: width * 0.16,
+                height: height * 0.36
+            )
+            .rotationEffect(.degrees(-2))
+            .position(
+                x: width * 0.58,
+                y: height * 0.79
+            )
+    }
+
+    @ViewBuilder
+    private func muscleHighlights(
+        width: CGFloat,
+        height: CGFloat
+    ) -> some View {
+        let active =
+            LinearGradient(
+                colors: [
+                    Color.indigo
+                        .opacity(0.92),
+                    Color.blue
+                        .opacity(0.62)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+        if hasAny(
+            "chest",
+            "pectorals",
+            "pecs"
+        ) {
+            Ellipse()
+                .fill(active)
+                .frame(
+                    width: width * 0.20,
+                    height: height * 0.11
+                )
+                .position(
+                    x: width * 0.43,
+                    y: height * 0.34
+                )
+
+            Ellipse()
+                .fill(active)
+                .frame(
+                    width: width * 0.20,
+                    height: height * 0.11
+                )
+                .position(
+                    x: width * 0.57,
+                    y: height * 0.34
+                )
+        }
+
+        if hasAny(
+            "shoulder",
+            "shoulders",
+            "delts",
+            "deltoids"
+        ) {
+            Circle()
+                .fill(active)
+                .frame(
+                    width: width * 0.15
+                )
+                .position(
+                    x: width * 0.31,
+                    y: height * 0.31
+                )
+
+            Circle()
+                .fill(active)
+                .frame(
+                    width: width * 0.15
+                )
+                .position(
+                    x: width * 0.69,
+                    y: height * 0.31
+                )
+        }
+
+        if hasAny(
+            "back",
+            "lats",
+            "latissimus",
+            "upper back"
+        ) {
+            Capsule()
+                .fill(active.opacity(0.88))
+                .frame(
+                    width: width * 0.12,
+                    height: height * 0.24
+                )
+                .rotationEffect(.degrees(13))
+                .position(
+                    x: width * 0.38,
+                    y: height * 0.44
+                )
+
+            Capsule()
+                .fill(active.opacity(0.88))
+                .frame(
+                    width: width * 0.12,
+                    height: height * 0.24
+                )
+                .rotationEffect(.degrees(-13))
+                .position(
+                    x: width * 0.62,
+                    y: height * 0.44
+                )
+        }
+
+        if hasAny(
+            "arms",
+            "biceps",
+            "triceps"
+        ) {
+            Capsule()
+                .fill(active)
+                .frame(
+                    width: width * 0.075,
+                    height: height * 0.19
+                )
+                .rotationEffect(.degrees(9))
+                .position(
+                    x: width * 0.25,
+                    y: height * 0.42
+                )
+
+            Capsule()
+                .fill(active)
+                .frame(
+                    width: width * 0.075,
+                    height: height * 0.19
+                )
+                .rotationEffect(.degrees(-9))
+                .position(
+                    x: width * 0.75,
+                    y: height * 0.42
+                )
+        }
+
+        if hasAny(
+            "core",
+            "abs",
+            "abdominals"
+        ) {
+            RoundedRectangle(
+                cornerRadius: width * 0.05,
+                style: .continuous
+            )
+            .fill(active.opacity(0.78))
+            .frame(
+                width: width * 0.18,
+                height: height * 0.20
+            )
+            .position(
+                x: width * 0.50,
+                y: height * 0.52
+            )
+        }
+
+        if hasAny(
+            "glutes",
+            "glute",
+            "gluteus"
+        ) {
+            Ellipse()
+                .fill(active.opacity(0.78))
+                .frame(
+                    width: width * 0.15,
+                    height: height * 0.10
+                )
+                .position(
+                    x: width * 0.43,
+                    y: height * 0.64
+                )
+
+            Ellipse()
+                .fill(active.opacity(0.78))
+                .frame(
+                    width: width * 0.15,
+                    height: height * 0.10
+                )
+                .position(
+                    x: width * 0.57,
+                    y: height * 0.64
+                )
+        }
+
+        if hasAny(
+            "quads",
+            "quadriceps",
+            "legs"
+        ) {
+            Capsule()
+                .fill(active)
+                .frame(
+                    width: width * 0.09,
+                    height: height * 0.19
+                )
+                .position(
+                    x: width * 0.42,
+                    y: height * 0.73
+                )
+
+            Capsule()
+                .fill(active)
+                .frame(
+                    width: width * 0.09,
+                    height: height * 0.19
+                )
+                .position(
+                    x: width * 0.58,
+                    y: height * 0.73
+                )
+        }
+
+        if hasAny(
+            "hamstrings",
+            "hamstring"
+        ) {
+            Capsule()
+                .fill(active.opacity(0.72))
+                .frame(
+                    width: width * 0.075,
+                    height: height * 0.18
+                )
+                .position(
+                    x: width * 0.38,
+                    y: height * 0.77
+                )
+
+            Capsule()
+                .fill(active.opacity(0.72))
+                .frame(
+                    width: width * 0.075,
+                    height: height * 0.18
+                )
+                .position(
+                    x: width * 0.62,
+                    y: height * 0.77
+                )
+        }
+
+        if hasAny(
+            "calves",
+            "calf"
+        ) {
+            Capsule()
+                .fill(active)
+                .frame(
+                    width: width * 0.07,
+                    height: height * 0.16
+                )
+                .position(
+                    x: width * 0.42,
+                    y: height * 0.91
+                )
+
+            Capsule()
+                .fill(active)
+                .frame(
+                    width: width * 0.07,
+                    height: height * 0.16
+                )
+                .position(
+                    x: width * 0.58,
+                    y: height * 0.91
+                )
+        }
+    }
+
+    @ViewBuilder
+    private func bodyDetailLines(
+        width: CGFloat,
+        height: CGFloat
+    ) -> some View {
+        Path { path in
+            path.move(
+                to: CGPoint(
+                    x: width * 0.50,
+                    y: height * 0.29
+                )
+            )
+            path.addLine(
+                to: CGPoint(
+                    x: width * 0.50,
+                    y: height * 0.63
+                )
+            )
+
+            for fraction in [
+                0.44,
+                0.49,
+                0.54
+            ] {
+                path.move(
+                    to: CGPoint(
+                        x: width * 0.44,
+                        y: height * fraction
+                    )
+                )
+                path.addLine(
+                    to: CGPoint(
+                        x: width * 0.56,
+                        y: height * fraction
+                    )
+                )
+            }
+        }
+        .stroke(
+            Color.white.opacity(0.42),
+            style: StrokeStyle(
+                lineWidth: 1,
+                lineCap: .round
+            )
+        )
+    }
+
+    private func hasAny(
+        _ names: String...
+    ) -> Bool {
+        names.contains { name in
+            normalized.contains {
+                value in
+                value == name ||
+                value.contains(name)
+            }
+        }
+    }
+}
+
+private struct HomeActivityTorsoShape:
+    Shape {
+    func path(
+        in rect: CGRect
+    ) -> Path {
+        var path = Path()
+
+        path.move(
+            to: CGPoint(
+                x: rect.midX,
+                y: rect.minY
+            )
+        )
+        path.addCurve(
+            to: CGPoint(
+                x: rect.maxX,
+                y: rect.height * 0.18
+            ),
+            control1: CGPoint(
+                x: rect.width * 0.66,
+                y: rect.minY
+            ),
+            control2: CGPoint(
+                x: rect.width * 0.90,
+                y: rect.height * 0.05
+            )
+        )
+        path.addCurve(
+            to: CGPoint(
+                x: rect.width * 0.70,
+                y: rect.maxY
+            ),
+            control1: CGPoint(
+                x: rect.width * 0.94,
+                y: rect.height * 0.50
+            ),
+            control2: CGPoint(
+                x: rect.width * 0.78,
+                y: rect.height * 0.82
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.width * 0.30,
+                y: rect.maxY
+            )
+        )
+        path.addCurve(
+            to: CGPoint(
+                x: rect.minX,
+                y: rect.height * 0.18
+            ),
+            control1: CGPoint(
+                x: rect.width * 0.22,
+                y: rect.height * 0.82
+            ),
+            control2: CGPoint(
+                x: rect.width * 0.06,
+                y: rect.height * 0.50
+            )
+        )
+        path.addCurve(
+            to: CGPoint(
+                x: rect.midX,
+                y: rect.minY
+            ),
+            control1: CGPoint(
+                x: rect.width * 0.10,
+                y: rect.height * 0.05
+            ),
+            control2: CGPoint(
+                x: rect.width * 0.34,
+                y: rect.minY
+            )
+        )
+        path.closeSubpath()
+
+        return path
+    }
+}
+
+private extension View {
+    func homeRouteGlassPill() -> some View {
+        self
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                Color.black.opacity(0.46),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.white.opacity(0.18),
+                        lineWidth: 0.7
+                    )
+            }
     }
 }
 
@@ -1283,33 +2320,10 @@ private struct HomeActivityStrengthCard: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.indigo.opacity(0.10),
-                                    ATHLTHTheme.cardWarm.opacity(0.40)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .font(.system(size: 58, weight: .light))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color.indigo.opacity(0.88),
-                                    Color.blue.opacity(0.48)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-                .frame(width: 96, height: 96)
+                HomeActivityMuscleArtwork(
+                    muscleGroups: focusAreas
+                )
+                .frame(width: 126, height: 150)
             }
 
             if !focusAreas.isEmpty {
