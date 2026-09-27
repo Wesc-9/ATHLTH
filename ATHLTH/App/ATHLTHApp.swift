@@ -274,6 +274,23 @@ struct AppRootView: View {
                 await syncSocialOwnedData()
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .athlthRemoteNotificationReceived
+            )
+        ) { _ in
+            guard appSession.signedIn else { return }
+
+            Task {
+                // The backend already delivered this event through APNs.
+                // Pull the authoritative inbox immediately so the Home bell
+                // updates while ATHLTH is open, without scheduling a duplicate
+                // local system notification for the same event.
+                await refreshSocialCore(
+                    deliverSystemAlertsForImportedInbox: false
+                )
+            }
+        }
         .onChange(of: health.workouts.map(\.id)) { _, _ in
             guard appSession.signedIn else { return }
 
@@ -1122,10 +1139,14 @@ struct AppRootView: View {
         pendingWorkoutReview = workout
     }
 
-    private func refreshSocialCore() async {
+    private func refreshSocialCore(
+        deliverSystemAlertsForImportedInbox: Bool = true
+    ) async {
         await social.refresh(
             challengeStore: challengeStore,
-            notificationStore: notifications
+            notificationStore: notifications,
+            deliverSystemAlertsForImportedInbox:
+                deliverSystemAlertsForImportedInbox
         )
 
         // Supabase social privacy is authoritative once the account is loaded.
