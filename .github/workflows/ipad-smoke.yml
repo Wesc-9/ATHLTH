@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.4.2
+      - release/v1.4.3
     paths:
       - ATHLTH/**/*.swift
       - ATHLTH/Assets.xcassets/**
