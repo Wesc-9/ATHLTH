@@ -948,8 +948,31 @@ struct AppRootView: View {
         )
     }
 
+    @MainActor
     private func resolveStartupAuthentication() async {
+        // A network/auth restoration must never leave the app parked on the
+        // launch gate indefinitely. This is especially important on a fresh
+        // install where a Keychain-backed Supabase session can outlive local
+        // UserDefaults state.
+        let timeoutTask = Task { @MainActor in
+            try? await Task.sleep(
+                nanoseconds: 10_000_000_000
+            )
+
+            guard !Task.isCancelled,
+                  !startupAuthenticationResolved
+            else {
+                return
+            }
+
+            appSession.resetAuthenticationState()
+            await accountService
+                .discardUnexpectedPersistedSession()
+            startupAuthenticationResolved = true
+        }
+
         defer {
+            timeoutTask.cancel()
             startupAuthenticationResolved = true
         }
 
@@ -965,19 +988,35 @@ struct AppRootView: View {
         // held behind ATHLTHLaunchGateView until the backend session and
         // profile have both been validated.
         do {
-            guard let bootstrap = try await accountService.restoreCurrentUser()
+            guard let bootstrap =
+                    try await accountService
+                        .restoreCurrentUser()
             else {
                 appSession.resetAuthenticationState()
-                await accountService.discardUnexpectedPersistedSession()
+                await accountService
+                    .discardUnexpectedPersistedSession()
                 return
             }
 
-            appSession.applyBackendBootstrap(bootstrap)
+            // If the fallback already recovered the launch UI, ignore a late
+            // backend response instead of unexpectedly switching screens.
+            guard !startupAuthenticationResolved else {
+                return
+            }
+
+            appSession.applyBackendBootstrap(
+                bootstrap
+            )
         } catch {
             // Never enter ProductRootTabView with a stale/partial profile.
             // Falling back to the login screen is safer and recoverable.
+            guard !startupAuthenticationResolved else {
+                return
+            }
+
             appSession.resetAuthenticationState()
-            await accountService.discardUnexpectedPersistedSession()
+            await accountService
+                .discardUnexpectedPersistedSession()
         }
     }
 
