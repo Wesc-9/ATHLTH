@@ -1039,6 +1039,61 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    var calendarEvents: [CommunityGroupEventRecord] {
+        let joinedIDs = joinedGroupIDs
+        return eventsByGroup
+            .filter { joinedIDs.contains($0.key) }
+            .values
+            .flatMap { $0 }
+            .sorted { $0.startsAt < $1.startsAt }
+    }
+
+    var calendarEventRSVPs: [CommunityGroupEventRSVPRecord] {
+        let joinedIDs = joinedGroupIDs
+        return eventRSVPsByGroup
+            .filter { joinedIDs.contains($0.key) }
+            .values
+            .flatMap { $0 }
+    }
+
+    func refreshCalendarContent() async {
+        guard let userID = currentUserID else { return }
+
+        for groupID in joinedGroupIDs {
+            do {
+                async let eventsQuery: [CommunityGroupEventRecord] = client
+                    .from("community_group_events")
+                    .select()
+                    .eq("group_id", value: groupID)
+                    .order("starts_at", ascending: true)
+                    .limit(100)
+                    .execute()
+                    .value
+
+                async let rsvpQuery: [CommunityGroupEventRSVPRecord] = client
+                    .from("community_group_event_rsvps")
+                    .select()
+                    .eq("group_id", value: groupID)
+                    .eq("user_id", value: userID)
+                    .execute()
+                    .value
+
+                let loadedEvents = try await eventsQuery
+                let loadedRSVPs = try await rsvpQuery
+
+                guard !Task.isCancelled else { return }
+
+                eventsByGroup[groupID] = loadedEvents
+                eventRSVPsByGroup[groupID] = loadedRSVPs
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     func loadGroupContent(_ groupID: UUID) async {
         let creatorOwnsGroup =
             groups.first {
