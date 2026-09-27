@@ -180,6 +180,18 @@ final class GhostRaceStore: ObservableObject {
                 firstTimestamp
             ) > 10
 
+        let firstPointStartOffset =
+            firstTimestamp.timeIntervalSince(
+                startedAt
+            )
+
+        let timestampBaseline =
+            hasUsefulTimestamps &&
+            firstPointStartOffset >= -30 &&
+            firstPointStartOffset <= 300
+                ? startedAt
+                : firstTimestamp
+
         let points = sampledIndices.map {
             index -> GhostRacePoint in
 
@@ -196,7 +208,7 @@ final class GhostRaceStore: ObservableObject {
                 rawElapsed =
                     location.timestamp
                         .timeIntervalSince(
-                            firstTimestamp
+                            timestampBaseline
                         )
             } else {
                 rawElapsed =
