@@ -1,7 +1,8 @@
 import Combine
 import Foundation
-import HealthKit
+@preconcurrency import HealthKit
 
+@MainActor
 final class WorkoutMirroringStore: NSObject, ObservableObject {
     @Published private(set) var snapshot: WatchWorkoutLiveSnapshot?
     @Published private(set) var connectionText = "Waiting for Apple Watch"
@@ -15,7 +16,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         super.init()
 
         healthStore.workoutSessionMirroringStartHandler = { [weak self] session in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 self?.attach(session)
             }
         }
@@ -164,29 +165,43 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
     }
 
-    private func publish(_ changes: @escaping () -> Void) {
-        if Thread.isMainThread {
-            changes()
-        } else {
-            DispatchQueue.main.async(execute: changes)
-        }
+    private func publish(_ changes: () -> Void) {
+        changes()
     }
 }
 
 extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
-    func workoutSession(
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
         didChangeTo toState: HKWorkoutSessionState,
         from fromState: HKWorkoutSessionState,
         date: Date
     ) {
-        let newState = mirrorState(for: toState)
+        let rawState = toState.rawValue
+        let startedAt = workoutSession.startDate
+        let endedAt = workoutSession.endDate
 
-        publish {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let sessionState = HKWorkoutSessionState(rawValue: rawState)
+            else {
+                return
+            }
+
+            let newState = self.mirrorState(for: sessionState)
+
             guard var snapshot = self.snapshot else { return }
             snapshot.state = newState
-            snapshot.startedAt = workoutSession.startDate ?? snapshot.startedAt
-            snapshot.elapsedTime = self.elapsedTime(for: workoutSession)
+            snapshot.startedAt = startedAt ?? snapshot.startedAt
+
+            if let start = startedAt {
+                let end = endedAt ?? Date()
+                snapshot.elapsedTime = max(
+                    0,
+                    end.timeIntervalSince(start)
+                )
+            }
+
             self.snapshot = snapshot
             self.connectionText = newState == .completed
                 ? "Workout completed"
@@ -199,12 +214,16 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
         }
     }
 
-    func workoutSession(
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
         didFailWithError error: Error
     ) {
-        publish {
-            self.errorMessage = error.localizedDescription
+        let message = error.localizedDescription
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            self.errorMessage = message
 
             if var snapshot = self.snapshot {
                 snapshot.state = .failed
@@ -216,26 +235,29 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
         }
     }
 
-    func workoutSession(
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
         didReceiveDataFromRemoteWorkoutSession data: [Data]
     ) {
-        handle(data)
+        Task { @MainActor [weak self] in
+            self?.handle(data)
+        }
     }
 
-    func workoutSession(
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
         didDisconnectFromRemoteDeviceWithError error: Error?
     ) {
-        publish {
-            if self.mirroredSession === workoutSession {
-                self.mirroredSession = nil
-            }
+        let message = error?.localizedDescription
 
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            self.mirroredSession = nil
             self.connectionText = "Reconnecting to Apple Watch"
 
-            if let error {
-                self.errorMessage = error.localizedDescription
+            if let message {
+                self.errorMessage = message
             }
         }
     }
