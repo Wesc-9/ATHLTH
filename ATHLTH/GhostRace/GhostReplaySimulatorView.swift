@@ -28,10 +28,6 @@ final class GhostReplaySimulatorStore: ObservableObject {
     private var replayTask: Task<Void, Never>?
     private var elapsedTime: TimeInterval = 0
 
-    deinit {
-        replayTask?.cancel()
-    }
-
     func markReady() {
         stopTask()
         elapsedTime = 0
@@ -59,7 +55,7 @@ final class GhostReplaySimulatorStore: ObservableObject {
 
             while !Task.isCancelled {
                 try? await Task.sleep(
-                    for: .milliseconds(100)
+                    nanoseconds: 100_000_000
                 )
 
                 guard !Task.isCancelled else {
