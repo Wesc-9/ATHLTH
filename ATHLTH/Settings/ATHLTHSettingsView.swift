@@ -2200,7 +2200,7 @@ private struct ATHLTHTrainingSettingsView: View {
 
             Section("Activity sharing") {
                 Toggle(
-                    "Publish completed workouts automatically",
+                    "Share completed workouts by default",
                     isOn: $settings.autoPublishCompletedWorkouts
                 )
                 .onChange(
@@ -2225,13 +2225,13 @@ private struct ATHLTHTrainingSettingsView: View {
                     }
 
                     Text(
-                        "ATHLTH publishes the workout after it is saved. Post-workout review still opens so you can add context or change visibility."
+                        "ATHLTH preselects your sharing visibility, but Workout Complete always opens before anything is published."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 } else {
                     Text(
-                        "Completed workouts stay private until you choose to share them."
+                        "Completed workouts default to private. Workout Complete still opens after every session so you can choose what to share."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
