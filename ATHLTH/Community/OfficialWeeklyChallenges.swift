@@ -201,6 +201,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
     @Published var errorMessage: String?
 
     private let client: SupabaseClient
+    private var lastRefreshAt: Date?
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -225,10 +226,17 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
             .sorted { $0.startsAt < $1.startsAt }
     }
 
-    func refresh() async {
+    func refresh(force: Bool = false) async {
         guard client.auth.currentUser != nil else {
             challenges = []
             participants = []
+            return
+        }
+
+        if !force,
+           let lastRefreshAt,
+           Date().timeIntervalSince(lastRefreshAt) < 180,
+           !challenges.isEmpty {
             return
         }
 
@@ -258,6 +266,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
 
             challenges = loadedChallenges
             participants = loadedParticipants
+            lastRefreshAt = Date()
             errorMessage = nil
         } catch is CancellationError {
             return
@@ -399,7 +408,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         }
 
         if didUpdate {
-            await refresh()
+            await refresh(force: true)
         }
     }
 
@@ -418,7 +427,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                 )
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -435,7 +444,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                 .eq("user_id", value: userID)
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -509,7 +518,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                 .upsert(write)
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
 
             if coverNeedsRefresh {
                 Task { @MainActor [weak self] in
@@ -536,7 +545,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                 .eq("id", value: challenge.id)
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -557,7 +566,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                 )
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -626,7 +635,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
             if response.generated,
                response.heroAsset?.isEmpty == false {
                 errorMessage = nil
-                await refresh()
+                await refresh(force: true)
                 return true
             }
 
