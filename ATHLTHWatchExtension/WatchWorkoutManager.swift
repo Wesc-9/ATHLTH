@@ -1974,6 +1974,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        let latestRoutePoint =
+            routePoints.last
+
         let snapshot = WatchWorkoutLiveSnapshot(
             kind: kind,
             state: stateOverride ?? mirrorState(for: state),
@@ -1985,7 +1988,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             distanceMeters: distanceMeters,
             averageHeartRate: averageHeartRate,
             maxHeartRate: maxHeartRate,
-            routePointCount: routePoints.count
+            routePointCount: routePoints.count,
+            currentLatitude:
+                latestRoutePoint?.latitude,
+            currentLongitude:
+                latestRoutePoint?.longitude,
+            routeProgressPercent:
+                routeProgressPercent
         )
 
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
