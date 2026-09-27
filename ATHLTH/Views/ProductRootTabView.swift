@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 
 struct ProductRootTabView: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
 
@@ -90,6 +91,9 @@ struct ProductRootTabView: View {
             onDismiss: {
                 if !workoutMirroring.hasActiveMirroredWorkout {
                     workoutMirroring.dismissSummary()
+                    if ghostRace.reference != nil {
+                        ghostRace.dismissResult()
+                    }
                 }
             }
         ) {
