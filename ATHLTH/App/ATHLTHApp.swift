@@ -780,6 +780,9 @@ struct AppRootView: View {
                 }
             }
         }
+        .onChange(of: spotifyPlayback.connectionState) { _, _ in
+            settings.spotifyConnected = spotifyPlayback.isConnected
+        }
         .confirmationDialog(
             "Share your first workout?",
             isPresented: Binding(
