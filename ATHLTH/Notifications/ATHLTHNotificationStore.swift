@@ -399,15 +399,27 @@ final class ATHLTHNotificationStore: ObservableObject {
         }
 
         let center = UNUserNotificationCenter.current()
-        let requests: [UNNotificationRequest] = await withCheckedContinuation { continuation in
-            center.getPendingNotificationRequests { requests in
-                continuation.resume(returning: requests)
-            }
-        }
+        let challengeRequestIDs: [String] =
+            await withCheckedContinuation {
+                (
+                    continuation:
+                        CheckedContinuation<[String], Never>
+                ) in
 
-        let challengeRequestIDs = requests
-            .map(\.identifier)
-            .filter { $0.hasPrefix("challenge-") }
+                center.getPendingNotificationRequests {
+                    requests in
+
+                    let identifiers = requests
+                        .map(\.identifier)
+                        .filter {
+                            $0.hasPrefix("challenge-")
+                        }
+
+                    continuation.resume(
+                        returning: identifiers
+                    )
+                }
+            }
 
         if !challengeRequestIDs.isEmpty {
             center.removePendingNotificationRequests(withIdentifiers: challengeRequestIDs)
