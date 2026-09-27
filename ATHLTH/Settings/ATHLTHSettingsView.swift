@@ -178,18 +178,18 @@ struct ATHLTHSettingsView: View {
                                     subtitle: healthSyncStatusText
                                 ) {
                                     connectionTrailing(
-                                        health.isRefreshing
+                                        healthRequestInProgress
                                             ? "Syncing"
                                             : health.hasRequestedAuthorization
                                                 ? "Sync now"
                                                 : "Connect",
                                         showChevron: false,
-                                        loading: health.isRefreshing || healthRequestInProgress
+                                        loading: healthRequestInProgress
                                     )
                                 }
                             }
                             .buttonStyle(.plain)
-                            .disabled(health.isRefreshing || healthRequestInProgress)
+                            .disabled(healthRequestInProgress)
                         }
                     }
 
@@ -841,7 +841,7 @@ struct ATHLTHSettingsView: View {
     }
 
     private var healthSyncStatusText: String {
-        if health.isRefreshing {
+        if healthRequestInProgress {
             return "Reading workouts, activity, sleep, heart data and profile values from Apple Health."
         }
 
@@ -858,16 +858,14 @@ struct ATHLTHSettingsView: View {
         }
 
         if let lastRefresh = health.lastSuccessfulRefreshAt {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .full
-            let relative = formatter.localizedString(for: lastRefresh, relativeTo: Date())
+            let synced = healthSyncTimestamp(lastRefresh)
 
             if health.hasTrainingHealthData {
                 if health.canWriteWorkouts {
-                    return "Apple Health training data imported successfully. Last synced \(relative)."
+                    return "Apple Health training data imported successfully. Last synced \(synced)."
                 }
 
-                return "Apple Health data was imported \(relative), but workout write access is off. Tap Sync now to review Health permissions."
+                return "Apple Health data was imported \(synced), but workout write access is off. Tap Sync now to review Health permissions."
             }
 
             if health.personalDetails.hasAnyValue {
@@ -880,6 +878,31 @@ struct ATHLTHSettingsView: View {
         return settings.backgroundHealthSyncEnabled
             ? "Apple Health is configured. Tap Sync now to perform the first full import."
             : "Apple Health is configured. Background sync is off, but you can still tap Sync now."
+    }
+
+    private func healthSyncTimestamp(
+        _ date: Date
+    ) -> String {
+        let calendar = Calendar.current
+
+        if calendar.isDateInToday(date) {
+            return "today at " + date.formatted(
+                date: .omitted,
+                time: .shortened
+            )
+        }
+
+        if calendar.isDateInYesterday(date) {
+            return "yesterday at " + date.formatted(
+                date: .omitted,
+                time: .shortened
+            )
+        }
+
+        return date.formatted(
+            date: .abbreviated,
+            time: .shortened
+        )
     }
 
     private var backgroundHealthSyncBinding: Binding<Bool> {
