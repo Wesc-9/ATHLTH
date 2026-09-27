@@ -290,7 +290,7 @@ struct GhostRaceHubView: View {
                     }
 
                     Text(
-                        "Voice uses your existing Audio Coach language setting. Lead-change alerts have a cooldown so ATHLTH does not talk constantly during close races."
+                        "Voice uses your existing Audio Coach language setting. While Ghost Audio Coach is on, its cadence replaces regular spoken workout intervals so the two coaches do not talk over each other. Route alerts still work normally."
                     )
                     .font(.caption2)
                     .foregroundStyle(.secondary)
