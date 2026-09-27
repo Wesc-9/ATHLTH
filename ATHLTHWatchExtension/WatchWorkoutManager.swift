@@ -5,6 +5,47 @@ import Foundation
 @preconcurrency import WatchConnectivity
 @preconcurrency import WatchKit
 
+private struct WatchLocationSample: Sendable {
+    let latitude: Double
+    let longitude: Double
+    let altitude: Double
+    let horizontalAccuracy: Double
+    let verticalAccuracy: Double
+    let course: Double
+    let speed: Double
+    let timestamp: Date
+
+    init(_ location: CLLocation) {
+        latitude = location.coordinate.latitude
+        longitude = location.coordinate.longitude
+        altitude = location.altitude
+        horizontalAccuracy =
+            location.horizontalAccuracy
+        verticalAccuracy =
+            location.verticalAccuracy
+        course = location.course
+        speed = location.speed
+        timestamp = location.timestamp
+    }
+
+    func makeLocation() -> CLLocation {
+        CLLocation(
+            coordinate: CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            ),
+            altitude: altitude,
+            horizontalAccuracy:
+                horizontalAccuracy,
+            verticalAccuracy:
+                verticalAccuracy,
+            course: course,
+            speed: speed,
+            timestamp: timestamp
+        )
+    }
+}
+
 enum WatchWorkoutState: Equatable {
     case idle
     case preparing
@@ -2792,21 +2833,94 @@ extension WatchWorkoutManager:
     }
 }
 
-extension WatchWorkoutManager: CLLocationManagerDelegate {
-    func locationManager(
+extension WatchWorkoutManager:
+    CLLocationManagerDelegate {
+
+    nonisolated func locationManager(
         _ manager: CLLocationManager,
-        didUpdateLocations locations: [CLLocation]
+        didUpdateLocations
+            locations: [CLLocation]
     ) {
-        let filtered = locations.filter {
-            $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 50
+        let samples =
+            locations
+                .filter {
+                    $0.horizontalAccuracy >= 0 &&
+                    $0.horizontalAccuracy <= 50
+                }
+                .map(WatchLocationSample.init)
+
+        guard !samples.isEmpty else {
+            return
         }
 
-        guard !filtered.isEmpty else { return }
+        Task { @MainActor [weak self] in
+            self?.handleLocationSamples(
+                samples
+            )
+        }
+    }
+
+    nonisolated func
+        locationManagerDidChangeAuthorization(
+            _ manager: CLLocationManager
+        ) {
+        let authorized =
+            manager.authorizationStatus
+                == .authorizedWhenInUse ||
+            manager.authorizationStatus
+                == .authorizedAlways
+
+        guard authorized else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.kind == .strength,
+                  self.state == .running
+            else {
+                return
+            }
+
+            self.locationManager
+                .requestLocation()
+        }
+    }
+
+    nonisolated func locationManager(
+        _ manager: CLLocationManager,
+        didFailWithError error: Error
+    ) {
+        let message =
+            "Location: \(error.localizedDescription)"
+
+        Task { @MainActor [weak self] in
+            self?.errorMessage = message
+        }
+    }
+}
+
+private extension WatchWorkoutManager {
+    func handleLocationSamples(
+        _ samples: [WatchLocationSample]
+    ) {
+        let filtered =
+            samples.map {
+                $0.makeLocation()
+            }
+
+        guard !filtered.isEmpty else {
+            return
+        }
 
         if kind == .strength {
-            if let bestLocation = filtered.min(by: {
-                $0.horizontalAccuracy < $1.horizontalAccuracy
-            }) {
+            if let bestLocation =
+                filtered.min(
+                    by: {
+                        $0.horizontalAccuracy <
+                        $1.horizontalAccuracy
+                    }
+                ) {
                 workoutLocation = bestLocation
                 attachWorkoutLocationMetadataIfPossible()
             }
@@ -2842,36 +2956,32 @@ extension WatchWorkoutManager: CLLocationManagerDelegate {
             )
         }
 
-        publish {
-            let startIndex = self.routePoints.count
-            self.routePoints.append(
-                contentsOf: filtered.enumerated().map { offset, location in
+        let startIndex =
+            routePoints.count
+        routePoints.append(
+            contentsOf:
+                filtered.enumerated().map {
+                    offset,
+                    location in
+
                     WatchRoutePoint(
-                        latitude: location.coordinate.latitude,
-                        longitude: location.coordinate.longitude,
-                        altitude: location.altitude,
-                        sequence: startIndex + offset
+                        latitude:
+                            location.coordinate
+                                .latitude,
+                        longitude:
+                            location.coordinate
+                                .longitude,
+                        altitude:
+                            location.altitude,
+                        sequence:
+                            startIndex +
+                            offset
                     )
                 }
-            )
-        }
+        )
     }
 
-    func locationManagerDidChangeAuthorization(
-        _ manager: CLLocationManager
-    ) {
-        guard kind == .strength,
-              state == .running,
-              manager.authorizationStatus == .authorizedWhenInUse ||
-              manager.authorizationStatus == .authorizedAlways
-        else {
-            return
-        }
-
-        manager.requestLocation()
-    }
-
-    private func attachWorkoutLocationMetadataIfPossible() {
+    func attachWorkoutLocationMetadataIfPossible() {
         guard kind == .strength,
               !workoutLocationMetadataAttached,
               let location = workoutLocation,
@@ -2883,12 +2993,15 @@ extension WatchWorkoutManager: CLLocationManagerDelegate {
         workoutLocationMetadataAttached = true
 
         builder.addMetadata([
-            ATHLTHWorkoutMetadataKey.locationLatitude:
-                location.coordinate.latitude,
-            ATHLTHWorkoutMetadataKey.locationLongitude:
-                location.coordinate.longitude,
-            ATHLTHWorkoutMetadataKey.locationHorizontalAccuracy:
-                location.horizontalAccuracy
+            ATHLTHWorkoutMetadataKey
+                .locationLatitude:
+                    location.coordinate.latitude,
+            ATHLTHWorkoutMetadataKey
+                .locationLongitude:
+                    location.coordinate.longitude,
+            ATHLTHWorkoutMetadataKey
+                .locationHorizontalAccuracy:
+                    location.horizontalAccuracy
         ]) { [weak self] success, error in
             guard !success,
                   let error
@@ -2900,20 +3013,14 @@ extension WatchWorkoutManager: CLLocationManagerDelegate {
                 "Workout location could not be saved: \(error.localizedDescription)"
 
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
+
                 self.workoutLocationMetadataAttached =
                     false
                 self.errorMessage = message
             }
-        }
-    }
-
-    func locationManager(
-        _ manager: CLLocationManager,
-        didFailWithError error: Error
-    ) {
-        publish {
-            self.errorMessage = "Location: \(error.localizedDescription)"
         }
     }
 }
