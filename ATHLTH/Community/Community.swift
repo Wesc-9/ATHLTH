@@ -1,5 +1,5 @@
 import Foundation
-import MapKit
+@preconcurrency import MapKit
 import Supabase
 import SwiftUI
 
@@ -183,6 +183,12 @@ private struct CommunityParticipantWrite: Encodable {
     }
 }
 
+private struct CommunityResolvedCoordinate: Sendable {
+    let latitude: Double
+    let longitude: Double
+}
+
+@MainActor
 final class SupabaseCommunityService {
     private let client: SupabaseClient
 
@@ -286,14 +292,57 @@ final class SupabaseCommunityService {
     ) async -> CLLocationCoordinate2D? {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
-        request.resultTypes = [.address, .pointOfInterest]
+        request.resultTypes = [
+            .address,
+            .pointOfInterest
+        ]
 
-        do {
-            let response = try await MKLocalSearch(request: request).start()
-            return response.mapItems.first?.placemark.coordinate
-        } catch {
+        let resolved:
+            CommunityResolvedCoordinate? =
+                await withCheckedContinuation {
+                    (
+                        continuation:
+                            CheckedContinuation<
+                                CommunityResolvedCoordinate?,
+                                Never
+                            >
+                    ) in
+
+                    MKLocalSearch(request: request)
+                        .start { response, _ in
+                            guard let coordinate =
+                                    response?
+                                        .mapItems
+                                        .first?
+                                        .placemark
+                                        .coordinate
+                            else {
+                                continuation.resume(
+                                    returning: nil
+                                )
+                                return
+                            }
+
+                            continuation.resume(
+                                returning:
+                                    CommunityResolvedCoordinate(
+                                        latitude:
+                                            coordinate.latitude,
+                                        longitude:
+                                            coordinate.longitude
+                                    )
+                            )
+                        }
+                }
+
+        guard let resolved else {
             return nil
         }
+
+        return CLLocationCoordinate2D(
+            latitude: resolved.latitude,
+            longitude: resolved.longitude
+        )
     }
 
     func setAttendance(
