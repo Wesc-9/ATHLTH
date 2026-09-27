@@ -687,7 +687,7 @@ struct AppRootView: View {
         .sheet(item: $pendingWorkoutReview) { workout in
             PostWorkoutReviewView(
                 workout: workout,
-                wasAutoPublished: settings.autoPublishCompletedWorkouts,
+                wasAutoPublished: false,
                 initialVisibilityOverride:
                     pendingWorkoutReviewVisibilityOverride
             )
@@ -927,15 +927,13 @@ struct AppRootView: View {
             return
         }
 
-        pendingWorkoutReviewVisibilityOverride = nil
+        pendingWorkoutReviewVisibilityOverride =
+            settings.autoPublishCompletedWorkouts
+                ? settings.defaultActivityVisibility
+                : nil
 
-        if settings.autoPublishCompletedWorkouts {
-            _ = await social.publishWorkout(
-                workout,
-                visibility: settings.defaultActivityVisibility
-            )
-        }
-
+        // Always show the post-workout review before anything is shared.
+        // The auto-share preference only chooses the default visibility.
         pendingWorkoutReview = workout
     }
 
@@ -981,16 +979,9 @@ struct AppRootView: View {
         pendingFirstWorkoutSharePrompt = nil
         pendingWorkoutReviewVisibilityOverride = visibility
 
-        Task {
-            _ = await social.publishWorkout(
-                workout,
-                visibility: visibility
-            )
-
-            await MainActor.run {
-                pendingWorkoutReview = workout
-            }
-        }
+        // Keep review mandatory. Nothing is published until the user
+        // confirms the completed workout from the review screen.
+        pendingWorkoutReview = workout
     }
 
     private func refreshSocialCore() async {
