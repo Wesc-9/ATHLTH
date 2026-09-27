@@ -20,13 +20,33 @@ final class SupabaseSocialService: Sendable {
 
         guard !clean.isEmpty else { return [] }
 
-        let rows: [SocialProfileCard] = try await client
+        async let usernameRowsTask: [SocialProfileCard] = client
             .from("social_profile_cards")
             .select()
             .ilike("username", pattern: "%\(clean)%")
             .limit(30)
             .execute()
             .value
+
+        async let nameRowsTask: [SocialProfileCard] = client
+            .from("social_profile_cards")
+            .select()
+            .ilike("display_name", pattern: "%\(clean)%")
+            .limit(30)
+            .execute()
+            .value
+
+        let usernameRows = try await usernameRowsTask
+        let nameRows = try await nameRowsTask
+
+        var seen = Set<UUID>()
+        let rows = (usernameRows + nameRows)
+            .filter { seen.insert($0.userID).inserted }
+            .sorted {
+                $0.resolvedName.localizedCaseInsensitiveCompare(
+                    $1.resolvedName
+                ) == .orderedAscending
+            }
 
         guard let currentUserID else { return rows }
         return rows.filter { $0.userID != currentUserID }
