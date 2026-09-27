@@ -21,6 +21,7 @@ private struct CoachIntakePreferences: Codable, Equatable {
     var homeEquipment: Set<String>
     var otherEquipment: String
     var limitations: String
+    var coachFocusNotes: String?
     var currentSessionsPerWeek: Int
     var useProfileInterests: Bool
     var sessionsPerWeek: Int
@@ -435,7 +436,8 @@ struct AIProgramBuilderView: View {
         CoachIntakePreferences(
             experience: experience, trainingFocus: trainingFocus, gymAccess: gymAccess,
             homeEquipment: homeEquipment, otherEquipment: otherEquipment,
-            limitations: limitations, currentSessionsPerWeek: currentSessionsPerWeek,
+            limitations: limitations, coachFocusNotes: coachFocusNotes,
+            currentSessionsPerWeek: currentSessionsPerWeek,
             useProfileInterests: useProfileInterests, sessionsPerWeek: sessionsPerWeek,
             sessionDurationMinutes: sessionDurationMinutes, availableDays: availableDays
         )
@@ -1069,6 +1071,7 @@ struct AIProgramBuilderView: View {
             homeEquipment = saved.homeEquipment
             otherEquipment = saved.otherEquipment
             limitations = saved.limitations
+            coachFocusNotes = saved.coachFocusNotes ?? ""
             currentSessionsPerWeek = saved.currentSessionsPerWeek
             useProfileInterests = saved.useProfileInterests
             availableDays = saved.availableDays
