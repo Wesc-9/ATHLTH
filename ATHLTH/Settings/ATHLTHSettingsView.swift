@@ -605,7 +605,7 @@ struct ATHLTHSettingsView: View {
                     }
 
                     if session.currentRole.canAccessControlCenter {
-                        settingsSection("Developer Tools") {
+                        settingsSection("Developer") {
                             PremiumSettingsCard {
                                 NavigationLink {
                                     AdminAIUsageView()
@@ -651,7 +651,7 @@ struct ATHLTHSettingsView: View {
                     }
 
                     if session.previewModeEnabled || session.currentRole.canAccessControlCenter {
-                        settingsSection("Developer") {
+                        settingsSection("Developer Tools") {
                             PremiumSettingsCard {
                                 NavigationLink {
                                     CapabilityLabView()
