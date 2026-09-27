@@ -361,6 +361,7 @@ final class SupabaseSocialService: Sendable {
             displayName: rawCard.displayName,
             bio: detailRows.first?.bio,
             avatarURL: rawCard.avatarURL,
+            profileVisibility: rawCard.profileVisibility,
             createdAt: rawCard.createdAt,
             updatedAt: rawCard.updatedAt
         )
