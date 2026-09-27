@@ -602,20 +602,43 @@ struct ATHLTHCommunityView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        let useImmersiveCommunityHero =
+            UIDevice.current.userInterfaceIdiom == .pad ||
+            UIScreen.main.bounds.width >= 390
+
+        return NavigationStack {
             ATHLTHPinnedHeroLayout(
                 accent: Color.purple.opacity(0.42),
-                softTransition: true
+                softTransition: true,
+                immersiveTransition: useImmersiveCommunityHero
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
                         imageName: "CommunityHero",
                         title: "Community",
                         subtitle: "Train together. Go further.",
-                        height: 190,
+                        height:
+                            useImmersiveCommunityHero
+                                ? 212
+                                : 190,
                         alignment: .leading,
-                        focalOffsetX: -18,
-                        focalOffsetY: 18
+                        focalOffsetX:
+                            useImmersiveCommunityHero
+                                ? -8
+                                : -18,
+                        focalOffsetY:
+                            useImmersiveCommunityHero
+                                ? 8
+                                : 18,
+                        titleFontSize:
+                            useImmersiveCommunityHero
+                                ? 30
+                                : 30,
+                        copyWidthFraction:
+                            useImmersiveCommunityHero
+                                ? 0.68
+                                : 0.80,
+                        immersiveCopy: useImmersiveCommunityHero
                     )
 
                     if session.currentRole.canAccessControlCenter {
@@ -645,7 +668,7 @@ struct ATHLTHCommunityView: View {
                     }
                 }
             } content: {
-                LazyVStack(spacing: 16) {
+                LazyVStack(spacing: 18) {
                     CommunityShowcaseShortcutStrip(
                         clubsCount: groups.joinedGroups.count,
                         challengeCount:
@@ -691,7 +714,7 @@ struct ATHLTHCommunityView: View {
                     )
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.top, useImmersiveCommunityHero ? 12 : 16)
                 .padding(.bottom, 30)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
