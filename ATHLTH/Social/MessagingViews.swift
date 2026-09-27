@@ -1168,6 +1168,7 @@ struct DirectMessageThreadView: View {
             avatarURL:
                 session.profile.avatarURL?
                     .absoluteString,
+            profileVisibility: "public",
             createdAt: nil,
             updatedAt: nil
         )
