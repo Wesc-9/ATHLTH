@@ -41,6 +41,27 @@ enum GhostRaceStartService {
                 raceRoute.id
             )
 
+            if let reference = ghostRace.reference {
+                watchConnection.sendGhostRace(
+                    WatchGhostRaceTransfer(
+                        title: reference.title,
+                        referenceDuration:
+                            reference.durationSeconds,
+                        routeDistanceMeters:
+                            reference.routeDistanceMeters,
+                        points:
+                            reference.points.map {
+                                WatchGhostRaceTimingPoint(
+                                    elapsedTime:
+                                        $0.elapsedTime,
+                                    cumulativeMeters:
+                                        $0.cumulativeMeters
+                                )
+                            }
+                    )
+                )
+            }
+
             try await watchConnection
                 .startWorkoutOnWatch(.running)
 
