@@ -1,9 +1,9 @@
-import AVFoundation
-import CoreLocation
+@preconcurrency import AVFoundation
+@preconcurrency import CoreLocation
 import Foundation
-import HealthKit
-import WatchConnectivity
-import WatchKit
+@preconcurrency import HealthKit
+@preconcurrency import WatchConnectivity
+@preconcurrency import WatchKit
 
 enum WatchWorkoutState: Equatable {
     case idle
@@ -15,8 +15,9 @@ enum WatchWorkoutState: Equatable {
     case failed(String)
 }
 
+@MainActor
 final class WatchWorkoutManager: NSObject, ObservableObject {
-    @MainActor static let shared = WatchWorkoutManager()
+    static let shared = WatchWorkoutManager()
 
     @Published private(set) var state: WatchWorkoutState = .idle
     @Published private(set) var kind: WatchWorkoutKind = .running
@@ -850,32 +851,35 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func startTimer() {
         stopTimer()
 
-        publish {
-            self.timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) {
-                [weak self] _ in
-                guard let self, let builder = self.workoutBuilder else { return }
-                self.publish {
-                    self.elapsedTime = builder.elapsedTime
-                    self.currentLapElapsedTime =
-                        max(
-                            builder.elapsedTime -
-                            self.lastLapElapsedTime,
-                            0
-                        )
-                    self.currentLapDistanceMeters =
-                        max(
-                            self.distanceMeters -
-                            self.lastLapDistanceMeters,
-                            0
-                        )
+        timer = Timer.scheduledTimer(
+            withTimeInterval: 1,
+            repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      let builder = self.workoutBuilder
+                else {
+                    return
                 }
+
+                self.elapsedTime = builder.elapsedTime
+                self.currentLapElapsedTime =
+                    max(
+                        builder.elapsedTime -
+                        self.lastLapElapsedTime,
+                        0
+                    )
+                self.currentLapDistanceMeters =
+                    max(
+                        self.distanceMeters -
+                        self.lastLapDistanceMeters,
+                        0
+                    )
+
                 self.evaluateStructuredRunningWorkout()
                 self.evaluateWorkoutTargetAlerts()
                 self.evaluateAudioCoach()
-
-                Task { [weak self] in
-                    await self?.sendLiveSnapshot()
-                }
+                await self.sendLiveSnapshot()
             }
         }
     }
@@ -2205,20 +2209,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         updateFinalStatistics(from: builder)
 
-        builder.endCollection(withEnd: endDate) { [weak self] success, error in
-            guard let self else { return }
-
-            if let error {
-                self.fail(error)
-                return
-            }
-
-            guard success else {
-                self.fail(WatchWorkoutError.collectionCouldNotEnd)
-                return
-            }
-
-            builder.finishWorkout { [weak self] workout, error in
+        builder.endCollection(
+            withEnd: endDate
+        ) { [weak self] success, error in
+            Task { @MainActor [weak self] in
                 guard let self else { return }
 
                 if let error {
@@ -2226,15 +2220,40 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     return
                 }
 
-                guard let workout else {
-                    self.fail(WatchWorkoutError.workoutCouldNotSave)
+                guard success else {
+                    self.fail(
+                        WatchWorkoutError.collectionCouldNotEnd
+                    )
                     return
                 }
 
-                self.finishRouteIfNeeded(
-                    workout: workout,
-                    endDate: endDate
-                )
+                builder.finishWorkout {
+                    [weak self] workout, error in
+
+                    Task { @MainActor [weak self] in
+                        guard let self else {
+                            return
+                        }
+
+                        if let error {
+                            self.fail(error)
+                            return
+                        }
+
+                        guard let workout else {
+                            self.fail(
+                                WatchWorkoutError
+                                    .workoutCouldNotSave
+                            )
+                            return
+                        }
+
+                        self.finishRouteIfNeeded(
+                            workout: workout,
+                            endDate: endDate
+                        )
+                    }
+                }
             }
         }
     }
@@ -2248,17 +2267,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        routeBuilder.finishRoute(with: workout, metadata: nil) {
-            [weak self] _, error in
-            guard let self else { return }
+        routeBuilder.finishRoute(
+            with: workout,
+            metadata: nil
+        ) { [weak self] _, error in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
 
-            if let error {
-                self.publish {
-                    self.errorMessage = "Workout saved, but the GPS route could not be attached: \(error.localizedDescription)"
+                if let error {
+                    self.errorMessage =
+                        "Workout saved, but the GPS route could not be attached: \(error.localizedDescription)"
                 }
-            }
 
-            self.complete(workout: workout, endDate: endDate)
+                self.complete(
+                    workout: workout,
+                    endDate: endDate
+                )
+            }
         }
     }
 
@@ -2289,7 +2314,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.state = .completed
         }
 
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
 
             await self.sendLiveSnapshot(
@@ -2299,7 +2324,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             if self.mirroringActive,
                let workoutSession = self.workoutSession {
-                try? await workoutSession.stopMirroringToCompanionDevice()
+                try? await workoutSession
+                    .stopMirroringToCompanionDevice()
                 self.mirroringActive = false
             }
         }
@@ -2439,6 +2465,64 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    private func updateStatistics(
+        identifiers: Set<String>,
+        builder: HKLiveWorkoutBuilder
+    ) {
+        let types = Set(
+            identifiers.compactMap {
+                identifier -> HKSampleType? in
+
+                if identifier ==
+                    HKQuantityTypeIdentifier
+                        .heartRate.rawValue {
+                    return HKObjectType
+                        .quantityType(
+                            forIdentifier:
+                                .heartRate
+                        )
+                }
+
+                if identifier ==
+                    HKQuantityTypeIdentifier
+                        .activeEnergyBurned.rawValue {
+                    return HKObjectType
+                        .quantityType(
+                            forIdentifier:
+                                .activeEnergyBurned
+                        )
+                }
+
+                if identifier ==
+                    HKQuantityTypeIdentifier
+                        .distanceWalkingRunning.rawValue {
+                    return HKObjectType
+                        .quantityType(
+                            forIdentifier:
+                                .distanceWalkingRunning
+                        )
+                }
+
+                if identifier ==
+                    HKQuantityTypeIdentifier
+                        .distanceCycling.rawValue {
+                    return HKObjectType
+                        .quantityType(
+                            forIdentifier:
+                                .distanceCycling
+                        )
+                }
+
+                return nil
+            }
+        )
+
+        updateStatistics(
+            types,
+            builder: builder
+        )
+    }
+
     private func updateFinalStatistics(from builder: HKLiveWorkoutBuilder) {
         var types = Set<HKSampleType>()
 
@@ -2500,6 +2584,78 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    private func handleWorkoutSessionState(
+        _ state: HKWorkoutSessionState,
+        date: Date
+    ) {
+        switch state {
+        case .running:
+            publishState(.running)
+
+            if kind == .strength {
+                requestStrengthSnapshot()
+            }
+
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+
+                if let workoutSession =
+                    self.workoutSession {
+                    await self
+                        .retryMirroringIfNeeded(
+                            workoutSession
+                        )
+                }
+
+                await self.sendLiveSnapshot(
+                    stateOverride: .running,
+                    force: true
+                )
+            }
+
+        case .paused:
+            publishState(.paused)
+
+            Task { @MainActor [weak self] in
+                await self?.sendLiveSnapshot(
+                    stateOverride: .paused,
+                    force: true
+                )
+            }
+
+        case .ended:
+            publishState(.ending)
+
+            Task { @MainActor [weak self] in
+                await self?.sendLiveSnapshot(
+                    stateOverride: .ending,
+                    force: true
+                )
+            }
+
+            finishWorkout(at: date)
+
+        default:
+            break
+        }
+    }
+
+    private func fail(
+        message: String
+    ) {
+        stopTimer()
+        locationManager.stopUpdatingLocation()
+        errorMessage = message
+        state = .failed(message)
+
+        Task { @MainActor [weak self] in
+            await self?.sendLiveSnapshot(
+                stateOverride: .failed,
+                force: true
+            )
+        }
+    }
+
     private func fail(_ error: Error) {
         stopTimer()
         locationManager.stopUpdatingLocation()
@@ -2508,7 +2664,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.state = .failed(error.localizedDescription)
         }
 
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
             await self.sendLiveSnapshot(
                 stateOverride: .failed,
@@ -2523,82 +2679,70 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
-    private func publish(_ changes: @escaping () -> Void) {
-        if Thread.isMainThread {
-            changes()
-        } else {
-            DispatchQueue.main.async(execute: changes)
-        }
+    private func publish(
+        _ changes: () -> Void
+    ) {
+        changes()
     }
 }
 
-extension WatchWorkoutManager: HKWorkoutSessionDelegate {
-    func workoutSession(
+extension WatchWorkoutManager:
+    HKWorkoutSessionDelegate {
+
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
         didChangeTo toState: HKWorkoutSessionState,
         from fromState: HKWorkoutSessionState,
         date: Date
     ) {
-        switch toState {
-        case .running:
-            publishState(.running)
+        let rawState = toState.rawValue
 
-            if kind == .strength {
-                requestStrengthSnapshot()
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let state =
+                    HKWorkoutSessionState(
+                        rawValue: rawState
+                    )
+            else {
+                return
             }
 
-            Task {
-                await retryMirroringIfNeeded(
-                    workoutSession
-                )
-                await sendLiveSnapshot(
-                    stateOverride: .running,
-                    force: true
-                )
-            }
-        case .paused:
-            publishState(.paused)
-            Task {
-                await sendLiveSnapshot(
-                    stateOverride: .paused,
-                    force: true
-                )
-            }
-        case .ended:
-            publishState(.ending)
-            Task {
-                await sendLiveSnapshot(
-                    stateOverride: .ending,
-                    force: true
-                )
-            }
-            finishWorkout(at: date)
-        default:
-            break
+            self.handleWorkoutSessionState(
+                state,
+                date: date
+            )
         }
     }
 
-    func workoutSession(
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
         didFailWithError error: Error
     ) {
-        fail(error)
+        let message = error.localizedDescription
+
+        Task { @MainActor [weak self] in
+            self?.fail(message: message)
+        }
     }
 
-    func workoutSession(
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
-        didReceiveDataFromRemoteWorkoutSession data: [Data]
+        didReceiveDataFromRemoteWorkoutSession
+            data: [Data]
     ) {
-        for payload in data {
-            guard let command = try? JSONDecoder().decode(
-                WatchWorkoutMirrorCommand.self,
-                from: payload
-            ) else {
-                continue
-            }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
 
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+            for payload in data {
+                guard
+                    let command =
+                        try? JSONDecoder().decode(
+                            WatchWorkoutMirrorCommand.self,
+                            from: payload
+                        )
+                else {
+                    continue
+                }
 
                 switch command.command {
                 case .end:
@@ -2613,16 +2757,38 @@ extension WatchWorkoutManager: HKWorkoutSessionDelegate {
     }
 }
 
-extension WatchWorkoutManager: HKLiveWorkoutBuilderDelegate {
-    func workoutBuilderDidCollectEvent(
+extension WatchWorkoutManager:
+    HKLiveWorkoutBuilderDelegate {
+
+    nonisolated func workoutBuilderDidCollectEvent(
         _ workoutBuilder: HKLiveWorkoutBuilder
     ) {}
 
-    func workoutBuilder(
+    nonisolated func workoutBuilder(
         _ workoutBuilder: HKLiveWorkoutBuilder,
-        didCollectDataOf collectedTypes: Set<HKSampleType>
+        didCollectDataOf
+            collectedTypes: Set<HKSampleType>
     ) {
-        updateStatistics(collectedTypes, builder: workoutBuilder)
+        let identifiers =
+            Set(
+                collectedTypes.map(
+                    \.identifier
+                )
+            )
+
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let builder =
+                    self.workoutBuilder
+            else {
+                return
+            }
+
+            self.updateStatistics(
+                identifiers: identifiers,
+                builder: builder
+            )
+        }
     }
 }
 
@@ -2647,10 +2813,20 @@ extension WatchWorkoutManager: CLLocationManagerDelegate {
             return
         }
 
-        routeBuilder?.insertRouteData(filtered) { [weak self] success, error in
-            guard let self, !success, let error else { return }
-            self.publish {
-                self.errorMessage = "GPS route update failed: \(error.localizedDescription)"
+        routeBuilder?.insertRouteData(
+            filtered
+        ) { [weak self] success, error in
+            guard !success,
+                  let error
+            else {
+                return
+            }
+
+            let message =
+                "GPS route update failed: \(error.localizedDescription)"
+
+            Task { @MainActor [weak self] in
+                self?.errorMessage = message
             }
         }
 
@@ -2714,14 +2890,20 @@ extension WatchWorkoutManager: CLLocationManagerDelegate {
             ATHLTHWorkoutMetadataKey.locationHorizontalAccuracy:
                 location.horizontalAccuracy
         ]) { [weak self] success, error in
-            guard let self else { return }
+            guard !success,
+                  let error
+            else {
+                return
+            }
 
-            if !success, let error {
-                self.workoutLocationMetadataAttached = false
-                self.publish {
-                    self.errorMessage =
-                        "Workout location could not be saved: \(error.localizedDescription)"
-                }
+            let message =
+                "Workout location could not be saved: \(error.localizedDescription)"
+
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.workoutLocationMetadataAttached =
+                    false
+                self.errorMessage = message
             }
         }
     }
