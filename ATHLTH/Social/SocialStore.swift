@@ -386,7 +386,8 @@ final class SocialStore: ObservableObject {
         }
     }
 
-    func updatePrivacy(_ updated: SocialPrivacySettings) async {
+    @discardableResult
+    func updatePrivacy(_ updated: SocialPrivacySettings) async -> Result<Void, Error> {
         var updated = updated
         // Public profiles are searchable without a separate setting.
         // Preserve explicit search opt-outs on existing non-public profiles.
@@ -398,9 +399,11 @@ final class SocialStore: ObservableObject {
 
         do {
             try await service.updatePrivacySettings(updated)
+            return .success(())
         } catch {
             errorMessage = error.localizedDescription
             privacy = try? await service.loadPrivacySettings()
+            return .failure(error)
         }
     }
 

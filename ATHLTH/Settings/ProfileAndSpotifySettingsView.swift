@@ -1044,6 +1044,8 @@ struct ATHLTHPrivacyCenterView: View {
 
     @State private var draft: SocialPrivacySettings?
     @State private var saving = false
+    @State private var saved = false
+    @State private var saveError: String?
 
     var body: some View {
         Form {
@@ -1132,22 +1134,25 @@ struct ATHLTHPrivacyCenterView: View {
                 }
 
                 Section {
-                    Button {
-                        Task {
-                            await saveSocialPrivacy()
+                    if saving {
+                        ProgressView("Saving…")
+                    } else if let saveError {
+                        Label("Changes could not be saved", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                        Text(saveError)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Retry") {
+                            schedulePrivacySave()
                         }
-                    } label: {
-                        HStack {
-                            Text("Save Social & Profile Privacy")
-
-                            Spacer()
-
-                            if saving {
-                                ProgressView()
-                            }
-                        }
+                    } else if saved {
+                        Label("Saved", systemImage: "checkmark.circle")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Changes save automatically")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .disabled(saving)
                 }
             } else {
                 Section("Social & Messages") {
@@ -1256,6 +1261,7 @@ struct ATHLTHPrivacyCenterView: View {
         .navigationTitle("Privacy & Visibility")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            guard draft == nil else { return }
             if social.privacy == nil {
                 await social.refresh()
             }
@@ -1271,28 +1277,44 @@ struct ATHLTHPrivacyCenterView: View {
 
         return Binding(
             get: { draft! },
-            set: { draft = $0 }
+            set: { updated in
+                guard updated != draft else { return }
+                draft = updated
+                schedulePrivacySave()
+            }
         )
     }
 
-    private func saveSocialPrivacy() async {
-        guard let draft else {
-            return
-        }
-
+    @MainActor
+    private func schedulePrivacySave() {
+        saved = false
+        saveError = nil
+        guard !saving, draft != nil else { return }
         saving = true
-        await social.updatePrivacy(draft)
 
-        if let visibility = ProfileVisibility(
-            rawValue: draft.profileVisibility
-        ) {
-            settings.profileVisibility = visibility
+        // Keep one writer alive when navigating away. Edits made during a
+        // request are coalesced into the next write, never sent concurrently.
+        Task { @MainActor in
+            defer { saving = false }
+            while let snapshot = draft {
+                let result = await social.updatePrivacy(snapshot)
+                if case .failure(let error) = result {
+                    saveError = error.localizedDescription
+                    return
+                }
+                guard draft == snapshot else { continue }
+
+                // Only mirror the final confirmed values locally. This also
+                // avoids triggering core-privacy observers with stale values.
+                if let visibility = ProfileVisibility(rawValue: snapshot.profileVisibility) {
+                    settings.profileVisibility = visibility
+                }
+                settings.shareTrainingPresence = snapshot.shareTrainingPresence
+                draft = social.privacy ?? snapshot
+                saved = true
+                return
+            }
         }
-
-        settings.shareTrainingPresence =
-            draft.shareTrainingPresence
-
-        saving = false
     }
 }
 
