@@ -41,6 +41,18 @@ enum AppleWatchWorkoutLaunchError: LocalizedError {
     }
 }
 
+private struct IncomingWatchPayload: Sendable {
+    let kind: String?
+    let probeID: String?
+    let data: Data?
+
+    init(_ payload: [String: Any]) {
+        kind = payload[WatchTransferMetadataKey.kind] as? String
+        probeID = payload[WatchTransferMetadataKey.probeID] as? String
+        data = payload[WatchTransferMetadataKey.payload] as? Data
+    }
+}
+
 @MainActor
 final class AppleWatchConnectionStore: NSObject, ObservableObject {
     @Published private(set) var state: AppleWatchConnectionState = .checking
@@ -441,57 +453,83 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
 
         let probeID = UUID().uuidString
         lastProbeID = probeID
+        verificationInProgress = true
+        connectivityError = nil
 
-        let payload: [String: Any] = [
-            WatchTransferMetadataKey.kind: WatchTransferKind.connectivityProbe.rawValue,
-            WatchTransferMetadataKey.probeID: probeID,
-            WatchTransferMetadataKey.sentAt: Date().timeIntervalSince1970
-        ]
-
-        DispatchQueue.main.async { [weak self] in
-            self?.verificationInProgress = true
-            self?.connectivityError = nil
-        }
+        let payload = connectivityProbePayload(probeID: probeID)
 
         if session.isReachable {
             session.sendMessage(
                 payload,
                 replyHandler: { [weak self] reply in
-                    self?.handleConnectivityAck(reply)
-                },
-                errorHandler: { [weak self, weak session] error in
-                    guard let self, let session else { return }
+                    let incoming = IncomingWatchPayload(reply)
 
-                    DispatchQueue.main.async {
-                        self.connectivityError = error.localizedDescription
+                    Task { @MainActor [weak self] in
+                        self?.handleConnectivityAck(incoming)
                     }
+                },
+                errorHandler: { [weak self] error in
+                    let message = error.localizedDescription
 
-                    self.queueConnectivityProbe(payload, on: session)
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+
+                        self.connectivityError = message
+
+                        guard let currentSession = self.session,
+                              currentSession.activationState == .activated
+                        else {
+                            return
+                        }
+
+                        self.queueConnectivityProbe(
+                            probeID: probeID,
+                            on: currentSession
+                        )
+                    }
                 }
             )
         } else {
-            queueConnectivityProbe(payload, on: session)
+            queueConnectivityProbe(
+                probeID: probeID,
+                on: session
+            )
         }
     }
 
+    private func connectivityProbePayload(
+        probeID: String
+    ) -> [String: Any] {
+        [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.connectivityProbe.rawValue,
+            WatchTransferMetadataKey.probeID: probeID,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
+        ]
+    }
+
     private func queueConnectivityProbe(
-        _ payload: [String: Any],
+        probeID: String,
         on session: WCSession
     ) {
         guard session.activationState == .activated else { return }
 
-        _ = session.transferUserInfo(payload)
+        _ = session.transferUserInfo(
+            connectivityProbePayload(probeID: probeID)
+        )
     }
 
-    private func handleConnectivityAck(_ payload: [String: Any]) {
+    private func handleConnectivityAck(
+        _ payload: IncomingWatchPayload
+    ) {
         guard
-            payload[WatchTransferMetadataKey.kind] as? String
-                == WatchTransferKind.connectivityAck.rawValue
+            payload.kind == WatchTransferKind.connectivityAck.rawValue
         else {
             return
         }
 
-        let probeID = payload[WatchTransferMetadataKey.probeID] as? String
+        let probeID = payload.probeID
 
         // A launch acknowledgement from the Watch can arrive without matching
         // the most recent explicit probe. Either form proves that the paired
@@ -503,11 +541,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
             return
         }
 
-        DispatchQueue.main.async { [weak self] in
-            self?.lastVerifiedAt = Date()
-            self?.verificationInProgress = false
-            self?.connectivityError = nil
-        }
+        lastVerifiedAt = Date()
+        verificationInProgress = false
+        connectivityError = nil
     }
 
     private func publishSnapshot(
@@ -517,28 +553,23 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         reachable: Bool,
         activation: String
     ) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.state = newState
-            self.paired = paired
-            self.watchAppInstalled = installed
-            self.reachable = reachable
-            self.activationStateText = activation
+        state = newState
+        self.paired = paired
+        watchAppInstalled = installed
+        self.reachable = reachable
+        activationStateText = activation
 
-            if newState != .ready {
-                self.verificationInProgress = false
-            }
+        if newState != .ready {
+            verificationInProgress = false
         }
     }
 
     private func receiveStrengthCommand(
-        from payload: [String: Any]
+        from payload: IncomingWatchPayload
     ) -> Bool {
         guard
-            payload[WatchTransferMetadataKey.kind] as? String
-                == WatchTransferKind.strengthCommand.rawValue,
-            let data =
-                payload[WatchTransferMetadataKey.payload] as? Data,
+            payload.kind == WatchTransferKind.strengthCommand.rawValue,
+            let data = payload.data,
             let command = try? JSONDecoder().decode(
                 WatchStrengthCommand.self,
                 from: data
@@ -547,20 +578,16 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
             return false
         }
 
-        DispatchQueue.main.async { [weak self] in
-            self?.lastStrengthCommand = command
-        }
-
+        lastStrengthCommand = command
         return true
     }
 
     private func receiveWorkoutResult(
-        from userInfo: [String: Any]
+        from payload: IncomingWatchPayload
     ) {
         guard
-            userInfo[WatchTransferMetadataKey.kind] as? String
-                == WatchTransferKind.workoutResult.rawValue,
-            let data = userInfo[WatchTransferMetadataKey.payload] as? Data,
+            payload.kind == WatchTransferKind.workoutResult.rawValue,
+            let data = payload.data,
             let result = try? JSONDecoder().decode(
                 WatchWorkoutResult.self,
                 from: data
@@ -569,14 +596,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
             return
         }
 
-        DispatchQueue.main.async { [weak self] in
-            self?.lastCompletedWorkout = result
-        }
+        lastCompletedWorkout = result
     }
 
-    private func receive(_ payload: [String: Any]) {
-        if payload[WatchTransferMetadataKey.kind] as? String
-            == WatchTransferKind.connectivityAck.rawValue {
+    private func receive(_ payload: IncomingWatchPayload) {
+        if payload.kind == WatchTransferKind.connectivityAck.rawValue {
             handleConnectivityAck(payload)
             return
         }
@@ -590,83 +614,134 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
 }
 
 extension AppleWatchConnectionStore: WCSessionDelegate {
-    func session(
+    nonisolated func session(
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
     ) {
-        if let error {
-            DispatchQueue.main.async { [weak self] in
-                self?.connectivityError = error.localizedDescription
-            }
-        }
+        let rawActivationState = activationState.rawValue
+        let errorMessage = error?.localizedDescription
 
-        guard activationState == .activated else {
-            publishSnapshot(
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            if let errorMessage {
+                self.connectivityError = errorMessage
+            }
+
+            guard
+                let resolvedState =
+                    WCSessionActivationState(
+                        rawValue: rawActivationState
+                    ),
+                resolvedState == .activated,
+                let currentSession = self.session
+            else {
+                self.publishSnapshot(
+                    state: .checking,
+                    paired: nil,
+                    installed: nil,
+                    reachable: false,
+                    activation: "Activation failed"
+                )
+                return
+            }
+
+            self.evaluate(currentSession)
+        }
+    }
+
+    nonisolated func session(
+        _ session: WCSession,
+        didReceiveMessage message: [String: Any]
+    ) {
+        let incoming = IncomingWatchPayload(message)
+
+        Task { @MainActor [weak self] in
+            self?.receive(incoming)
+        }
+    }
+
+    nonisolated func session(
+        _ session: WCSession,
+        didReceiveUserInfo userInfo: [String: Any] = [:]
+    ) {
+        let incoming = IncomingWatchPayload(userInfo)
+
+        Task { @MainActor [weak self] in
+            self?.receive(incoming)
+        }
+    }
+
+    nonisolated func sessionReachabilityDidChange(
+        _ session: WCSession
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let currentSession = self.session
+            else {
+                return
+            }
+
+            self.evaluate(currentSession)
+        }
+    }
+
+    #if os(iOS)
+    nonisolated func sessionDidBecomeInactive(
+        _ session: WCSession
+    ) {
+        Task { @MainActor [weak self] in
+            self?.publishSnapshot(
                 state: .checking,
                 paired: nil,
                 installed: nil,
                 reachable: false,
-                activation: "Activation failed"
+                activation: "Inactive"
             )
-            return
         }
-
-        evaluate(session)
     }
 
-    func session(
-        _ session: WCSession,
-        didReceiveMessage message: [String: Any]
+    nonisolated func sessionDidDeactivate(
+        _ session: WCSession
     ) {
-        receive(message)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            self.verificationRequested = true
+            self.publishSnapshot(
+                state: .checking,
+                paired: nil,
+                installed: nil,
+                reachable: false,
+                activation: "Reactivating"
+            )
+            self.session?.activate()
+        }
     }
 
-    func session(
-        _ session: WCSession,
-        didReceiveUserInfo userInfo: [String: Any] = [:]
+    nonisolated func sessionWatchStateDidChange(
+        _ session: WCSession
     ) {
-        receive(userInfo)
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let currentSession = self.session
+            else {
+                return
+            }
+
+            self.verificationRequested = true
+            self.evaluate(currentSession)
+        }
     }
 
-    func sessionReachabilityDidChange(_ session: WCSession) {
-        evaluate(session)
-    }
-
-    #if os(iOS)
-    func sessionDidBecomeInactive(_ session: WCSession) {
-        publishSnapshot(
-            state: .checking,
-            paired: nil,
-            installed: nil,
-            reachable: false,
-            activation: "Inactive"
-        )
-    }
-
-    func sessionDidDeactivate(_ session: WCSession) {
-        verificationRequested = true
-        publishSnapshot(
-            state: .checking,
-            paired: nil,
-            installed: nil,
-            reachable: false,
-            activation: "Reactivating"
-        )
-        session.activate()
-    }
-
-    func sessionWatchStateDidChange(_ session: WCSession) {
-        verificationRequested = true
-        evaluate(session)
-    }
-
-    func session(
+    nonisolated func session(
         _ session: WCSession,
         didFinish fileTransfer: WCSessionFileTransfer,
         error: Error?
     ) {
-        try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
+        let fileURL = fileTransfer.file.fileURL
+        try? FileManager.default.removeItem(at: fileURL)
     }
     #endif
 }
