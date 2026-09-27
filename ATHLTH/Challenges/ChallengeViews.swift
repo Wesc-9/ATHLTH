@@ -966,6 +966,186 @@ struct ChallengeCreationView: View {
         }
     }
 
+    @ViewBuilder
+    private var routeSelectionCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let route = selectedRoute {
+                if route.coordinates.count >= 2 {
+                    Map(
+                        initialPosition: .region(
+                            challengeRegion(for: route)
+                        )
+                    ) {
+                        MapPolyline(
+                            coordinates:
+                                route.coordinates.map(\.coordinate)
+                        )
+                        .stroke(
+                            ATHLTHTheme.accent,
+                            style: StrokeStyle(
+                                lineWidth: 5,
+                                lineCap: .round,
+                                lineJoin: .round
+                            )
+                        )
+
+                        if let first = route.coordinates.first {
+                            Marker(
+                                route.startName ?? "Start",
+                                coordinate: first.coordinate
+                            )
+                            .tint(ATHLTHTheme.accent)
+                        }
+
+                        if let last = route.coordinates.last {
+                            Marker(
+                                route.endName ?? "Finish",
+                                coordinate: last.coordinate
+                            )
+                            .tint(.red)
+                        }
+                    }
+                    .allowsHitTesting(false)
+                    .frame(height: 170)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(route.title)
+                        .font(.headline)
+
+                    if let start = route.startName,
+                       let end = route.endName {
+                        Text("\(start) → \(end)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    HStack(spacing: 12) {
+                        Label(
+                            String(
+                                format: "%.1f km",
+                                route.distanceKilometers
+                            ),
+                            systemImage: "figure.run"
+                        )
+
+                        if let elevation = route.elevationGainMeters {
+                            Label(
+                                "\(Int(elevation.rounded())) m",
+                                systemImage: "mountain.2.fill"
+                            )
+                        }
+
+                        Label(
+                            "\(route.coordinates.count) points",
+                            systemImage: "point.3.connected.trianglepath.dotted"
+                        )
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 10) {
+                    NavigationLink {
+                        ChallengeRouteSelectionView(
+                            selectedRouteID: $selectedRouteID
+                        )
+                    } label: {
+                        Label(
+                            "Change Route",
+                            systemImage: "map"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    NavigationLink {
+                        RunRouteBuilderView()
+                    } label: {
+                        Label(
+                            "New Route",
+                            systemImage: "plus"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "map.fill")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 50, height: 50)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 14,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Choose a route")
+                            .font(.headline)
+
+                        Text(
+                            session.savedRoutes.isEmpty
+                                ? "You do not have any saved routes yet."
+                                : "Select one of your saved routes or create a new one."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+
+                HStack(spacing: 10) {
+                    if !session.savedRoutes.isEmpty {
+                        NavigationLink {
+                            ChallengeRouteSelectionView(
+                                selectedRouteID: $selectedRouteID
+                            )
+                        } label: {
+                            Label(
+                                "My Routes",
+                                systemImage: "map"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accent)
+                    }
+
+                    NavigationLink {
+                        RunRouteBuilderView()
+                    } label: {
+                        Label(
+                            "Create New",
+                            systemImage: "plus"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(
+                        session.savedRoutes.isEmpty
+                            ? .borderedProminent
+                            : .bordered
+                    )
+                    .tint(ATHLTHTheme.accent)
+                }
+            }
+        }
+        .padding()
+        .challengeCard()
+    }
+
     private var strengthRules: some View {
         VStack(alignment: .leading, spacing: 14) {
             if scoring != .workoutVolume {
