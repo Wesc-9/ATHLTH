@@ -48,6 +48,7 @@ struct AIProgramBuilderView: View {
     @State private var sessionDurationMinutes = 60
     @State private var availableDays: Set<Int> = Set(1...7)
     @State private var userNotes = ""
+    @State private var coachFocusNotes = ""
     @State private var showingQuestions = true
     @State private var experience = ""
     @State private var trainingFocus: TrainingFocus = .generalFitness
@@ -110,107 +111,47 @@ struct AIProgramBuilderView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                if showingQuestions {
-                    coachQuestions
-                } else {
-                    Section {
-                        Label(
-                            mode == .generate
-                                ? "Build a new program from your goals"
-                                : "Fill the gaps in your current program",
-                            systemImage: "sparkles"
-                        )
-                        .font(.headline)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    coachHero
 
-                        Text(
-                            mode == .generate
-                                ? "ATHLTH Coach uses your confirmed training profile, selected goals and answers. Review the draft before adding it to your calendar."
-                                : "ATHLTH Coach suggests sessions for empty days only. Existing sessions remain untouched."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Section("Your training profile") {
-                        LabeledContent("Experience", value: experience)
-                        LabeledContent("Focus", value: trainingFocus.title)
-                        LabeledContent("Gym access", value: gymAccess)
-                        Button("Edit coach answers") { showingQuestions = true }
-                        Text("Your answers, selected goals and optional interests are sent to ATHLTH Coach. Apple Health records are not included.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    goalsSection
-                    timelineSection
-                    .disabled(mode == .complete)
-                    availabilitySection
-
-                    Section("Preferences") {
-                        Stepper(
-                            "\(sessionsPerWeek) sessions per week",
-                            value: $sessionsPerWeek,
-                            in: 1...max(availableDays.count, 1)
-                        )
-                        .onChange(of: sessionsPerWeek) { _, _ in preview = nil }
-
-                        Stepper(
-                            "About \(sessionDurationMinutes) min per session",
-                            value: $sessionDurationMinutes,
-                            in: 20...180,
-                            step: 5
-                        )
-                        .onChange(of: sessionDurationMinutes) { _, _ in preview = nil }
-
-                        TextField(
-                            "Any other preferences? Preferred split, race details…",
-                            text: $userNotes,
-                            axis: .vertical
-                        )
-                        .lineLimit(3...7)
-                        .onChange(of: userNotes) { _, _ in preview = nil }
-                    }
-
-                    if let preview {
-                        previewSection(preview)
+                    if showingQuestions {
+                        coachQuestions
                     } else {
-                        Section {
-                            Button {
-                                Task { await generatePreview() }
-                            } label: {
-                                HStack {
-                                    Spacer()
-                                    if isGenerating {
-                                        ProgressView()
-                                            .padding(.trailing, 6)
-                                    } else {
-                                        Image(systemName: "sparkles")
-                                    }
-                                    Text(
-                                        isGenerating
-                                            ? "Building Program…"
-                                            : mode.actionTitle
-                                    )
-                                    Spacer()
-                                }
-                            }
-                            .disabled(!canGenerate)
-                        } footer: {
-                            if availableDays.isEmpty {
-                                Text("Choose at least one available training day.")
-                            } else {
-                                Text(
-                                    "AI suggestions are a starting point. Review volume, exercise choice and intensity before using the program."
-                                )
-                            }
+                        coachSummary
+                        goalsSection
+                        timelineSection
+                            .disabled(mode == .complete)
+                        availabilitySection
+                        preferencesSection
+
+                        if let preview {
+                            previewSection(preview)
+                        } else {
+                            generateCard
                         }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 36)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
             }
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: ATHLTHTheme.champagne.opacity(0.20)
+                )
+            )
             .disabled(isGenerating)
             .onChange(of: coachContext) { _, _ in preview = nil }
             .onChange(of: intakePreferences) { _, value in
                 guard didLoadDefaults, session.signedIn else { return }
-                AccountLocalStorage.write(value, name: "coach", userID: session.profile.userID)
+                AccountLocalStorage.write(
+                    value,
+                    name: "coach",
+                    userID: session.profile.userID
+                )
             }
             .navigationTitle(
                 showingQuestions ? "Meet your coach" : "ATHLTH Coach"
@@ -242,6 +183,254 @@ struct AIProgramBuilderView: View {
         }
     }
 
+    private var coachHero: some View {
+        ZStack(alignment: .bottomLeading) {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.97, green: 0.93, blue: 0.84),
+                    Color(red: 0.88, green: 0.92, blue: 0.82),
+                    Color(red: 0.75, green: 0.84, blue: 0.70)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.white.opacity(0.34))
+                .frame(width: 180, height: 180)
+                .offset(x: 190, y: -65)
+                .blur(radius: 2)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("YOUR COACH")
+                    .font(.caption2.weight(.bold))
+                    .tracking(3)
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText.opacity(0.58)
+                    )
+
+                Text(
+                    showingQuestions
+                        ? "Build around\nyour life."
+                        : "Your plan,\nmade personal."
+                )
+                .font(
+                    .system(
+                        size: 36,
+                        weight: .bold,
+                        design: .serif
+                    )
+                )
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineSpacing(-3)
+
+                Text(
+                    showingQuestions
+                        ? "Tell ATHLTH what matters. We’ll combine it with your goals, schedule and training profile."
+                        : "Review the inputs that shape your adaptive training plan before Coach builds it."
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText.opacity(0.70)
+                )
+                .frame(maxWidth: 310, alignment: .leading)
+            }
+            .padding(22)
+        }
+        .frame(height: 250)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 30,
+                style: .continuous
+            )
+        )
+        .overlay(alignment: .topTrailing) {
+            Image(systemName: "figure.run")
+                .font(.system(size: 88, weight: .ultraLight))
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText.opacity(0.12)
+                )
+                .padding(24)
+        }
+        .shadow(
+            color: Color.black.opacity(0.08),
+            radius: 18,
+            y: 8
+        )
+    }
+
+    private var coachSummary: some View {
+        coachCard {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "sparkles")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.champagneSoft,
+                        in: Circle()
+                    )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your training profile")
+                        .font(.headline)
+
+                    HStack(spacing: 7) {
+                        coachChip(experience)
+                        coachChip(trainingFocus.title)
+                        coachChip(
+                            gymAccess == "Yes"
+                                ? "Gym access"
+                                : "Home / outdoors"
+                        )
+                    }
+
+                    Button("Edit coach answers") {
+                        showingQuestions = true
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+        }
+    }
+
+    private var preferencesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(
+                eyebrow: "PLAN DETAILS",
+                title: "How should training fit?"
+            )
+
+            coachCard {
+                Stepper(
+                    "\(sessionsPerWeek) sessions per week",
+                    value: $sessionsPerWeek,
+                    in: 1...max(availableDays.count, 1)
+                )
+                .onChange(of: sessionsPerWeek) { _, _ in
+                    preview = nil
+                }
+
+                Divider()
+
+                Stepper(
+                    "About \(sessionDurationMinutes) min per session",
+                    value: $sessionDurationMinutes,
+                    in: 20...180,
+                    step: 5
+                )
+                .onChange(of: sessionDurationMinutes) { _, _ in
+                    preview = nil
+                }
+
+                Divider()
+
+                TextField(
+                    "Any other preferences? Preferred split, race details…",
+                    text: $userNotes,
+                    axis: .vertical
+                )
+                .lineLimit(3...7)
+                .onChange(of: userNotes) { _, _ in
+                    preview = nil
+                }
+            }
+        }
+    }
+
+    private var generateCard: some View {
+        coachCard {
+            Button {
+                Task { await generatePreview() }
+            } label: {
+                HStack {
+                    Spacer()
+                    if isGenerating {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "sparkles")
+                    }
+                    Text(
+                        isGenerating
+                            ? "Building your plan…"
+                            : mode.actionTitle
+                    )
+                    .font(.headline)
+                    Spacer()
+                }
+                .frame(height: 54)
+                .foregroundStyle(.white)
+                .background(
+                    ATHLTHTheme.accentDeep,
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!canGenerate)
+        }
+    }
+
+    private func coachSectionHeading(
+        eyebrow: String,
+        title: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(eyebrow)
+                .font(.caption2.weight(.bold))
+                .tracking(2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Text(title)
+                .font(.title3.weight(.bold))
+        }
+    }
+
+    private func coachChip(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .lineLimit(1)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: Capsule()
+            )
+    }
+
+    private func coachCard<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            content()
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.white.opacity(0.84),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.88), lineWidth: 0.8)
+        }
+        .shadow(
+            color: Color.black.opacity(0.045),
+            radius: 12,
+            y: 5
+        )
+    }
+
     private var intakePreferences: CoachIntakePreferences {
         CoachIntakePreferences(
             experience: experience, trainingFocus: trainingFocus, gymAccess: gymAccess,
@@ -271,6 +460,7 @@ struct AIProgramBuilderView: View {
         Other available equipment: \(String(otherEquipment.prefix(300))).
         Limitations or movements to avoid: \(limitations.isEmpty ? "None reported" : String(limitations.prefix(500))).
         Profile interests: \(interests).
+        Athlete's own focus request: \(coachFocusNotes.isEmpty ? "No additional focus request" : String(coachFocusNotes.prefix(700))).
         Only prescribe equipment the user can access. With no gym or listed home equipment, use bodyweight or outdoor sessions.
         Scale volume to experience and current training; do not treat an experienced athlete as a beginner or overload a beginner.
         """
@@ -278,129 +468,296 @@ struct AIProgramBuilderView: View {
 
     @ViewBuilder
     private var coachQuestions: some View {
-        Section {
-            Label("A plan that fits your life", systemImage: "sparkles")
-                .font(.headline)
-            Text("Confirm a few details. Your training focus is filled from your profile, and your goals are available on the next screen.")
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(
+                eyebrow: "01 · EXPERIENCE",
+                title: "Where are you starting?"
+            )
 
-        Section("1. How experienced are you?") {
-            Picker("Training experience", selection: $experience) {
-                Text("Choose your level").tag("")
-                Text("Beginner").tag("Beginner")
-                Text("Intermediate").tag("Intermediate")
-                Text("Experienced / train regularly").tag("Experienced")
-            }
-            Stepper("Currently \(currentSessionsPerWeek) sessions per week", value: $currentSessionsPerWeek, in: 0...14)
-        }
-
-        Section("2. What do you want to train?") {
-            Picker("Training focus", selection: $trainingFocus) {
-                ForEach(TrainingFocus.allCases) { focus in
-                    Text(focus.title).tag(focus)
+            coachCard {
+                Picker("Training experience", selection: $experience) {
+                    Text("Choose your level").tag("")
+                    Text("Beginner").tag("Beginner")
+                    Text("Intermediate").tag("Intermediate")
+                    Text("Experienced / train regularly")
+                        .tag("Experienced")
                 }
-            }
-            Text(trainingFocus.subtitle).font(.caption).foregroundStyle(.secondary)
-            if let interests = session.onboardingProfile?.interests, !interests.isEmpty {
-                Toggle("Use my profile interests", isOn: $useProfileInterests)
-                if useProfileInterests {
-                    Text(interests.map(\.title).sorted().joined(separator: " · "))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+
+                Divider()
+
+                Stepper(
+                    "Currently \(currentSessionsPerWeek) sessions per week",
+                    value: $currentSessionsPerWeek,
+                    in: 0...14
+                )
             }
         }
 
-        Section("3. Where can you train?") {
-            Picker("Gym access", selection: $gymAccess) {
-                Text("Choose an option").tag("")
-                Text("Yes — I can use a gym").tag("Yes")
-                Text("No — home or outdoors").tag("No")
-            }
-            Text("Equipment available at home")
-                .font(.subheadline.weight(.semibold))
-            ForEach(equipmentOptions, id: \.self) { equipment in
-                Toggle(equipment, isOn: Binding(
-                    get: { homeEquipment.contains(equipment) },
-                    set: { enabled in
-                        if enabled { homeEquipment.insert(equipment) }
-                        else { homeEquipment.remove(equipment) }
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(
+                eyebrow: "02 · DIRECTION",
+                title: "What should Coach build toward?"
+            )
+
+            coachCard {
+                Picker("Training focus", selection: $trainingFocus) {
+                    ForEach(TrainingFocus.allCases) { focus in
+                        Text(focus.title).tag(focus)
                     }
-                ))
+                }
+
+                Text(trainingFocus.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                if !goalStore.activeGoals.isEmpty {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text("Train toward a goal")
+                            .font(.subheadline.weight(.semibold))
+
+                        ForEach(goalStore.activeGoals) { goal in
+                            Button {
+                                if selectedGoalIDs.contains(goal.id) {
+                                    selectedGoalIDs.remove(goal.id)
+                                } else {
+                                    selectedGoalIDs.insert(goal.id)
+                                }
+                                preview = nil
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(
+                                        systemName:
+                                            selectedGoalIDs.contains(goal.id)
+                                                ? "checkmark.circle.fill"
+                                                : "circle"
+                                    )
+                                    .foregroundStyle(
+                                        selectedGoalIDs.contains(goal.id)
+                                            ? ATHLTHTheme.accentDeep
+                                            : ATHLTHTheme.mutedText
+                                    )
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(goal.title)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(
+                                                ATHLTHTheme.primaryText
+                                            )
+
+                                        HStack(spacing: 5) {
+                                            Text(goal.category.title)
+                                            if let deadline = goal.deadline {
+                                                Text("·")
+                                                Text(
+                                                    deadline.formatted(
+                                                        date: .abbreviated,
+                                                        time: .omitted
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        .font(.caption2)
+                                        .foregroundStyle(
+                                            ATHLTHTheme.mutedText
+                                        )
+                                    }
+
+                                    Spacer()
+
+                                    if goal.isPrimary {
+                                        Text("PRIMARY")
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(
+                                                ATHLTHTheme.accentDeep
+                                            )
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Tell Coach what matters most")
+                        .font(.subheadline.weight(.semibold))
+
+                    TextField(
+                        "Example: Improve my 10K pace without losing strength. Keep Mondays light and prioritize recovery after long runs.",
+                        text: $coachFocusNotes,
+                        axis: .vertical
+                    )
+                    .lineLimit(4...8)
+                    .onChange(of: coachFocusNotes) { _, _ in
+                        preview = nil
+                    }
+
+                    Text(
+                        "Coach combines this with the goals you select above. You do not need to repeat information already stored in a goal."
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                if let interests = session.onboardingProfile?.interests,
+                   !interests.isEmpty {
+                    Divider()
+
+                    Toggle(
+                        "Use my profile interests",
+                        isOn: $useProfileInterests
+                    )
+
+                    if useProfileInterests {
+                        Text(
+                            interests.map(\.title)
+                                .sorted()
+                                .joined(separator: " · ")
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
             }
-            TextField("Other equipment (optional)", text: $otherEquipment, axis: .vertical)
-            Text("Leave all equipment off for bodyweight training at home.")
-                .font(.caption).foregroundStyle(.secondary)
         }
 
-        Section("4. Anything we should adapt?") {
-            TextField("Injuries, limitations or movements to avoid (optional)", text: $limitations, axis: .vertical)
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(
+                eyebrow: "03 · ENVIRONMENT",
+                title: "Where can you train?"
+            )
+
+            coachCard {
+                Picker("Gym access", selection: $gymAccess) {
+                    Text("Choose an option").tag("")
+                    Text("Yes — I can use a gym").tag("Yes")
+                    Text("No — home or outdoors").tag("No")
+                }
+
+                Divider()
+
+                Text("Equipment available at home")
+                    .font(.subheadline.weight(.semibold))
+
+                ForEach(equipmentOptions, id: \.self) { equipment in
+                    Toggle(
+                        equipment,
+                        isOn: Binding(
+                            get: {
+                                homeEquipment.contains(equipment)
+                            },
+                            set: { enabled in
+                                if enabled {
+                                    homeEquipment.insert(equipment)
+                                } else {
+                                    homeEquipment.remove(equipment)
+                                }
+                            }
+                        )
+                    )
+                }
+
+                TextField(
+                    "Other equipment (optional)",
+                    text: $otherEquipment,
+                    axis: .vertical
+                )
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(
+                eyebrow: "04 · ADAPT",
+                title: "Anything Coach should protect?"
+            )
+
+            coachCard {
+                TextField(
+                    "Injuries, limitations or movements to avoid (optional)",
+                    text: $limitations,
+                    axis: .vertical
+                )
                 .lineLimit(2...5)
-            Text("Only include details you want the coach to use when planning your workouts.")
-                .font(.caption).foregroundStyle(.secondary)
+
+                Text(
+                    "Only include details you want ATHLTH Coach to use when planning."
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
         }
 
-        Section {
-            Button {
-                showingQuestions = false
-            } label: {
-                Label("Continue to goals & schedule", systemImage: "arrow.right")
-                    .frame(maxWidth: .infinity)
+        Button {
+            showingQuestions = false
+        } label: {
+            HStack {
+                Text("Continue to plan")
+                    .font(.headline)
+                Spacer()
+                Image(systemName: "arrow.right")
             }
-            .disabled(!questionsAnswered)
-        } footer: {
-            if !questionsAnswered {
-                Text("Choose your experience level and gym access to continue.")
-            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .frame(height: 56)
+            .background(
+                ATHLTHTheme.accentDeep,
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
         }
+        .buttonStyle(.plain)
+        .disabled(!questionsAnswered)
+        .opacity(questionsAnswered ? 1 : 0.45)
     }
 
     private var goalsSection: some View {
-        Section("Goals") {
-            if goalStore.activeGoals.isEmpty {
-                Text("No active goals yet. Coach will build a routine around your training focus. You can add a specific goal from your profile later.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(goalStore.activeGoals) { goal in
-                    Toggle(
-                        isOn: Binding(
-                            get: { selectedGoalIDs.contains(goal.id) },
-                            set: { enabled in
-                                if enabled {
-                                    selectedGoalIDs.insert(goal.id)
-                                } else {
-                                    selectedGoalIDs.remove(goal.id)
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(
+                eyebrow: "GOALS",
+                title: "What are we training for?"
+            )
+
+            coachCard {
+                if goalStore.activeGoals.isEmpty {
+                    Text(
+                        "No active goals yet. Coach will build around your training focus and free-text direction."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                } else {
+                    ForEach(goalStore.activeGoals) { goal in
+                        Toggle(
+                            isOn: Binding(
+                                get: {
+                                    selectedGoalIDs.contains(goal.id)
+                                },
+                                set: { enabled in
+                                    if enabled {
+                                        selectedGoalIDs.insert(goal.id)
+                                    } else {
+                                        selectedGoalIDs.remove(goal.id)
+                                    }
+                                    preview = nil
                                 }
-                                preview = nil
-                            }
-                        )
-                    ) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 6) {
+                            )
+                        ) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(goal.title)
                                     .font(.subheadline.weight(.semibold))
 
-                                if goal.isPrimary {
-                                    Text("PRIMARY")
-                                        .font(.system(size: 8, weight: .bold))
-                                        .foregroundStyle(ATHLTHTheme.accent)
-                                }
-                            }
-
-                            HStack(spacing: 6) {
                                 Text(goal.category.title)
-                                if let deadline = goal.deadline {
-                                    Text("·")
-                                    Text(
-                                        deadline.formatted(
-                                            date: .abbreviated,
-                                            time: .omitted
-                                        )
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.mutedText
                                     )
-                                }
                             }
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -409,7 +766,9 @@ struct AIProgramBuilderView: View {
     }
 
     private var timelineSection: some View {
-        Section("Timeline") {
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(eyebrow: "TIMELINE", title: "Set the training window")
+            coachCard {
             DatePicker(
                 "Start date",
                 selection: $startDate,
@@ -473,11 +832,14 @@ struct AIProgramBuilderView: View {
             )
             .font(.caption)
             .foregroundStyle(.secondary)
+            }
         }
     }
 
     private var availabilitySection: some View {
-        Section("Available training days") {
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(eyebrow: "SCHEDULE", title: "When can you train?")
+            coachCard {
             HStack(spacing: 7) {
                 ForEach(1...7, id: \.self) { index in
                     Button {
@@ -514,12 +876,15 @@ struct AIProgramBuilderView: View {
             )
             .font(.caption)
             .foregroundStyle(.secondary)
+            }
         }
     }
 
     @ViewBuilder
     private func previewSection(_ draft: AIProgramDraft) -> some View {
-        Section("Preview") {
+        VStack(alignment: .leading, spacing: 10) {
+            coachSectionHeading(eyebrow: "YOUR PLAN", title: "Coach draft")
+            coachCard {
             Text(draft.title)
                 .font(.headline)
 
@@ -591,6 +956,7 @@ struct AIProgramBuilderView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
+            }
         }
     }
 
