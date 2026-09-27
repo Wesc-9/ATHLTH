@@ -597,17 +597,8 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
             }
 
             if reportError {
-                switch response.reason {
-                case "image_ai_not_configured":
-                    errorMessage =
-                        "AI cover generation is not configured yet."
-                case "image_generation_failed":
-                    errorMessage =
-                        "AI could not generate a cover right now. Try again later."
-                default:
-                    errorMessage =
-                        "The challenge was saved, but its AI cover could not be generated."
-                }
+                errorMessage =
+                    "The challenge was saved, but its Groq-directed cover could not be created."
             }
 
             return false
