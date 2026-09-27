@@ -1633,41 +1633,98 @@ struct TrainingPlanManagerView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            ATHLTHCard {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Build your training plan")
-                            .font(.title3.weight(.bold))
-                        Text("Create it yourself, or let ATHLTH Coach build a draft around your profile, goals and everyday life.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("YOUR TRAINING PLAN")
+                        .font(.caption2.weight(.bold))
+                        .tracking(2.4)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
 
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 10) { creationButtons }
-                        VStack(spacing: 10) { creationButtons }
-                    }
+                    Text(
+                        session.activePlan == nil
+                            ? "Build what comes next."
+                            : "Keep building."
+                    )
+                    .font(
+                        .system(
+                            size: 30,
+                            weight: .bold,
+                            design: .serif
+                        )
+                    )
 
+                    Text(
+                        session.activePlan == nil
+                            ? "Create it yourself or let ATHLTH Coach shape a draft around your goals and everyday life."
+                            : "Your active plan stays in focus. Create another plan or ask Coach to help when life changes."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                HStack(spacing: 10) {
+                    Button {
+                        showingProgramCreation = true
+                    } label: {
+                        Label("Create plan", systemImage: "plus")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .background(
+                                Color.white.opacity(0.84),
+                                in: RoundedRectangle(
+                                    cornerRadius: 16,
+                                    style: .continuous
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        openAI(.generate)
+                    } label: {
+                        Label("ATHLTH Coach", systemImage: "sparkles")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .foregroundStyle(.white)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: RoundedRectangle(
+                                    cornerRadius: 16,
+                                    style: .continuous
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                HStack(spacing: 18) {
                     Button {
                         showingAllPlans = true
                     } label: {
-                        Label("All plans", systemImage: "square.stack.3d.up")
-                            .font(.caption.weight(.semibold))
+                        Label(
+                            "All plans",
+                            systemImage: "square.stack.3d.up"
+                        )
                     }
 
                     if session.activePlan != nil {
                         Button {
                             openAI(.complete)
                         } label: {
-                            Label("Let Coach fill empty days", systemImage: "wand.and.stars")
-                                .font(.caption.weight(.semibold))
+                            Label(
+                                "Fill empty days",
+                                systemImage: "wand.and.stars"
+                            )
                         }
                     }
-                    Text("Review every coach plan before adding it to your calendar. Existing plans are kept.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
             }
+            .padding(2)
 
             if !session.planTemplates.isEmpty {
                 ATHLTHCard {
