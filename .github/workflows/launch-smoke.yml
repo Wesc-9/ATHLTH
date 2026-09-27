@@ -1,10 +1,10 @@
-name: ATHLTH Launch Smoke Test
+name: ATHLTH iPhone Compatibility Smoke Test
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.3.8
+      - release/v1.4.2
     paths:
       - .github/launch-trigger
 
@@ -22,8 +22,14 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
           xcodebuild -version
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install validation tools
+        run: |
+          brew install xcodegen
+          brew install imagemagick
+
+      - name: Optimize hero assets for runtime memory
+        shell: bash
+        run: bash scripts/optimize_hero_assets.sh
 
       - name: Generate iPhone-only smoke-test project
         shell: bash
@@ -53,7 +59,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Boot simulator and launch ATHLTH
+      - name: Launch on compact standard and large iPhones
         shell: bash
         run: |
           set -euo pipefail
@@ -61,48 +67,173 @@ jobs:
           RUNTIME=$(xcrun simctl list runtimes -j | python3 -c '
           import json,sys
           data=json.load(sys.stdin)
-          runtimes=[r for r in data["runtimes"] if r.get("isAvailable") and r.get("platform")=="iOS"]
+          runtimes=[
+              r for r in data["runtimes"]
+              if r.get("isAvailable")
+              and r.get("platform")=="iOS"
+          ]
           if not runtimes:
-              runtimes=[r for r in data["runtimes"] if r.get("isAvailable") and "iOS" in r.get("name","")]
+              runtimes=[
+                  r for r in data["runtimes"]
+                  if r.get("isAvailable")
+                  and "iOS" in r.get("name","")
+              ]
+          if not runtimes:
+              raise SystemExit("No iOS runtime is available")
           print(runtimes[-1]["identifier"])
           ')
 
-          DEVICE_TYPE=$(xcrun simctl list devicetypes -j | python3 -c '
-          import json,sys
-          data=json.load(sys.stdin)
-          phones=[d for d in data["devicetypes"] if "iPhone" in d.get("name","")]
-          print(phones[0]["identifier"])
-          ')
-
-          UDID=$(xcrun simctl create ATHLTHSmoke "$DEVICE_TYPE" "$RUNTIME")
-          trap 'xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
-
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b
-
           APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name 'ATHLTH.app' -print -quit)
           test -n "$APP"
-          xcrun simctl install "$UDID" "$APP"
+          test -d "$APP"
 
-          set +e
-          LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
-          LAUNCH_STATUS=$?
-          set -e
-          echo "$LAUNCH_OUTPUT"
+          DEVICE_MATRIX="$RUNNER_TEMP/iphone-device-matrix.txt"
 
-          if [ "$LAUNCH_STATUS" -ne 0 ]; then
-            echo "::error::ATHLTH failed to launch."
-            xcrun simctl spawn "$UDID" log show --last 2m --style compact --predicate 'process == "ATHLTH"' || true
-            exit 1
-          fi
+          xcrun simctl list devicetypes -j | python3 - "$DEVICE_MATRIX" <<'PY'
+          import json,sys
 
-          PID=$(echo "$LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
-          sleep 8
+          output=sys.argv[1]
+          data=json.load(sys.stdin)
+          phones=[
+              d for d in data["devicetypes"]
+              if d.get("name","").startswith("iPhone")
+          ]
 
-          if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
-            echo "ATHLTH remained alive after launch (PID $PID)."
-          else
-            echo "::error::ATHLTH process exited shortly after launch."
-            xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
-            exit 1
-          fi
+          if not phones:
+              raise SystemExit("No iPhone simulator device types are available")
+
+          by_name={d["name"]:d for d in phones}
+          used=set()
+
+          candidates={
+              "compact":[
+                  "iPhone SE (3rd generation)",
+                  "iPhone SE (2nd generation)",
+                  "iPhone 13 mini",
+                  "iPhone 12 mini",
+              ],
+              "standard":[
+                  "iPhone 15",
+                  "iPhone 16",
+                  "iPhone 17",
+                  "iPhone 14",
+              ],
+              "large":[
+                  "iPhone 15 Pro Max",
+                  "iPhone 16 Pro Max",
+                  "iPhone 17 Pro Max",
+                  "iPhone 14 Pro Max",
+                  "iPhone 16 Plus",
+                  "iPhone 15 Plus",
+              ],
+          }
+
+          def choose(kind):
+              for name in candidates[kind]:
+                  device=by_name.get(name)
+                  if device and device["identifier"] not in used:
+                      used.add(device["identifier"])
+                      return device
+
+              remaining=[
+                  d for d in phones
+                  if d["identifier"] not in used
+              ]
+
+              if kind=="compact":
+                  preferred=[
+                      d for d in remaining
+                      if "SE" in d["name"] or "mini" in d["name"].lower()
+                  ]
+              elif kind=="large":
+                  preferred=[
+                      d for d in remaining
+                      if "Pro Max" in d["name"] or "Plus" in d["name"]
+                  ]
+              else:
+                  preferred=[
+                      d for d in remaining
+                      if "Pro Max" not in d["name"]
+                      and "Plus" not in d["name"]
+                      and "SE" not in d["name"]
+                      and "mini" not in d["name"].lower()
+                  ]
+
+              pool=preferred or remaining
+              if not pool:
+                  raise SystemExit(f"No unused device type for {kind}")
+
+              device=pool[-1] if kind=="large" else pool[0]
+              used.add(device["identifier"])
+              return device
+
+          with open(output,"w") as fh:
+              for kind in ("compact","standard","large"):
+                  device=choose(kind)
+                  fh.write(
+                      f'{kind}|{device["identifier"]}|{device["name"]}\n'
+                  )
+          PY
+
+          cat "$DEVICE_MATRIX"
+
+          cleanup_device() {
+            local udid="$1"
+            xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+            xcrun simctl delete "$udid" >/dev/null 2>&1 || true
+          }
+
+          while IFS='|' read -r CLASS DEVICE_TYPE DEVICE_NAME; do
+            echo "Testing $CLASS layout on $DEVICE_NAME"
+
+            UDID=$(xcrun simctl create "ATHLTH-$CLASS" "$DEVICE_TYPE" "$RUNTIME")
+            trap 'cleanup_device "$UDID"' EXIT
+
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl install "$UDID" "$APP"
+
+            set +e
+            LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
+            LAUNCH_STATUS=$?
+            set -e
+
+            echo "$LAUNCH_OUTPUT"
+
+            if [ "$LAUNCH_STATUS" -ne 0 ]; then
+              echo "::error::ATHLTH failed to launch on $DEVICE_NAME."
+              xcrun simctl spawn "$UDID" log show --last 2m --style compact --predicate 'process == "ATHLTH"' || true
+              exit 1
+            fi
+
+            PID=$(echo "$LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+            sleep 8
+
+            if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
+              echo "::error::ATHLTH exited shortly after launch on $DEVICE_NAME."
+              xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+              exit 1
+            fi
+
+            SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS.png"
+            xcrun simctl io "$UDID" screenshot "$SCREENSHOT"
+            test -s "$SCREENSHOT"
+
+            ENTROPY=$(magick "$SCREENSHOT" -colorspace Gray -format "%[entropy]" info:)
+            echo "$DEVICE_NAME launch screenshot entropy: $ENTROPY"
+
+            python3 - "$ENTROPY" "$DEVICE_NAME" <<'PY'
+          import sys
+          entropy=float(sys.argv[1])
+          device=sys.argv[2]
+          if entropy < 0.025:
+              raise SystemExit(
+                  f"ATHLTH appears visually blank on {device}: entropy={entropy:.5f}"
+              )
+          PY
+
+            echo "ATHLTH remained alive and rendered non-blank UI on $DEVICE_NAME (PID $PID)."
+
+            cleanup_device "$UDID"
+            trap - EXIT
+          done < "$DEVICE_MATRIX"
