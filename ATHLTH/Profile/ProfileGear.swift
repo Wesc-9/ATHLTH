@@ -1790,9 +1790,6 @@ struct ProfileGearEditorView: View {
             guard !didLoadDetails else { return }
             didLoadDetails = true
 
-            async let catalogRefresh: Void =
-                catalog.refresh(category: category)
-
             if category == .watch {
                 watchConnection.refreshStatus()
             }
@@ -1801,7 +1798,7 @@ struct ProfileGearEditorView: View {
                 await gear.refresh()
             }
 
-            _ = await catalogRefresh
+            await catalog.refresh(category: category)
 
             if let existing,
                let record = gear.details(for: existing) {
@@ -2181,7 +2178,11 @@ struct ProfileGearEditorView: View {
 
         manualModel =
             !detailDraft.model.isEmpty &&
-            catalogModels.isEmpty
+            catalog.matchingEntry(
+                category: category,
+                brand: detailDraft.brand,
+                model: detailDraft.model
+            ) == nil
     }
 
     private var shoeDetailsSection: some View {
