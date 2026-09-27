@@ -302,8 +302,14 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         _ playlist: SpotifyPlaylistReference,
         appRemote: SPTAppRemote
     ) async {
-        await withCheckedContinuation { continuation in
-            appRemote.playerAPI?.play(playlist.uri) { [weak self] _, error in
+        await withCheckedContinuation {
+            (continuation: CheckedContinuation<Void, Never>) in
+            guard let playerAPI = appRemote.playerAPI else {
+                continuation.resume()
+                return
+            }
+
+            playerAPI.play(playlist.uri) { [weak self] _, error in
                 Task { @MainActor in
                     if let error {
                         self?.lastErrorMessage = error.localizedDescription
@@ -314,7 +320,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                     self?.pendingPlaybackURI = nil
                     continuation.resume()
                 }
-            } ?? continuation.resume()
+            }
         }
     }
 
@@ -506,9 +512,16 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     private func isAuthorizationError(_ error: Error) -> Bool {
-        if case SpotifyPlaybackError.authorizationExpired = error {
+        guard let spotifyError =
+                error as? SpotifyPlaybackError
+        else {
+            return false
+        }
+
+        if case .authorizationExpired = spotifyError {
             return true
         }
+
         return false
     }
 }
