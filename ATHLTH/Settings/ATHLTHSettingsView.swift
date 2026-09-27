@@ -2203,6 +2203,16 @@ private struct ATHLTHTrainingSettingsView: View {
                     "Publish completed workouts automatically",
                     isOn: $settings.autoPublishCompletedWorkouts
                 )
+                .onChange(
+                    of: settings.autoPublishCompletedWorkouts
+                ) { _, enabled in
+                    settings.workoutSharingChoiceCompleted = true
+
+                    if enabled &&
+                        settings.defaultActivityVisibility == .privateOnly {
+                        settings.defaultActivityVisibility = .friends
+                    }
+                }
 
                 if settings.autoPublishCompletedWorkouts {
                     Picker(
