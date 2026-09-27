@@ -260,6 +260,24 @@ final class GhostRaceStore: ObservableObject {
         lastMatchedIndex = nil
     }
 
+    func prepare(
+        reference: GhostRaceReference
+    ) throws {
+        guard reference.points.count >= 2,
+              reference.routeDistanceMeters >= 200,
+              reference.durationSeconds > 0
+        else {
+            throw GhostRacePreparationError
+                .routeTooShort
+        }
+
+        self.reference = reference
+        comparison = nil
+        result = nil
+        errorMessage = nil
+        lastMatchedIndex = nil
+    }
+
     func cancel() {
         reference = nil
         comparison = nil
