@@ -76,19 +76,40 @@ struct ATHLTHApp: App {
 private struct ATHLTHLaunchGateView: View {
     var body: some View {
         ZStack {
-            Color.white
-                .ignoresSafeArea()
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.55)
+            )
+            .ignoresSafeArea()
 
-            VStack(spacing: 18) {
-                ATHLTHBrandMark(size: .compact, showTagline: false)
+            VStack(spacing: 16) {
+                ATHLTHBrandMark(
+                    size: .compact,
+                    showTagline: false
+                )
 
                 ProgressView()
                     .controlSize(.regular)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(
+                        ATHLTHTheme.accent
+                    )
+
+                Text("Opening ATHLTH…")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
             }
+            .padding(28)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Opening ATHLTH")
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            "Opening ATHLTH"
+        )
     }
 }
 
