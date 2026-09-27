@@ -311,3 +311,12 @@ jobs:
             cleanup_device "$UDID"
             trap - EXIT
           done < "$DEVICE_MATRIX"
+
+      - name: Upload iPhone smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-iphone-smoke-screenshots
+          path: ${{ runner.temp }}/athlth-*.png
+          if-no-files-found: warn
+          retention-days: 3
