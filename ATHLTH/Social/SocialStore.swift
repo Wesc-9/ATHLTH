@@ -25,6 +25,7 @@ final class SocialStore: ObservableObject {
 
     private let service: SupabaseSocialService
     private var lastHomeFeedRefreshAt: Date?
+    private var lastFullRefreshAt: Date?
     private var profileCache: [UUID: SocialFriendProfile] = [:]
     private let activationDate: Date
 
@@ -168,6 +169,7 @@ final class SocialStore: ObservableObject {
                 )
             }
 
+            lastFullRefreshAt = Date()
             errorMessage = nil
         } catch is CancellationError {
             // SwiftUI may cancel Community refresh work when the view
@@ -177,6 +179,27 @@ final class SocialStore: ObservableObject {
             guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    func refreshIfStale(
+        maxAge: TimeInterval = 120,
+        challengeStore: ChallengeStore? = nil,
+        notificationStore: ATHLTHNotificationStore? = nil,
+        deliverSystemAlertsForImportedInbox: Bool = true
+    ) async {
+        if let lastFullRefreshAt,
+           Date().timeIntervalSince(lastFullRefreshAt) < maxAge,
+           privacy != nil,
+           !visibleProfiles.isEmpty {
+            return
+        }
+
+        await refresh(
+            challengeStore: challengeStore,
+            notificationStore: notificationStore,
+            deliverSystemAlertsForImportedInbox:
+                deliverSystemAlertsForImportedInbox
+        )
     }
 
     /// Launch/Home bootstrap that loads only the relationship state needed
