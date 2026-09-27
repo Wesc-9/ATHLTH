@@ -94,12 +94,6 @@ struct AdvancedPlannerView: View {
                 .environmentObject(session)
             }
         }
-        .sheet(isPresented: $showingSpotifyPlaylistPicker) {
-            SpotifyPlaylistPickerView(
-                title: "Program Playlist",
-                selection: $selectedSpotifyPlaylist
-            )
-        }
         .confirmationDialog(
             weekPendingRemoval.map {
                 "Remove W\($0.weekNumber)?"
@@ -3049,6 +3043,12 @@ struct PlanMetadataEditorView: View {
                     )
                 }
             }
+        }
+        .sheet(isPresented: $showingSpotifyPlaylistPicker) {
+            SpotifyPlaylistPickerView(
+                title: "Program Playlist",
+                selection: $selectedSpotifyPlaylist
+            )
         }
         .confirmationDialog(
             "Delete \(plan.title)?",
