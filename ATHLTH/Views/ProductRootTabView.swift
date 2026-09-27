@@ -5197,16 +5197,42 @@ struct ATHLTHProgressView: View {
     private let canvas = Color(red: 0.965, green: 0.972, blue: 0.968)
 
     var body: some View {
-        NavigationStack {
+        let useImmersiveProgressHero =
+            UIDevice.current.userInterfaceIdiom == .pad ||
+            UIScreen.main.bounds.width >= 390
+
+        return NavigationStack {
             ATHLTHPinnedHeroLayout(
                 accent: green.opacity(0.60),
-                softTransition: true
+                softTransition: true,
+                immersiveTransition: useImmersiveProgressHero
             ) {
                 ATHLTHTabHero(
                     imageName: "ProgressHero",
                     title: "Progress",
-                        subtitle: "See your training, consistency and health trends.",
-                    height: 190
+                    subtitle: "See your training, consistency and health trends.",
+                    height:
+                        useImmersiveProgressHero
+                            ? 226
+                            : 190,
+                    alignment: .leading,
+                    focalOffsetX:
+                        useImmersiveProgressHero
+                            ? 4
+                            : 18,
+                    focalOffsetY:
+                        useImmersiveProgressHero
+                            ? 6
+                            : 16,
+                    titleFontSize:
+                        useImmersiveProgressHero
+                            ? 31
+                            : 30,
+                    copyWidthFraction:
+                        useImmersiveProgressHero
+                            ? 0.66
+                            : 0.80,
+                    immersiveCopy: useImmersiveProgressHero
                 )
             } content: {
                 LazyVStack(spacing: 14) {
