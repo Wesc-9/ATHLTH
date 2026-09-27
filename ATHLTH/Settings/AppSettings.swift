@@ -541,13 +541,16 @@ final class AppSettingsStore: ObservableObject {
         messageNotificationsEnabled = defaults.object(forKey: "settings.messageNotifications") as? Bool ?? true
         mentionNotificationsEnabled = defaults.object(forKey: "settings.mentionNotifications") as? Bool ?? true
 
-        spotifyAutoplayLinkedPlaylists = false
+        spotifyAutoplayLinkedPlaylists =
+            defaults.object(
+                forKey: "settings.spotifyAutoplayLinkedPlaylists"
+            ) as? Bool ?? true
         watchConnected = defaults.object(forKey: "settings.watchConnected") as? Bool ?? false
-        spotifyConnected = false
+        spotifyConnected =
+            defaults.object(
+                forKey: "settings.spotifyConnected"
+            ) as? Bool ?? false
         homeAssistantConnected = defaults.object(forKey: "settings.homeAssistantConnected") as? Bool ?? false
-
-        defaults.set(false, forKey: "settings.spotifyAutoplayLinkedPlaylists")
-        defaults.set(false, forKey: "settings.spotifyConnected")
 
         isInitializing = false
     }
