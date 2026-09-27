@@ -4068,7 +4068,7 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
     }
-    private static func safeDoubleValue(
+    nonisolated private static func safeDoubleValue(
         _ quantity: HKQuantity?,
         unit: HKUnit
     ) -> Double? {
