@@ -445,11 +445,11 @@ struct GhostRaceHubView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Challenge a friend")
+                        Text("Race a friend")
                             .font(.headline)
 
                         Text(
-                            "Use ATHLTH Challenges for route, distance and verified GPS rules."
+                            "Send a privacy-filtered ghost from one of your runs, or accept a friend’s ghost and race it live."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -459,17 +459,30 @@ struct GhostRaceHubView: View {
                 }
 
                 NavigationLink {
-                    ChallengeCreationView()
+                    GhostFriendRaceHubView()
                 } label: {
                     Label(
-                        "Create running challenge",
-                        systemImage: "trophy.fill"
+                        "Open friend Ghost Races",
+                        systemImage: "figure.run.square.stack.fill"
                     )
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.vitality)
                 .controlSize(.large)
+
+                NavigationLink {
+                    ChallengeCreationView()
+                } label: {
+                    Label(
+                        "Standard challenge",
+                        systemImage: "trophy.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHTheme.accent)
             }
         }
     }
