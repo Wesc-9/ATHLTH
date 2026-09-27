@@ -154,6 +154,57 @@ function clampInteger(value: unknown, low: number, high: number, fallback: numbe
   return Math.min(Math.max(Math.round(parsed), low), high);
 }
 
+
+async function recordGroqQuota(
+  response: Response,
+  feature: string,
+) {
+  const supabaseURL = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseURL || !serviceRoleKey) return;
+
+  const parseHeader = (name: string) => {
+    const raw = response.headers.get(name);
+    if (!raw) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? Math.max(0, Math.round(value)) : null;
+  };
+
+  const limitRequests = parseHeader("x-ratelimit-limit-requests");
+  const remainingRequests = parseHeader("x-ratelimit-remaining-requests");
+  const resetRequests = response.headers.get("x-ratelimit-reset-requests");
+
+  if (limitRequests == null && remainingRequests == null) return;
+
+  const admin = createClient(supabaseURL, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { error } = await admin
+    .from("ai_provider_quota_snapshots")
+    .upsert(
+      {
+        provider: "groq",
+        model:
+          Deno.env.get("GROQ_TRAINING_MODEL") ??
+          "openai/gpt-oss-120b",
+        limit_requests: limitRequests,
+        remaining_requests: remainingRequests,
+        reset_requests: resetRequests,
+        last_feature: feature,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "provider,model" },
+    );
+
+  if (error) {
+    console.error("Unable to record AI quota", {
+      feature,
+      message: error.message,
+    });
+  }
+}
+
 function extractOutputText(payload: any): string | null {
   if (typeof payload?.output_text === "string") return payload.output_text;
 
@@ -460,6 +511,8 @@ Hard rules:
       },
     }),
   });
+
+  await recordGroqQuota(aiResponse, "training-program");
 
   if (!aiResponse.ok) {
     const failure = await aiResponse.text();
