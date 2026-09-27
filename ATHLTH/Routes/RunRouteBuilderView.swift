@@ -1,4 +1,4 @@
-import MapKit
+@preconcurrency import MapKit
 import SwiftUI
 
 struct RunRouteBuilderView: View {
@@ -1144,42 +1144,60 @@ private struct RunRouteSearchField: View {
     }
 }
 
-final class RunRouteLocationSearchModel: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
+private struct RunRouteResolvedLocation: Sendable {
+    let latitude: Double
+    let longitude: Double
+    let name: String
+}
+
+@MainActor
+final class RunRouteLocationSearchModel:
+    NSObject,
+    ObservableObject,
+    MKLocalSearchCompleterDelegate
+{
     @Published var query = "" {
         didSet {
             completer.queryFragment = query
         }
     }
 
-    @Published private(set) var suggestions: [RunRouteLocationSuggestion] = []
+    @Published private(set) var suggestions:
+        [RunRouteLocationSuggestion] = []
 
     private let completer = MKLocalSearchCompleter()
 
     override init() {
         super.init()
         completer.delegate = self
-        completer.resultTypes = [.address, .pointOfInterest]
+        completer.resultTypes = [
+            .address,
+            .pointOfInterest
+        ]
     }
 
-    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        let mapped = completer.results.prefix(12).map {
-            RunRouteLocationSuggestion(
-                completion: $0,
-                title: $0.title,
-                subtitle: $0.subtitle
-            )
-        }
+    nonisolated func completerDidUpdateResults(
+        _ completer: MKLocalSearchCompleter
+    ) {
+        let mapped = completer.results
+            .prefix(12)
+            .map {
+                RunRouteLocationSuggestion(
+                    title: $0.title,
+                    subtitle: $0.subtitle
+                )
+            }
 
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             self?.suggestions = mapped
         }
     }
 
-    func completer(
+    nonisolated func completer(
         _ completer: MKLocalSearchCompleter,
         didFailWithError error: Error
     ) {
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             self?.suggestions = []
         }
     }
@@ -1189,20 +1207,101 @@ final class RunRouteLocationSearchModel: NSObject, ObservableObject, MKLocalSear
         suggestions = []
     }
 
-    func resolve(_ suggestion: RunRouteLocationSuggestion) async -> MKMapItem? {
-        let request = MKLocalSearch.Request(completion: suggestion.completion)
+    func resolve(
+        _ suggestion: RunRouteLocationSuggestion
+    ) async -> MKMapItem? {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = [
+            suggestion.title,
+            suggestion.subtitle
+        ]
+        .filter { !$0.isEmpty }
+        .joined(separator: ", ")
 
-        return await withCheckedContinuation { continuation in
-            MKLocalSearch(request: request).start { response, _ in
-                continuation.resume(returning: response?.mapItems.first)
-            }
+        let fallbackName =
+            suggestion.title.isEmpty
+                ? suggestion.subtitle
+                : suggestion.title
+
+        let resolved:
+            RunRouteResolvedLocation? =
+                await withCheckedContinuation {
+                    (
+                        continuation:
+                            CheckedContinuation<
+                                RunRouteResolvedLocation?,
+                                Never
+                            >
+                    ) in
+
+                    MKLocalSearch(request: request)
+                        .start { response, _ in
+                            guard let item =
+                                    response?
+                                        .mapItems
+                                        .first
+                            else {
+                                continuation.resume(
+                                    returning: nil
+                                )
+                                return
+                            }
+
+                            let coordinate =
+                                item.placemark
+                                    .coordinate
+                            let name =
+                                item.name?
+                                    .trimmingCharacters(
+                                        in:
+                                            .whitespacesAndNewlines
+                                    )
+
+                            continuation.resume(
+                                returning:
+                                    RunRouteResolvedLocation(
+                                        latitude:
+                                            coordinate.latitude,
+                                        longitude:
+                                            coordinate.longitude,
+                                        name:
+                                            name?.isEmpty == false
+                                                ? name!
+                                                : fallbackName
+                                    )
+                            )
+                        }
+                }
+
+        guard let resolved else {
+            return nil
         }
+
+        let placemark = MKPlacemark(
+            coordinate:
+                CLLocationCoordinate2D(
+                    latitude:
+                        resolved.latitude,
+                    longitude:
+                        resolved.longitude
+                )
+        )
+        let item = MKMapItem(
+            placemark: placemark
+        )
+        item.name = resolved.name
+        return item
     }
 
-    static func displayName(for item: MKMapItem?) -> String {
-        guard let item else { return "—" }
+    static func displayName(
+        for item: MKMapItem?
+    ) -> String {
+        guard let item else {
+            return "—"
+        }
 
-        if let name = item.name, !name.isEmpty {
+        if let name = item.name,
+           !name.isEmpty {
             return name
         }
 
@@ -1216,9 +1315,11 @@ final class RunRouteLocationSearchModel: NSObject, ObservableObject, MKLocalSear
     }
 }
 
-struct RunRouteLocationSuggestion: Identifiable {
+struct RunRouteLocationSuggestion:
+    Identifiable,
+    Sendable
+{
     let id = UUID()
-    let completion: MKLocalSearchCompletion
     let title: String
     let subtitle: String
 }
