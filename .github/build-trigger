@@ -156,3 +156,5 @@ validate-immersive-progress-hero
 validate-community-hero-and-weekly-cover
 
 validate-ai-weekly-cover-pipeline
+
+validate-groq-weekly-cover-renderer
