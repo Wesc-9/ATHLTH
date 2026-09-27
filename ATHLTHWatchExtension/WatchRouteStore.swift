@@ -196,7 +196,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
 
             DispatchQueue.main.async {
                 WatchWorkoutManager.shared
-                    .configureGhostRace(ghost)
+                    .configureGhostRace(
+                        ghost.points.isEmpty
+                            ? nil
+                            : ghost
+                    )
             }
             return true
 
