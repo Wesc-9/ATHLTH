@@ -168,6 +168,7 @@ final class RouteDiscoveryStore: ObservableObject {
     @Published var errorMessage: String?
 
     private let service: SupabaseRouteDiscoveryService
+    private var lastRefreshAt: Date?
 
     init(
         service: SupabaseRouteDiscoveryService =
@@ -176,7 +177,14 @@ final class RouteDiscoveryStore: ObservableObject {
         self.service = service
     }
 
-    func refresh() async {
+    func refresh(force: Bool = false) async {
+        if !force,
+           let lastRefreshAt,
+           Date().timeIntervalSince(lastRefreshAt) < 180,
+           !routes.isEmpty {
+            return
+        }
+
         guard !isLoading else { return }
 
         isLoading = true
@@ -189,6 +197,7 @@ final class RouteDiscoveryStore: ObservableObject {
             guard !Task.isCancelled else { return }
 
             routes = loadedRoutes
+            lastRefreshAt = Date()
             errorMessage = nil
         } catch is CancellationError {
             // Pull-to-refresh and SwiftUI view tasks may legitimately
@@ -204,7 +213,7 @@ final class RouteDiscoveryStore: ObservableObject {
     func publish(_ route: TrainingRoute) async {
         do {
             try await service.publish(route)
-            await refresh()
+            await refresh(force: true)
         } catch {
             errorMessage = error.localizedDescription
         }
