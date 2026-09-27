@@ -285,6 +285,40 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
             .map(\.userID)
     }
 
+    func rank(for challengeID: UUID) -> Int? {
+        guard let userID = client.auth.currentUser?.id else { return nil }
+
+        let ranked = participants
+            .filter { $0.challengeID == challengeID }
+            .sorted {
+                ($0.completionValue ?? 0) >
+                ($1.completionValue ?? 0)
+            }
+
+        guard let index = ranked.firstIndex(
+            where: { $0.userID == userID }
+        ) else {
+            return nil
+        }
+
+        return index + 1
+    }
+
+    func leadingParticipants(
+        for challengeID: UUID,
+        limit: Int = 5
+    ) -> [OfficialWeeklyChallengeParticipant] {
+        Array(
+            participants
+                .filter { $0.challengeID == challengeID }
+                .sorted {
+                    ($0.completionValue ?? 0) >
+                    ($1.completionValue ?? 0)
+                }
+                .prefix(max(limit, 0))
+        )
+    }
+
     func isJoined(_ challengeID: UUID) -> Bool {
         guard let userID = client.auth.currentUser?.id else { return false }
 
@@ -1504,6 +1538,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                         premiumHeroCard(challenge)
                         challengeOverviewSection(challenge)
                         progressSection(challenge)
+                        leaderboardSection(challenge)
                         countedWorkoutsSection
                         rulesSection(challenge)
                     }
@@ -1650,23 +1685,39 @@ struct OfficialWeeklyChallengeDetailView: View {
                     }
                 }
 
-                HStack(spacing: 9) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 9),
+                        GridItem(.flexible(), spacing: 9)
+                    ],
+                    spacing: 9
+                ) {
                     OfficialWeeklyChallengeCompactStat(
-                        icon: challenge.kind.icon,
-                        title: "TARGET",
-                        value: compactTargetText(for: challenge)
+                        icon: "chart.bar.fill",
+                        title: "PROGRESS",
+                        value: progressPercentText(for: challenge),
+                        detail: resolvedProgressText(for: challenge)
+                    )
+
+                    OfficialWeeklyChallengeCompactStat(
+                        icon: "scope",
+                        title: "REMAINING",
+                        value: remainingText(for: challenge),
+                        detail: remainingDetail(for: challenge)
                     )
 
                     OfficialWeeklyChallengeCompactStat(
                         icon: "calendar",
-                        title: "TIME",
-                        value: shortTimeRemaining(for: challenge)
+                        title: "TIME LEFT",
+                        value: shortTimeRemaining(for: challenge),
+                        detail: dateRangeText(for: challenge)
                     )
 
                     OfficialWeeklyChallengeCompactStat(
-                        icon: "person.3.fill",
-                        title: "JOINED",
-                        value: "\(store.participantCount(for: challenge.id))"
+                        icon: "trophy.fill",
+                        title: "YOUR RANK",
+                        value: rankText(for: challenge),
+                        detail: "\(store.participantCount(for: challenge.id)) participants"
                     )
                 }
 
@@ -1900,6 +1951,132 @@ struct OfficialWeeklyChallengeDetailView: View {
                 Text(remainingText(for: challenge))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func leaderboardSection(
+        _ challenge: OfficialWeeklyChallenge
+    ) -> some View {
+        ATHLTHCard {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Leaderboard")
+                        .font(.title3.bold())
+
+                    Text(
+                        "Community progress for this weekly challenge."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if let rank = store.rank(for: challenge.id) {
+                    Text("#\(rank)")
+                        .font(.title2.bold())
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+
+            let leaders = store.leadingParticipants(
+                for: challenge.id,
+                limit: 5
+            )
+
+            if leaders.isEmpty {
+                ContentUnavailableView(
+                    "No leaderboard yet",
+                    systemImage: "trophy",
+                    description: Text(
+                        "Progress appears here as participants complete qualifying workouts."
+                    )
+                )
+                .padding(.vertical, 10)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(
+                        Array(leaders.enumerated()),
+                        id: \.element.userID
+                    ) { index, participant in
+                        HStack(spacing: 12) {
+                            Text("\(index + 1)")
+                                .font(.headline.monospacedDigit())
+                                .foregroundStyle(
+                                    index < 3
+                                        ? ATHLTHTheme.accentDeep
+                                        : .secondary
+                                )
+                                .frame(width: 24)
+
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        index == 0
+                                            ? ATHLTHTheme.champagneSoft
+                                            : ATHLTHTheme.surfaceStone
+                                    )
+
+                                Image(
+                                    systemName:
+                                        index == 0
+                                            ? "trophy.fill"
+                                            : "figure.run"
+                                )
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                )
+                            }
+                            .frame(width: 34, height: 34)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(
+                                    participantLabel(
+                                        participant,
+                                        rank: index + 1,
+                                        challenge: challenge
+                                    )
+                                )
+                                .font(.subheadline.weight(.semibold))
+
+                                Text(
+                                    leaderboardProgressText(
+                                        participant,
+                                        challenge: challenge
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            let fraction = min(
+                                max(
+                                    (participant.completionValue ?? 0) /
+                                    max(challenge.targetValue, 0.0001),
+                                    0
+                                ),
+                                1
+                            )
+
+                            Text(
+                                "\(Int((fraction * 100).rounded()))%"
+                            )
+                            .font(.subheadline.bold())
+                            .monospacedDigit()
+                        }
+                        .padding(.vertical, 9)
+
+                        if index < leaders.count - 1 {
+                            Divider()
+                                .padding(.leading, 70)
+                        }
+                    }
+                }
             }
         }
     }
@@ -2243,6 +2420,51 @@ struct OfficialWeeklyChallengeDetailView: View {
         }
     }
 
+    private func rankText(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        guard store.isJoined(challenge.id) else {
+            return "—"
+        }
+
+        guard let rank = store.rank(for: challenge.id) else {
+            return "—"
+        }
+
+        return "#\(rank)"
+    }
+
+    private func participantLabel(
+        _ participant: OfficialWeeklyChallengeParticipant,
+        rank: Int,
+        challenge: OfficialWeeklyChallenge
+    ) -> String {
+        if let currentRank = store.rank(for: challenge.id),
+           currentRank == rank {
+            return "You"
+        }
+
+        return "Participant \(rank)"
+    }
+
+    private func leaderboardProgressText(
+        _ participant: OfficialWeeklyChallengeParticipant,
+        challenge: OfficialWeeklyChallenge
+    ) -> String {
+        let value = participant.completionValue ?? 0
+
+        switch challenge.kind {
+        case .distance:
+            return String(format: "%.1f km", value)
+        case .sessions:
+            return "\(Int(value.rounded(.down))) workouts"
+        case .minutes:
+            return "\(Int(value.rounded(.down))) min"
+        case .streak:
+            return "\(Int(value.rounded(.down))) days"
+        }
+    }
+
     private func challengeFocusTitle(
         for challenge: OfficialWeeklyChallenge
     ) -> String {
@@ -2293,6 +2515,7 @@ private struct OfficialWeeklyChallengeCompactStat: View {
     let icon: String
     let title: String
     let value: String
+    var detail: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -2311,6 +2534,14 @@ private struct OfficialWeeklyChallengeCompactStat: View {
                 .foregroundStyle(ATHLTHTheme.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
+
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
