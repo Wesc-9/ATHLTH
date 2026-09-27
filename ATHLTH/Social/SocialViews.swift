@@ -739,7 +739,11 @@ struct FriendProfileView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.accent.opacity(0.18)
+            )
+        )
         .navigationTitle(profile?.card.usernameLabel ?? "Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
