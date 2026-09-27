@@ -249,6 +249,7 @@ struct ATHLTHTabHero: View {
     var body: some View {
         GeometryReader { proxy in
             let isTablet =
+                UIDevice.current.userInterfaceIdiom == .pad &&
                 proxy.size.width >= 700
             let isNarrowPhone =
                 proxy.size.width < 390
@@ -605,6 +606,9 @@ private struct ATHLTHTopRoundedSheetShape: Shape {
 }
 
 struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
+    @Environment(\.horizontalSizeClass)
+    private var horizontalSizeClass
+
     let accent: Color
     let softTransition: Bool
     private let hero: Hero
@@ -614,6 +618,17 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     // Other screens retain their existing layout.
     private var sheetOverlap: CGFloat { softTransition ? 24 : 8 }
     private let sheetCornerRadius: CGFloat = 30
+
+    private var usesTabletContentWidth: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad &&
+        horizontalSizeClass == .regular
+    }
+
+    private var contentMaximumWidth: CGFloat? {
+        usesTabletContentWidth
+            ? 1040
+            : nil
+    }
 
     init(
         accent: Color,
@@ -659,6 +674,17 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                     // avoids the fixed rectangular cutoff seen previously.
                     VStack(spacing: 0) {
                         content
+                            .frame(
+                                maxWidth:
+                                    contentMaximumWidth ??
+                                    .infinity
+                            )
+                            .padding(
+                                .horizontal,
+                                usesTabletContentWidth
+                                    ? 22
+                                    : 0
+                            )
                             .frame(maxWidth: .infinity)
                     }
                     .frame(maxWidth: .infinity)
