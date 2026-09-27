@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - restore/v1-athlth-plus
+      - fix/v1.4.2-swift6-release
     paths:
       - .github/workflows/signing-diagnostics.yml
 
@@ -87,7 +88,7 @@ jobs:
                   print("HTTP failure:", url, getattr(e, "code", None), body.decode("utf-8", errors="replace"))
                   raise
 
-          for identifier in ["com.wesc9.athlth", "com.wesc9.athlth.watchkitapp"]:
+          for identifier in ["com.wesc9.athlth", "com.wesc9.athlth.widgets", "com.wesc9.athlth.watchkitapp"]:
               from urllib.parse import quote
               url = (
                   "https://api.appstoreconnect.apple.com/v1/bundleIds"
