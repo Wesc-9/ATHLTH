@@ -6,10 +6,6 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct ProductRootTabView: View {
-    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
-    @EnvironmentObject private var ghostRace: GhostRaceStore
-    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
-    @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var selectedTab: Int
 
@@ -92,44 +88,57 @@ struct ProductRootTabView: View {
                 selectedTab = 0
             }
         }
-        .sheet(
-            isPresented: Binding(
-                get: {
-                    guard settings.trainingDeviceProvider == .appleWatch,
-                          workoutMirroring.isPresentationRequested
-                    else {
-                        return false
-                    }
-
-                    if let kind = workoutMirroring.snapshot?.kind,
-                       kind == .strength || kind == .functional {
-                        // Strength uses the ATHLTH set logger on iPhone.
-                        // Watch mirroring remains a sensor/data companion and
-                        // must never replace the reps/weight/rest interface.
-                        return false
-                    }
-
-                    return true
-                },
-                set: { presented in
-                    if !presented &&
-                        !workoutMirroring.hasActiveMirroredWorkout {
-                        workoutMirroring.dismissSummary()
-                    }
-                }
-            ),
-            onDismiss: {
-                if !workoutMirroring.hasActiveMirroredWorkout {
-                    workoutMirroring.dismissSummary()
-                    if ghostRace.reference != nil {
-                        ghostRace.dismissResult()
-                    }
-                }
-            }
-        ) {
-            MirroredWorkoutLiveView()
-                .environmentObject(workoutMirroring)
+        .background {
+            ATHLTHMirroredWorkoutPresenter()
+                .frame(width: 0, height: 0)
         }
+    }
+}
+
+private struct ATHLTHMirroredWorkoutPresenter: View {
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var settings: AppSettingsStore
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .sheet(
+                isPresented: Binding(
+                    get: {
+                        guard settings.trainingDeviceProvider == .appleWatch,
+                              workoutMirroring.isPresentationRequested
+                        else {
+                            return false
+                        }
+
+                        if let kind = workoutMirroring.snapshot?.kind,
+                           kind == .strength || kind == .functional {
+                            return false
+                        }
+
+                        return true
+                    },
+                    set: { presented in
+                        if !presented &&
+                            !workoutMirroring.hasActiveMirroredWorkout {
+                            workoutMirroring.dismissSummary()
+                        }
+                    }
+                ),
+                onDismiss: {
+                    if !workoutMirroring.hasActiveMirroredWorkout {
+                        workoutMirroring.dismissSummary()
+
+                        if ghostRace.reference != nil {
+                            ghostRace.dismissResult()
+                        }
+                    }
+                }
+            ) {
+                MirroredWorkoutLiveView()
+                    .environmentObject(workoutMirroring)
+            }
     }
 }
 
