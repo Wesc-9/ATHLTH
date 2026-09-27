@@ -491,6 +491,7 @@ struct ATHLTHHomeView: View {
                                     trackingMode: trackingMode,
                                     captureDevice: .appleWatch
                                 )
+                                startSpotifyForPlannedWorkoutIfNeeded(workout)
                                 showingHomeStrengthWorkout = true
                             } catch {
                                 homeWatchTransferError =
@@ -504,6 +505,7 @@ struct ATHLTHHomeView: View {
                                 trackingMode: trackingMode,
                                 captureDevice: .iPhone
                             )
+                            startSpotifyForPlannedWorkoutIfNeeded(workout)
                             showingHomeStrengthWorkout = true
                         }
                     }
