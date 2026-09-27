@@ -1586,43 +1586,79 @@ struct OfficialWeeklyChallengeDetailView: View {
                 OfficialWeeklyChallengeArtwork(
                     challenge: challenge
                 )
-                .frame(height: 300)
+                .frame(height: 330)
                 .clipped()
 
                 LinearGradient(
                     colors: [
-                        Color.clear,
+                        Color.black.opacity(0.02),
                         Color.black.opacity(0.10),
-                        Color.black.opacity(0.62)
+                        Color.black.opacity(0.74)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("WEEKLY CHALLENGE")
-                        .font(.caption.weight(.semibold))
-                        .tracking(2.6)
-                        .foregroundStyle(.white.opacity(0.88))
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label(
+                            "WEEKLY CHALLENGE",
+                            systemImage: "sparkles"
+                        )
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.8)
+                        .foregroundStyle(.white.opacity(0.92))
+                        .padding(.horizontal, 11)
+                        .frame(height: 30)
+                        .background(
+                            Color.black.opacity(0.20),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.white.opacity(0.24),
+                                    lineWidth: 0.8
+                                )
+                        }
+
+                        Spacer()
+
+                        Text(timeRemaining(for: challenge))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .padding(.horizontal, 11)
+                            .frame(height: 30)
+                            .background(
+                                Color.black.opacity(0.20),
+                                in: Capsule()
+                            )
+                    }
+
+                    Spacer()
 
                     Text(challenge.title)
                         .font(
                             .system(
-                                size: 38,
+                                size: 40,
                                 weight: .semibold,
                                 design: .serif
                             )
                         )
                         .foregroundStyle(.white)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.78)
+                        .minimumScaleFactor(0.72)
 
                     Text(challenge.subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.90))
                         .lineLimit(3)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
 
-                    HStack(spacing: 7) {
+                    HStack(spacing: 8) {
                         Label(
                             challenge.kind.targetText(
                                 challenge.targetValue
@@ -1630,9 +1666,11 @@ struct OfficialWeeklyChallengeDetailView: View {
                             systemImage: challenge.kind.icon
                         )
 
-                        Text("·")
+                        Text("•")
 
-                        Text(timeRemaining(for: challenge))
+                        Text(
+                            "\(store.participantCount(for: challenge.id)) participating"
+                        )
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.88))
@@ -1640,84 +1678,142 @@ struct OfficialWeeklyChallengeDetailView: View {
                 .padding(20)
             }
 
-            VStack(spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 5) {
                         Text(
                             store.isJoined(challenge.id)
-                                ? "YOUR CHALLENGE"
-                                : "READY WHEN YOU ARE"
+                                ? "YOUR PROGRESS"
+                                : "THE CHALLENGE"
                         )
-                        .font(.caption.weight(.semibold))
-                        .tracking(1.4)
-                        .foregroundStyle(.secondary)
+                        .font(.caption.weight(.bold))
+                        .tracking(1.5)
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep.opacity(0.76)
+                        )
 
                         Text(primaryProgressText(for: challenge))
                             .font(
                                 .system(
-                                    size: 30,
+                                    size: 32,
                                     weight: .semibold,
                                     design: .serif
                                 )
                             )
-                            .foregroundStyle(.primary)
-                    }
-
-                    Spacer()
-
-                    if store.isCompleted(challenge.id) {
-                        Label(
-                            "Completed",
-                            systemImage: "checkmark.seal.fill"
-                        )
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.green)
-                    } else if store.isJoined(challenge.id) {
-                        Text(progressStatus(for: challenge))
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .padding(.horizontal, 11)
-                            .frame(height: 30)
-                            .background(
-                                ATHLTHTheme.accent.opacity(0.10),
-                                in: Capsule()
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
                             )
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.78)
+
+                        Text(
+                            store.isJoined(challenge.id)
+                                ? progressStatusDescription(
+                                    for: challenge
+                                )
+                                : challengeFocusDescription(
+                                    for: challenge
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
                     }
+
+                    Spacer(minLength: 6)
+
+                    ZStack {
+                        Circle()
+                            .stroke(
+                                ATHLTHTheme.surfaceStone,
+                                lineWidth: 7
+                            )
+
+                        Circle()
+                            .trim(
+                                from: 0,
+                                to: resolvedProgress(
+                                    for: challenge
+                                )
+                            )
+                            .stroke(
+                                ATHLTHTheme.vitality,
+                                style: StrokeStyle(
+                                    lineWidth: 7,
+                                    lineCap: .round
+                                )
+                            )
+                            .rotationEffect(.degrees(-90))
+
+                        VStack(spacing: 0) {
+                            Text(
+                                progressPercentText(
+                                    for: challenge
+                                )
+                            )
+                            .font(.headline.bold())
+                            .monospacedDigit()
+
+                            Text("done")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(width: 82, height: 82)
                 }
 
                 LazyVGrid(
                     columns: [
-                        GridItem(.flexible(), spacing: 9),
-                        GridItem(.flexible(), spacing: 9)
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
                     ],
-                    spacing: 9
+                    spacing: 10
                 ) {
                     OfficialWeeklyChallengeCompactStat(
-                        icon: "chart.bar.fill",
-                        title: "PROGRESS",
-                        value: progressPercentText(for: challenge),
-                        detail: resolvedProgressText(for: challenge)
+                        icon: "scope",
+                        title: "TARGET",
+                        value: compactTargetText(
+                            for: challenge
+                        ),
+                        detail:
+                            challenge.kind == .distance
+                                ? "Run or walk"
+                                : "Weekly goal"
                     )
 
                     OfficialWeeklyChallengeCompactStat(
-                        icon: "scope",
-                        title: "REMAINING",
-                        value: remainingText(for: challenge),
-                        detail: remainingDetail(for: challenge)
+                        icon: "chart.bar.fill",
+                        title: "PROGRESS",
+                        value: progressPercentText(
+                            for: challenge
+                        ),
+                        detail: resolvedProgressText(
+                            for: challenge
+                        )
                     )
 
                     OfficialWeeklyChallengeCompactStat(
                         icon: "calendar",
                         title: "TIME LEFT",
-                        value: shortTimeRemaining(for: challenge),
-                        detail: dateRangeText(for: challenge)
+                        value: shortTimeRemaining(
+                            for: challenge
+                        ),
+                        detail: dateRangeText(
+                            for: challenge
+                        )
                     )
 
                     OfficialWeeklyChallengeCompactStat(
                         icon: "trophy.fill",
                         title: "YOUR RANK",
-                        value: rankText(for: challenge),
-                        detail: "\(store.participantCount(for: challenge.id)) participants"
+                        value: rankText(
+                            for: challenge
+                        ),
+                        detail:
+                            "\(store.participantCount(for: challenge.id)) participants"
                     )
                 }
 
@@ -1735,7 +1831,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 9) {
+                    HStack(spacing: 10) {
                         Image(
                             systemName:
                                 store.isJoined(challenge.id)
@@ -1751,15 +1847,22 @@ struct OfficialWeeklyChallengeDetailView: View {
 
                         Spacer()
 
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "arrow.right")
                     }
                     .font(.headline)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 18)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 54)
+                    .frame(height: 56)
                     .background(
-                        ATHLTHTheme.accentDeep,
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.accentDeep,
+                                ATHLTHTheme.accentDeep.opacity(0.86)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
                         in: RoundedRectangle(
                             cornerRadius: 18,
                             style: .continuous
@@ -1769,49 +1872,74 @@ struct OfficialWeeklyChallengeDetailView: View {
                 .buttonStyle(.plain)
 
                 if store.isJoined(challenge.id) {
-                    Button(role: .destructive) {
-                        Task {
-                            await store.leave(challenge)
-                        }
-                    } label: {
-                        Text("Leave Challenge")
+                    HStack {
+                        if store.isCompleted(challenge.id) {
+                            Label(
+                                "Challenge completed",
+                                systemImage: "checkmark.seal.fill"
+                            )
                             .font(.caption.weight(.semibold))
+                            .foregroundStyle(.green)
+                        } else {
+                            Label(
+                                progressStatus(
+                                    for: challenge
+                                ),
+                                systemImage: "bolt.heart.fill"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                        }
+
+                        Spacer()
+
+                        Button(role: .destructive) {
+                            Task {
+                                await store.leave(challenge)
+                            }
+                        } label: {
+                            Text("Leave")
+                                .font(.caption.weight(.semibold))
+                        }
                     }
                 }
             }
-            .padding(18)
+            .padding(20)
             .background(
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.98),
-                        ATHLTHTheme.surfaceStone.opacity(0.92)
+                        Color.white,
+                        ATHLTHTheme.champagneSoft.opacity(0.30),
+                        ATHLTHTheme.surfaceStone.opacity(0.74)
                     ],
                     startPoint: .top,
-                    endPoint: .bottom
+                    endPoint: .bottomTrailing
                 )
             )
         }
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 30,
+                cornerRadius: 32,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 30,
+                cornerRadius: 32,
                 style: .continuous
             )
             .stroke(
-                Color.white.opacity(0.72),
-                lineWidth: 0.8
+                Color.white.opacity(0.82),
+                lineWidth: 0.9
             )
         }
         .shadow(
-            color: Color.black.opacity(0.08),
-            radius: 24,
+            color: ATHLTHTheme.accentDeep.opacity(0.09),
+            radius: 26,
             x: 0,
-            y: 12
+            y: 14
         )
     }
 
