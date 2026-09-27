@@ -320,3 +320,97 @@ struct ExerciseLibraryEntry: Identifiable, Hashable {
 
     var name: String { exercise.name }
 }
+
+
+// MARK: - Coach plan adaptation proposals
+
+enum CoachPlanChangeKind: String, Codable, CaseIterable, Hashable {
+    case moveWorkout
+    case replaceWorkout
+    case adjustDuration
+    case adjustIntensity
+    case addRecovery
+    case removeWorkout
+}
+
+enum CoachPlanProposalStatus: String, Codable, Hashable {
+    case proposed
+    case accepted
+    case dismissed
+    case reverted
+}
+
+struct CoachPlanChange: Identifiable, Codable, Hashable {
+    let id: UUID
+    let kind: CoachPlanChangeKind
+    let sessionID: UUID?
+    let sourceDate: Date?
+    let targetDate: Date?
+    let title: String
+    let summary: String
+    let reason: String
+    let replacementTitle: String?
+    let durationMinutes: Int?
+    let intensityNote: String?
+
+    init(
+        id: UUID = UUID(),
+        kind: CoachPlanChangeKind,
+        sessionID: UUID? = nil,
+        sourceDate: Date? = nil,
+        targetDate: Date? = nil,
+        title: String,
+        summary: String,
+        reason: String,
+        replacementTitle: String? = nil,
+        durationMinutes: Int? = nil,
+        intensityNote: String? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.sessionID = sessionID
+        self.sourceDate = sourceDate
+        self.targetDate = targetDate
+        self.title = title
+        self.summary = summary
+        self.reason = reason
+        self.replacementTitle = replacementTitle
+        self.durationMinutes = durationMinutes
+        self.intensityNote = intensityNote
+    }
+}
+
+struct CoachPlanChangeProposal: Identifiable, Codable, Hashable {
+    let id: UUID
+    let planID: UUID
+    let planVersion: Int
+    let createdAt: Date
+    var status: CoachPlanProposalStatus
+    let headline: String
+    let rationale: String
+    let changes: [CoachPlanChange]
+
+    init(
+        id: UUID = UUID(),
+        planID: UUID,
+        planVersion: Int,
+        createdAt: Date = Date(),
+        status: CoachPlanProposalStatus = .proposed,
+        headline: String,
+        rationale: String,
+        changes: [CoachPlanChange]
+    ) {
+        self.id = id
+        self.planID = planID
+        self.planVersion = planVersion
+        self.createdAt = createdAt
+        self.status = status
+        self.headline = headline
+        self.rationale = rationale
+        self.changes = changes
+    }
+
+    func isStillValid(for plan: TrainingPlan) -> Bool {
+        plan.id == planID && plan.version == planVersion
+    }
+}
