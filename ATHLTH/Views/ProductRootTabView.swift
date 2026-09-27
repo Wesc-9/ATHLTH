@@ -5051,7 +5051,10 @@ struct ATHLTHRecoveryView: View {
 
         do {
             recoveryAIInsight = try await RecoveryAIService()
-                .generate(recoveryAIContext)
+                .generate(
+                    recoveryAIContext,
+                    bypassCache: force
+                )
         } catch {
             // The deterministic fallback remains visible so Recovery
             // never becomes an empty screen when AI is unavailable.
