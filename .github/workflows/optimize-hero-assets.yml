@@ -1,0 +1,83 @@
+name: Optimize ATHLTH hero assets
+
+on:
+  push:
+    branches:
+      - release/v1.4.3
+    paths:
+      - ".github/workflows/optimize-hero-assets.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  optimize:
+    runs-on: macos-15
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1.4.3
+          fetch-depth: 0
+
+      - name: Preserve master artwork outside app target
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p DesignMasters/Heroes
+          assets=(
+            "ATHLTH/Assets.xcassets/OnboardingHero.imageset/ATHLTH_hero_4x_3764x6688.png"
+            "ATHLTH/Assets.xcassets/HomeHero.imageset/home.png"
+            "ATHLTH/Assets.xcassets/TrainHero.imageset/train.png"
+            "ATHLTH/Assets.xcassets/RecoveryHero.imageset/recovery.png"
+            "ATHLTH/Assets.xcassets/ProgressHero.imageset/progress.png"
+            "ATHLTH/Assets.xcassets/CommunityHero.imageset/community.png"
+            "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset/StrengthPostWorkoutHero.jpg"
+          )
+
+          for asset in "${assets[@]}"; do
+            [ -f "$asset" ] || continue
+            destination="DesignMasters/Heroes/$(basename "$asset")"
+            if [ ! -f "$destination" ]; then
+              cp "$asset" "$destination"
+            fi
+          done
+
+      - name: Resize runtime artwork
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 3000 px is comfortably above the physical render size needed by
+          # current iPhone and iPad layouts while avoiding huge decode buffers.
+          assets=(
+            "ATHLTH/Assets.xcassets/OnboardingHero.imageset/ATHLTH_hero_4x_3764x6688.png"
+            "ATHLTH/Assets.xcassets/HomeHero.imageset/home.png"
+            "ATHLTH/Assets.xcassets/TrainHero.imageset/train.png"
+            "ATHLTH/Assets.xcassets/RecoveryHero.imageset/recovery.png"
+            "ATHLTH/Assets.xcassets/ProgressHero.imageset/progress.png"
+            "ATHLTH/Assets.xcassets/CommunityHero.imageset/community.png"
+            "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset/StrengthPostWorkoutHero.jpg"
+          )
+
+          for asset in "${assets[@]}"; do
+            [ -f "$asset" ] || continue
+            sips -Z 3000 "$asset" >/dev/null
+          done
+
+      - name: Commit optimized runtime assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet && [ -z "$(git status --porcelain DesignMasters)" ]; then
+            echo "Hero assets already optimized."
+            exit 0
+          fi
+
+          git config user.name "ATHLTH Performance Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add ATHLTH/Assets.xcassets DesignMasters/Heroes
+          git commit -m "Optimize runtime hero image assets"
+          git push origin HEAD:release/v1.4.3
