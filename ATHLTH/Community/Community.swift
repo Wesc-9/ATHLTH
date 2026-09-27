@@ -776,6 +776,15 @@ struct ATHLTHCommunityView: View {
     private func refreshCommunity(
         force: Bool = false
     ) async {
+        let performanceID =
+            ATHLTHPerformance.begin("CommunityRefresh")
+        defer {
+            ATHLTHPerformance.end(
+                "CommunityRefresh",
+                id: performanceID
+            )
+        }
+
         async let eventRefresh: Void =
             community.refresh(force: force)
         async let socialRefresh: Void =
