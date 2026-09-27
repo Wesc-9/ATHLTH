@@ -824,6 +824,17 @@ struct PostWorkoutReviewView: View {
 
     let workout: SocialPublishableWorkout
     let wasAutoPublished: Bool
+    let initialVisibilityOverride: ProfileVisibility?
+
+    init(
+        workout: SocialPublishableWorkout,
+        wasAutoPublished: Bool,
+        initialVisibilityOverride: ProfileVisibility? = nil
+    ) {
+        self.workout = workout
+        self.wasAutoPublished = wasAutoPublished
+        self.initialVisibilityOverride = initialVisibilityOverride
+    }
 
     @State private var visibility: ProfileVisibility = .friends
     @State private var descriptionText = ""
@@ -1127,7 +1138,9 @@ struct PostWorkoutReviewView: View {
     }
 
     private func loadExistingReview() async {
-        visibility = settings.defaultActivityVisibility
+        visibility =
+            initialVisibilityOverride ??
+            settings.defaultActivityVisibility
         selectedFriendIDs =
             social.workoutAssociatedFriendIDs(
                 for: workout.id
