@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var mirroring: WorkoutMirroringStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
 
     var body: some View {
         NavigationStack {
@@ -10,6 +11,16 @@ struct MirroredWorkoutLiveView: View {
                     header
 
                     if let snapshot = mirroring.snapshot {
+                        if ghostRace.reference != nil &&
+                            snapshot.kind == .running {
+                            GhostRaceLivePanel(
+                                snapshot: snapshot
+                            )
+                            .environmentObject(
+                                ghostRace
+                            )
+                        }
+
                         timer(snapshot)
 
                         HStack(spacing: 12) {
@@ -189,6 +200,9 @@ struct MirroredWorkoutLiveView: View {
         if snapshot.state == .completed || snapshot.state == .failed {
             Button {
                 mirroring.dismissSummary()
+                if ghostRace.reference != nil {
+                    ghostRace.dismissResult()
+                }
             } label: {
                 Label("Done", systemImage: "checkmark")
                     .font(.headline)
