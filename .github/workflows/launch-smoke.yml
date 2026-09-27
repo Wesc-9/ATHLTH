@@ -6,7 +6,16 @@ on:
     branches:
       - release/v1.4.2
     paths:
+      - ATHLTH/**/*.swift
+      - Shared/**/*.swift
+      - project.yml
+      - scripts/optimize_hero_assets.sh
+      - .github/workflows/launch-smoke.yml
       - .github/launch-trigger
+
+concurrency:
+  group: athlth-iphone-compatibility-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
