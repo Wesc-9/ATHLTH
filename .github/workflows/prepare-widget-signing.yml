@@ -228,4 +228,5 @@ jobs:
           ensure_app_groups_capability "$MAIN_RESOURCE_ID" "com.wesc9.athlth"
           ensure_app_groups_capability "$WIDGET_RESOURCE_ID" "com.wesc9.athlth.widgets"
 
-          echo "ATHLTH bundle IDs are ready for App Group provisioning."
+          echo "ATHLTH bundle IDs have the App Groups capability enabled."
+          echo "The group.com.wesc9.athlth association itself must also exist in Apple Developer for the main app and widget."
