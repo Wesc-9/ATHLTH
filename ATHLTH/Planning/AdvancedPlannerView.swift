@@ -2175,26 +2175,6 @@ struct TrainingPlanCreationView: View {
                 }
             }
         }
-        .confirmationDialog(
-            "Delete \(plan.title)?",
-            isPresented: $showingDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete Program", role: .destructive) {
-                goalStore.setLinkedPlan(
-                    plan.id,
-                    goalIDs: []
-                )
-                session.deleteTrainingPlan(plan.id)
-                dismiss()
-            }
-
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(
-                "This removes the program and its remaining schedule. Completed workout history is kept."
-            )
-        }
         .alert(
             "Plan Conflict",
             isPresented: Binding(
@@ -2959,6 +2939,26 @@ struct PlanMetadataEditorView: View {
                     )
                 }
             }
+        }
+        .confirmationDialog(
+            "Delete \(plan.title)?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Program", role: .destructive) {
+                goalStore.setLinkedPlan(
+                    plan.id,
+                    goalIDs: []
+                )
+                session.deleteTrainingPlan(plan.id)
+                dismiss()
+            }
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "This removes the program and its remaining schedule. Completed workout history is kept."
+            )
         }
         .alert(
             "Plan Conflict",

@@ -1962,7 +1962,7 @@ struct ChallengeCreationView: View {
         case 2: return "60–70%"
         case 3: return "70–80%"
         case 4: return "80–90%"
-        default: return "90–100%"
+        default: return "90%+"
         }
     }
 
@@ -3061,7 +3061,7 @@ struct ChallengeDetailView: View {
         case 2: return "60–70% of personal max HR"
         case 3: return "70–80% of personal max HR"
         case 4: return "80–90% of personal max HR"
-        default: return "90–100% of personal max HR"
+        default: return "90%+ of personal max HR"
         }
     }
 

@@ -414,8 +414,7 @@ final class ChallengeStore: ObservableObject {
             .filter {
                 $0.sport == .heartRate &&
                 $0.rules.verificationPolicy.allowsVerified &&
-                $0.status != .cancelled &&
-                $0.status != .completed
+                $0.status != .cancelled
             }
             .map(\.id)
 
