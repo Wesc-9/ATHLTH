@@ -160,3 +160,5 @@ validate-ai-weekly-cover-pipeline
 validate-groq-weekly-cover-renderer
 
 validate-final-groq-weekly-cover
+
+validate-premium-weekly-challenge-detail
