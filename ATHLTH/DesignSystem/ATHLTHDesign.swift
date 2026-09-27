@@ -235,11 +235,56 @@ struct ATHLTHTabHero: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let isTablet =
+                proxy.size.width >= 700
+            let isNarrowPhone =
+                proxy.size.width < 390
+            let isVeryNarrowPhone =
+                proxy.size.width < 360
+            let imageScale: CGFloat =
+                isTablet
+                    ? 1.04
+                    : (
+                        isNarrowPhone
+                            ? 1.08
+                            : 1.12
+                    )
+            let horizontalOffset =
+                isTablet
+                    ? focalOffsetX * 0.4
+                    : (
+                        isNarrowPhone
+                            ? focalOffsetX * 0.72
+                            : focalOffsetX
+                    )
+            let verticalOffset =
+                isTablet
+                    ? focalOffsetY * 0.35
+                    : (
+                        isNarrowPhone
+                            ? focalOffsetY * 0.72
+                            : focalOffsetY
+                    )
+            let copyFraction =
+                isNarrowPhone
+                    ? min(
+                        copyWidthFraction + 0.10,
+                        0.92
+                    )
+                    : copyWidthFraction
+            let resolvedTitleSize =
+                isNarrowPhone
+                    ? min(
+                        titleFontSize,
+                        27
+                    )
+                    : titleFontSize
+
             ZStack(alignment: .leading) {
                 // Continue the exact same artwork below the normal hero
-                // boundary without changing the visible 190 pt crop or moving
-                // any overlay text. This layer only supplies image bleed behind
-                // the fixed content surface / pull-down area.
+                // boundary without changing the visible crop. Narrow phones
+                // use slightly less overscan so focal subjects are not pushed
+                // outside the viewport.
                 Image(imageName)
                     .resizable()
                     .interpolation(.high)
@@ -247,18 +292,14 @@ struct ATHLTHTabHero: View {
                     .scaledToFill()
                     .frame(
                         width: proxy.size.width,
-                        height: proxy.size.height + scrollRevealBleed,
+                        height:
+                            proxy.size.height +
+                            scrollRevealBleed,
                         alignment: alignment
                     )
-                    .scaleEffect(
-                        proxy.size.width >= 700
-                            ? 1.04
-                            : 1.12
-                    )
+                    .scaleEffect(imageScale)
                     .offset(
-                        x: proxy.size.width >= 700
-                            ? focalOffsetX * 0.4
-                            : focalOffsetX,
+                        x: horizontalOffset,
                         y: scrollRevealBleed / 2
                     )
                     .clipped()
@@ -274,21 +315,10 @@ struct ATHLTHTabHero: View {
                         height: proxy.size.height,
                         alignment: alignment
                     )
-                    // Keep enough overscan on iPhone to move the focal subject
-                    // below the status/Dynamic Island zone without exposing
-                    // empty image edges. Wide iPad layouts need far less zoom.
-                    .scaleEffect(
-                        proxy.size.width >= 700
-                            ? 1.04
-                            : 1.12
-                    )
+                    .scaleEffect(imageScale)
                     .offset(
-                        x: proxy.size.width >= 700
-                            ? focalOffsetX * 0.4
-                            : focalOffsetX,
-                        y: proxy.size.width >= 700
-                            ? focalOffsetY * 0.35
-                            : focalOffsetY
+                        x: horizontalOffset,
+                        y: verticalOffset
                     )
                     .clipped()
 
@@ -312,10 +342,8 @@ struct ATHLTHTabHero: View {
                     endPoint: .bottom
                 )
 
-                // The hero is intentionally full-bleed, but the top strip is
-                // treated as visual breathing room for the iPhone status bar
-                // and Dynamic Island. Important subjects are positioned below
-                // this zone with focalOffsetY.
+                // Reserve visual breathing room for every status-bar shape:
+                // classic status bar, notch and Dynamic Island.
                 LinearGradient(
                     colors: [
                         Color.black.opacity(0.22),
@@ -325,18 +353,32 @@ struct ATHLTHTabHero: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 62)
-                .frame(maxHeight: .infinity, alignment: .top)
+                .frame(
+                    height:
+                        isNarrowPhone
+                            ? 56
+                            : 62
+                )
+                .frame(
+                    maxHeight: .infinity,
+                    alignment: .top
+                )
                 .allowsHitTesting(false)
 
                 RadialGradient(
                     colors: [
-                        ATHLTHTheme.champagne.opacity(0.17),
+                        ATHLTHTheme.champagne
+                            .opacity(0.17),
                         Color.clear
                     ],
                     center: .topTrailing,
                     startRadius: 0,
-                    endRadius: max(proxy.size.width * 0.72, 260)
+                    endRadius:
+                        max(
+                            proxy.size.width *
+                                0.72,
+                            240
+                        )
                 )
                 .blendMode(.screen)
                 .allowsHitTesting(false)
@@ -351,56 +393,133 @@ struct ATHLTHTabHero: View {
                 )
                 .allowsHitTesting(false)
 
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 0
+                ) {
                     Text("ATHLTH")
-                        .font(.system(size: 17, weight: .black))
-                        .tracking(5.5)
+                        .font(
+                            .system(
+                                size:
+                                    isVeryNarrowPhone
+                                        ? 15
+                                        : 17,
+                                weight: .black
+                            )
+                        )
+                        .tracking(
+                            isVeryNarrowPhone
+                                ? 4.2
+                                : 5.5
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.84)
 
-                    Text("MOVE BETTER · LIVE LONGER")
-                        .font(.system(size: 8, weight: .semibold))
-                        .tracking(1.7)
-                        .padding(.top, 2)
+                    Text(
+                        "MOVE BETTER · LIVE LONGER"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                isVeryNarrowPhone
+                                    ? 7
+                                    : 8,
+                            weight: .semibold
+                        )
+                    )
+                    .tracking(
+                        isVeryNarrowPhone
+                            ? 1.3
+                            : 1.7
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .padding(.top, 2)
 
-                    Spacer(minLength: 12)
+                    Spacer(
+                        minLength:
+                            isNarrowPhone
+                                ? 8
+                                : 12
+                    )
 
                     Text(title)
                         .font(
                             .system(
-                                size: titleFontSize,
+                                size:
+                                    resolvedTitleSize,
                                 weight: .bold
                             )
                         )
                         .lineLimit(2)
-                        .minimumScaleFactor(0.82)
+                        .minimumScaleFactor(0.76)
 
                     Text(subtitle)
-                        .font(.subheadline)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.86)
+                        .font(
+                            .system(
+                                size:
+                                    isNarrowPhone
+                                        ? 13
+                                        : 15,
+                                weight: .regular
+                            )
+                        )
+                        .lineLimit(
+                            isNarrowPhone
+                                ? 3
+                                : 2
+                        )
+                        .minimumScaleFactor(0.78)
                         .padding(.top, 2)
                 }
                 .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.30), radius: 5, x: 0, y: 2)
-                .padding(.leading, 20)
-                .padding(.trailing, 18)
-                .padding(.top, 48)
+                .shadow(
+                    color:
+                        .black.opacity(0.30),
+                    radius: 5,
+                    x: 0,
+                    y: 2
+                )
+                .padding(
+                    .leading,
+                    isNarrowPhone
+                        ? 16
+                        : 20
+                )
+                .padding(
+                    .trailing,
+                    isNarrowPhone
+                        ? 14
+                        : 18
+                )
+                .padding(
+                    .top,
+                    isNarrowPhone
+                        ? 44
+                        : 48
+                )
                 .padding(.bottom, 16)
                 .frame(
-                    maxWidth: min(
-                        proxy.size.width * copyWidthFraction,
-                        600
-                    ),
+                    maxWidth:
+                        min(
+                            proxy.size.width *
+                                copyFraction,
+                            600
+                        ),
                     maxHeight: .infinity,
                     alignment: .leading
                 )
             }
         }
         .frame(height: height)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(subtitle)")
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            "\(title). \(subtitle)"
+        )
     }
 }
-
 
 private struct ATHLTHTopRoundedSheetShape: Shape {
     let radius: CGFloat
