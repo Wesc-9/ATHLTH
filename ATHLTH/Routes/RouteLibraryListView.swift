@@ -1,6 +1,7 @@
 import CoreLocation
 import SwiftUI
 import Supabase
+import UniformTypeIdentifiers
 
 enum RouteLibrarySource {
     case database, mine
@@ -69,11 +70,19 @@ struct RouteLibraryListView: View {
     @State private var lengthFilter = 0
     @State private var loading = false
     @State private var errorMessage: String?
+    @State private var hasMore = false
+    @State private var catalogRequestID = UUID()
+    @State private var importingGPX = false
+
+    private var catalogKey: String {
+        [query, sort.rawValue, String(lengthFilter),
+         String(locationStore.location?.coordinate.latitude ?? 0),
+         String(locationStore.location?.coordinate.longitude ?? 0)].joined(separator: "|")
+    }
 
     private var entries: [RouteLibraryEntry] {
-        let values = source == .mine
-            ? session.savedRoutes.map(RouteLibraryEntry.init(route:))
-            : catalog
+        if source == .database { return catalog }
+        let values = session.savedRoutes.map(RouteLibraryEntry.init(route:))
         let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return values.filter { entry in
             let matchesSearch = search.isEmpty ||
@@ -149,13 +158,17 @@ struct RouteLibraryListView: View {
             if let errorMessage {
                 Section {
                     Text(errorMessage).font(.caption).foregroundStyle(.red)
-                    Button("Retry") { Task { await loadCatalog() } }
+                    if source == .database {
+                        Button("Retry") { Task { await loadCatalog() } }
+                    } else {
+                        Button("Import GPX again") { importingGPX = true }
+                    }
                 }
             }
             if loading {
                 ProgressView("Loading routes…")
             }
-            Section("\(entries.count) routes") {
+            Section("\(entries.count) routes\(hasMore ? " loaded" : "")") {
                 ForEach(entries) { entry in
                     NavigationLink {
                         if source == .mine,
@@ -185,6 +198,10 @@ struct RouteLibraryListView: View {
                         .padding(.vertical, 5)
                     }
                 }
+                if source == .database && hasMore {
+                    Button("Load more routes") { Task { await loadCatalog(reset: false) } }
+                        .disabled(loading)
+                }
                 if entries.isEmpty && !loading && errorMessage == nil {
                     ContentUnavailableView(
                         "No routes found", systemImage: "map",
@@ -201,13 +218,19 @@ struct RouteLibraryListView: View {
         .toolbar {
             if source == .mine {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink { RunRouteBuilderView() } label: {
-                        Label("Create route", systemImage: "plus")
+                    Menu {
+                        NavigationLink("Create route") { RunRouteBuilderView() }
+                        Button("Import GPX") { importingGPX = true }
+                    } label: {
+                        Label("Add route", systemImage: "plus")
                     }
                 }
             }
         }
-        .task { if source == .database { await loadCatalog() } }
+        .task(id: catalogKey) { if source == .database { await loadCatalog() } }
+        .fileImporter(isPresented: $importingGPX, allowedContentTypes: [UTType(filenameExtension: "gpx") ?? .xml, .xml]) { result in
+            Task { await importRoute(result) }
+        }
         .refreshable { if source == .database { await loadCatalog() } }
         .onChange(of: sort) { _, value in
             if value == .nearest { locationStore.refresh() }
@@ -216,37 +239,62 @@ struct RouteLibraryListView: View {
     }
 
     @MainActor
-    private func loadCatalog() async {
-        guard !loading else { return }
-        loading = true
-        errorMessage = nil
-        defer { loading = false }
+    private func importRoute(_ result: Result<URL, Error>) async {
         do {
-            var loaded: [RouteLibraryEntry] = []
-            var offset = 0
-            // Fetch only lightweight metadata, not every route's GPS polyline.
-            // Page through the catalogue so nearest sorting isn't limited to
-            // the small, newest-only discovery window used by the Home map.
-            while true {
-                try Task.checkCancellation()
-                let page: [RouteLibraryEntry] = try await SupabaseEnvironment.client
-                    .from("community_routes")
-                    .select("id,title,distance_kilometers,elevation_gain_meters,start_name,end_name,center_latitude,center_longitude,created_at")
-                    .eq("visibility", value: "public")
-                    .order("id", ascending: true)
-                    .range(from: offset, to: offset + 199)
-                    .execute().value
-                loaded.append(contentsOf: page)
-                if page.count < 200 { break }
-                offset += page.count
+            let url = try result.get()
+            let access = url.startAccessingSecurityScopedResource()
+            defer { if access { url.stopAccessingSecurityScopedResource() } }
+            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            guard size <= 10_000_000 else {
+                errorMessage = "Choose a GPX file smaller than 10 MB."
+                return
             }
-            try Task.checkCancellation()
-            var seen = Set<UUID>()
-            catalog = loaded.filter { seen.insert($0.id).inserted }
+            let ownerID = session.profile.userID
+            let route = try await Task.detached(priority: .userInitiated) {
+                let data = try Data(contentsOf: url)
+                return try await GPXRouteImporter(ownerID: ownerID).importGPX(data: data, filename: url.lastPathComponent)
+            }.value
+            guard session.signedIn, session.profile.userID == ownerID else { return }
+            session.addImportedRoute(route)
+            errorMessage = nil
         } catch {
-            if !Task.isCancelled { errorMessage = error.localizedDescription }
+            errorMessage = error.localizedDescription
         }
     }
+
+    @MainActor
+    private func loadCatalog(reset: Bool = true) async {
+        if !reset && loading { return }
+        let requestID = UUID()
+        catalogRequestID = requestID
+        loading = true
+        errorMessage = nil
+        if reset { catalog = []; hasMore = false }
+        let offset = catalog.count
+        defer { if catalogRequestID == requestID { loading = false } }
+        do {
+            if reset { try await Task.sleep(nanoseconds: 250_000_000) }
+            let params = RouteCatalogSearchParameters(
+                p_query: String(query.prefix(200)),
+                p_sort: sort == .nearest && locationStore.location == nil ? "Name A–Z" : sort.rawValue,
+                p_length: lengthFilter,
+                p_latitude: locationStore.location?.coordinate.latitude,
+                p_longitude: locationStore.location?.coordinate.longitude,
+                p_offset: offset
+            )
+            let page: [RouteLibraryEntry] = try await SupabaseEnvironment.client
+                .rpc("search_route_catalog", params: params).execute().value
+            try Task.checkCancellation()
+            guard catalogRequestID == requestID else { return }
+            catalog += page
+            hasMore = page.count == 50
+        } catch {
+            if !Task.isCancelled && catalogRequestID == requestID {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
 }
 
 private struct RouteLibraryDetailLoader: View {
@@ -286,4 +334,13 @@ private struct RouteLibraryDetailLoader: View {
             if !Task.isCancelled { errorMessage = error.localizedDescription }
         }
     }
+}
+
+private struct RouteCatalogSearchParameters: Encodable {
+    let p_query: String
+    let p_sort: String
+    let p_length: Int
+    let p_latitude: Double?
+    let p_longitude: Double?
+    let p_offset: Int
 }

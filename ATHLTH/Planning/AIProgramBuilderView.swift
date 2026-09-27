@@ -14,6 +14,20 @@ private enum AIProgramTimelineMode: String, CaseIterable, Identifiable {
     }
 }
 
+private struct CoachIntakePreferences: Codable, Equatable {
+    var experience: String
+    var trainingFocus: TrainingFocus
+    var gymAccess: String
+    var homeEquipment: Set<String>
+    var otherEquipment: String
+    var limitations: String
+    var currentSessionsPerWeek: Int
+    var useProfileInterests: Bool
+    var sessionsPerWeek: Int
+    var sessionDurationMinutes: Int
+    var availableDays: Set<Int>
+}
+
 struct AIProgramBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -53,6 +67,8 @@ struct AIProgramBuilderView: View {
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var didLoadDefaults = false
+    @State private var completingPlanID: UUID?
+    @State private var completingPlanVersion: Int?
 
     private let service = AIProgramService()
     private let dayNames = ["M", "T", "W", "T", "F", "S", "S"]
@@ -126,6 +142,7 @@ struct AIProgramBuilderView: View {
                     }
                     goalsSection
                     timelineSection
+                    .disabled(mode == .complete)
                     availabilitySection
 
                     Section("Preferences") {
@@ -191,6 +208,10 @@ struct AIProgramBuilderView: View {
             }
             .disabled(isGenerating)
             .onChange(of: coachContext) { _, _ in preview = nil }
+            .onChange(of: intakePreferences) { _, value in
+                guard didLoadDefaults, session.signedIn else { return }
+                AccountLocalStorage.write(value, name: "coach", userID: session.profile.userID)
+            }
             .navigationTitle(
                 showingQuestions ? "Meet your coach" : "ATHLTH Coach"
             )
@@ -219,6 +240,16 @@ struct AIProgramBuilderView: View {
                 Text(errorMessage ?? "")
             }
         }
+    }
+
+    private var intakePreferences: CoachIntakePreferences {
+        CoachIntakePreferences(
+            experience: experience, trainingFocus: trainingFocus, gymAccess: gymAccess,
+            homeEquipment: homeEquipment, otherEquipment: otherEquipment,
+            limitations: limitations, currentSessionsPerWeek: currentSessionsPerWeek,
+            useProfileInterests: useProfileInterests, sessionsPerWeek: sessionsPerWeek,
+            sessionDurationMinutes: sessionDurationMinutes, availableDays: availableDays
+        )
     }
 
     private var questionsAnswered: Bool {
@@ -641,7 +672,13 @@ struct AIProgramBuilderView: View {
             )
 
         case .complete:
-            session.fillEmptyDaysFromGeneratedProgram(generated)
+            guard session.fillEmptyDaysFromGeneratedProgram(
+                generated, expectedPlanID: completingPlanID,
+                expectedVersion: completingPlanVersion
+            ) else {
+                errorMessage = "The plan changed while this draft was being prepared. Close Coach and reopen the plan to generate a fresh draft."
+                return
+            }
 
             if let planID = session.activePlan?.id {
                 goalStore.setLinkedPlan(
@@ -659,6 +696,19 @@ struct AIProgramBuilderView: View {
         guard !didLoadDefaults else { return }
         didLoadDefaults = true
         trainingFocus = session.onboardingProfile?.trainingFocus ?? .generalFitness
+        if let saved = AccountLocalStorage.read(CoachIntakePreferences.self, name: "coach", userID: session.profile.userID) {
+            experience = saved.experience
+            trainingFocus = saved.trainingFocus
+            gymAccess = saved.gymAccess
+            homeEquipment = saved.homeEquipment
+            otherEquipment = saved.otherEquipment
+            limitations = saved.limitations
+            currentSessionsPerWeek = saved.currentSessionsPerWeek
+            useProfileInterests = saved.useProfileInterests
+            availableDays = saved.availableDays
+            sessionsPerWeek = min(max(saved.sessionsPerWeek, 1), max(availableDays.count, 1))
+            sessionDurationMinutes = min(max(saved.sessionDurationMinutes, 20), 180)
+        }
 
         if mode == .generate {
             startDate = session.suggestedTrainingPlanStartDate
@@ -671,6 +721,8 @@ struct AIProgramBuilderView: View {
 
         if mode == .complete,
            let plan = session.activePlan {
+            completingPlanID = plan.id
+            completingPlanVersion = plan.version
             weekCount = max(plan.weeks.count, 1)
             startDate = plan.startDate
                 ?? Calendar.current.startOfDay(for: Date())

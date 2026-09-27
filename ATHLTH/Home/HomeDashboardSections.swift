@@ -295,9 +295,7 @@ struct HomeGettingStartedCard: View {
                         tint: ATHLTHTheme.accentDeep,
                         complete: hasPlan,
                         destination: AnyView(
-                            AdvancedPlannerView(
-                                onOpenPrograms: {}
-                            )
+                            AdvancedPlannerView()
                         )
                     ) {
                         dismissPlanTip()

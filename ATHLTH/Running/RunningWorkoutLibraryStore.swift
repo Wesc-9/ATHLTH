@@ -4,8 +4,43 @@ import Foundation
 final class RunningWorkoutLibraryStore: ObservableObject {
     @Published private(set) var customTemplates: [RunningWorkoutTemplate] = []
 
-    init() {
-        customTemplates = Self.loadCustomTemplates()
+    @Published private(set) var hasUnassignedLegacyWorkouts = false
+    private var accountID: UUID?
+
+    init() {}
+
+    func switchAccount(_ userID: UUID?) {
+        guard accountID != userID else { return }
+        accountID = userID
+        customTemplates = []
+        hasUnassignedLegacyWorkouts = false
+        guard let userID else { return }
+        if let stored = AccountLocalStorage.read([RunningWorkoutTemplate].self, name: "runningLibrary", userID: userID) {
+            customTemplates = stored
+            if UserDefaults.standard.string(forKey: "legacy.runningOwner") == nil,
+               UserDefaults.standard.string(forKey: "legacy.trainingOwner") == nil {
+                hasUnassignedLegacyWorkouts = !Self.loadCustomTemplates().isEmpty
+            }
+        } else {
+            let legacyOwner = UserDefaults.standard.string(forKey: "legacy.runningOwner")
+                ?? UserDefaults.standard.string(forKey: "legacy.trainingOwner")
+            if legacyOwner == userID.uuidString {
+                customTemplates = Self.loadCustomTemplates()
+                UserDefaults.standard.set(userID.uuidString, forKey: "legacy.runningOwner")
+                persist()
+            } else if legacyOwner == nil {
+                hasUnassignedLegacyWorkouts = !Self.loadCustomTemplates().isEmpty
+            }
+        }
+    }
+
+    func restoreUnassignedDeviceWorkouts() {
+        guard let accountID, hasUnassignedLegacyWorkouts else { return }
+        let existing = Set(customTemplates.map(\.id))
+        customTemplates += Self.loadCustomTemplates().filter { !existing.contains($0.id) }
+        UserDefaults.standard.set(accountID.uuidString, forKey: "legacy.runningOwner")
+        hasUnassignedLegacyWorkouts = false
+        persist()
     }
 
     var allTemplates: [RunningWorkoutTemplate] {
@@ -15,6 +50,7 @@ final class RunningWorkoutLibraryStore: ObservableObject {
     }
 
     func save(_ template: RunningWorkoutTemplate) {
+        guard accountID != nil else { return }
         var copy = template
         copy.updatedAt = Date()
         copy.isBuiltIn = false
@@ -87,18 +123,8 @@ final class RunningWorkoutLibraryStore: ObservableObject {
     }
 
     private func persist() {
-        guard let url = Self.storageURL else { return }
-
-        do {
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let data = try JSONEncoder().encode(customTemplates)
-            try data.write(to: url, options: .atomic)
-        } catch {
-            return
-        }
+        guard let accountID else { return }
+        AccountLocalStorage.write(customTemplates, name: "runningLibrary", userID: accountID)
     }
 
     private static func loadCustomTemplates() -> [RunningWorkoutTemplate] {

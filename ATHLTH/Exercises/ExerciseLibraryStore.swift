@@ -12,9 +12,18 @@ final class ExerciseLibraryStore: ObservableObject {
     private let datasetURL = URL(string: "https://exercise-dataset.com/exercises.json")!
     private let imageBaseURL = URL(string: "https://exercise-dataset.com/")!
 
+    private var accountID: UUID?
+
     init() {
-        loadCustomExercises()
         loadCachedRepDB()
+    }
+
+    func switchAccount(_ userID: UUID?) {
+        guard accountID != userID else { return }
+        accountID = userID
+        customExercises = []
+        guard userID != nil else { return }
+        loadCustomExercises()
     }
 
     var allExercises: [ExerciseLibraryEntry] {
@@ -179,7 +188,7 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     func updateCustomExercise(_ exercise: Exercise) {
-        guard exercise.origin == .custom else { return }
+        guard exercise.origin == .custom, exercise.ownerID == accountID else { return }
 
         let entry = ExerciseLibraryEntry(
             id: exercise.id,
@@ -311,14 +320,18 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     private func loadCustomExercises() {
-        guard let url = Self.customExercisesURL,
-              let data = try? Data(contentsOf: url),
-              let decoded = try? JSONDecoder().decode(
-                  [Exercise].self,
-                  from: data
-              )
-        else {
-            return
+        guard let accountID else { return }
+        let decoded: [Exercise]
+        if let stored = AccountLocalStorage.read([Exercise].self, name: "exerciseLibrary", userID: accountID) {
+            decoded = stored
+        } else if let url = Self.customExercisesURL,
+                  let data = try? Data(contentsOf: url),
+                  let legacy = try? JSONDecoder().decode([Exercise].self, from: data) {
+            // The legacy file contains owner IDs. Only migrate this account's records.
+            decoded = legacy.filter { $0.ownerID == accountID }
+            AccountLocalStorage.write(decoded, name: "exerciseLibrary", userID: accountID)
+        } else {
+            decoded = []
         }
 
         customExercises = decoded.map { exercise in
@@ -339,19 +352,8 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     private func persistCustomExercises() {
-        guard let url = Self.customExercisesURL else { return }
-
-        do {
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let exercises = customExercises.map(\.exercise)
-            let data = try JSONEncoder().encode(exercises)
-            try data.write(to: url, options: .atomic)
-        } catch {
-            return
-        }
+        guard let accountID else { return }
+        AccountLocalStorage.write(customExercises.map(\.exercise), name: "exerciseLibrary", userID: accountID)
     }
 
     private static var storageDirectory: URL? {

@@ -75,7 +75,20 @@ targets:
         Release:
           APS_ENVIRONMENT: production
     scheme:
-      testTargets: []
+      testTargets:
+        - ATHLTHTests
+
+  ATHLTHTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: ATHLTH
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.tests
 
   ATHLTHWatchApp:
     type: application

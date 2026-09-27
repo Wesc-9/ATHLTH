@@ -9,6 +9,17 @@ enum TrainingPlanTimingStatus: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+
+private struct AccountTrainingContent: Codable {
+    var activePlan: TrainingPlan?
+    var scheduledPlans: [TrainingPlan]
+    var planTemplates: [TrainingPlan]
+    var savedWorkoutTemplates: [PlannedSession]
+    var manuallyCompletedPlanSessions: Set<String>
+    var savedRoutes: [TrainingRoute]
+    var onboardingProfile: OnboardingProfileData?
+}
+
 @MainActor
 final class AppSessionStore: ObservableObject {
     @Published var profile: UserProfile
@@ -37,6 +48,8 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var subscriptionAccess: SubscriptionAccess
 
     private let defaults: UserDefaults
+    private var localAccountID: UUID?
+    private var loadingAccountContent = false
     private var backendSubscriptionAccess: SubscriptionAccess
     private var storeEntitlement: StoreSubscriptionEntitlement?
 
@@ -50,15 +63,12 @@ final class AppSessionStore: ObservableObject {
         let resolvedProfile = profile ?? Self.makeSignedOutProfile()
 
         self.profile = resolvedProfile
-        self.activePlan = activePlan ?? Self.loadActivePlan(from: defaults)
-        self.scheduledPlans = Self.loadScheduledPlans(from: defaults)
-        self.planTemplates = Self.loadPlanTemplates(from: defaults)
-        self.savedWorkoutTemplates = Self.loadSavedWorkoutTemplates(from: defaults)
-        self.manuallyCompletedPlanSessions =
-            Self.loadManuallyCompletedPlanSessions(from: defaults)
-        self.savedRoutes = savedRoutes.isEmpty
-            ? Self.loadSavedRoutes(from: defaults)
-            : savedRoutes
+        self.activePlan = activePlan
+        self.scheduledPlans = []
+        self.planTemplates = []
+        self.savedWorkoutTemplates = []
+        self.manuallyCompletedPlanSessions = []
+        self.savedRoutes = savedRoutes
         self.previewModeEnabled = previewModeEnabled
         self.defaults = defaults
         self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? resolvedProfile.displayName
@@ -101,14 +111,22 @@ final class AppSessionStore: ObservableObject {
         self.onboardingCompleted = defaults.bool(forKey: "session.onboardingCompleted")
         self.signInMethod = defaults.string(forKey: "session.signInMethod").flatMap(SignInMethod.init(rawValue:))
 
-        if let data = defaults.data(forKey: "session.onboardingProfile") {
-            self.onboardingProfile = try? JSONDecoder().decode(OnboardingProfileData.self, from: data)
-        } else {
-            self.onboardingProfile = nil
+        self.onboardingProfile = nil
+        // Legacy data stays untouched until its owner is authenticated.
+        if defaults.data(forKey: "legacy.onboardingProfile") == nil,
+           let legacy = defaults.data(forKey: "session.onboardingProfile") {
+            defaults.set(legacy, forKey: "legacy.onboardingProfile")
+        }
+        if defaults.string(forKey: "legacy.trainingOwner") == nil {
+            var owners = Set(Self.loadScheduledPlans(from: defaults).map(\.ownerID))
+            owners.formUnion(Self.loadPlanTemplates(from: defaults).map(\.ownerID))
+            owners.formUnion(Self.loadSavedRoutes(from: defaults).map(\.ownerID))
+            if let plan = Self.loadActivePlan(from: defaults) { owners.insert(plan.ownerID) }
+            if owners.count == 1, let owner = owners.first {
+                defaults.set(owner.uuidString, forKey: "legacy.trainingOwner")
+            }
         }
 
-        migrateLegacyTrainingPlanIfNeeded()
-        refreshActivePlanForToday()
     }
 
     private static func makeSignedOutProfile() -> UserProfile {
@@ -144,6 +162,7 @@ final class AppSessionStore: ObservableObject {
         _ bootstrap: BackendUserBootstrap,
         method: SignInMethod? = nil
     ) {
+        activateLocalAccount(bootstrap.profile.id)
         signedIn = true
         defaults.set(true, forKey: "session.signedIn")
 
@@ -307,9 +326,7 @@ final class AppSessionStore: ObservableObject {
     func saveOnboardingProfile(_ data: OnboardingProfileData) {
         onboardingProfile = data
 
-        if let encoded = try? JSONEncoder().encode(data) {
-            defaults.set(encoded, forKey: "session.onboardingProfile")
-        }
+        persistAccountContent()
     }
 
     func setPersonalizedOfferConsent(_ consent: PersonalizedOfferConsent) {
@@ -403,29 +420,35 @@ final class AppSessionStore: ObservableObject {
     }
 
     func clearAfterAccountDeletion() {
+        let deletedID = localAccountID
         clearAfterSignOut()
+        if let deletedID {
+            defaults.removeObject(forKey: AccountLocalStorage.key("training", userID: deletedID))
+            defaults.removeObject(forKey: AccountLocalStorage.key("coach", userID: deletedID))
+            AccountLocalStorage.write([RunningWorkoutTemplate](), name: "runningLibrary", userID: deletedID, defaults: defaults)
+            AccountLocalStorage.write([Exercise](), name: "exerciseLibrary", userID: deletedID, defaults: defaults)
+            defaults.set(true, forKey: AccountLocalStorage.key("legacyMigrated", userID: deletedID))
+        }
     }
 
     func clearAfterSignOut() {
         resetAuthenticationState()
         profile = Self.makeSignedOutProfile()
+        previewModeEnabled = false
+        usernameSeed = profile.displayName
+    }
+
+    func resetAuthenticationState() {
+        persistAccountContent()
+        localAccountID = nil
+        loadingAccountContent = true
         activePlan = nil
         scheduledPlans = []
         savedRoutes = []
         planTemplates = []
         savedWorkoutTemplates = []
         manuallyCompletedPlanSessions = []
-        previewModeEnabled = false
-        usernameSeed = profile.displayName
-        defaults.removeObject(forKey: "session.activeTrainingPlan")
-        defaults.removeObject(forKey: "session.scheduledTrainingPlans")
-        defaults.removeObject(forKey: "session.savedRoutes")
-        defaults.removeObject(forKey: "session.trainingPlanTemplates")
-        defaults.removeObject(forKey: "session.savedWorkoutTemplates")
-        defaults.removeObject(forKey: "session.manuallyCompletedPlanSessions")
-    }
-
-    func resetAuthenticationState() {
+        loadingAccountContent = false
         signedIn = false
         onboardingCompleted = false
         signInMethod = nil
@@ -1543,47 +1566,36 @@ final class AppSessionStore: ObservableObject {
         persistScheduledPlans()
     }
 
+    @discardableResult
     func fillEmptyDaysFromGeneratedProgram(
-        _ generated: TrainingPlan
-    ) {
-        guard var current = activePlan else {
-            activePlan = generated
-            return
-        }
+        _ generated: TrainingPlan,
+        expectedPlanID: UUID? = nil,
+        expectedVersion: Int? = nil
+    ) -> Bool {
+        guard var current = activePlan,
+              expectedPlanID == nil || current.id == expectedPlanID,
+              expectedVersion == nil || current.version == expectedVersion
+        else { return false }
 
-        let targetWeekCount = max(generated.weeks.count, 1)
-
-        if current.weeks.count < targetWeekCount {
-            for number in (current.weeks.count + 1)...targetWeekCount {
-                current.weeks.append(makeEmptyWeek(number: number))
-            }
-        } else if current.weeks.count > targetWeekCount {
-            current.weeks = Array(current.weeks.prefix(targetWeekCount))
-        }
-
+        // Complete is strictly additive inside the original plan window.
+        // Match explicit week/day numbers; never truncate, extend or shift it.
         for weekIndex in current.weeks.indices {
-            guard generated.weeks.indices.contains(weekIndex) else {
-                continue
-            }
-
-            let generatedWeek = generated.weeks[weekIndex]
-
+            guard let generatedWeek = generated.weeks.first(where: {
+                $0.weekNumber == current.weeks[weekIndex].weekNumber
+            }) else { continue }
             for dayIndex in current.weeks[weekIndex].days.indices {
-                guard generatedWeek.days.indices.contains(dayIndex) else {
-                    continue
-                }
-
-                if current.weeks[weekIndex].days[dayIndex].sessions.isEmpty {
-                    current.weeks[weekIndex].days[dayIndex].sessions =
-                        generatedWeek.days[dayIndex].sessions
-                }
+                guard current.weeks[weekIndex].days[dayIndex].sessions.isEmpty,
+                      let generatedDay = generatedWeek.days.first(where: {
+                          $0.dayIndex == current.weeks[weekIndex].days[dayIndex].dayIndex
+                      })
+                else { continue }
+                current.weeks[weekIndex].days[dayIndex].sessions = generatedDay.sessions
             }
         }
-
-        current.startDate = generated.startDate ?? current.startDate
         current.updatedAt = Date()
         current.version += 1
         activePlan = current
+        return true
     }
 
     func setActivePlanWeekCount(_ weekCount: Int) {
@@ -1999,31 +2011,54 @@ final class AppSessionStore: ObservableObject {
         savedRoutes.insert(copy, at: 0)
     }
 
-    private func persistActivePlan() {
-        guard let activePlan,
-              let data = try? JSONEncoder().encode(activePlan)
-        else {
-            defaults.removeObject(forKey: "session.activeTrainingPlan")
-            return
-        }
+    private func persistAccountContent() {
+        guard !loadingAccountContent, let userID = localAccountID else { return }
+        let content = AccountTrainingContent(
+            activePlan: activePlan, scheduledPlans: scheduledPlans,
+            planTemplates: planTemplates, savedWorkoutTemplates: savedWorkoutTemplates,
+            manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
+            savedRoutes: savedRoutes, onboardingProfile: onboardingProfile
+        )
+        AccountLocalStorage.write(content, name: "training", userID: userID, defaults: defaults)
+    }
 
-        defaults.set(data, forKey: "session.activeTrainingPlan")
+    private func activateLocalAccount(_ userID: UUID) {
+        guard localAccountID != userID else { return }
+        persistAccountContent()
+        loadingAccountContent = true
+        localAccountID = userID
+        let stored = AccountLocalStorage.read(AccountTrainingContent.self, name: "training", userID: userID, defaults: defaults)
+        let mayMigrate = !defaults.bool(forKey: AccountLocalStorage.key("legacyMigrated", userID: userID))
+        let ownsUnlabelledLegacy = defaults.string(forKey: "legacy.trainingOwner") == userID.uuidString
+        let legacyPlan = mayMigrate ? Self.loadActivePlan(from: defaults) : nil
+        activePlan = stored?.activePlan ?? (legacyPlan?.ownerID == userID ? legacyPlan : nil)
+        scheduledPlans = stored?.scheduledPlans ?? (mayMigrate ? Self.loadScheduledPlans(from: defaults).filter { $0.ownerID == userID } : [])
+        planTemplates = stored?.planTemplates ?? (mayMigrate ? Self.loadPlanTemplates(from: defaults).filter { $0.ownerID == userID } : [])
+        savedRoutes = stored?.savedRoutes ?? (mayMigrate ? Self.loadSavedRoutes(from: defaults).filter { $0.ownerID == userID } : [])
+        savedWorkoutTemplates = stored?.savedWorkoutTemplates ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadSavedWorkoutTemplates(from: defaults) : [])
+        manuallyCompletedPlanSessions = stored?.manuallyCompletedPlanSessions ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadManuallyCompletedPlanSessions(from: defaults) : [])
+        onboardingProfile = stored?.onboardingProfile
+        if stored == nil && mayMigrate && ownsUnlabelledLegacy,
+           let data = defaults.data(forKey: "legacy.onboardingProfile") {
+            onboardingProfile = try? JSONDecoder().decode(OnboardingProfileData.self, from: data)
+        }
+        defaults.set(true, forKey: AccountLocalStorage.key("legacyMigrated", userID: userID))
+        loadingAccountContent = false
+        migrateLegacyTrainingPlanIfNeeded()
+        refreshActivePlanForToday()
+        persistAccountContent()
+    }
+
+    private func persistActivePlan() {
+        persistAccountContent()
     }
 
     private func persistScheduledPlans() {
-        guard let data = try? JSONEncoder().encode(scheduledPlans) else {
-            return
-        }
-
-        defaults.set(data, forKey: "session.scheduledTrainingPlans")
+        persistAccountContent()
     }
 
     private func persistSavedRoutes() {
-        guard let data = try? JSONEncoder().encode(savedRoutes) else {
-            return
-        }
-
-        defaults.set(data, forKey: "session.savedRoutes")
+        persistAccountContent()
     }
 
     private static func loadSavedRoutes(from defaults: UserDefaults) -> [TrainingRoute] {
@@ -2037,24 +2072,11 @@ final class AppSessionStore: ObservableObject {
     }
 
     private func persistPlanTemplates() {
-        guard let data = try? JSONEncoder().encode(planTemplates) else {
-            return
-        }
-
-        defaults.set(data, forKey: "session.trainingPlanTemplates")
+        persistAccountContent()
     }
 
     private func persistManuallyCompletedPlanSessions() {
-        let values = Array(manuallyCompletedPlanSessions).sorted()
-
-        guard let data = try? JSONEncoder().encode(values) else {
-            return
-        }
-
-        defaults.set(
-            data,
-            forKey: "session.manuallyCompletedPlanSessions"
-        )
+        persistAccountContent()
     }
 
     private static func loadManuallyCompletedPlanSessions(
@@ -2079,11 +2101,7 @@ final class AppSessionStore: ObservableObject {
     }
 
     private func persistSavedWorkoutTemplates() {
-        guard let data = try? JSONEncoder().encode(savedWorkoutTemplates) else {
-            return
-        }
-
-        defaults.set(data, forKey: "session.savedWorkoutTemplates")
+        persistAccountContent()
     }
 
     private static func loadSavedWorkoutTemplates(

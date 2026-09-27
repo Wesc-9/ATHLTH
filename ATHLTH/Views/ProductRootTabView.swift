@@ -4035,51 +4035,6 @@ struct ATHLTHTrainView: View {
         )
     }
 
-    private func routeRegion(
-        _ route: TrainingRoute
-    ) -> MKCoordinateRegion? {
-        let coordinates = route.coordinates.map(\.coordinate)
-        guard let first = coordinates.first else {
-            return nil
-        }
-
-        let latitudes = coordinates.map(\.latitude)
-        let longitudes = coordinates.map(\.longitude)
-
-        guard let minLatitude = latitudes.min(),
-              let maxLatitude = latitudes.max(),
-              let minLongitude = longitudes.min(),
-              let maxLongitude = longitudes.max()
-        else {
-            return MKCoordinateRegion(
-                center: first,
-                span: MKCoordinateSpan(
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01
-                )
-            )
-        }
-
-        let latitudeDelta = max(
-            (maxLatitude - minLatitude) * 1.30,
-            0.01
-        )
-        let longitudeDelta = max(
-            (maxLongitude - minLongitude) * 1.30,
-            0.01
-        )
-
-        return MKCoordinateRegion(
-            center: CLLocationCoordinate2D(
-                latitude: (minLatitude + maxLatitude) / 2,
-                longitude: (minLongitude + maxLongitude) / 2
-            ),
-            span: MKCoordinateSpan(
-                latitudeDelta: latitudeDelta,
-                longitudeDelta: longitudeDelta
-            )
-        )
-    }
 
 
 }

@@ -5,7 +5,6 @@ struct AdvancedPlannerView: View {
 
     let planID: UUID?
     let showsEmptyState: Bool
-    let onOpenPrograms: () -> Void
 
     @State private var selectedWeekID: UUID?
     @State private var selectedDayID: UUID?
@@ -18,12 +17,10 @@ struct AdvancedPlannerView: View {
 
     init(
         planID: UUID? = nil,
-        showsEmptyState: Bool = true,
-        onOpenPrograms: @escaping () -> Void = {}
+        showsEmptyState: Bool = true
     ) {
         self.planID = planID
         self.showsEmptyState = showsEmptyState
-        self.onOpenPrograms = onOpenPrograms
     }
 
     private var displayedPlan: TrainingPlan? {

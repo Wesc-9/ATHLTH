@@ -92,6 +92,8 @@ private struct ATHLTHLaunchGateView: View {
 
 struct AppRootView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -647,6 +649,10 @@ struct AppRootView: View {
             Task {
                 await syncSocialOwnedData()
             }
+        }
+        .onChange(of: appSession.signedIn ? appSession.profile.userID : nil, initial: true) { _, userID in
+            exerciseLibrary.switchAccount(userID)
+            runningWorkoutLibrary.switchAccount(userID)
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
             guard signedIn else { return }

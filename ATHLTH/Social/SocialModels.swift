@@ -867,3 +867,26 @@ struct SocialFollowInsert: Encodable {
         case followingID = "following_id"
     }
 }
+
+// Keep the controls displayed in Privacy & Visibility aligned with the
+// audience fields enforced by the server. Never widen a friends-only section.
+extension SocialPrivacySettings {
+    mutating func normalizeSectionVisibility() {
+        let audience = profileVisibility
+        func scope(_ enabled: Bool, _ current: String) -> String {
+            PrivacyVisibilityRules.scope(enabled: enabled, current: current, profile: audience)
+        }
+        trainingPresenceVisibility = scope(shareTrainingPresence, trainingPresenceVisibility)
+        performanceStatsVisibility = scope(sharePerformanceStats || shareWorkoutTotals, performanceStatsVisibility)
+        trophyCabinetVisibility = scope(shareTrophyCabinet, trophyCabinetVisibility)
+        recentActivityVisibility = scope(shareRecentActivity, recentActivityVisibility)
+        goalsVisibility = scope(shareGoals, goalsVisibility)
+        runningPRsVisibility = scope(shareRunningPRs, runningPRsVisibility)
+        strengthPRsVisibility = scope(shareStrengthPRs, strengthPRsVisibility)
+        // Training focus has its own audience picker, not a sharing toggle.
+        if profileVisibility == "private" { trainingFocusVisibility = "private" }
+        else if profileVisibility == "friends" && trainingFocusVisibility == "public" {
+            trainingFocusVisibility = "friends"
+        }
+    }
+}

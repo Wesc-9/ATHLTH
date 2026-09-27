@@ -25,6 +25,7 @@ struct RunningWorkoutLibraryView: View {
     @State private var query = ""
     @State private var selectedType: RunningWorkoutType?
     @State private var showingBuilder = false
+    @State private var confirmingLegacyRestore = false
     @State private var selectedSection: RunningWorkoutLibrarySection = .library
 
     init(
@@ -108,6 +109,13 @@ struct RunningWorkoutLibraryView: View {
                 .padding(.vertical, 10)
             }
 
+            if selectedSection == .mine && library.hasUnassignedLegacyWorkouts {
+                Button("Restore older workouts from this device") {
+                    confirmingLegacyRestore = true
+                }
+                .padding()
+            }
+
             if templates.isEmpty && selectedSection == .mine && selectedType == nil {
                 ContentUnavailableView {
                     Label("No custom workouts yet", systemImage: "figure.run")
@@ -148,6 +156,13 @@ struct RunningWorkoutLibraryView: View {
                     .padding()
                 }
             }
+        }
+        .confirmationDialog("Restore workouts to this account?", isPresented: $confirmingLegacyRestore, titleVisibility: .visible) {
+            Button("These are my workouts — restore") {
+                library.restoreUnassignedDeviceWorkouts()
+            }
+        } message: {
+            Text("Older workouts on this device have no account identifier. Only restore them if they belong to you.")
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(selectionTitle ?? "Running Workouts")

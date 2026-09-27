@@ -35,6 +35,7 @@ final class GPXRouteImporter: NSObject, RouteImporting, XMLParserDelegate {
 
         let parser = XMLParser(data: data)
         parser.delegate = self
+        parser.shouldResolveExternalEntities = false
 
         guard parser.parse() else {
             throw parseError ?? parser.parserError ?? GPXImportError.invalidDocument
@@ -85,7 +86,9 @@ final class GPXRouteImporter: NSObject, RouteImporting, XMLParserDelegate {
                 let latText = attributeDict["lat"],
                 let lonText = attributeDict["lon"],
                 let latitude = Double(latText),
-                let longitude = Double(lonText)
+                let longitude = Double(lonText),
+                latitude.isFinite, longitude.isFinite,
+                (-90...90).contains(latitude), (-180...180).contains(longitude)
             else {
                 return
             }
