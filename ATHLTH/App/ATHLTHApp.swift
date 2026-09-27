@@ -386,18 +386,6 @@ struct AppRootView: View {
             }
         }
         )
-        .onChange(of: health.recovery) { _, _ in
-        }
-        .onChange(of: appSession.activePlan) { _, _ in
-        }
-        .onChange(of: goals.goals) { _, _ in
-        }
-        .onChange(of: workoutMirroring.snapshot) { _, snapshot in
-            ATHLTHSurfaceCoordinator.syncLiveActivity(
-                with: snapshot
-            )
-            ghostRace.update(with: snapshot)
-        }
         .onChange(of: settings.trainingDeviceProvider) { _, provider in
             if provider == .appleWatch {
                 watchConnection.connect()
