@@ -18,6 +18,8 @@ struct AccountTrainingContent: Codable {
     var manuallyCompletedPlanSessions: Set<String>
     var savedRoutes: [TrainingRoute]
     var onboardingProfile: OnboardingProfileData?
+    var pendingCoachPlanProposal: CoachPlanChangeProposal? = nil
+    var coachPlanAdaptationHistory: [CoachPlanAdaptationRecord]? = nil
 }
 
 @MainActor
@@ -32,6 +34,8 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var planTemplates: [TrainingPlan]
     @Published private(set) var savedWorkoutTemplates: [PlannedSession]
     @Published private(set) var manuallyCompletedPlanSessions: Set<String>
+    @Published private(set) var pendingCoachPlanProposal: CoachPlanChangeProposal?
+    @Published private(set) var coachPlanAdaptationHistory: [CoachPlanAdaptationRecord]
     @Published var savedRoutes: [TrainingRoute] {
         didSet {
             persistSavedRoutes()
@@ -68,6 +72,8 @@ final class AppSessionStore: ObservableObject {
         self.planTemplates = []
         self.savedWorkoutTemplates = []
         self.manuallyCompletedPlanSessions = []
+        self.pendingCoachPlanProposal = nil
+        self.coachPlanAdaptationHistory = []
         self.savedRoutes = savedRoutes
 
         // Internal simulator-only compatibility mode. Production launches do
@@ -465,6 +471,8 @@ final class AppSessionStore: ObservableObject {
         planTemplates = []
         savedWorkoutTemplates = []
         manuallyCompletedPlanSessions = []
+        pendingCoachPlanProposal = nil
+        coachPlanAdaptationHistory = []
         loadingAccountContent = false
         signedIn = false
         onboardingCompleted = false
@@ -1615,6 +1623,283 @@ final class AppSessionStore: ObservableObject {
         return true
     }
 
+    @discardableResult
+    func stageCoachPlanProposal(
+        _ proposal: CoachPlanChangeProposal
+    ) -> Bool {
+        guard let plan = trainingPlan(withID: proposal.planID),
+              proposal.status == .proposed,
+              proposal.isStillValid(for: plan)
+        else {
+            return false
+        }
+
+        pendingCoachPlanProposal = proposal
+        persistAccountContent()
+        return true
+    }
+
+    func dismissCoachPlanProposal() {
+        pendingCoachPlanProposal = nil
+        persistAccountContent()
+    }
+
+    @discardableResult
+    func applyCoachPlanProposal(
+        _ proposal: CoachPlanChangeProposal
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: proposal.planID),
+              proposal.status == .proposed,
+              proposal.isStillValid(for: plan)
+        else {
+            return false
+        }
+
+        let before = plan
+        var didChange = false
+
+        func dayLocation(for date: Date) -> (week: Int, day: Int)? {
+            guard let startDate = plan.startDate else { return nil }
+            let calendar = Calendar.current
+            let start = calendar.startOfDay(for: startDate)
+            let target = calendar.startOfDay(for: date)
+            guard let offset = calendar.dateComponents(
+                [.day],
+                from: start,
+                to: target
+            ).day,
+            offset >= 0,
+            offset < plan.weeks.count * 7
+            else {
+                return nil
+            }
+
+            let weekNumber = (offset / 7) + 1
+            let dayIndex = (offset % 7) + 1
+            guard let weekIndex = plan.weeks.firstIndex(
+                where: { $0.weekNumber == weekNumber }
+            ),
+            let resolvedDayIndex = plan.weeks[weekIndex].days.firstIndex(
+                where: { $0.dayIndex == dayIndex }
+            )
+            else {
+                return nil
+            }
+
+            return (weekIndex, resolvedDayIndex)
+        }
+
+        func sessionLocation(
+            _ sessionID: UUID
+        ) -> (week: Int, day: Int, session: Int)? {
+            for weekIndex in plan.weeks.indices {
+                for dayIndex in plan.weeks[weekIndex].days.indices {
+                    if let sessionIndex = plan.weeks[weekIndex]
+                        .days[dayIndex]
+                        .sessions
+                        .firstIndex(where: { $0.id == sessionID }) {
+                        return (weekIndex, dayIndex, sessionIndex)
+                    }
+                }
+            }
+            return nil
+        }
+
+        for change in proposal.changes {
+            switch change.kind {
+            case .moveWorkout:
+                guard let sessionID = change.sessionID,
+                      let targetDate = change.targetDate,
+                      let source = sessionLocation(sessionID),
+                      let target = dayLocation(for: targetDate)
+                else { continue }
+
+                var session = plan.weeks[source.week]
+                    .days[source.day]
+                    .sessions.remove(at: source.session)
+
+                if let scheduledStart = session.scheduledStart {
+                    let calendar = Calendar.current
+                    let components = calendar.dateComponents(
+                        [.hour, .minute, .second],
+                        from: scheduledStart
+                    )
+                    session.scheduledStart = calendar.date(
+                        bySettingHour: components.hour ?? 8,
+                        minute: components.minute ?? 0,
+                        second: components.second ?? 0,
+                        of: targetDate
+                    )
+                }
+
+                plan.weeks[target.week]
+                    .days[target.day]
+                    .sessions.append(session)
+                didChange = true
+
+            case .replaceWorkout:
+                guard let sessionID = change.sessionID,
+                      let location = sessionLocation(sessionID)
+                else { continue }
+
+                if let replacementTitle = change.replacementTitle?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !replacementTitle.isEmpty {
+                    plan.weeks[location.week]
+                        .days[location.day]
+                        .sessions[location.session]
+                        .title = replacementTitle
+                }
+                if let duration = change.durationMinutes {
+                    plan.weeks[location.week]
+                        .days[location.day]
+                        .sessions[location.session]
+                        .durationMinutes = min(max(duration, 10), 240)
+                }
+                if let note = change.intensityNote?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !note.isEmpty {
+                    plan.weeks[location.week]
+                        .days[location.day]
+                        .sessions[location.session]
+                        .notes = note
+                }
+                didChange = true
+
+            case .adjustDuration:
+                guard let sessionID = change.sessionID,
+                      let duration = change.durationMinutes,
+                      let location = sessionLocation(sessionID)
+                else { continue }
+
+                plan.weeks[location.week]
+                    .days[location.day]
+                    .sessions[location.session]
+                    .durationMinutes = min(max(duration, 10), 240)
+                didChange = true
+
+            case .adjustIntensity:
+                guard let sessionID = change.sessionID,
+                      let note = change.intensityNote?
+                        .trimmingCharacters(in: .whitespacesAndNewlines),
+                      !note.isEmpty,
+                      let location = sessionLocation(sessionID)
+                else { continue }
+
+                let existing = plan.weeks[location.week]
+                    .days[location.day]
+                    .sessions[location.session]
+                    .notes?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                plan.weeks[location.week]
+                    .days[location.day]
+                    .sessions[location.session]
+                    .notes = [existing, "Coach: \(note)"]
+                    .compactMap { $0 }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: "\n\n")
+                didChange = true
+
+            case .addRecovery:
+                guard let targetDate = change.targetDate,
+                      let target = dayLocation(for: targetDate)
+                else { continue }
+
+                let session = PlannedSession(
+                    id: UUID(),
+                    title: {
+                        let value = change.replacementTitle?
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        return (value?.isEmpty == false) ? value! : "Recovery"
+                    }(),
+                    kind: .recovery,
+                    scheduledStart: nil,
+                    durationMinutes: min(
+                        max(change.durationMinutes ?? 25, 10),
+                        90
+                    ),
+                    targetDistanceKilometers: nil,
+                    targetPaceSecondsPerKilometer: nil,
+                    routeID: nil,
+                    exercises: [],
+                    notes: change.intensityNote ?? change.reason
+                )
+                plan.weeks[target.week]
+                    .days[target.day]
+                    .sessions.append(session)
+                didChange = true
+
+            case .removeWorkout:
+                guard let sessionID = change.sessionID,
+                      let location = sessionLocation(sessionID)
+                else { continue }
+
+                plan.weeks[location.week]
+                    .days[location.day]
+                    .sessions.remove(at: location.session)
+                didChange = true
+            }
+        }
+
+        guard didChange else {
+            return false
+        }
+
+        plan.updatedAt = Date()
+        plan.version += 1
+
+        var acceptedProposal = proposal
+        acceptedProposal.status = .accepted
+        let record = CoachPlanAdaptationRecord(
+            proposal: acceptedProposal,
+            planBefore: before,
+            planAfter: plan
+        )
+
+        replaceTrainingPlan(plan)
+        pendingCoachPlanProposal = nil
+        coachPlanAdaptationHistory.insert(record, at: 0)
+        coachPlanAdaptationHistory = Array(
+            coachPlanAdaptationHistory.prefix(12)
+        )
+        persistAccountContent()
+        return true
+    }
+
+    @discardableResult
+    func revertCoachPlanAdaptation(
+        _ recordID: UUID
+    ) -> Bool {
+        guard let index = coachPlanAdaptationHistory.firstIndex(
+            where: { $0.id == recordID }
+        ),
+        coachPlanAdaptationHistory[index].revertedAt == nil
+        else {
+            return false
+        }
+
+        let record = coachPlanAdaptationHistory[index]
+        guard let current = trainingPlan(withID: record.planAfter.id),
+              current.version == record.planAfter.version
+        else {
+            return false
+        }
+
+        var restored = record.planBefore
+        restored.updatedAt = Date()
+        restored.version = current.version + 1
+
+        var revertedProposal = record.proposal
+        revertedProposal.status = .reverted
+        coachPlanAdaptationHistory[index].proposal = revertedProposal
+        coachPlanAdaptationHistory[index].revertedAt = Date()
+
+        replaceTrainingPlan(restored)
+        persistAccountContent()
+        return true
+    }
+
     func setActivePlanWeekCount(_ weekCount: Int) {
         guard let planID = activePlan?.id else {
             return
@@ -2034,7 +2319,10 @@ final class AppSessionStore: ObservableObject {
             activePlan: activePlan, scheduledPlans: scheduledPlans,
             planTemplates: planTemplates, savedWorkoutTemplates: savedWorkoutTemplates,
             manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
-            savedRoutes: savedRoutes, onboardingProfile: onboardingProfile
+            savedRoutes: savedRoutes,
+            onboardingProfile: onboardingProfile,
+            pendingCoachPlanProposal: pendingCoachPlanProposal,
+            coachPlanAdaptationHistory: coachPlanAdaptationHistory
         )
         AccountLocalStorage.write(content, name: "training", userID: userID, defaults: defaults)
     }
@@ -2060,6 +2348,8 @@ final class AppSessionStore: ObservableObject {
         savedRoutes = stored?.savedRoutes ?? (mayMigrate ? Self.loadSavedRoutes(from: defaults).filter { $0.ownerID == userID } : [])
         savedWorkoutTemplates = stored?.savedWorkoutTemplates ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadSavedWorkoutTemplates(from: defaults) : [])
         manuallyCompletedPlanSessions = stored?.manuallyCompletedPlanSessions ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadManuallyCompletedPlanSessions(from: defaults) : [])
+        pendingCoachPlanProposal = stored?.pendingCoachPlanProposal
+        coachPlanAdaptationHistory = stored?.coachPlanAdaptationHistory ?? []
         onboardingProfile = stored?.onboardingProfile
         if stored == nil && mayMigrate && ownsUnlabelledLegacy,
            let data = defaults.data(forKey: "legacy.onboardingProfile") {
