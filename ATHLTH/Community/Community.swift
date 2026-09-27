@@ -1155,38 +1155,42 @@ struct CommunityEventDetailView: View {
             .padding(.top, 4)
         } else {
             HStack(spacing: 10) {
-                Button {
-                    Task {
-                        if community.isJoined(item) {
+                if community.isJoined(item) {
+                    Button {
+                        Task {
                             await community.leave(item)
-                        } else {
+                        }
+                    } label: {
+                        Label(
+                            "Deltar",
+                            systemImage:
+                                "checkmark.circle.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTheme.accent)
+                } else {
+                    Button {
+                        Task {
                             await community.join(item)
                         }
+                    } label: {
+                        Label(
+                            "Delta",
+                            systemImage:
+                                "person.badge.plus"
+                        )
+                        .frame(maxWidth: .infinity)
                     }
-                } label: {
-                    Label(
-                        community.isJoined(item)
-                            ? "Deltar"
-                            : "Delta",
-                        systemImage:
-                            community.isJoined(item)
-                                ? "checkmark.circle.fill"
-                                : "person.badge.plus"
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
+                    .disabled(
+                        item.event.maxParticipants.map {
+                            item.participantCount >= $0
+                        } ?? false
                     )
-                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(
-                    community.isJoined(item)
-                        ? .bordered
-                        : .borderedProminent
-                )
-                .tint(ATHLTHTheme.accent)
-                .disabled(
-                    !community.isJoined(item) &&
-                    item.event.maxParticipants.map {
-                        item.participantCount >= $0
-                    } ?? false
-                )
 
                 Button {
                     Task {
