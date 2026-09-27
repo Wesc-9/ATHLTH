@@ -149,9 +149,9 @@ jobs:
               print(json.load(handle)["data"]["id"])
           PY
               )"
-              echo "Registered Apple Developer bundle ID: $identifier"
+              echo "Registered Apple Developer bundle ID: $identifier" >&2
             else
-              echo "Apple Developer bundle ID already exists: $identifier"
+              echo "Apple Developer bundle ID already exists: $identifier" >&2
             fi
 
             printf '%s' "$resource_id"
