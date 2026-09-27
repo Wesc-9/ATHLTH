@@ -291,6 +291,9 @@ struct WorkoutHistoryDetailView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
 
     let workout: SocialPublishableWorkout
 
@@ -298,6 +301,8 @@ struct WorkoutHistoryDetailView: View {
     @State private var healthDetail = WorkoutDetail()
     @State private var healthDetailLoaded = false
     @State private var showingReview = false
+    @State private var startingGhostRace = false
+    @State private var ghostRaceError: String?
 
     var body: some View {
         ScrollView {
@@ -333,6 +338,10 @@ struct WorkoutHistoryDetailView: View {
                             }
                         }
                     }
+                }
+
+                if workout.activity == .running {
+                    ghostRaceCard
                 }
 
                 metricGrid
@@ -414,6 +423,21 @@ struct WorkoutHistoryDetailView: View {
             await gearRefresh
             healthDetailLoaded = true
         }
+        .alert(
+            "Ghost Race",
+            isPresented: Binding(
+                get: { ghostRaceError != nil },
+                set: { visible in
+                    if !visible {
+                        ghostRaceError = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(ghostRaceError ?? "")
+        }
         .sheet(isPresented: $showingReview, onDismiss: {
             Task {
                 activity = await social.workoutActivity(for: workout.id)
@@ -424,6 +448,95 @@ struct WorkoutHistoryDetailView: View {
                 workout: workout,
                 wasAutoPublished: activity != nil
             )
+        }
+    }
+
+    private var ghostRaceCard: some View {
+        ATHLTHCard {
+            HStack(spacing: 13) {
+                Image(systemName: "figure.run.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHTheme.vitality)
+                    .frame(width: 46, height: 46)
+                    .background(
+                        ATHLTHTheme.vitalitySoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 14
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Race this effort")
+                        .font(.headline)
+
+                    Text(
+                        healthDetailLoaded &&
+                        healthDetail.route.count >= 2
+                            ? "Use this GPS run as a live ghost."
+                            : "A saved GPS route is required."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button {
+                    Task {
+                        await startGhostRace()
+                    }
+                } label: {
+                    if startingGhostRace {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("Race")
+                            .font(.caption.weight(.bold))
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.vitality)
+                .disabled(
+                    startingGhostRace ||
+                    !healthDetailLoaded ||
+                    healthDetail.route.count < 2 ||
+                    settings.trainingDeviceProvider != .appleWatch ||
+                    !watchConnection.isReady
+                )
+            }
+        }
+    }
+
+    @MainActor
+    private func startGhostRace() async {
+        guard workout.activity == .running else {
+            return
+        }
+
+        guard settings.trainingDeviceProvider == .appleWatch,
+              watchConnection.isReady
+        else {
+            ghostRaceError =
+                "Connect Apple Watch before starting a Ghost Race."
+            return
+        }
+
+        startingGhostRace = true
+        defer {
+            startingGhostRace = false
+        }
+
+        do {
+            try await GhostRaceStartService.start(
+                workout: workout,
+                detail: healthDetail,
+                ownerID: session.profile.userID,
+                ghostRace: ghostRace,
+                watchConnection: watchConnection,
+                settings: settings
+            )
+        } catch {
+            ghostRaceError = error.localizedDescription
         }
     }
 
