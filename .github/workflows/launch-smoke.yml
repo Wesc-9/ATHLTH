@@ -96,13 +96,18 @@ jobs:
           test -n "$APP"
           test -d "$APP"
 
+          DEVICE_TYPES_JSON="$RUNNER_TEMP/iphone-device-types.json"
           DEVICE_MATRIX="$RUNNER_TEMP/iphone-device-matrix.txt"
 
-          xcrun simctl list devicetypes -j | python3 - "$DEVICE_MATRIX" <<'PY'
+          xcrun simctl list devicetypes -j > "$DEVICE_TYPES_JSON"
+
+          python3 - "$DEVICE_TYPES_JSON" "$DEVICE_MATRIX" <<'PY'
           import json,sys
 
-          output=sys.argv[1]
-          data=json.load(sys.stdin)
+          source=sys.argv[1]
+          output=sys.argv[2]
+          with open(source) as fh:
+              data=json.load(fh)
           phones=[
               d for d in data["devicetypes"]
               if d.get("name","").startswith("iPhone")
