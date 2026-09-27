@@ -92,6 +92,7 @@ private struct RouteAttemptWrite: Encodable {
     }
 }
 
+@MainActor
 final class SupabaseRouteAttemptService {
     private let client: SupabaseClient
 
