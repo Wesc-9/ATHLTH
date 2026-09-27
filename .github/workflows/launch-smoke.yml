@@ -68,7 +68,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Launch on compact standard and large iPhones
+      - name: Launch across SE mini standard and large iPhones
         shell: bash
         run: |
           set -euo pipefail
@@ -118,8 +118,11 @@ jobs:
               "compact":[
                   "iPhone SE (3rd generation)",
                   "iPhone SE (2nd generation)",
+              ],
+              "mini":[
                   "iPhone 13 mini",
                   "iPhone 12 mini",
+                  "iPhone 14",
               ],
               "standard":[
                   "iPhone 15",
@@ -152,7 +155,12 @@ jobs:
               if kind=="compact":
                   preferred=[
                       d for d in remaining
-                      if "SE" in d["name"] or "mini" in d["name"].lower()
+                      if "SE" in d["name"]
+                  ]
+              elif kind=="mini":
+                  preferred=[
+                      d for d in remaining
+                      if "mini" in d["name"].lower()
                   ]
               elif kind=="large":
                   preferred=[
@@ -177,7 +185,7 @@ jobs:
               return device
 
           with open(output,"w") as fh:
-              for kind in ("compact","standard","large"):
+              for kind in ("compact","mini","standard","large"):
                   device=choose(kind)
                   fh.write(
                       f'{kind}|{device["identifier"]}|{device["name"]}\n'
