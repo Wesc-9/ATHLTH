@@ -6036,6 +6036,15 @@ struct ATHLTHProgressView: View {
     }
 
     private func loadSupportingProgressData() async {
+        let performanceID =
+            ATHLTHPerformance.begin("ProgressSupportingData")
+        defer {
+            ATHLTHPerformance.end(
+                "ProgressSupportingData",
+                id: performanceID
+            )
+        }
+
         guard health.healthDataAvailable,
               health.hasRequestedAuthorization
         else {
@@ -6064,6 +6073,15 @@ struct ATHLTHProgressView: View {
     }
 
     private func loadProgressData() async {
+        let performanceID =
+            ATHLTHPerformance.begin("ProgressRangeLoad")
+        defer {
+            ATHLTHPerformance.end(
+                "ProgressRangeLoad",
+                id: performanceID
+            )
+        }
+
         guard health.healthDataAvailable else {
             progressSnapshot = nil
             progressError = "Apple Health is unavailable on this device."
