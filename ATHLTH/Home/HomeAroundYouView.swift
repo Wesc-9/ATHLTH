@@ -145,9 +145,35 @@ private struct AroundYouRouteItem: Identifiable {
     let ownerID: UUID
     let isMine: Bool
     let trainingRoute: TrainingRoute
+    let centerCoordinate: CLLocationCoordinate2D?
+    let renderCoordinates: [CLLocationCoordinate2D]
+    let hitTestLocations: [CLLocation]
 
-    var centerCoordinate: CLLocationCoordinate2D? {
-        guard !coordinates.isEmpty else { return nil }
+    init(
+        id: UUID,
+        title: String,
+        distanceKilometers: Double,
+        elevationGainMeters: Double?,
+        coordinates: [RouteCoordinate],
+        ownerID: UUID,
+        isMine: Bool,
+        trainingRoute: TrainingRoute
+    ) {
+        self.id = id
+        self.title = title
+        self.distanceKilometers = distanceKilometers
+        self.elevationGainMeters = elevationGainMeters
+        self.coordinates = coordinates
+        self.ownerID = ownerID
+        self.isMine = isMine
+        self.trainingRoute = trainingRoute
+
+        if coordinates.isEmpty {
+            centerCoordinate = nil
+            renderCoordinates = []
+            hitTestLocations = []
+            return
+        }
 
         let latitude =
             coordinates.reduce(0) { $0 + $1.latitude } /
@@ -156,10 +182,51 @@ private struct AroundYouRouteItem: Identifiable {
             coordinates.reduce(0) { $0 + $1.longitude } /
             Double(coordinates.count)
 
-        return CLLocationCoordinate2D(
+        centerCoordinate = CLLocationCoordinate2D(
             latitude: latitude,
             longitude: longitude
         )
+
+        func sampled(
+            maximumCount: Int
+        ) -> [RouteCoordinate] {
+            guard coordinates.count > maximumCount else {
+                return coordinates
+            }
+
+            let strideValue = max(
+                coordinates.count / maximumCount,
+                1
+            )
+
+            var result = coordinates.enumerated().compactMap {
+                index,
+                point -> RouteCoordinate? in
+                guard index % strideValue == 0 else {
+                    return nil
+                }
+                return point
+            }
+
+            if let last = coordinates.last,
+               result.last?.latitude != last.latitude ||
+                result.last?.longitude != last.longitude {
+                result.append(last)
+            }
+
+            return result
+        }
+
+        renderCoordinates = sampled(maximumCount: 180)
+            .map(\.coordinate)
+
+        hitTestLocations = sampled(maximumCount: 140)
+            .map {
+                CLLocation(
+                    latitude: $0.latitude,
+                    longitude: $0.longitude
+                )
+            }
     }
 }
 
@@ -647,7 +714,7 @@ struct AroundYouExploreView: View {
 
                             MapPolyline(
                                 coordinates:
-                                    route.coordinates.map(\.coordinate)
+                                    route.renderCoordinates
                             )
                             .stroke(
                                 route.isMine
@@ -884,31 +951,8 @@ struct AroundYouExploreView: View {
                     return nil
                 }
 
-                let strideValue = max(
-                    route.coordinates.count / 140,
-                    1
-                )
-
-                let sampled = route.coordinates
-                    .enumerated()
-                    .compactMap {
-                        index,
-                        point -> CLLocation? in
-                        guard
-                            index % strideValue == 0 ||
-                            index ==
-                                route.coordinates.count - 1
-                        else {
-                            return nil
-                        }
-
-                        return CLLocation(
-                            latitude: point.latitude,
-                            longitude: point.longitude
-                        )
-                    }
-
-                guard let nearest = sampled
+                guard let nearest =
+                    route.hitTestLocations
                     .lazy
                     .map({
                         tapLocation.distance(from: $0)
