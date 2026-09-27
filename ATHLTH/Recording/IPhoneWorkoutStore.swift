@@ -44,6 +44,8 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
     private var accountID: UUID?
     private var pendingWalking: Bool?
     private var lastLocation: CLLocation?
+    private var lastActiveCheckpointWriteAt: Date?
+    private let activeCheckpointInterval: TimeInterval = 5
     private let manager = CLLocationManager()
     private let healthStore = HKHealthStore()
 
@@ -73,7 +75,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         if let active, history.contains(where: { $0.id == active.id }) { self.active = nil }
         showingWorkout = false
         message = active == nil ? nil : "Recovered workout paused at the last saved checkpoint. Resume when you are ready."
-        persist()
+        lastActiveCheckpointWriteAt = nil
     }
 
     func start(walking: Bool) {
@@ -98,7 +100,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         lastLocation = nil
         manager.allowsBackgroundLocationUpdates = true
         manager.startUpdatingLocation()
-        persist()
+        persistActiveCheckpoint(force: true)
     }
 
     func pause() {
@@ -110,7 +112,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         active = workout
         manager.stopUpdatingLocation()
         lastLocation = nil
-        persist()
+        persistActiveCheckpoint(force: true)
     }
 
     func resume() {
@@ -132,7 +134,8 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         workout.end = Date()
         history.insert(workout, at: 0)
         active = nil
-        persist()
+        persistActiveCheckpoint(force: true)
+        persistHistory()
         await saveToHealth(workout, userID: userID)
     }
 
@@ -175,7 +178,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
             }
             guard accountID == userID else { return }
             if let index = history.firstIndex(where: { $0.id == workout.id }) { history[index].healthID = saved.uuid }
-            persist()
+            persistHistory()
             if message?.contains("GPS route remains") != true { message = "Workout saved to ATHLTH and Apple Health." }
             await HealthKitManager.shared.refreshAll()
         } catch {
