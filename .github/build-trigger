@@ -144,3 +144,5 @@ validate-build-45
 start-v1.4.3-baseline
 
 validate-immersive-home-hero
+
+validate-home-compact-fallback
