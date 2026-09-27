@@ -256,6 +256,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
     @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
     @Published var autoPublishCompletedWorkouts: Bool { didSet { persist() } }
+    @Published var workoutSharingChoiceCompleted: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
 
@@ -395,6 +396,9 @@ final class AppSettingsStore: ObservableObject {
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
         backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
         autoPublishCompletedWorkouts = defaults.object(forKey: "settings.autoPublishCompletedWorkouts") as? Bool ?? false
+        workoutSharingChoiceCompleted = defaults.object(
+            forKey: "settings.workoutSharingChoiceCompleted"
+        ) as? Bool ?? false
         audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
         hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
 
@@ -537,6 +541,10 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
         defaults.set(backgroundHealthSyncEnabled, forKey: "settings.backgroundHealthSyncEnabled")
         defaults.set(autoPublishCompletedWorkouts, forKey: "settings.autoPublishCompletedWorkouts")
+        defaults.set(
+            workoutSharingChoiceCompleted,
+            forKey: "settings.workoutSharingChoiceCompleted"
+        )
         defaults.set(audioCuesEnabled, forKey: "settings.audioCues")
         defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
 
