@@ -165,7 +165,8 @@ struct ATHLTHHomeView: View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
                 accent: ATHLTHTheme.premiumGold.opacity(0.70),
-                softTransition: true
+                softTransition: true,
+                immersiveTransition: true
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
@@ -175,12 +176,13 @@ struct ATHLTHHomeView: View {
                             session.profile.presence.state == .training
                                 ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
                                 : "Today, training and recovery at a glance.",
-                        height: 190,
+                        height: 242,
                         alignment: .leading,
-                        focalOffsetX: 18,
-                        focalOffsetY: 14,
-                        titleFontSize: 27,
-                        copyWidthFraction: 0.82
+                        focalOffsetX: 10,
+                        focalOffsetY: 8,
+                        titleFontSize: 30,
+                        copyWidthFraction: 0.76,
+                        immersiveCopy: true
                     )
 
                     HStack(spacing: 8) {
@@ -293,8 +295,8 @@ struct ATHLTHHomeView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Profile")
                     }
-                    .padding(.top, 62)
-                    .padding(.trailing, 12)
+                    .padding(.top, 66)
+                    .padding(.trailing, 14)
                 }
             } content: {
                 LazyVStack(spacing: 18) {
