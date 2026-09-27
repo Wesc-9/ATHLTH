@@ -72,7 +72,7 @@ final class AuditRegressionTests: XCTestCase {
         try withDefaults { defaults in
             let owner = UUID()
             let saved = plan(owner)
-            defaults.set(try JSONEncoder().encode(saved), forKey: "session.activePlan")
+            defaults.set(try JSONEncoder().encode(saved), forKey: "session.activeTrainingPlan")
             let store = AppSessionStore(defaults: defaults)
             store.applyBackendBootstrap(bootstrap(UUID()))
             XCTAssertNil(store.activePlan)
