@@ -42,6 +42,47 @@ enum GhostRaceStartService {
             )
 
             if let reference = ghostRace.reference {
+                let watchPointStep =
+                    max(
+                        reference.points.count / 320,
+                        1
+                    )
+
+                var watchPoints =
+                    reference.points.enumerated()
+                        .compactMap {
+                            index,
+                            point
+                            -> WatchGhostRaceTimingPoint? in
+
+                            guard index % watchPointStep == 0 ||
+                                    index ==
+                                    reference.points.count - 1
+                            else {
+                                return nil
+                            }
+
+                            return WatchGhostRaceTimingPoint(
+                                elapsedTime:
+                                    point.elapsedTime,
+                                cumulativeMeters:
+                                    point.cumulativeMeters
+                            )
+                        }
+
+                if let final = reference.points.last,
+                   watchPoints.last?.cumulativeMeters !=
+                    final.cumulativeMeters {
+                    watchPoints.append(
+                        WatchGhostRaceTimingPoint(
+                            elapsedTime:
+                                final.elapsedTime,
+                            cumulativeMeters:
+                                final.cumulativeMeters
+                        )
+                    )
+                }
+
                 watchConnection.sendGhostRace(
                     WatchGhostRaceTransfer(
                         title: reference.title,
@@ -49,15 +90,7 @@ enum GhostRaceStartService {
                             reference.durationSeconds,
                         routeDistanceMeters:
                             reference.routeDistanceMeters,
-                        points:
-                            reference.points.map {
-                                WatchGhostRaceTimingPoint(
-                                    elapsedTime:
-                                        $0.elapsedTime,
-                                    cumulativeMeters:
-                                        $0.cumulativeMeters
-                                )
-                            }
+                        points: watchPoints
                     )
                 )
             }
