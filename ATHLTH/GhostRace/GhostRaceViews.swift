@@ -24,6 +24,7 @@ struct GhostRaceHubView: View {
             LazyVStack(spacing: 18) {
                 hero
                 modeOverview
+                audioCoachCard
                 pastSelfSection
                 routeSection
                 friendSection
@@ -149,6 +150,152 @@ struct GhostRaceHubView: View {
                 subtitle: "Challenge",
                 icon: "person.2.fill"
             )
+        }
+    }
+
+    private var audioCoachCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Ghost Audio Coach")
+                            .font(.headline)
+
+                        Text(
+                            "Hear your lead without looking at the screen."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Toggle(
+                        "",
+                        isOn:
+                            $settings
+                                .ghostRaceAudioEnabled
+                    )
+                    .labelsHidden()
+                }
+
+                if settings.ghostRaceAudioEnabled {
+                    Toggle(
+                        "Announce every distance",
+                        isOn:
+                            $settings
+                                .ghostRaceAudioUseDistance
+                    )
+
+                    if settings
+                        .ghostRaceAudioUseDistance {
+                        HStack {
+                            Text("Distance interval")
+                            Spacer()
+                            Picker(
+                                "Distance interval",
+                                selection:
+                                    $settings
+                                        .ghostRaceAudioDistanceIntervalKilometers
+                            ) {
+                                Text("0.5 km")
+                                    .tag(0.5)
+                                Text("1 km")
+                                    .tag(1.0)
+                                Text("2 km")
+                                    .tag(2.0)
+                            }
+                            .pickerStyle(.menu)
+                        }
+                    }
+
+                    Toggle(
+                        "Announce every time interval",
+                        isOn:
+                            $settings
+                                .ghostRaceAudioUseTime
+                    )
+
+                    if settings
+                        .ghostRaceAudioUseTime {
+                        HStack {
+                            Text("Time interval")
+                            Spacer()
+                            Picker(
+                                "Time interval",
+                                selection:
+                                    $settings
+                                        .ghostRaceAudioTimeIntervalMinutes
+                            ) {
+                                Text("2 min")
+                                    .tag(2)
+                                Text("5 min")
+                                    .tag(5)
+                                Text("10 min")
+                                    .tag(10)
+                            }
+                            .pickerStyle(.menu)
+                        }
+                    }
+
+                    Toggle(
+                        "Announce meaningful lead changes",
+                        isOn:
+                            $settings
+                                .ghostRaceAudioAnnounceLeadChanges
+                    )
+
+                    if settings
+                        .ghostRaceAudioAnnounceLeadChanges {
+                        HStack {
+                            Text("Lead-change threshold")
+                            Spacer()
+                            Picker(
+                                "Lead-change threshold",
+                                selection:
+                                    $settings
+                                        .ghostRaceAudioLeadChangeMeters
+                            ) {
+                                Text("15 m")
+                                    .tag(15.0)
+                                Text("25 m")
+                                    .tag(25.0)
+                                Text("50 m")
+                                    .tag(50.0)
+                                Text("100 m")
+                                    .tag(100.0)
+                            }
+                            .pickerStyle(.menu)
+                        }
+                    }
+
+                    HStack {
+                        Text("Delivery")
+                        Spacer()
+                        Picker(
+                            "Delivery",
+                            selection:
+                                $settings
+                                    .ghostRaceAudioDelivery
+                        ) {
+                            ForEach(
+                                WatchAlertDelivery
+                                    .allCases
+                            ) { delivery in
+                                Text(delivery.title)
+                                    .tag(delivery)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+
+                    Text(
+                        "Voice uses your existing Audio Coach language setting. Lead-change alerts have a cooldown so ATHLTH does not talk constantly during close races."
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
