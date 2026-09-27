@@ -41,10 +41,6 @@ protocol SocialProviding {
     func unfollow(userID: UUID) async throws
 }
 
-protocol RouteImporting {
-    func importGPX(data: Data, filename: String?) async throws -> TrainingRoute
-}
-
 protocol MusicProviding {
     func connect() async throws
     func disconnect() async

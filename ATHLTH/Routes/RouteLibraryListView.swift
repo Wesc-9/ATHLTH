@@ -1,7 +1,6 @@
 import CoreLocation
 import SwiftUI
 import Supabase
-import UniformTypeIdentifiers
 
 enum RouteLibrarySource {
     case database, mine
@@ -72,7 +71,6 @@ struct RouteLibraryListView: View {
     @State private var errorMessage: String?
     @State private var hasMore = false
     @State private var catalogRequestID = UUID()
-    @State private var importingGPX = false
 
     private var catalogKey: String {
         [query, sort.rawValue, String(lengthFilter),
@@ -160,8 +158,6 @@ struct RouteLibraryListView: View {
                     Text(errorMessage).font(.caption).foregroundStyle(.red)
                     if source == .database {
                         Button("Retry") { Task { await loadCatalog() } }
-                    } else {
-                        Button("Import GPX again") { importingGPX = true }
                     }
                 }
             }
@@ -218,48 +214,20 @@ struct RouteLibraryListView: View {
         .toolbar {
             if source == .mine {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        NavigationLink("Create route") { RunRouteBuilderView() }
-                        Button("Import GPX") { importingGPX = true }
+                    NavigationLink {
+                        RunRouteBuilderView()
                     } label: {
-                        Label("Add route", systemImage: "plus")
+                        Label("Create route", systemImage: "plus")
                     }
                 }
             }
         }
         .task(id: catalogKey) { if source == .database { await loadCatalog() } }
-        .fileImporter(isPresented: $importingGPX, allowedContentTypes: [UTType(filenameExtension: "gpx") ?? .xml, .xml]) { result in
-            Task { await importRoute(result) }
-        }
         .refreshable { if source == .database { await loadCatalog() } }
         .onChange(of: sort) { _, value in
             if value == .nearest { locationStore.refresh() }
         }
         .onDisappear { locationStore.stop() }
-    }
-
-    @MainActor
-    private func importRoute(_ result: Result<URL, Error>) async {
-        do {
-            let url = try result.get()
-            let access = url.startAccessingSecurityScopedResource()
-            defer { if access { url.stopAccessingSecurityScopedResource() } }
-            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            guard size <= 10_000_000 else {
-                errorMessage = "Choose a GPX file smaller than 10 MB."
-                return
-            }
-            let ownerID = session.profile.userID
-            let route = try await Task.detached(priority: .userInitiated) {
-                let data = try Data(contentsOf: url)
-                return try await GPXRouteImporter(ownerID: ownerID).importGPX(data: data, filename: url.lastPathComponent)
-            }.value
-            guard session.signedIn, session.profile.userID == ownerID else { return }
-            session.addImportedRoute(route)
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
-        }
     }
 
     @MainActor
