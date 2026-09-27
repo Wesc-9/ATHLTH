@@ -89,7 +89,7 @@ struct CommunityGroupAnnouncementReactionRecord:
     }
 }
 
-struct CommunityGroupLeaderboardEntry:
+struct CommunityGroupEngagementLeaderboardEntry:
     Codable,
     Identifiable,
     Hashable
@@ -778,7 +778,7 @@ final class CommunityGroupStore: ObservableObject {
     @Published private(set) var ownInvites: [CommunityGroupInviteRecord] = []
     @Published private(set) var notificationPreferencesByGroup: [UUID: CommunityGroupNotificationPreferenceRecord] = [:]
     @Published private(set) var eventRSVPsByGroup: [UUID: [CommunityGroupEventRSVPRecord]] = [:]
-    @Published private(set) var leaderboardByGroup: [UUID: [CommunityGroupLeaderboardEntry]] = [:]
+    @Published private(set) var leaderboardByGroup: [UUID: [CommunityGroupEngagementLeaderboardEntry]] = [:]
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
@@ -919,7 +919,7 @@ final class CommunityGroupStore: ObservableObject {
 
     func leaderboard(
         in groupID: UUID
-    ) -> [CommunityGroupLeaderboardEntry] {
+    ) -> [CommunityGroupEngagementLeaderboardEntry] {
         leaderboardByGroup[groupID] ?? []
     }
 
@@ -1311,7 +1311,7 @@ final class CommunityGroupStore: ObservableObject {
                     .value
 
             async let leaderboardQuery:
-                [CommunityGroupLeaderboardEntry] = client
+                [CommunityGroupEngagementLeaderboardEntry] = client
                     .rpc(
                         "get_community_group_leaderboard",
                         params: CommunityGroupLeaderboardParams(
@@ -1866,7 +1866,7 @@ final class CommunityGroupStore: ObservableObject {
         _ groupID: UUID
     ) async {
         do {
-            let rows: [CommunityGroupLeaderboardEntry] =
+            let rows: [CommunityGroupEngagementLeaderboardEntry] =
                 try await client
                     .rpc(
                         "get_community_group_leaderboard",
@@ -4117,7 +4117,7 @@ struct CommunityGroupDetailView: View {
     }
 
     private func leaderboardActivitySummary(
-        _ entry: CommunityGroupLeaderboardEntry
+        _ entry: CommunityGroupEngagementLeaderboardEntry
     ) -> String {
         var parts: [String] = []
 
