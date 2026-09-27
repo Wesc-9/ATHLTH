@@ -102,28 +102,18 @@ struct EmailAuthView: View {
             OnboardingCard {
                 VStack(spacing: 14) {
                     if mode == .createAccount {
-                        HStack(spacing: 12) {
-                            TextField("First name", text: $firstName)
-                                .textContentType(.givenName)
-                                .textInputAutocapitalization(.words)
-                                .autocorrectionDisabled()
-                                .padding(14)
-                                .background(OnboardingTheme.subtleFill, in: RoundedRectangle(cornerRadius: 14))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(OnboardingTheme.border, lineWidth: 1)
-                                }
+                        ViewThatFits(
+                            in: .horizontal
+                        ) {
+                            HStack(spacing: 12) {
+                                firstNameField
+                                lastNameField
+                            }
 
-                            TextField("Last name", text: $lastName)
-                                .textContentType(.familyName)
-                                .textInputAutocapitalization(.words)
-                                .autocorrectionDisabled()
-                                .padding(14)
-                                .background(OnboardingTheme.subtleFill, in: RoundedRectangle(cornerRadius: 14))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(OnboardingTheme.border, lineWidth: 1)
-                                }
+                            VStack(spacing: 12) {
+                                firstNameField
+                                lastNameField
+                            }
                         }
                     }
 
@@ -220,6 +210,58 @@ struct EmailAuthView: View {
                 .font(.subheadline)
                 .disabled(isSubmitting)
             }
+        }
+    }
+
+    private var firstNameField: some View {
+        TextField(
+            "First name",
+            text: $firstName
+        )
+        .textContentType(.givenName)
+        .textInputAutocapitalization(.words)
+        .autocorrectionDisabled()
+        .padding(14)
+        .background(
+            OnboardingTheme.subtleFill,
+            in: RoundedRectangle(
+                cornerRadius: 14
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 14
+            )
+            .stroke(
+                OnboardingTheme.border,
+                lineWidth: 1
+            )
+        }
+    }
+
+    private var lastNameField: some View {
+        TextField(
+            "Last name",
+            text: $lastName
+        )
+        .textContentType(.familyName)
+        .textInputAutocapitalization(.words)
+        .autocorrectionDisabled()
+        .padding(14)
+        .background(
+            OnboardingTheme.subtleFill,
+            in: RoundedRectangle(
+                cornerRadius: 14
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 14
+            )
+            .stroke(
+                OnboardingTheme.border,
+                lineWidth: 1
+            )
         }
     }
 
