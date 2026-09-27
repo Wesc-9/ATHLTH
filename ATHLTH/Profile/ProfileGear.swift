@@ -1557,10 +1557,27 @@ struct ProfileGearThumb: View {
     }
 }
 
+private enum ProfileGearEditorMode: String, CaseIterable, Identifiable {
+    case basic
+    case advanced
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .basic: return "Basic"
+        case .advanced: return "Advanced"
+        }
+    }
+}
+
 struct ProfileGearEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+
+    @StateObject private var catalog = GearCatalogStore()
 
     let category: ProfileGearCategory
     let existing: ProfileGearItem?
@@ -1576,6 +1593,10 @@ struct ProfileGearEditorView: View {
     @State private var saving = false
     @State private var localError: String?
     @State private var didLoadDetails = false
+    @State private var editorMode: ProfileGearEditorMode
+    @State private var manualBrand = false
+    @State private var manualModel = false
+    @State private var lastAutoName: String?
 
     init(
         category: ProfileGearCategory,
@@ -1592,10 +1613,34 @@ struct ProfileGearEditorView: View {
                 category: category
             )
         )
+        _editorMode = State(
+            initialValue: existing == nil
+                ? .basic
+                : .advanced
+        )
     }
 
     var body: some View {
         Form {
+            Section {
+                Picker("Setup", selection: $editorMode) {
+                    ForEach(ProfileGearEditorMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(
+                    editorMode == .basic
+                        ? "Choose the product quickly. ATHLTH fills what it can from the Gear Catalog."
+                        : "Add lifecycle, usage and profile details in addition to the catalog selection."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            catalogSelectionSection
+
             Section("Item") {
                 TextField(
                     category == .shoes
@@ -1604,48 +1649,53 @@ struct ProfileGearEditorView: View {
                     text: $name
                 )
 
-                Picker(
-                    "Status",
-                    selection: $detailDraft.status
-                ) {
-                    ForEach(ProfileGearStatus.allCases) { status in
-                        Text(status.title).tag(status)
-                    }
-                }
-
                 Toggle(
                     "Show on profile",
                     isOn: $showOnProfile
                 )
                 .disabled(detailDraft.status == .retired)
 
-                Text(
-                    "Only one \(category.shortTitle.lowercased()) is featured on your profile. Retired gear stays in history but is removed from new workout choices."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                if editorMode == .advanced {
+                    Picker(
+                        "Status",
+                        selection: $detailDraft.status
+                    ) {
+                        ForEach(ProfileGearStatus.allCases) { status in
+                            Text(status.title).tag(status)
+                        }
+                    }
+
+                    Text(
+                        "Only one \(category.shortTitle.lowercased()) is featured on your profile. Retired gear stays in history but is removed from new workout choices."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
 
-            if category == .shoes {
-                shoeDetailsSection
-            } else {
-                generalDetailsSection
+            if editorMode == .advanced {
+                if category == .shoes {
+                    shoeDetailsSection
+                } else {
+                    generalDetailsSection
+                }
+
+                if let existing {
+                    usageSection(existing)
+                }
+
+                Section("Notes") {
+                    TextField(
+                        "Optional notes",
+                        text: $detailDraft.notes,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+                }
             }
 
-            if let existing {
-                usageSection(existing)
-            }
-
-            Section("Notes") {
-                TextField(
-                    "Optional notes",
-                    text: $detailDraft.notes,
-                    axis: .vertical
-                )
-                .lineLimit(2...5)
-            }
-
-            Section("Photo") {
+            if editorMode == .advanced {
+                Section("Photo") {
                 HStack(spacing: 14) {
                     preview
 
@@ -1667,6 +1717,7 @@ struct ProfileGearEditorView: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                }
             }
 
             if let displayedError =
