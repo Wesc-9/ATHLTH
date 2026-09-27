@@ -206,7 +206,7 @@ enum ProfileVisibility: String, Codable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .privateOnly: return "Private"
-        case .friends: return "Friends"
+        case .friends: return "Followers"
         case .publicProfile: return "Public"
         }
     }
