@@ -26,6 +26,7 @@ struct ATHLTHApp: App {
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
     @StateObject private var workoutMirroring = WorkoutMirroringStore()
+    @StateObject private var ghostRace = GhostRaceStore()
     @StateObject private var subscriptionStore = SubscriptionStore()
     @StateObject private var subscriptionBackend = SubscriptionBackendService()
     @StateObject private var accountService = SupabaseAccountService()
@@ -58,6 +59,7 @@ struct ATHLTHApp: App {
                 .environmentObject(spotifyPlayback)
                 .environmentObject(watchConnection)
                 .environmentObject(workoutMirroring)
+                .environmentObject(ghostRace)
                 .environmentObject(subscriptionStore)
                 .environmentObject(subscriptionBackend)
                 .environmentObject(accountService)
@@ -102,6 +104,7 @@ struct AppRootView: View {
     @EnvironmentObject private var subscriptionBackend: SubscriptionBackendService
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var gear: ProfileGearStore
@@ -304,6 +307,7 @@ struct AppRootView: View {
             ATHLTHSurfaceCoordinator.syncLiveActivity(
                 with: snapshot
             )
+            ghostRace.update(with: snapshot)
         }
         .onChange(of: settings.trainingDeviceProvider) { _, provider in
             if provider == .appleWatch {
