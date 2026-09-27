@@ -69,7 +69,20 @@ final class AppSessionStore: ObservableObject {
         self.savedWorkoutTemplates = []
         self.manuallyCompletedPlanSessions = []
         self.savedRoutes = savedRoutes
-        self.previewModeEnabled = previewModeEnabled
+
+        // Internal simulator-only compatibility mode. Production launches do
+        // not include this argument, so normal authentication remains
+        // unchanged. CI uses it to render signed-out product surfaces across
+        // the supported iPhone size classes without needing test credentials.
+        let compatibilityPreview =
+            ProcessInfo.processInfo.arguments
+                .contains(
+                    "--athlth-compatibility-preview"
+                )
+        self.previewModeEnabled =
+            previewModeEnabled ||
+            compatibilityPreview
+
         self.defaults = defaults
         self.usernameSeed = defaults.string(forKey: "session.usernameSeed") ?? resolvedProfile.displayName
 
