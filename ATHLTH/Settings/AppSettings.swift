@@ -284,6 +284,15 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachAnnounceRemainingStepTime: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceRemainingStepDistance: Bool { didSet { persist() } }
 
+    @Published var ghostRaceAudioEnabled: Bool { didSet { persist() } }
+    @Published var ghostRaceAudioDistanceIntervalKilometers: Double { didSet { persist() } }
+    @Published var ghostRaceAudioTimeIntervalMinutes: Int { didSet { persist() } }
+    @Published var ghostRaceAudioUseDistance: Bool { didSet { persist() } }
+    @Published var ghostRaceAudioUseTime: Bool { didSet { persist() } }
+    @Published var ghostRaceAudioAnnounceLeadChanges: Bool { didSet { persist() } }
+    @Published var ghostRaceAudioLeadChangeMeters: Double { didSet { persist() } }
+    @Published var ghostRaceAudioDelivery: WatchAlertDelivery { didSet { persist() } }
+
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
     @Published var challengeNotificationsEnabled: Bool { didSet { persist() } }
@@ -490,6 +499,41 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.audioCoach.announceRemainingStepDistance"
             ) as? Bool ?? true
+
+        ghostRaceAudioEnabled =
+            defaults.object(
+                forKey: "settings.ghostRace.audio.enabled"
+            ) as? Bool ?? true
+        ghostRaceAudioDistanceIntervalKilometers =
+            defaults.object(
+                forKey: "settings.ghostRace.audio.distanceKilometers"
+            ) as? Double ?? 1.0
+        ghostRaceAudioTimeIntervalMinutes =
+            defaults.object(
+                forKey: "settings.ghostRace.audio.timeMinutes"
+            ) as? Int ?? 5
+        ghostRaceAudioUseDistance =
+            defaults.object(
+                forKey: "settings.ghostRace.audio.useDistance"
+            ) as? Bool ?? true
+        ghostRaceAudioUseTime =
+            defaults.object(
+                forKey: "settings.ghostRace.audio.useTime"
+            ) as? Bool ?? false
+        ghostRaceAudioAnnounceLeadChanges =
+            defaults.object(
+                forKey: "settings.ghostRace.audio.leadChanges"
+            ) as? Bool ?? true
+        ghostRaceAudioLeadChangeMeters =
+            defaults.object(
+                forKey: "settings.ghostRace.audio.leadChangeMeters"
+            ) as? Double ?? 25
+        ghostRaceAudioDelivery =
+            WatchAlertDelivery(
+                rawValue: defaults.string(
+                    forKey: "settings.ghostRace.audio.delivery"
+                ) ?? ""
+            ) ?? .voice
 
         workoutRemindersEnabled = defaults.object(forKey: "settings.workoutReminders") as? Bool ?? true
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
@@ -704,6 +748,41 @@ final class AppSettingsStore: ObservableObject {
                 audioCoachAnnounceRemainingStepTime,
             announceRemainingStepDistance:
                 audioCoachAnnounceRemainingStepDistance
+        )
+    }
+
+    var ghostRaceAudioConfiguration:
+        WatchGhostRaceAudioConfiguration {
+        WatchGhostRaceAudioConfiguration(
+            enabled: ghostRaceAudioEnabled,
+            distanceIntervalMeters:
+                ghostRaceAudioUseDistance
+                    ? max(
+                        ghostRaceAudioDistanceIntervalKilometers,
+                        0.25
+                    ) * 1_000
+                    : nil,
+            timeIntervalSeconds:
+                ghostRaceAudioUseTime
+                    ? TimeInterval(
+                        max(
+                            ghostRaceAudioTimeIntervalMinutes,
+                            1
+                        ) * 60
+                    )
+                    : nil,
+            announceLeadChanges:
+                ghostRaceAudioAnnounceLeadChanges,
+            leadChangeThresholdMeters:
+                min(
+                    max(
+                        ghostRaceAudioLeadChangeMeters,
+                        10
+                    ),
+                    250
+                ),
+            delivery:
+                ghostRaceAudioDelivery
         )
     }
 
