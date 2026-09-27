@@ -15,3 +15,5 @@ ephemeral-signing-release-dryrun
 exact-bundle-signing-release-dryrun
 
 verify-app-group-association
+
+validate-release-build-45
