@@ -1,43 +1,113 @@
-import CoreLocation
+@preconcurrency import CoreLocation
 import Foundation
 
-@MainActor
-final class ChallengeLocationStore: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
-    @Published private(set) var authorizationStatus: CLAuthorizationStatus
-    @Published private(set) var isLocating = false
-    @Published private(set) var lastError: String?
+private struct ChallengeLocationSample: Sendable {
+    let latitude: Double
+    let longitude: Double
+    let altitude: Double
+    let horizontalAccuracy: Double
+    let verticalAccuracy: Double
+    let course: Double
+    let speed: Double
+    let timestamp: Date
 
-    private let manager = CLLocationManager()
-    private var continuation: CheckedContinuation<CLLocation?, Never>?
-
-    override init() {
-        authorizationStatus = manager.authorizationStatus
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBest
+    init(_ location: CLLocation) {
+        latitude = location.coordinate.latitude
+        longitude = location.coordinate.longitude
+        altitude = location.altitude
+        horizontalAccuracy =
+            location.horizontalAccuracy
+        verticalAccuracy =
+            location.verticalAccuracy
+        course = location.course
+        speed = location.speed
+        timestamp = location.timestamp
     }
 
-    func requestCurrentLocation() async -> CLLocation? {
+    func makeLocation() -> CLLocation {
+        CLLocation(
+            coordinate: CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            ),
+            altitude: altitude,
+            horizontalAccuracy:
+                horizontalAccuracy,
+            verticalAccuracy:
+                verticalAccuracy,
+            course: course,
+            speed: speed,
+            timestamp: timestamp
+        )
+    }
+}
+
+@MainActor
+final class ChallengeLocationStore:
+    NSObject,
+    ObservableObject,
+    CLLocationManagerDelegate {
+
+    @Published private(set)
+    var authorizationStatus:
+        CLAuthorizationStatus
+
+    @Published private(set)
+    var isLocating = false
+
+    @Published private(set)
+    var lastError: String?
+
+    private let manager =
+        CLLocationManager()
+
+    private var continuation:
+        CheckedContinuation<
+            CLLocation?,
+            Never
+        >?
+
+    override init() {
+        authorizationStatus =
+            manager.authorizationStatus
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy =
+            kCLLocationAccuracyBest
+    }
+
+    func requestCurrentLocation()
+        async -> CLLocation? {
+
         if let continuation {
-            continuation.resume(returning: nil)
+            continuation.resume(
+                returning: nil
+            )
             self.continuation = nil
         }
 
         lastError = nil
 
         switch manager.authorizationStatus {
-        case .authorizedWhenInUse, .authorizedAlways:
+        case .authorizedWhenInUse,
+             .authorizedAlways:
             return await locate()
 
         case .notDetermined:
-            return await withCheckedContinuation { continuation in
-                self.continuation = continuation
+            return await withCheckedContinuation {
+                continuation in
+
+                self.continuation =
+                    continuation
                 isLocating = true
-                manager.requestWhenInUseAuthorization()
+                manager
+                    .requestWhenInUseAuthorization()
             }
 
-        case .denied, .restricted:
-            lastError = "Location access is off. You can still check in manually, but ATHLTH cannot verify that you are near the meetup point."
+        case .denied,
+             .restricted:
+            lastError =
+                "Location access is off. You can still check in manually, but ATHLTH cannot verify that you are near the meetup point."
             return nil
 
         @unknown default:
@@ -45,30 +115,54 @@ final class ChallengeLocationStore: NSObject, ObservableObject, @preconcurrency 
         }
     }
 
-    private func locate() async -> CLLocation? {
-        await withCheckedContinuation { continuation in
-            self.continuation = continuation
+    private func locate()
+        async -> CLLocation? {
+
+        await withCheckedContinuation {
+            continuation in
+
+            self.continuation =
+                continuation
             isLocating = true
             manager.requestLocation()
         }
     }
 
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        authorizationStatus = manager.authorizationStatus
+    private func handleAuthorization(
+        rawValue: Int
+    ) {
+        guard let status =
+            CLAuthorizationStatus(
+                rawValue: Int32(rawValue)
+            )
+        else {
+            return
+        }
 
-        guard let continuation else { return }
+        authorizationStatus = status
 
-        switch manager.authorizationStatus {
-        case .authorizedWhenInUse, .authorizedAlways:
+        guard let continuation
+        else {
+            return
+        }
+
+        switch status {
+        case .authorizedWhenInUse,
+             .authorizedAlways:
             self.continuation = nil
             manager.requestLocation()
-            self.continuation = continuation
+            self.continuation =
+                continuation
 
-        case .denied, .restricted:
+        case .denied,
+             .restricted:
             self.continuation = nil
             isLocating = false
-            lastError = "Location access is off. You can still check in manually, but ATHLTH cannot verify that you are near the meetup point."
-            continuation.resume(returning: nil)
+            lastError =
+                "Location access is off. You can still check in manually, but ATHLTH cannot verify that you are near the meetup point."
+            continuation.resume(
+                returning: nil
+            )
 
         case .notDetermined:
             break
@@ -76,35 +170,99 @@ final class ChallengeLocationStore: NSObject, ObservableObject, @preconcurrency 
         @unknown default:
             self.continuation = nil
             isLocating = false
-            continuation.resume(returning: nil)
+            continuation.resume(
+                returning: nil
+            )
         }
     }
 
-    func locationManager(
-        _ manager: CLLocationManager,
-        didUpdateLocations locations: [CLLocation]
+    private func finishLocation(
+        _ sample:
+            ChallengeLocationSample?
     ) {
-        guard let continuation else { return }
-
-        let recent = locations
-            .filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 100 }
-            .sorted { $0.timestamp > $1.timestamp }
-            .first
+        guard let continuation
+        else {
+            return
+        }
 
         self.continuation = nil
         isLocating = false
-        continuation.resume(returning: recent)
+        continuation.resume(
+            returning:
+                sample?.makeLocation()
+        )
     }
 
-    func locationManager(
+    private func finishLocation(
+        errorMessage: String
+    ) {
+        guard let continuation
+        else {
+            return
+        }
+
+        self.continuation = nil
+        isLocating = false
+        lastError = errorMessage
+        continuation.resume(
+            returning: nil
+        )
+    }
+
+    nonisolated func
+        locationManagerDidChangeAuthorization(
+            _ manager: CLLocationManager
+        ) {
+        let rawValue =
+            Int(
+                manager.authorizationStatus
+                    .rawValue
+            )
+
+        Task { @MainActor [weak self] in
+            self?.handleAuthorization(
+                rawValue: rawValue
+            )
+        }
+    }
+
+    nonisolated func locationManager(
+        _ manager: CLLocationManager,
+        didUpdateLocations
+            locations: [CLLocation]
+    ) {
+        let recent =
+            locations
+                .filter {
+                    $0.horizontalAccuracy >= 0 &&
+                    $0.horizontalAccuracy <= 100
+                }
+                .sorted {
+                    $0.timestamp >
+                    $1.timestamp
+                }
+                .first
+                .map(
+                    ChallengeLocationSample
+                        .init
+                )
+
+        Task { @MainActor [weak self] in
+            self?.finishLocation(recent)
+        }
+    }
+
+    nonisolated func locationManager(
         _ manager: CLLocationManager,
         didFailWithError error: Error
     ) {
-        guard let continuation else { return }
+        let message =
+            error.localizedDescription
 
-        self.continuation = nil
-        isLocating = false
-        lastError = error.localizedDescription
-        continuation.resume(returning: nil)
+        Task { @MainActor [weak self] in
+            self?.finishLocation(
+                errorMessage: message
+            )
+        }
     }
 }
