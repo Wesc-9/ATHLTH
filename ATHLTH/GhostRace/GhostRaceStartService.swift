@@ -92,6 +92,7 @@ enum GhostRaceStartService {
             ghostRace.cancel()
             watchConnection
                 .sendWorkoutRouteSelection(nil)
+            watchConnection.clearGhostRace()
             throw error
         }
     }
