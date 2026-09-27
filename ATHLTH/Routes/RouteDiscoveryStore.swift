@@ -99,6 +99,7 @@ private struct CommunityRouteWrite: Encodable {
     }
 }
 
+@MainActor
 final class SupabaseRouteDiscoveryService {
     private let client: SupabaseClient
 
