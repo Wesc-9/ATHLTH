@@ -90,7 +90,10 @@ enum GhostRaceStartService {
                             reference.durationSeconds,
                         routeDistanceMeters:
                             reference.routeDistanceMeters,
-                        points: watchPoints
+                        points: watchPoints,
+                        audio:
+                            settings
+                                .ghostRaceAudioConfiguration
                     )
                 )
             }
