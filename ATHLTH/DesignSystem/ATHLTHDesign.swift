@@ -216,7 +216,19 @@ struct ATHLTHPageHeader: View {
 }
 
 
+private struct ATHLTHHeroBottomInsetKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 16
+}
+
+extension EnvironmentValues {
+    var athlthHeroBottomInset: CGFloat {
+        get { self[ATHLTHHeroBottomInsetKey.self] }
+        set { self[ATHLTHHeroBottomInsetKey.self] = newValue }
+    }
+}
+
 struct ATHLTHTabHero: View {
+    @Environment(\.athlthHeroBottomInset) private var bottomInset
     let imageName: String
     let title: String
     let subtitle: String
@@ -498,7 +510,7 @@ struct ATHLTHTabHero: View {
                         ? 44
                         : 48
                 )
-                .padding(.bottom, 16)
+                .padding(.bottom, bottomInset)
                 .frame(
                     maxWidth:
                         min(
@@ -511,7 +523,7 @@ struct ATHLTHTabHero: View {
                 )
             }
         }
-        .frame(height: height)
+        .frame(height: height + bottomInset - 16)
         .accessibilityElement(
             children: .combine
         )
@@ -584,20 +596,23 @@ private struct ATHLTHTopRoundedSheetShape: Shape {
 
 struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     let accent: Color
+    let softTransition: Bool
     private let hero: Hero
     private let content: Content
 
-    // Keep a small overlap so the content still feels attached to the hero,
-    // but leave more room for the hero copy than the previous 18 pt overlap.
-    private let sheetOverlap: CGFloat = 8
+    // Tab heroes reserve extra space below their copy for the fade and overlap.
+    // Other screens retain their existing layout.
+    private var sheetOverlap: CGFloat { softTransition ? 24 : 8 }
     private let sheetCornerRadius: CGFloat = 30
 
     init(
         accent: Color,
+        softTransition: Bool = false,
         @ViewBuilder hero: () -> Hero,
         @ViewBuilder content: () -> Content
     ) {
         self.accent = accent
+        self.softTransition = softTransition
         self.hero = hero()
         self.content = content()
     }
@@ -608,6 +623,22 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
 
             VStack(spacing: -sheetOverlap) {
                 hero
+                    .environment(\.athlthHeroBottomInset, softTransition ? 40 : 16)
+                    .overlay(alignment: .bottom) {
+                        if softTransition {
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .clear, location: 0),
+                                    .init(color: ATHLTHTheme.canvasTop.opacity(0.18), location: 0.35),
+                                    .init(color: ATHLTHTheme.canvasTop.opacity(0.86), location: 0.80),
+                                    .init(color: ATHLTHTheme.canvasTop, location: 1)
+                                ],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                            .frame(height: 40)
+                            .allowsHitTesting(false)
+                        }
+                    }
                     .zIndex(0)
 
                 ScrollView {
@@ -647,17 +678,18 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                             radius: sheetCornerRadius
                         )
                         .stroke(
-                            Color.white.opacity(0.70),
+                            Color.white.opacity(softTransition ? 0 : 0.70),
                             lineWidth: 0.8
                         )
                         .allowsHitTesting(false)
                     }
                     .shadow(
-                        color: ATHLTHTheme.accentDeep.opacity(0.075),
+                        color: ATHLTHTheme.accentDeep.opacity(softTransition ? 0.045 : 0.075),
                         radius: 20,
                         x: 0,
-                        y: -4
+                        y: softTransition ? 4 : -4
                     )
+                    .padding(.horizontal, softTransition ? 10 : 0)
                 }
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)

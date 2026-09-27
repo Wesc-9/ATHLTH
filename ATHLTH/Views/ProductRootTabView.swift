@@ -134,7 +134,8 @@ struct ATHLTHHomeView: View {
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.premiumGold.opacity(0.70)
+                accent: ATHLTHTheme.premiumGold.opacity(0.70),
+                softTransition: true
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
@@ -2887,7 +2888,8 @@ struct ATHLTHTrainView: View {
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: Color.green.opacity(0.55)
+                accent: Color.green.opacity(0.55),
+                softTransition: true
             ) {
                 ATHLTHTabHero(
                     imageName: "TrainHero",
@@ -4107,7 +4109,8 @@ struct ATHLTHRecoveryView: View {
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: Color.blue.opacity(0.70)
+                accent: Color.blue.opacity(0.70),
+                softTransition: true
             ) {
                 ATHLTHTabHero(
                     imageName: "RecoveryHero",
@@ -5067,6 +5070,7 @@ struct ATHLTHRecoveryView: View {
 }
 
 private struct ATHLTHProgressHero: View {
+    @Environment(\.athlthHeroBottomInset) private var bottomInset
     let title: String
     let subtitle: String
     var height: CGFloat = 190
@@ -5103,7 +5107,7 @@ private struct ATHLTHProgressHero: View {
             }
             .clipped()
         }
-        .frame(height: height)
+        .frame(height: height + bottomInset - 16)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(subtitle)")
     }
@@ -5374,7 +5378,7 @@ private struct ATHLTHProgressHero: View {
         .padding(.leading, 20)
         .padding(.trailing, 18)
         .padding(.top, 48)
-        .padding(.bottom, 16)
+        .padding(.bottom, bottomInset)
         .frame(
             maxWidth: min(
                 proxy.size.width * 0.58,
@@ -5418,7 +5422,8 @@ struct ATHLTHProgressView: View {
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: green.opacity(0.60)
+                accent: green.opacity(0.60),
+                softTransition: true
             ) {
                 ATHLTHProgressHero(
                     title: "Progress",

@@ -555,7 +555,8 @@ struct ATHLTHCommunityView: View {
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: Color.purple.opacity(0.42)
+                accent: Color.purple.opacity(0.42),
+                softTransition: true
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
