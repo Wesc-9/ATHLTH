@@ -137,15 +137,9 @@ struct GhostFriendRaceHubView: View {
         .navigationTitle("Race a Friend")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            async let socialRefresh: Void = social.refresh()
-            async let raceRefresh: Void = friendRaces.refresh()
-            async let runLoad: Void = loadRuns()
-
-            _ = await (
-                socialRefresh,
-                raceRefresh,
-                runLoad
-            )
+            await social.refresh()
+            await friendRaces.refresh()
+            await loadRuns()
         }
         .refreshable {
             await social.refresh()
