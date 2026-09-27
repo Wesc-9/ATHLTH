@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum ATHLTHTheme {
     static let cornerRadius: CGFloat = 24
@@ -297,42 +298,51 @@ struct ATHLTHTabHero: View {
                 // boundary without changing the visible crop. Narrow phones
                 // use slightly less overscan so focal subjects are not pushed
                 // outside the viewport.
-                Image(imageName)
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
-                    .frame(
-                        width: proxy.size.width,
-                        height:
-                            proxy.size.height +
-                            scrollRevealBleed,
-                        alignment: alignment
-                    )
-                    .scaleEffect(imageScale)
-                    .offset(
-                        x: horizontalOffset,
-                        y: scrollRevealBleed / 2
-                    )
-                    .clipped()
-                    .allowsHitTesting(false)
+                // A calm, readable background while a tab has no uploaded artwork.
+                LinearGradient(
+                    colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.accent, Color(red: 0.64, green: 0.66, blue: 0.63)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
 
-                Image(imageName)
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height,
-                        alignment: alignment
-                    )
-                    .scaleEffect(imageScale)
-                    .offset(
-                        x: horizontalOffset,
-                        y: verticalOffset
-                    )
-                    .clipped()
+                if let artwork = UIImage(named: imageName) {
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .scaledToFill()
+                        .frame(
+                            width: proxy.size.width,
+                            height:
+                                proxy.size.height +
+                                scrollRevealBleed,
+                            alignment: alignment
+                        )
+                        .scaleEffect(imageScale)
+                        .offset(
+                            x: horizontalOffset,
+                            y: scrollRevealBleed / 2
+                        )
+                        .clipped()
+                        .allowsHitTesting(false)
+
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .scaledToFill()
+                        .frame(
+                            width: proxy.size.width,
+                            height: proxy.size.height,
+                            alignment: alignment
+                        )
+                        .scaleEffect(imageScale)
+                        .offset(
+                            x: horizontalOffset,
+                            y: verticalOffset
+                        )
+                        .clipped()
+
+                }
 
                 LinearGradient(
                     colors: [

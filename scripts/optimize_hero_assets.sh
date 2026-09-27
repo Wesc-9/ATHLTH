@@ -1,6 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
+# Connect manually uploaded tab artwork before compiling the asset catalogue.
+# Empty image sets are intentional until replacement JPGs have been uploaded.
+python3 - <<'PY_ASSETS'
+import json
+from pathlib import Path
+for name in ("HomeHero", "TrainHero", "ProgressHero", "RecoveryHero", "CommunityHero"):
+    folder = Path("ATHLTH/Assets.xcassets") / (name + ".imageset")
+    image = {"idiom": "universal"}
+    if (folder / (name + ".jpg")).is_file():
+        image["filename"] = name + ".jpg"
+    (folder / "Contents.json").write_text(json.dumps({
+        "images": [image], "info": {"author": "xcode", "version": 1}
+    }, indent=2) + "\n")
+PY_ASSETS
+
+
 resize_if_needed() {
   local file="$1"
   local max_dimension="$2"
