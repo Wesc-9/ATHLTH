@@ -428,6 +428,7 @@ final class CommunityEventStore: ObservableObject {
     @Published var errorMessage: String?
 
     private let service: SupabaseCommunityService
+    private var lastRefreshAt: Date?
 
     init(service: SupabaseCommunityService = SupabaseCommunityService()) {
         self.service = service
@@ -446,9 +447,16 @@ final class CommunityEventStore: ObservableObject {
             .sorted { $0.event.startsAt < $1.event.startsAt }
     }
 
-    func refresh() async {
+    func refresh(force: Bool = false) async {
         guard currentUserID != nil else {
             events = []
+            return
+        }
+
+        if !force,
+           let lastRefreshAt,
+           Date().timeIntervalSince(lastRefreshAt) < 120,
+           !events.isEmpty {
             return
         }
 
@@ -467,6 +475,7 @@ final class CommunityEventStore: ObservableObject {
             }
 
             events = loadedEvents
+            lastRefreshAt = Date()
             errorMessage = nil
         } catch is CancellationError {
             // SwiftUI can legitimately cancel .task work when the view
@@ -485,7 +494,7 @@ final class CommunityEventStore: ObservableObject {
     func create(_ draft: CommunityEventDraft) async -> Bool {
         do {
             try await service.createEvent(draft)
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -502,7 +511,7 @@ final class CommunityEventStore: ObservableObject {
 
         do {
             try await service.join(eventID: item.id)
-            await refresh()
+            await refresh(force: true)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -511,7 +520,7 @@ final class CommunityEventStore: ObservableObject {
     func maybe(_ item: CommunityEventItem) async {
         do {
             try await service.maybe(eventID: item.id)
-            await refresh()
+            await refresh(force: true)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -520,7 +529,7 @@ final class CommunityEventStore: ObservableObject {
     func leave(_ item: CommunityEventItem) async {
         do {
             try await service.leave(eventID: item.id)
-            await refresh()
+            await refresh(force: true)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -529,7 +538,7 @@ final class CommunityEventStore: ObservableObject {
     func cancel(_ item: CommunityEventItem) async {
         do {
             try await service.cancel(eventID: item.id)
-            await refresh()
+            await refresh(force: true)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -720,7 +729,7 @@ struct ATHLTHCommunityView: View {
                 .frame(maxWidth: .infinity)
             }
             .refreshable {
-                await refreshCommunity()
+                await refreshCommunity(force: true)
             }
             .task {
                 await refreshCommunity()
@@ -764,14 +773,19 @@ struct ATHLTHCommunityView: View {
     }
 
     @MainActor
-    private func refreshCommunity() async {
-        async let eventRefresh: Void = community.refresh()
+    private func refreshCommunity(
+        force: Bool = false
+    ) async {
+        async let eventRefresh: Void =
+            community.refresh(force: force)
         async let socialRefresh: Void =
             social.refresh(challengeStore: challenges)
-        async let groupRefresh: Void = groups.refresh()
-        async let routeRefresh: Void = routeDiscovery.refresh()
+        async let groupRefresh: Void =
+            groups.refresh(force: force)
+        async let routeRefresh: Void =
+            routeDiscovery.refresh(force: force)
         async let officialChallengeRefresh: Void =
-            officialChallenges.refresh()
+            officialChallenges.refresh(force: force)
 
         _ = await (
             eventRefresh,
