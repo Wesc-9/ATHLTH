@@ -1534,8 +1534,9 @@ struct OfficialWeeklyChallengeDetailView: View {
         Group {
             if let challenge {
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 18) {
                         premiumHeroCard(challenge)
+                        challengeOverviewSection(challenge)
                         progressSection(challenge)
                         leaderboardSection(challenge)
                         countedWorkoutsSection
@@ -1585,7 +1586,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 OfficialWeeklyChallengeArtwork(
                     challenge: challenge
                 )
-                .frame(height: 224)
+                .frame(height: 238)
                 .clipped()
 
                 LinearGradient(
@@ -1682,8 +1683,8 @@ struct OfficialWeeklyChallengeDetailView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(
                             store.isJoined(challenge.id)
-                                ? "YOUR PROGRESS"
-                                : "THE CHALLENGE"
+                                ? "YOUR WEEKLY TARGET"
+                                : "RECOMMENDED TARGET"
                         )
                         .font(.caption.weight(.bold))
                         .tracking(1.5)
@@ -1719,6 +1720,33 @@ struct OfficialWeeklyChallengeDetailView: View {
                         .fixedSize(
                             horizontal: false,
                             vertical: true
+                        )
+
+                        HStack(spacing: 7) {
+                            Image(
+                                systemName:
+                                    store.isJoined(challenge.id)
+                                        ? "checkmark.circle.fill"
+                                        : "sparkles"
+                            )
+
+                            Text(
+                                store.isJoined(challenge.id)
+                                    ? progressStatus(for: challenge)
+                                    : challengeFocusTitle(for: challenge)
+                            )
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.76)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .padding(.horizontal, 10)
+                        .frame(height: 29)
+                        .background(
+                            ATHLTHTheme.champagneSoft.opacity(0.72),
+                            in: Capsule()
                         )
                     }
 
@@ -1945,13 +1973,13 @@ struct OfficialWeeklyChallengeDetailView: View {
         }
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 32,
+                cornerRadius: 34,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 32,
+                cornerRadius: 34,
                 style: .continuous
             )
             .stroke(
