@@ -77,7 +77,7 @@ struct ProfileFriendsSection: View {
                             Text("Find your training crew")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
-                            Text("Search by @username and send a friend request.")
+                            Text("Search athletes and follow public profiles instantly.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -292,7 +292,7 @@ struct SocialHubView: View {
                     ContentUnavailableView(
                         "No requests",
                         systemImage: "person.crop.circle.badge.checkmark",
-                        description: Text("Friend and workout invitations will appear here.")
+                        description: Text("Follow and workout requests will appear here.")
                     )
                     .padding(.vertical, 50)
                 }
@@ -367,7 +367,7 @@ struct SocialHubView: View {
                 }
 
                 if !social.incomingRequests.isEmpty {
-                    sectionTitle("Incoming")
+                    sectionTitle("Follow Requests")
 
                     ForEach(social.incomingRequests) { request in
                         SocialProfileRow(profile: request.profile) {
@@ -390,7 +390,7 @@ struct SocialHubView: View {
                 }
 
                 if !social.outgoingRequests.isEmpty {
-                    sectionTitle("Sent")
+                    sectionTitle("Follow Requests Sent")
 
                     ForEach(social.outgoingRequests) { request in
                         SocialProfileRow(profile: request.profile) {
@@ -414,7 +414,7 @@ struct SocialHubView: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
 
-                    TextField("@username", text: $searchText)
+                    TextField("Name or @username", text: $searchText)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .submitLabel(.search)
@@ -451,9 +451,9 @@ struct SocialHubView: View {
 
                 if searchText.isEmpty {
                     ContentUnavailableView(
-                        "Find ATHLTH friends",
+                        "Find ATHLTH users",
                         systemImage: "person.2.badge.plus",
-                        description: Text("Search for a unique @username.")
+                        description: Text("Search by name or @username.")
                     )
                     .padding(.vertical, 45)
                 } else if social.discoverResults.isEmpty {
@@ -480,38 +480,61 @@ struct SocialHubView: View {
     }
 
     @ViewBuilder
-    private func relationshipAction(_ profile: SocialProfileCard) -> some View {
-        switch social.relationshipState(with: profile.userID) {
-        case .friends:
-            Text("Friends")
+    private func relationshipAction(
+        _ profile: SocialProfileCard
+    ) -> some View {
+        if social.isFollowing(profile.userID) {
+            Text("Following")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(ATHLTHTheme.accent)
+        } else {
+            switch social.relationshipState(
+                with: profile.userID
+            ) {
+            case .outgoingPending:
+                Text("Requested")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
 
-        case .outgoingPending:
-            Text("Requested")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+            case .incomingPending:
+                Text("Respond")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.orange)
 
-        case .incomingPending:
-            Text("Respond")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.orange)
+            case .blocked:
+                Text("Blocked")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.red)
 
-        case .blocked:
-            Text("Blocked")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.red)
+            case .friends:
+                Button("Follow") {
+                    Task {
+                        await social.follow(profile)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .tint(ATHLTHTheme.accent)
 
-        case .none:
-            Button("Add") {
-                Task { await social.sendFriendRequest(to: profile) }
+            case .none:
+                Button("Follow") {
+                    Task {
+                        if profile.isPrivateProfile {
+                            await social.sendFriendRequest(
+                                to: profile
+                            )
+                        } else {
+                            await social.follow(profile)
+                        }
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .tint(ATHLTHTheme.accent)
+
+            case .selfUser:
+                EmptyView()
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .tint(ATHLTHTheme.accent)
-
-        case .selfUser:
-            EmptyView()
         }
     }
 
