@@ -71,6 +71,7 @@ private struct RecoveryAIAnswer: Decodable {
     let answer: String
 }
 
+@MainActor
 final class RecoveryAIService {
     private let client: SupabaseClient
 
