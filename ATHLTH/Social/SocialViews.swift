@@ -212,7 +212,7 @@ struct SocialHubView: View {
                 }
             }
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(ATHLTHPremiumCanvas(accent: ATHLTHTheme.accent.opacity(0.20)))
         .navigationTitle("Social")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -676,6 +676,7 @@ struct FriendProfileView: View {
     @State private var showingReport = false
     @State private var confirmRemove = false
     @State private var confirmBlock = false
+    @State private var followOverview = SocialFollowOverview.empty
 
     var body: some View {
         ScrollView {
@@ -686,6 +687,12 @@ struct FriendProfileView: View {
                 } else if let profile {
                     profileHeader(profile)
                     actionBar(profile)
+
+                    if profile.card.isPrivateProfile &&
+                        social.relationshipState(with: userID) != .friends &&
+                        !social.isFollowing(userID) {
+                        privateProfileNotice
+                    }
 
                     if let performance = profile.performance {
                         compareCard(friend: performance)
@@ -776,92 +783,224 @@ struct FriendProfileView: View {
     }
 
     private func profileHeader(_ profile: SocialFriendProfile) -> some View {
-        VStack(spacing: 13) {
-            SocialAvatar(profile: profile.card, size: 104)
+        VStack(spacing: 18) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.accent.opacity(0.18),
+                                ATHLTHTheme.vitality.opacity(0.10),
+                                Color.white.opacity(0.92)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 126, height: 126)
 
-            VStack(spacing: 4) {
+                SocialAvatar(profile: profile.card, size: 112)
+                    .overlay {
+                        Circle()
+                            .stroke(Color.white.opacity(0.92), lineWidth: 3)
+                    }
+            }
+
+            VStack(spacing: 5) {
                 Text(profile.card.resolvedName)
-                    .font(.title.bold())
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .multilineTextAlignment(.center)
 
                 if !profile.card.usernameLabel.isEmpty {
                     Text(profile.card.usernameLabel)
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                 }
+
+                Label(
+                    profile.card.isPrivateProfile
+                        ? "Private profile"
+                        : "Public profile",
+                    systemImage:
+                        profile.card.isPrivateProfile
+                            ? "lock.fill"
+                            : "globe.europe.africa.fill"
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(
+                    profile.card.isPrivateProfile
+                        ? ATHLTHTheme.mutedText
+                        : ATHLTHTheme.vitality
+                )
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Color.white.opacity(0.72),
+                    in: Capsule()
+                )
             }
 
-            if let bio = profile.card.bio, !bio.isEmpty {
+            if let bio = profile.card.bio?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !bio.isEmpty {
                 Text(bio)
                     .font(.subheadline)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.78))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12)
             }
 
-            if let focus = profile.trainingFocus {
-                Label(focus.title, systemImage: focus.systemImage)
+            followStats(profile)
+
+            HStack(spacing: 8) {
+                if let focus = profile.trainingFocus {
+                    Label(focus.title, systemImage: focus.systemImage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(ATHLTHTheme.accentSoft, in: Capsule())
+                }
+
+                if let presence = profile.presence {
+                    Label(
+                        presence.state == "training"
+                            ? "Training now"
+                            : "Available",
+                        systemImage: presence.state == "training"
+                            ? "figure.run"
+                            : "circle.fill"
+                    )
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHTheme.vitality)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
-                        ATHLTHTheme.accentSoft,
+                        ATHLTHTheme.vitalitySoft,
                         in: Capsule()
                     )
-            }
-
-            if let presence = profile.presence {
-                Label(
-                    presence.state == "training"
-                        ? "Training now\(presence.workoutTitle.map { " · \($0)" } ?? "")"
-                        : "Available",
-                    systemImage: presence.state == "training"
-                        ? "figure.run"
-                        : "circle.fill"
-                )
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
+                }
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 24)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(
+                cornerRadius: 30,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 30,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.72), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private func followStats(
+        _ profile: SocialFriendProfile
+    ) -> some View {
+        HStack(spacing: 0) {
+            if profile.card.isPrivateProfile {
+                followStat(
+                    value: followOverview.followerCount,
+                    title: "Followers"
+                )
+            } else {
+                NavigationLink {
+                    ProfileConnectionsView(
+                        title: "Followers",
+                        profiles: followOverview.followers,
+                        totalCount: followOverview.followerCount
+                    )
+                } label: {
+                    followStat(
+                        value: followOverview.followerCount,
+                        title: "Followers"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Divider()
+                .frame(height: 34)
+
+            if profile.card.isPrivateProfile {
+                followStat(
+                    value: followOverview.followingCount,
+                    title: "Following"
+                )
+            } else {
+                NavigationLink {
+                    ProfileConnectionsView(
+                        title: "Following",
+                        profiles: followOverview.following,
+                        totalCount: followOverview.followingCount
+                    )
+                } label: {
+                    followStat(
+                        value: followOverview.followingCount,
+                        title: "Following"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 12)
+        .background(
+            Color.white.opacity(0.70),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+    }
+
+    private func followStat(
+        value: Int,
+        title: String
+    ) -> some View {
+        VStack(spacing: 2) {
+            Text("\(value)")
+                .font(.headline.monospacedDigit())
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Text(title)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
     }
 
     private func actionBar(_ profile: SocialFriendProfile) -> some View {
         let relationship = social.relationshipState(with: userID)
 
         return VStack(spacing: 10) {
-            if social.isFollowing(userID) {
-                Button {
-                    Task { await social.unfollow(userID) }
-                } label: {
-                    Label("Following", systemImage: "person.fill.checkmark")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHTheme.accent)
-            } else {
-                Button {
-                    Task { await social.follow(profile.card) }
-                } label: {
-                    Label("Follow", systemImage: "person.badge.plus")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
-            }
-
             HStack(spacing: 10) {
-                relationshipButton(profile.card)
+                mainFollowButton(profile)
 
                 NavigationLink {
                     DirectMessageThreadView(friend: profile.card)
                 } label: {
                     Label(
-                        relationship == .friends ? "Message" : "Message request",
+                        relationship == .friends
+                            ? "Message"
+                            : "Message request",
                         systemImage: "message.fill"
                     )
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
+                    .frame(height: 48)
                 }
                 .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.accentDeep)
             }
 
             if relationship == .friends {
@@ -869,79 +1008,164 @@ struct FriendProfileView: View {
                     showingChallenge = true
                 } label: {
                     Label("Challenge", systemImage: "bolt.fill")
+                        .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
+                        .frame(height: 46)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .tint(ATHLTHTheme.accent)
             }
         }
     }
 
     @ViewBuilder
-    private func relationshipButton(_ card: SocialProfileCard) -> some View {
-        switch social.relationshipState(with: userID) {
-        case .friends:
-            Label("Friends", systemImage: "checkmark")
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+    private func mainFollowButton(
+        _ profile: SocialFriendProfile
+    ) -> some View {
+        let relationship = social.relationshipState(with: userID)
 
-        case .outgoingPending:
-            Text("Request sent")
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .background(Color(.secondarySystemGroupedBackground), in: Capsule())
-
-        case .incomingPending:
-            if let request = social.incomingRequests.first(where: {
-                $0.profile.userID == userID
-            }) {
-                HStack(spacing: 8) {
-                    Button("Decline") {
-                        Task {
-                            await social.decline(request)
-                            await load(force: true)
-                        }
-                    }
-                    .buttonStyle(.bordered)
+        if social.isFollowing(userID) {
+            Button {
+                Task {
+                    await social.unfollow(userID)
+                    followOverview = await social.loadFollowOverview(
+                        for: userID
+                    )
+                }
+            } label: {
+                Label("Following", systemImage: "person.fill.checkmark")
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+            }
+            .buttonStyle(.bordered)
+            .tint(ATHLTHTheme.accentDeep)
+        } else if profile.card.isPrivateProfile {
+            switch relationship {
+            case .outgoingPending:
+                Label("Requested", systemImage: "clock.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(
+                        Color.primary.opacity(0.05),
+                        in: Capsule()
+                    )
 
-                    Button("Accept") {
+            case .incomingPending:
+                if let request = social.incomingRequests.first(where: {
+                    $0.profile.userID == userID
+                }) {
+                    Button {
                         Task {
                             await social.accept(request)
                             await load(force: true)
                         }
+                    } label: {
+                        Label(
+                            "Accept request",
+                            systemImage: "person.crop.circle.badge.checkmark"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accent)
-                    .frame(maxWidth: .infinity)
+                    .tint(ATHLTHTheme.accentDeep)
                 }
-            } else {
-                Text("Friend request pending")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(
-                        Color(.secondarySystemGroupedBackground),
-                        in: Capsule()
-                    )
-            }
 
-        case .none:
+            case .friends:
+                Button {
+                    Task {
+                        await social.follow(profile.card)
+                        followOverview = await social.loadFollowOverview(
+                            for: userID
+                        )
+                    }
+                } label: {
+                    Label("Follow", systemImage: "person.badge.plus")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+
+            case .none:
+                Button {
+                    Task {
+                        await social.sendFriendRequest(to: profile.card)
+                    }
+                } label: {
+                    Label("Follow", systemImage: "person.badge.plus")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+
+            case .blocked:
+                Label("Blocked", systemImage: "nosign")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+
+            case .selfUser:
+                EmptyView()
+            }
+        } else {
             Button {
-                Task { await social.sendFriendRequest(to: card) }
+                Task {
+                    await social.follow(profile.card)
+                    followOverview = await social.loadFollowOverview(
+                        for: userID
+                    )
+                }
             } label: {
-                Label("Add Friend", systemImage: "person.badge.plus")
+                Label("Follow", systemImage: "person.badge.plus")
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
+                    .frame(height: 48)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
+        }
+    }
 
-        case .blocked:
-            Text("Blocked")
-                .frame(maxWidth: .infinity)
-                .foregroundStyle(.red)
+    private var privateProfileNotice: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "lock.fill")
+                .font(.title3)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
 
-        case .selfUser:
-            EmptyView()
+            Text("This profile is private")
+                .font(.headline)
+
+            Text(
+                "Send a follow request to unlock the profile sections this athlete shares with approved connections."
+            )
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(18)
+        .background(
+            Color.white.opacity(0.76),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.72), lineWidth: 1)
         }
     }
 
@@ -1110,11 +1334,18 @@ struct FriendProfileView: View {
 
     private func load(force: Bool = false) async {
         loading = true
-        async let profileTask = social.loadFriendProfile(userID, forceRefresh: force)
-        async let ownTask = try? health.profilePerformanceStats(forceRefresh: force)
+        async let profileTask = social.loadFriendProfile(
+            userID,
+            forceRefresh: force
+        )
+        async let ownTask = try? health.profilePerformanceStats(
+            forceRefresh: force
+        )
+        async let followTask = social.loadFollowOverview(for: userID)
 
         profile = await profileTask
         ownStats = await ownTask
+        followOverview = await followTask
         loading = false
     }
 
@@ -1145,6 +1376,54 @@ struct FriendProfileView: View {
         case "challenge": return "person.2.fill"
         default: return "sparkles"
         }
+    }
+}
+
+
+struct ProfileConnectionsView: View {
+    let title: String
+    let profiles: [SocialProfileCard]
+    let totalCount: Int
+
+    var body: some View {
+        List {
+            if profiles.isEmpty {
+                ContentUnavailableView(
+                    totalCount > 0
+                        ? "Profiles unavailable"
+                        : "No \(title.lowercased()) yet",
+                    systemImage: "person.2",
+                    description: Text(
+                        totalCount > profiles.count
+                            ? "Some profiles are not currently visible to you."
+                            : "This list is empty."
+                    )
+                )
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(profiles) { profile in
+                    NavigationLink {
+                        FriendProfileView(userID: profile.userID)
+                    } label: {
+                        HStack(spacing: 12) {
+                            SocialAvatar(profile: profile, size: 44)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(profile.resolvedName)
+                                    .font(.subheadline.weight(.semibold))
+
+                                Text(profile.usernameLabel)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
