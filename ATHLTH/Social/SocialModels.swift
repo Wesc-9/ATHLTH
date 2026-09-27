@@ -15,6 +15,7 @@ struct SocialProfileCard: Identifiable, Codable, Hashable {
     let displayName: String?
     let bio: String?
     let avatarURL: String?
+    let profileVisibility: String?
     let createdAt: Date?
     let updatedAt: Date?
 
@@ -24,6 +25,7 @@ struct SocialProfileCard: Identifiable, Codable, Hashable {
         case displayName = "display_name"
         case bio
         case avatarURL = "avatar_url"
+        case profileVisibility = "profile_visibility"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -39,6 +41,28 @@ struct SocialProfileCard: Identifiable, Codable, Hashable {
         guard let username, !username.isEmpty else { return "" }
         return "@\(username)"
     }
+
+    var isPrivateProfile: Bool {
+        profileVisibility == "private"
+    }
+
+    var isPublicProfile: Bool {
+        profileVisibility == nil || profileVisibility == "public"
+    }
+}
+
+struct SocialFollowOverview: Hashable {
+    let followerCount: Int
+    let followingCount: Int
+    let followers: [SocialProfileCard]
+    let following: [SocialProfileCard]
+
+    static let empty = SocialFollowOverview(
+        followerCount: 0,
+        followingCount: 0,
+        followers: [],
+        following: []
+    )
 }
 
 struct SocialProfileDetailRecord: Codable, Hashable {
