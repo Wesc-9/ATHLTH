@@ -711,10 +711,7 @@ struct OfficialWeeklyChallengeCard: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            Image(challenge.heroAsset)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFill()
+            challengeArtwork
 
             LinearGradient(
                 colors: [
@@ -846,7 +843,7 @@ struct OfficialWeeklyChallengeCard: View {
             }
             .allowsHitTesting(false)
         }
-        .frame(height: 270)
+        .frame(height: 258)
         .frame(maxWidth: .infinity)
         .clipShape(
             RoundedRectangle(
@@ -871,6 +868,89 @@ struct OfficialWeeklyChallengeCard: View {
             await store.syncCompletionState(
                 workouts: health.workouts
             )
+        }
+    }
+
+    @ViewBuilder
+    private var challengeArtwork: some View {
+        if let remoteURL = URL(string: challenge.heroAsset),
+           remoteURL.scheme == "https" || remoteURL.scheme == "http" {
+            AsyncImage(url: remoteURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFill()
+                default:
+                    challengeFallbackArtwork
+                }
+            }
+        } else if challenge.heroAsset != "CommunityHero",
+                  !challenge.heroAsset.isEmpty,
+                  UIImage(named: challenge.heroAsset) != nil {
+            Image(challenge.heroAsset)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFill()
+        } else {
+            challengeFallbackArtwork
+        }
+    }
+
+    private var challengeFallbackArtwork: some View {
+        ZStack {
+            LinearGradient(
+                colors: challengeFallbackColors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.white.opacity(0.16))
+                .frame(width: 220, height: 220)
+                .blur(radius: 2)
+                .offset(x: 118, y: -72)
+
+            Circle()
+                .fill(Color.white.opacity(0.10))
+                .frame(width: 150, height: 150)
+                .offset(x: -126, y: 92)
+
+            Image(systemName: challenge.kind.icon)
+                .font(.system(size: 78, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.20))
+                .rotationEffect(.degrees(-8))
+                .offset(x: 118, y: 44)
+        }
+    }
+
+    private var challengeFallbackColors: [Color] {
+        switch challenge.kind {
+        case .distance:
+            return [
+                Color(red: 0.16, green: 0.53, blue: 0.42),
+                Color(red: 0.50, green: 0.74, blue: 0.61),
+                Color(red: 0.88, green: 0.83, blue: 0.66)
+            ]
+        case .sessions:
+            return [
+                Color(red: 0.35, green: 0.30, blue: 0.68),
+                Color(red: 0.55, green: 0.43, blue: 0.78),
+                Color(red: 0.88, green: 0.72, blue: 0.61)
+            ]
+        case .minutes:
+            return [
+                Color(red: 0.16, green: 0.46, blue: 0.69),
+                Color(red: 0.43, green: 0.69, blue: 0.80),
+                Color(red: 0.88, green: 0.82, blue: 0.67)
+            ]
+        case .streak:
+            return [
+                Color(red: 0.70, green: 0.34, blue: 0.18),
+                Color(red: 0.88, green: 0.55, blue: 0.28),
+                Color(red: 0.92, green: 0.80, blue: 0.59)
+            ]
         }
     }
 
