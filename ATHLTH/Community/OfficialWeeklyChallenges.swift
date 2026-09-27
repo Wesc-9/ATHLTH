@@ -769,6 +769,429 @@ enum OfficialWeeklyChallengeProgress {
     }
 }
 
+private struct OfficialWeeklyCoverRecipe {
+    let palette: String
+    let scene: String
+    let light: String
+    let motif: String
+    let energy: String
+    let variant: Int
+
+    init?(asset: String) {
+        guard
+            let components = URLComponents(string: asset),
+            components.scheme == "athlth-cover",
+            components.host == "v1"
+        else {
+            return nil
+        }
+
+        let values = Dictionary(
+            uniqueKeysWithValues:
+                (components.queryItems ?? []).map {
+                    ($0.name, $0.value ?? "")
+                }
+        )
+
+        palette = values["palette"] ?? "sage"
+        scene = values["scene"] ?? "mountain"
+        light = values["light"] ?? "daylight"
+        motif = values["motif"] ?? "route"
+        energy = values["energy"] ?? "steady"
+        variant = Int(values["variant"] ?? "1") ?? 1
+    }
+}
+
+private struct OfficialWeeklyChallengeArtwork: View {
+    let challenge: OfficialWeeklyChallenge
+
+    private var recipe: OfficialWeeklyCoverRecipe? {
+        OfficialWeeklyCoverRecipe(asset: challenge.heroAsset)
+    }
+
+    var body: some View {
+        Group {
+            if let recipe {
+                generatedArtwork(recipe)
+            } else if let remoteURL = URL(string: challenge.heroAsset),
+                      remoteURL.scheme == "https" ||
+                      remoteURL.scheme == "http" {
+                AsyncImage(url: remoteURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .interpolation(.high)
+                            .scaledToFill()
+                    default:
+                        fallbackArtwork
+                    }
+                }
+            } else if challenge.heroAsset != "CommunityHero",
+                      !challenge.heroAsset.isEmpty,
+                      UIImage(named: challenge.heroAsset) != nil {
+                Image(challenge.heroAsset)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+            } else {
+                fallbackArtwork
+            }
+        }
+    }
+
+    private func generatedArtwork(
+        _ recipe: OfficialWeeklyCoverRecipe
+    ) -> some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+
+            ZStack {
+                LinearGradient(
+                    colors: paletteColors(recipe.palette),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                lightOverlay(recipe.light)
+
+                sceneLayer(
+                    recipe.scene,
+                    size: size,
+                    variant: recipe.variant
+                )
+
+                routeLayer(
+                    size: size,
+                    variant: recipe.variant,
+                    energy: recipe.energy
+                )
+
+                motifLayer(recipe.motif)
+                    .frame(
+                        width: min(size.width * 0.36, 150),
+                        height: min(size.width * 0.36, 150)
+                    )
+                    .offset(
+                        x: size.width * 0.28,
+                        y: size.height * 0.15
+                    )
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.12),
+                        Color.clear,
+                        Color.black.opacity(0.16)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+            .clipped()
+        }
+    }
+
+    @ViewBuilder
+    private func sceneLayer(
+        _ scene: String,
+        size: CGSize,
+        variant: Int
+    ) -> some View {
+        switch scene {
+        case "coast":
+            VStack {
+                Spacer()
+                Image(systemName: "water.waves")
+                    .font(.system(size: max(size.width * 0.28, 92)))
+                    .foregroundStyle(Color.white.opacity(0.20))
+                    .offset(x: variant.isMultiple(of: 2) ? 70 : 110)
+            }
+        case "forest":
+            HStack(alignment: .bottom, spacing: -18) {
+                ForEach(0..<4, id: \.self) { index in
+                    Image(systemName: "tree.fill")
+                        .font(
+                            .system(
+                                size:
+                                    58 +
+                                    CGFloat((index + variant) % 3) * 18
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white.opacity(
+                                0.10 + Double(index) * 0.025
+                            )
+                        )
+                }
+            }
+            .offset(
+                x: size.width * 0.18,
+                y: size.height * 0.14
+            )
+        case "city":
+            HStack(alignment: .bottom, spacing: 8) {
+                Image(systemName: "building.fill")
+                Image(systemName: "building.2.fill")
+                Image(systemName: "building.fill")
+            }
+            .font(.system(size: max(size.width * 0.13, 48)))
+            .foregroundStyle(Color.white.opacity(0.15))
+            .offset(
+                x: size.width * 0.22,
+                y: size.height * 0.16
+            )
+        case "track":
+            ZStack {
+                RoundedRectangle(cornerRadius: 80)
+                    .stroke(
+                        Color.white.opacity(0.18),
+                        lineWidth: 5
+                    )
+                    .frame(
+                        width: size.width * 0.54,
+                        height: size.height * 0.44
+                    )
+
+                RoundedRectangle(cornerRadius: 70)
+                    .stroke(
+                        Color.white.opacity(0.11),
+                        lineWidth: 3
+                    )
+                    .frame(
+                        width: size.width * 0.44,
+                        height: size.height * 0.32
+                    )
+            }
+            .rotationEffect(.degrees(-10))
+            .offset(x: size.width * 0.22)
+        case "studio":
+            Image(systemName: "figure.run")
+                .font(.system(size: max(size.width * 0.24, 88)))
+                .foregroundStyle(Color.white.opacity(0.16))
+                .offset(
+                    x: size.width * 0.25,
+                    y: size.height * 0.10
+                )
+        case "mountain":
+            Image(systemName: "mountain.2.fill")
+                .font(.system(size: max(size.width * 0.31, 112)))
+                .foregroundStyle(Color.white.opacity(0.16))
+                .offset(
+                    x: size.width * 0.22,
+                    y: size.height * 0.15
+                )
+        default:
+            EmptyView()
+        }
+    }
+
+    private func routeLayer(
+        size: CGSize,
+        variant: Int,
+        energy: String
+    ) -> some View {
+        Canvas { context, canvasSize in
+            var path = Path()
+
+            let startY =
+                canvasSize.height *
+                (variant.isMultiple(of: 2) ? 0.72 : 0.66)
+
+            path.move(
+                to: CGPoint(
+                    x: canvasSize.width * 0.43,
+                    y: startY
+                )
+            )
+
+            path.addCurve(
+                to: CGPoint(
+                    x: canvasSize.width * 1.05,
+                    y: canvasSize.height *
+                        (variant > 2 ? 0.22 : 0.35)
+                ),
+                control1: CGPoint(
+                    x: canvasSize.width * 0.62,
+                    y: canvasSize.height * 0.78
+                ),
+                control2: CGPoint(
+                    x: canvasSize.width * 0.72,
+                    y: canvasSize.height * 0.26
+                )
+            )
+
+            let opacity: Double
+            switch energy {
+            case "energetic":
+                opacity = 0.52
+            case "calm":
+                opacity = 0.28
+            default:
+                opacity = 0.40
+            }
+
+            context.stroke(
+                path,
+                with: .color(Color.white.opacity(opacity)),
+                style: StrokeStyle(
+                    lineWidth: energy == "energetic" ? 4 : 3,
+                    lineCap: .round,
+                    dash: [10, 12]
+                )
+            )
+        }
+        .frame(width: size.width, height: size.height)
+    }
+
+    private func motifLayer(_ motif: String) -> some View {
+        let symbol: String
+
+        switch motif {
+        case "waves":
+            symbol = "wave.3.right"
+        case "steps":
+            symbol = "figure.walk.motion"
+        case "pulse":
+            symbol = "waveform.path.ecg"
+        case "streak":
+            symbol = "flame.fill"
+        case "group":
+            symbol = "person.3.fill"
+        default:
+            symbol = "figure.run"
+        }
+
+        return Image(systemName: symbol)
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(Color.white.opacity(0.13))
+            .rotationEffect(.degrees(-8))
+    }
+
+    private func lightOverlay(_ light: String) -> some View {
+        RadialGradient(
+            colors: [
+                lightColor(light).opacity(0.42),
+                lightColor(light).opacity(0.08),
+                Color.clear
+            ],
+            center: .topTrailing,
+            startRadius: 10,
+            endRadius: 270
+        )
+    }
+
+    private func paletteColors(_ palette: String) -> [Color] {
+        switch palette {
+        case "ocean":
+            return [
+                Color(red: 0.12, green: 0.42, blue: 0.62),
+                Color(red: 0.35, green: 0.68, blue: 0.75),
+                Color(red: 0.86, green: 0.82, blue: 0.68)
+            ]
+        case "amber":
+            return [
+                Color(red: 0.64, green: 0.30, blue: 0.15),
+                Color(red: 0.88, green: 0.55, blue: 0.26),
+                Color(red: 0.94, green: 0.80, blue: 0.56)
+            ]
+        case "violet":
+            return [
+                Color(red: 0.32, green: 0.26, blue: 0.64),
+                Color(red: 0.54, green: 0.43, blue: 0.78),
+                Color(red: 0.88, green: 0.72, blue: 0.70)
+            ]
+        case "rose":
+            return [
+                Color(red: 0.64, green: 0.28, blue: 0.40),
+                Color(red: 0.84, green: 0.50, blue: 0.56),
+                Color(red: 0.93, green: 0.77, blue: 0.67)
+            ]
+        case "slate":
+            return [
+                Color(red: 0.22, green: 0.30, blue: 0.36),
+                Color(red: 0.43, green: 0.55, blue: 0.59),
+                Color(red: 0.82, green: 0.81, blue: 0.73)
+            ]
+        default:
+            return [
+                Color(red: 0.16, green: 0.53, blue: 0.42),
+                Color(red: 0.50, green: 0.74, blue: 0.61),
+                Color(red: 0.88, green: 0.83, blue: 0.66)
+            ]
+        }
+    }
+
+    private func lightColor(_ light: String) -> Color {
+        switch light {
+        case "sunrise":
+            return Color(red: 1.0, green: 0.71, blue: 0.47)
+        case "golden_hour":
+            return Color(red: 1.0, green: 0.76, blue: 0.43)
+        case "dusk":
+            return Color(red: 0.52, green: 0.48, blue: 0.82)
+        default:
+            return .white
+        }
+    }
+
+    private var fallbackArtwork: some View {
+        ZStack {
+            LinearGradient(
+                colors: fallbackColors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.white.opacity(0.16))
+                .frame(width: 220, height: 220)
+                .blur(radius: 2)
+                .offset(x: 118, y: -72)
+
+            Circle()
+                .fill(Color.white.opacity(0.10))
+                .frame(width: 150, height: 150)
+                .offset(x: -126, y: 92)
+
+            Image(systemName: challenge.kind.icon)
+                .font(.system(size: 78, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.20))
+                .rotationEffect(.degrees(-8))
+                .offset(x: 118, y: 44)
+        }
+    }
+
+    private var fallbackColors: [Color] {
+        switch challenge.kind {
+        case .distance:
+            return [
+                Color(red: 0.16, green: 0.53, blue: 0.42),
+                Color(red: 0.50, green: 0.74, blue: 0.61),
+                Color(red: 0.88, green: 0.83, blue: 0.66)
+            ]
+        case .sessions:
+            return [
+                Color(red: 0.35, green: 0.30, blue: 0.68),
+                Color(red: 0.55, green: 0.43, blue: 0.78),
+                Color(red: 0.88, green: 0.72, blue: 0.61)
+            ]
+        case .minutes:
+            return [
+                Color(red: 0.16, green: 0.46, blue: 0.69),
+                Color(red: 0.43, green: 0.69, blue: 0.80),
+                Color(red: 0.88, green: 0.82, blue: 0.67)
+            ]
+        case .streak:
+            return [
+                Color(red: 0.70, green: 0.34, blue: 0.18),
+                Color(red: 0.88, green: 0.55, blue: 0.28),
+                Color(red: 0.92, green: 0.80, blue: 0.59)
+            ]
+        }
+    }
+}
+
 struct OfficialWeeklyChallengeCard: View {
     @EnvironmentObject private var store: OfficialWeeklyChallengeStore
     @EnvironmentObject private var health: HealthKitManager
@@ -958,87 +1381,10 @@ struct OfficialWeeklyChallengeCard: View {
         }
     }
 
-    @ViewBuilder
     private var challengeArtwork: some View {
-        if let remoteURL = URL(string: challenge.heroAsset),
-           remoteURL.scheme == "https" || remoteURL.scheme == "http" {
-            AsyncImage(url: remoteURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFill()
-                default:
-                    challengeFallbackArtwork
-                }
-            }
-        } else if challenge.heroAsset != "CommunityHero",
-                  !challenge.heroAsset.isEmpty,
-                  UIImage(named: challenge.heroAsset) != nil {
-            Image(challenge.heroAsset)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFill()
-        } else {
-            challengeFallbackArtwork
-        }
-    }
-
-    private var challengeFallbackArtwork: some View {
-        ZStack {
-            LinearGradient(
-                colors: challengeFallbackColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(Color.white.opacity(0.16))
-                .frame(width: 220, height: 220)
-                .blur(radius: 2)
-                .offset(x: 118, y: -72)
-
-            Circle()
-                .fill(Color.white.opacity(0.10))
-                .frame(width: 150, height: 150)
-                .offset(x: -126, y: 92)
-
-            Image(systemName: challenge.kind.icon)
-                .font(.system(size: 78, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.20))
-                .rotationEffect(.degrees(-8))
-                .offset(x: 118, y: 44)
-        }
-    }
-
-    private var challengeFallbackColors: [Color] {
-        switch challenge.kind {
-        case .distance:
-            return [
-                Color(red: 0.16, green: 0.53, blue: 0.42),
-                Color(red: 0.50, green: 0.74, blue: 0.61),
-                Color(red: 0.88, green: 0.83, blue: 0.66)
-            ]
-        case .sessions:
-            return [
-                Color(red: 0.35, green: 0.30, blue: 0.68),
-                Color(red: 0.55, green: 0.43, blue: 0.78),
-                Color(red: 0.88, green: 0.72, blue: 0.61)
-            ]
-        case .minutes:
-            return [
-                Color(red: 0.16, green: 0.46, blue: 0.69),
-                Color(red: 0.43, green: 0.69, blue: 0.80),
-                Color(red: 0.88, green: 0.82, blue: 0.67)
-            ]
-        case .streak:
-            return [
-                Color(red: 0.70, green: 0.34, blue: 0.18),
-                Color(red: 0.88, green: 0.55, blue: 0.28),
-                Color(red: 0.92, green: 0.80, blue: 0.59)
-            ]
-        }
+        OfficialWeeklyChallengeArtwork(
+            challenge: challenge
+        )
     }
 
     private var visibleParticipantProfiles: [SocialProfileCard] {
@@ -1122,17 +1468,17 @@ struct OfficialWeeklyChallengeDetailView: View {
             if let challenge {
                 ScrollView {
                     VStack(spacing: 18) {
-                        Image(challenge.heroAsset)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 220)
-                            .clipped()
-                            .clipShape(
-                                RoundedRectangle(
-                                    cornerRadius: 24,
-                                    style: .continuous
-                                )
+                        OfficialWeeklyChallengeArtwork(
+                            challenge: challenge
+                        )
+                        .frame(height: 220)
+                        .clipped()
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 24,
+                                style: .continuous
                             )
+                        )
 
                         VStack(alignment: .leading, spacing: 10) {
                             Text(challenge.title)
