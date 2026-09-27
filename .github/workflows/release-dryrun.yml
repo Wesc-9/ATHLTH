@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - release/v1.4.2
+      - fix/v1.4.2-swift6-release
     paths:
       - .github/release-trigger
 
@@ -251,3 +252,14 @@ jobs:
           echo "Exported Widget CFBundleVersion: $WIDGET_BUILD"
           test "$IOS_BUILD" = "$WATCH_BUILD"
           test "$IOS_BUILD" = "$WIDGET_BUILD"
+
+      - name: Upload dry-run diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-release-dryrun-diagnostics
+          path: |
+            ~/Library/Logs/DiagnosticReports
+            ${{ runner.temp }}/export
+            /var/folders/**/T/*.xcdistributionlogs
+          if-no-files-found: ignore
