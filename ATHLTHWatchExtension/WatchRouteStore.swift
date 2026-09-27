@@ -186,6 +186,20 @@ final class WatchRouteStore: NSObject, ObservableObject {
             }
             return true
 
+        case .ghostRace:
+            guard let ghost = try? JSONDecoder().decode(
+                WatchGhostRaceTransfer.self,
+                from: data
+            ) else {
+                return false
+            }
+
+            DispatchQueue.main.async {
+                WatchWorkoutManager.shared
+                    .configureGhostRace(ghost)
+            }
+            return true
+
         case .strengthSnapshot:
             guard let snapshot = try? JSONDecoder().decode(
                 WatchStrengthSessionSnapshot.self,
