@@ -201,7 +201,11 @@ final class SocialStore: ObservableObject {
         defer { isHomeFeedRefreshing = false }
 
         do {
-            feed = try await service.loadFeed(limit: 18)
+            let refreshedFeed = try await service.loadFeed(limit: 18)
+            feed = refreshedFeed.filter { item in
+                item.activity.actorID == currentUserID ||
+                followingIDs.contains(item.activity.actorID)
+            }
             lastHomeFeedRefreshAt = Date()
         } catch {
             // A lightweight Home refresh must not overwrite a more important
