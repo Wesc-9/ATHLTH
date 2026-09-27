@@ -258,6 +258,9 @@ struct AppRootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             phoneWorkout.checkpoint()
+            if phase != .active {
+                strengthWorkout.checkpoint()
+            }
 
             if phase != .active,
                appSession.signedIn {
@@ -778,7 +781,7 @@ struct AppRootView: View {
             guard appSession.signedIn else { return }
             let userID = appSession.profile.userID
             while !Task.isCancelled {
-                try? await Task.sleep(for: .minutes(5))
+                try? await Task.sleep(for: .seconds(300))
                 guard !Task.isCancelled, appSession.signedIn, appSession.profile.userID == userID else { return }
                 await trainingBackups.backUp(userID: userID)
             }
