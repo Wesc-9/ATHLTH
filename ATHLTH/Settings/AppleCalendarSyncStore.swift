@@ -18,7 +18,16 @@ final class AppleCalendarSyncStore: ObservableObject {
 
     private let eventStore = EKEventStore()
     private let defaults: UserDefaults
-    private var pendingPlan: TrainingPlan?
+    private var pendingSnapshot: CalendarSyncSnapshot?
+
+    private struct CalendarSyncSnapshot {
+        let plan: TrainingPlan?
+        let communityEvents: [CommunityEventItem]
+        let challenges: [ATHLTHChallenge]
+        let officialChallenges: [OfficialWeeklyChallenge]
+        let joinedOfficialChallengeIDs: Set<UUID>
+        let currentUserID: UUID?
+    }
 
     private enum Key {
         static let enabled =
@@ -105,7 +114,12 @@ final class AppleCalendarSyncStore: ObservableObject {
     }
 
     func enable(
-        plan: TrainingPlan?
+        plan: TrainingPlan?,
+        communityEvents: [CommunityEventItem] = [],
+        challenges: [ATHLTHChallenge] = [],
+        officialChallenges: [OfficialWeeklyChallenge] = [],
+        joinedOfficialChallengeIDs: Set<UUID> = [],
+        currentUserID: UUID? = nil
     ) async {
         errorMessage = nil
 
@@ -123,7 +137,15 @@ final class AppleCalendarSyncStore: ObservableObject {
             isEnabled = true
             persistEnabled()
 
-            await sync(plan: plan)
+            await sync(
+                plan: plan,
+                communityEvents: communityEvents,
+                challenges: challenges,
+                officialChallenges: officialChallenges,
+                joinedOfficialChallengeIDs:
+                    joinedOfficialChallengeIDs,
+                currentUserID: currentUserID
+            )
         } catch {
             isEnabled = false
             persistEnabled()
@@ -169,7 +191,12 @@ final class AppleCalendarSyncStore: ObservableObject {
     }
 
     func syncIfEnabled(
-        plan: TrainingPlan?
+        plan: TrainingPlan?,
+        communityEvents: [CommunityEventItem] = [],
+        challenges: [ATHLTHChallenge] = [],
+        officialChallenges: [OfficialWeeklyChallenge] = [],
+        joinedOfficialChallengeIDs: Set<UUID> = [],
+        currentUserID: UUID? = nil
     ) async {
         guard isEnabled else {
             return
@@ -183,14 +210,37 @@ final class AppleCalendarSyncStore: ObservableObject {
             return
         }
 
-        await sync(plan: plan)
+        await sync(
+            plan: plan,
+            communityEvents: communityEvents,
+            challenges: challenges,
+            officialChallenges: officialChallenges,
+            joinedOfficialChallengeIDs:
+                joinedOfficialChallengeIDs,
+            currentUserID: currentUserID
+        )
     }
 
     func sync(
-        plan: TrainingPlan?
+        plan: TrainingPlan?,
+        communityEvents: [CommunityEventItem] = [],
+        challenges: [ATHLTHChallenge] = [],
+        officialChallenges: [OfficialWeeklyChallenge] = [],
+        joinedOfficialChallengeIDs: Set<UUID> = [],
+        currentUserID: UUID? = nil
     ) async {
+        let snapshot = CalendarSyncSnapshot(
+            plan: plan,
+            communityEvents: communityEvents,
+            challenges: challenges,
+            officialChallenges: officialChallenges,
+            joinedOfficialChallengeIDs:
+                joinedOfficialChallengeIDs,
+            currentUserID: currentUserID
+        )
+
         if isSyncing {
-            pendingPlan = plan
+            pendingSnapshot = snapshot
             return
         }
 
@@ -200,7 +250,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         do {
             let calendar = try ensureCalendar()
             try synchronize(
-                plan: plan,
+                snapshot: snapshot,
                 calendar: calendar
             )
 
@@ -216,9 +266,21 @@ final class AppleCalendarSyncStore: ObservableObject {
 
         isSyncing = false
 
-        if let pendingPlan {
-            self.pendingPlan = nil
-            await sync(plan: pendingPlan)
+        if let pendingSnapshot {
+            self.pendingSnapshot = nil
+            await sync(
+                plan: pendingSnapshot.plan,
+                communityEvents:
+                    pendingSnapshot.communityEvents,
+                challenges:
+                    pendingSnapshot.challenges,
+                officialChallenges:
+                    pendingSnapshot.officialChallenges,
+                joinedOfficialChallengeIDs:
+                    pendingSnapshot.joinedOfficialChallengeIDs,
+                currentUserID:
+                    pendingSnapshot.currentUserID
+            )
         }
     }
 
