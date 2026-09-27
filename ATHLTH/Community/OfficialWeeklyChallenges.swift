@@ -63,7 +63,7 @@ struct OfficialWeeklyChallenge: Identifiable, Codable, Hashable {
     var endsAt: Date
     var heroAsset: String
     var source: String
-    var createdBy: UUID
+    var createdBy: UUID?
     var createdAt: Date
     var updatedAt: Date
 
