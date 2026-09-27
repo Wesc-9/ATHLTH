@@ -55,6 +55,31 @@ enum GhostRaceStartService {
         )
     }
 
+    static func startTarget(
+        route: TrainingRoute,
+        targetDurationSeconds: TimeInterval,
+        ownerID: UUID,
+        ghostRace: GhostRaceStore,
+        watchConnection: AppleWatchConnectionStore,
+        settings: AppSettingsStore
+    ) async throws {
+        try ghostRace.prepareTarget(
+            route: route,
+            targetDurationSeconds:
+                targetDurationSeconds
+        )
+
+        try await launchPrepared(
+            title:
+                "Target · \(route.title)",
+            ownerID: ownerID,
+            ghostRace: ghostRace,
+            watchConnection:
+                watchConnection,
+            settings: settings
+        )
+    }
+
     static func start(
         workout: WorkoutSummary,
         detail: WorkoutDetail,
