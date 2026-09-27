@@ -2937,19 +2937,42 @@ struct ATHLTHTrainView: View {
     @State private var showingStrengthWorkout = false
 
     var body: some View {
-        NavigationStack {
+        let useImmersiveTrainHero =
+            UIDevice.current.userInterfaceIdiom == .pad ||
+            UIScreen.main.bounds.width >= 390
+
+        return NavigationStack {
             ATHLTHPinnedHeroLayout(
                 accent: Color.green.opacity(0.55),
-                softTransition: true
+                softTransition: true,
+                immersiveTransition: useImmersiveTrainHero
             ) {
                 ATHLTHTabHero(
                     imageName: "TrainHero",
-                        title: "Train",
-                        subtitle: "Build a stronger, healthier you.",
-                        height: 190,
-                        alignment: .leading,
-                        focalOffsetX: -18,
-                    focalOffsetY: 18
+                    title: "Train",
+                    subtitle: "Build a stronger, healthier you.",
+                    height:
+                        useImmersiveTrainHero
+                            ? 232
+                            : 190,
+                    alignment: .leading,
+                    focalOffsetX:
+                        useImmersiveTrainHero
+                            ? -10
+                            : -18,
+                    focalOffsetY:
+                        useImmersiveTrainHero
+                            ? 10
+                            : 18,
+                    titleFontSize:
+                        useImmersiveTrainHero
+                            ? 31
+                            : 30,
+                    copyWidthFraction:
+                        useImmersiveTrainHero
+                            ? 0.70
+                            : 0.80,
+                    immersiveCopy: useImmersiveTrainHero
                 )
             } content: {
                 VStack(spacing: 18) {
