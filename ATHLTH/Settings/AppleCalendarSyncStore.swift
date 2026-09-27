@@ -435,35 +435,33 @@ final class AppleCalendarSyncStore: ObservableObject {
     }
 
     private func synchronize(
-        plan: TrainingPlan?,
+        snapshot: CalendarSyncSnapshot,
         calendar: EKCalendar
     ) throws {
         let existingEvents =
             managedEvents(in: calendar)
 
-        var existingBySession:
-            [UUID: EKEvent] = [:]
+        var existingByKey:
+            [String: EKEvent] = [:]
         var duplicateEvents:
             [EKEvent] = []
 
         for event in existingEvents {
-            guard let sessionID =
-                    sessionID(from: event)
+            guard let key = managedKey(from: event)
             else {
                 continue
             }
 
-            if existingBySession[sessionID] == nil {
-                existingBySession[sessionID] =
-                    event
+            if existingByKey[key] == nil {
+                existingByKey[key] = event
             } else {
                 duplicateEvents.append(event)
             }
         }
 
-        var activeSessionIDs = Set<UUID>()
+        var activeKeys = Set<String>()
 
-        if let plan,
+        if let plan = snapshot.plan,
            let planStart = plan.startDate {
             let calendarAPI = Calendar.current
             let normalizedStart =
@@ -494,14 +492,15 @@ final class AppleCalendarSyncStore: ObservableObject {
                     }
 
                     for session in day.sessions {
-                        activeSessionIDs.insert(
-                            session.id
-                        )
+                        let key =
+                            managedKey(
+                                type: "session",
+                                id: session.id
+                            )
+                        activeKeys.insert(key)
 
                         let event =
-                            existingBySession[
-                                session.id
-                            ] ??
+                            existingByKey[key] ??
                             EKEvent(
                                 eventStore:
                                     eventStore
@@ -525,12 +524,131 @@ final class AppleCalendarSyncStore: ObservableObject {
             }
         }
 
+        if let currentUserID = snapshot.currentUserID {
+            let now = Date()
+
+            for item in snapshot.communityEvents {
+                let record = item.event
+                let isParticipant =
+                    record.creatorID == currentUserID ||
+                    item.participantRows.contains {
+                        $0.userID == currentUserID
+                    }
+                let effectiveEnd =
+                    record.endsAt ??
+                    record.startsAt
+                        .addingTimeInterval(3_600)
+
+                guard isParticipant,
+                      record.status == "upcoming",
+                      effectiveEnd >= now
+                else {
+                    continue
+                }
+
+                let key =
+                    managedKey(
+                        type: "event",
+                        id: record.id
+                    )
+                activeKeys.insert(key)
+
+                let event =
+                    existingByKey[key] ??
+                    EKEvent(eventStore: eventStore)
+
+                configure(
+                    event,
+                    communityEvent: item,
+                    calendar: calendar
+                )
+
+                try eventStore.save(
+                    event,
+                    span: .thisEvent,
+                    commit: false
+                )
+            }
+
+            for challenge in snapshot.challenges {
+                let isParticipant =
+                    challenge.creatorID == currentUserID ||
+                    challenge.participants.contains {
+                        $0.userID == currentUserID &&
+                        (
+                            $0.state == .creator ||
+                            $0.state == .accepted
+                        )
+                    }
+
+                guard isParticipant,
+                      challenge.status == .upcoming ||
+                      challenge.status == .active
+                else {
+                    continue
+                }
+
+                let key =
+                    managedKey(
+                        type: "challenge",
+                        id: challenge.id
+                    )
+                activeKeys.insert(key)
+
+                let event =
+                    existingByKey[key] ??
+                    EKEvent(eventStore: eventStore)
+
+                configure(
+                    event,
+                    challenge: challenge,
+                    calendar: calendar
+                )
+
+                try eventStore.save(
+                    event,
+                    span: .thisEvent,
+                    commit: false
+                )
+            }
+
+            for challenge in snapshot.officialChallenges {
+                guard snapshot
+                    .joinedOfficialChallengeIDs
+                    .contains(challenge.id),
+                      challenge.endsAt >= now
+                else {
+                    continue
+                }
+
+                let key =
+                    managedKey(
+                        type: "official-challenge",
+                        id: challenge.id
+                    )
+                activeKeys.insert(key)
+
+                let event =
+                    existingByKey[key] ??
+                    EKEvent(eventStore: eventStore)
+
+                configure(
+                    event,
+                    officialChallenge: challenge,
+                    calendar: calendar
+                )
+
+                try eventStore.save(
+                    event,
+                    span: .thisEvent,
+                    commit: false
+                )
+            }
+        }
+
         for event in existingEvents {
-            guard let sessionID =
-                    sessionID(from: event),
-                  !activeSessionIDs.contains(
-                    sessionID
-                  )
+            guard let key = managedKey(from: event),
+                  !activeKeys.contains(key)
             else {
                 continue
             }
