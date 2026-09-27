@@ -299,6 +299,18 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var routeProgressPercent: Double? = nil
 }
 
+struct WatchGhostRaceTimingPoint: Codable, Hashable {
+    var elapsedTime: TimeInterval
+    var cumulativeMeters: Double
+}
+
+struct WatchGhostRaceTransfer: Codable, Hashable {
+    var title: String
+    var referenceDuration: TimeInterval
+    var routeDistanceMeters: Double
+    var points: [WatchGhostRaceTimingPoint]
+}
+
 struct WatchWorkoutMirrorCommand: Codable, Hashable {
     var command: WatchWorkoutCommand
 }
@@ -316,6 +328,7 @@ enum WatchTransferKind: String {
     case workoutRouteSelection
     case audioCoachConfiguration
     case runningWorkout
+    case ghostRace
     case strengthSnapshot
     case strengthCommand
     case connectivityProbe
