@@ -389,6 +389,15 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshAll() async {
+        let performanceID =
+            ATHLTHPerformance.begin("HealthRefresh")
+        defer {
+            ATHLTHPerformance.end(
+                "HealthRefresh",
+                id: performanceID
+            )
+        }
+
         guard healthDataAvailable,
               !isRefreshing,
               !shouldDeferAutomaticHealthWork
