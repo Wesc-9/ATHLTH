@@ -312,6 +312,7 @@ enum GhostFriendRaceSanitizer {
     }
 }
 
+@MainActor
 final class SupabaseGhostFriendRaceService {
     private let client: SupabaseClient
 
