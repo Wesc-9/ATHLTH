@@ -249,6 +249,20 @@ struct AppRootView: View {
                 await officialWeeklyChallenges.syncCompletionState(
                     workouts: health.workouts
                 )
+
+                if let maxHR =
+                    appSession.onboardingProfile?
+                        .maximumHeartRateBPM {
+                    await challengeStore
+                        .syncHeartRateHealthWorkouts(
+                            health: health,
+                            userID:
+                                appSession.profile.userID,
+                            displayName:
+                                appSession.profile.displayName,
+                            maximumHeartRateBPM: maxHR
+                        )
+                }
             }
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
@@ -284,6 +298,28 @@ struct AppRootView: View {
             }
 
             appSession.mergePersonalDetailsFromAppleHealth(details)
+        }
+        .onChange(
+            of: appSession.onboardingProfile?
+                .maximumHeartRateBPM
+        ) { _, maxHR in
+            guard appSession.signedIn,
+                  let maxHR
+            else {
+                return
+            }
+
+            Task {
+                await challengeStore
+                    .syncHeartRateHealthWorkouts(
+                        health: health,
+                        userID:
+                            appSession.profile.userID,
+                        displayName:
+                            appSession.profile.displayName,
+                        maximumHeartRateBPM: maxHR
+                    )
+            }
         }
         .onChange(of: settings.backgroundHealthSyncEnabled) { _, enabled in
             guard health.hasRequestedAuthorization else {
@@ -401,20 +437,24 @@ struct AppRootView: View {
                 )
                 notifications.syncGoalEvents(from: goals.goals)
 
-                if watchBelongsToATHLTHStrength {
-                    // The StrengthWorkoutStore completion pipeline handles
-                    // progression, challenges, gear, sharing and review.
-                    // Watch metrics belong to that same ATHLTH strength log.
-                    watchConnection.clearCompletedWorkout()
-                    return
-                }
-
                 await challengeStore.ingestWatchWorkout(
                     result,
                     health: health,
                     userID: appSession.profile.userID,
-                    displayName: appSession.profile.displayName
+                    displayName: appSession.profile.displayName,
+                    maximumHeartRateBPM:
+                        appSession.onboardingProfile?
+                            .maximumHeartRateBPM
                 )
+
+                if watchBelongsToATHLTHStrength {
+                    // Strength-specific challenge processing stays in the
+                    // StrengthWorkoutStore pipeline, but heart-rate
+                    // challenges have already consumed the verified
+                    // HealthKit heart-rate samples above.
+                    watchConnection.clearCompletedWorkout()
+                    return
+                }
                 await social.finishActiveWorkout(
                     sourceWorkoutID: result.healthKitWorkoutUUID ?? result.id,
                     endedAt: result.endedAt

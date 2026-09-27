@@ -1012,7 +1012,8 @@ final class HealthKitManager: ObservableObject {
                 ineligibilityReason: nil
             )
 
-        case .heaviestWeight, .mostReps, .exerciseVolume, .workoutVolume:
+        case .heaviestWeight, .mostReps, .exerciseVolume, .workoutVolume,
+                .heartRateZoneTime:
             return challengeEvidenceFailure(
                 result: result,
                 duration: selectedDuration,
@@ -1020,6 +1021,224 @@ final class HealthKitManager: ObservableObject {
                 reason: "This is not a running scoring rule."
             )
         }
+    }
+
+    func challengeHeartRateEvidence(
+        workoutID: UUID,
+        rules: ATHLTHChallengeRules,
+        maximumHeartRateBPM: Int
+    ) async -> ChallengeHeartRateEvidence? {
+        guard maximumHeartRateBPM >= 80,
+              maximumHeartRateBPM <= 250,
+              let workout =
+                try? await workoutForChallenge(
+                    uuid: workoutID
+                ),
+              let type =
+                HKObjectType.quantityType(
+                    forIdentifier: .heartRate
+                )
+        else {
+            return nil
+        }
+
+        let predicate =
+            HKQuery.predicateForObjects(from: workout)
+        let sort = NSSortDescriptor(
+            key: HKSampleSortIdentifierStartDate,
+            ascending: true
+        )
+
+        let samples: [HKQuantitySample]
+
+        do {
+            samples =
+                try await withCheckedThrowingContinuation {
+                    (
+                        continuation:
+                            CheckedContinuation<
+                                [HKQuantitySample],
+                                Error
+                            >
+                    ) in
+                    let query = HKSampleQuery(
+                        sampleType: type,
+                        predicate: predicate,
+                        limit: HKObjectQueryNoLimit,
+                        sortDescriptors: [sort]
+                    ) { _, values, error in
+                        if let error {
+                            continuation.resume(
+                                throwing: error
+                            )
+                        } else {
+                            continuation.resume(
+                                returning:
+                                    values
+                                        as? [HKQuantitySample]
+                                        ?? []
+                            )
+                        }
+                    }
+
+                    healthStore.execute(query)
+                }
+        } catch {
+            return nil
+        }
+
+        guard samples.count >= 2 else {
+            return nil
+        }
+
+        let unit =
+            HKUnit.count()
+                .unitDivided(by: .minute())
+        let zone = min(
+            max(rules.heartRateZone ?? 5, 1),
+            5
+        )
+
+        let lowerFraction: Double
+        let upperFraction: Double?
+
+        switch zone {
+        case 1:
+            lowerFraction = 0.50
+            upperFraction = 0.60
+        case 2:
+            lowerFraction = 0.60
+            upperFraction = 0.70
+        case 3:
+            lowerFraction = 0.70
+            upperFraction = 0.80
+        case 4:
+            lowerFraction = 0.80
+            upperFraction = 0.90
+        default:
+            lowerFraction = 0.90
+            upperFraction = nil
+        }
+
+        let minimumBPM =
+            Double(maximumHeartRateBPM) *
+            lowerFraction
+        let maximumBPM =
+            upperFraction.map {
+                Double(maximumHeartRateBPM) * $0
+            }
+
+        let values = samples.compactMap { sample -> Double? in
+            guard let value =
+                    Self.safeDoubleValue(
+                        sample.quantity,
+                        unit: unit
+                    ),
+                  value.isFinite,
+                  value >= 30,
+                  value <= 260
+            else {
+                return nil
+            }
+
+            return value
+        }
+
+        guard !values.isEmpty else {
+            return nil
+        }
+
+        var zoneSeconds: TimeInterval = 0
+        var coveredSeconds: TimeInterval = 0
+
+        for index in samples.indices {
+            guard let bpm =
+                    Self.safeDoubleValue(
+                        samples[index].quantity,
+                        unit: unit
+                    ),
+                  bpm.isFinite,
+                  bpm >= 30,
+                  bpm <= 260
+            else {
+                continue
+            }
+
+            let sampleDate =
+                samples[index].startDate
+            let nextDate: Date
+
+            if index + 1 < samples.count {
+                nextDate =
+                    samples[index + 1].startDate
+            } else {
+                nextDate = min(
+                    workout.endDate,
+                    sampleDate.addingTimeInterval(5)
+                )
+            }
+
+            // Cap every sample interval so sensor dropouts cannot
+            // artificially add long blocks of zone time.
+            let interval = min(
+                max(
+                    nextDate.timeIntervalSince(
+                        sampleDate
+                    ),
+                    0
+                ),
+                15
+            )
+
+            guard interval > 0 else {
+                continue
+            }
+
+            coveredSeconds += interval
+
+            let isInZone =
+                bpm >= minimumBPM &&
+                (
+                    maximumBPM == nil ||
+                    bpm < maximumBPM!
+                )
+
+            if isInZone {
+                zoneSeconds += interval
+            }
+        }
+
+        // Require enough real HR coverage to treat the workout as
+        // verified rather than extrapolating from a handful of samples.
+        guard coveredSeconds >= 30 else {
+            return nil
+        }
+
+        let average =
+            values.reduce(0, +) /
+            Double(values.count)
+        let peak = values.max()
+
+        var detail =
+            "\(challengeClock(zoneSeconds)) in Zone \(zone)"
+
+        if let peak {
+            detail +=
+                " · peak \(Int(peak.rounded())) bpm"
+        }
+
+        return ChallengeHeartRateEvidence(
+            startedAt: workout.startDate,
+            endedAt: workout.endDate,
+            zone: zone,
+            zoneTimeSeconds: zoneSeconds,
+            averageHeartRateBPM: average,
+            peakHeartRateBPM: peak,
+            score: zoneSeconds,
+            detail: detail,
+            isEligible: true,
+            ineligibilityReason: nil
+        )
     }
 
     func groupChallengeRouteMatchPercent(

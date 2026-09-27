@@ -545,6 +545,10 @@ struct ChallengeCreationView: View {
     @State private var routeMatchPercent = 90.0
     @State private var advancedRules = false
 
+    @State private var heartRateZone = 5
+    @State private var heartRateAggregation:
+        ChallengeHeartRateAggregation = .totalChallenge
+
     @State private var exerciseName = "Bench Press"
     @State private var requiredWeightEnabled = false
     @State private var requiredWeightKg = 80.0
@@ -614,15 +618,25 @@ struct ChallengeCreationView: View {
                 }
             }
             .onChange(of: sport) { _, newSport in
-                if newSport == .running {
+                switch newSport {
+                case .running:
                     scoring = .fastestDistance
                     verificationPolicy = .verifiedRequired
-                } else {
+
+                case .strength:
                     scoring = .heaviestWeight
                     usesSpecificRoute = false
                     selectedRouteID = nil
                     verificationPolicy =
                         .verifiedPreferredManualAllowed
+
+                case .heartRate:
+                    scoring = .heartRateZoneTime
+                    usesSpecificRoute = false
+                    selectedRouteID = nil
+                    gpsRequired = false
+                    verificationPolicy = .verifiedRequired
+                    allowMultipleAttempts = true
                 }
             }
             .onChange(of: scoring) { _, newScoring in
@@ -642,6 +656,11 @@ struct ChallengeCreationView: View {
                     gpsRequired = true
                 } else {
                     selectedRouteID = nil
+                }
+            }
+            .onChange(of: heartRateAggregation) { _, aggregation in
+                if aggregation == .totalChallenge {
+                    allowMultipleAttempts = true
                 }
             }
             .onChange(of: selectedRouteID) { _, routeID in
@@ -691,9 +710,10 @@ struct ChallengeCreationView: View {
                 .font(.title2.bold())
                 .padding(.top, 4)
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 sportButton(.running)
                 sportButton(.strength)
+                sportButton(.heartRate)
             }
 
             Text("Scoring")
@@ -760,13 +780,18 @@ struct ChallengeCreationView: View {
             }
             .pickerStyle(.segmented)
 
-            if sport == .running {
+            switch sport {
+            case .running:
                 runningRules
-            } else {
+            case .strength:
                 strengthRules
+            case .heartRate:
+                heartRateRules
             }
 
-            if advancedRules {
+            if advancedRules &&
+                !(sport == .heartRate &&
+                  heartRateAggregation == .totalChallenge) {
                 Toggle(
                     "Allow multiple attempts",
                     isOn: $allowMultipleAttempts
@@ -1156,6 +1181,162 @@ struct ChallengeCreationView: View {
         .challengeCard()
     }
 
+    private var heartRateRules: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Heart-rate zone")
+                    .font(.headline)
+
+                HStack(spacing: 7) {
+                    ForEach(1...5, id: \.self) { zone in
+                        Button {
+                            heartRateZone = zone
+                        } label: {
+                            VStack(spacing: 4) {
+                                Text("Z\(zone)")
+                                    .font(.subheadline.weight(.bold))
+                                Text(heartRateZonePercentText(zone))
+                                    .font(.system(size: 9, weight: .medium))
+                                    .minimumScaleFactor(0.8)
+                            }
+                            .foregroundStyle(
+                                heartRateZone == zone
+                                    ? .white
+                                    : ATHLTHTheme.primaryText
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 58)
+                            .background(
+                                heartRateZone == zone
+                                    ? ATHLTHTheme.accent
+                                    : Color(.secondarySystemGroupedBackground),
+                                in: RoundedRectangle(
+                                    cornerRadius: 14,
+                                    style: .continuous
+                                )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if let maximumHeartRateBPM {
+                    HStack(spacing: 11) {
+                        Image(systemName: "heart.fill")
+                            .foregroundStyle(.pink)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(
+                                "Zone \(heartRateZone) · \(heartRateZoneBPMText(zone: heartRateZone, maxHR: maximumHeartRateBPM))"
+                            )
+                            .font(.subheadline.weight(.semibold))
+
+                            Text(
+                                "Calculated from your private max HR of \(maximumHeartRateBPM) bpm."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding()
+                    .challengeCard()
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(
+                            "Maximum heart rate required",
+                            systemImage: "heart.slash"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.orange)
+
+                        Text(
+                            "ATHLTH compares time in a personal heart-rate zone. Add your maximum heart rate before creating this challenge."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        NavigationLink {
+                            PersonalHealthProfileView()
+                        } label: {
+                            Label(
+                                "Set Maximum Heart Rate",
+                                systemImage: "heart.text.square"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accent)
+                    }
+                    .padding()
+                    .challengeCard()
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 9) {
+                Text("Leaderboard")
+                    .font(.headline)
+
+                Picker(
+                    "Leaderboard",
+                    selection: $heartRateAggregation
+                ) {
+                    ForEach(
+                        ChallengeHeartRateAggregation.allCases
+                    ) { aggregation in
+                        Text(aggregation.title)
+                            .tag(aggregation)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(heartRateAggregation.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .challengeCard()
+
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.shield.fill")
+                    .foregroundStyle(ATHLTHTheme.accent)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Verified heart-rate data only")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text(
+                        "Any qualifying workout can count when it contains Apple Health heart-rate samples. Manual heart-rate results are never accepted."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding()
+            .challengeCard()
+
+            if advancedRules {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(
+                        "Personal zones",
+                        systemImage: "person.crop.circle.badge.checkmark"
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Text(
+                        "Every participant is scored against their own private maximum heart rate. ATHLTH never exposes that value to the challenge or leaderboard."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding()
+                .challengeCard()
+            }
+        }
+    }
+
     private var strengthRules: some View {
         VStack(alignment: .leading, spacing: 14) {
             if scoring != .workoutVolume {
@@ -1507,7 +1688,20 @@ struct ChallengeCreationView: View {
                 }
             }
 
-            if sport == .running {
+            if sport == .heartRate {
+                reviewRow(
+                    "Zone",
+                    "Zone \(heartRateZone) · \(heartRateZonePercentText(heartRateZone))"
+                )
+                reviewRow(
+                    "Leaderboard",
+                    heartRateAggregation.title
+                )
+                reviewRow(
+                    "Verification",
+                    "Verified HR samples only"
+                )
+            } else if sport == .running {
                 reviewRow(
                     "Verification",
                     "Verified only · no manual results"
@@ -1567,6 +1761,8 @@ struct ChallengeCreationView: View {
             return [.fastestDistance, .farthestInTime, .mostDistance]
         case .strength:
             return [.heaviestWeight, .mostReps, .exerciseVolume, .workoutVolume]
+        case .heartRate:
+            return [.heartRateZoneTime]
         }
     }
 
@@ -1598,6 +1794,11 @@ struct ChallengeCreationView: View {
                 }
 
                 return true
+            }
+
+            if sport == .heartRate {
+                return maximumHeartRateBPM != nil &&
+                    (1...5).contains(heartRateZone)
             }
 
             if scoring != .workoutVolume &&
@@ -1693,9 +1894,9 @@ struct ChallengeCreationView: View {
         let rules = ATHLTHChallengeRules(
             scoring: effectiveScoring,
             verificationPolicy:
-                sport == .running
-                    ? .verifiedRequired
-                    : verificationPolicy,
+                sport == .strength
+                    ? verificationPolicy
+                    : .verifiedRequired,
             targetDistanceMeters:
                 scoring == .fastestDistance &&
                 !usesSpecificRoute
@@ -1720,6 +1921,14 @@ struct ChallengeCreationView: View {
                 requiredWeightEnabled
                 ? requiredWeightKg
                 : nil,
+            heartRateZone:
+                sport == .heartRate
+                    ? heartRateZone
+                    : nil,
+            heartRateAggregation:
+                sport == .heartRate
+                    ? heartRateAggregation
+                    : nil,
             startsAt: startsAt,
             endsAt: hasEnd ? endsAt : nil,
             allowMultipleAttempts: allowMultipleAttempts,
@@ -1739,6 +1948,57 @@ struct ChallengeCreationView: View {
         )
 
         dismiss()
+    }
+
+    private var maximumHeartRateBPM: Int? {
+        session.onboardingProfile?.maximumHeartRateBPM
+    }
+
+    private func heartRateZonePercentText(
+        _ zone: Int
+    ) -> String {
+        switch zone {
+        case 1: return "50–60%"
+        case 2: return "60–70%"
+        case 3: return "70–80%"
+        case 4: return "80–90%"
+        default: return "90–100%"
+        }
+    }
+
+    private func heartRateZoneBPMText(
+        zone: Int,
+        maxHR: Int
+    ) -> String {
+        let lowerFactor: Double
+        let upperFactor: Double
+
+        switch zone {
+        case 1:
+            lowerFactor = 0.50
+            upperFactor = 0.60
+        case 2:
+            lowerFactor = 0.60
+            upperFactor = 0.70
+        case 3:
+            lowerFactor = 0.70
+            upperFactor = 0.80
+        case 4:
+            lowerFactor = 0.80
+            upperFactor = 0.90
+        default:
+            lowerFactor = 0.90
+            upperFactor = 1.00
+        }
+
+        let lower = Int(
+            ceil(Double(maxHR) * lowerFactor)
+        )
+        let upper = Int(
+            floor(Double(maxHR) * upperFactor)
+        )
+
+        return "\(lower)–\(upper) bpm"
     }
 
     private var allowedRouteDeviationPercent: Double {
@@ -1950,6 +2210,8 @@ struct ChallengeCreationView: View {
             return "Highest reps × weight volume for one exercise."
         case .workoutVolume:
             return "Highest total volume in one strength workout."
+        case .heartRateZoneTime:
+            return "Compete on verified time spent in a personal heart-rate zone."
         }
     }
 
@@ -2100,9 +2362,26 @@ private struct ChallengeReviewCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
-                colors: sport == .running
-                    ? [ATHLTHTheme.accent.opacity(0.90), .black]
-                    : [.orange.opacity(0.80), .black],
+                colors: {
+                    switch sport {
+                    case .running:
+                        return [
+                            ATHLTHTheme.accent.opacity(0.90),
+                            .black
+                        ]
+                    case .strength:
+                        return [
+                            .orange.opacity(0.80),
+                            .black
+                        ]
+                    case .heartRate:
+                        return [
+                            .pink.opacity(0.88),
+                            .red.opacity(0.72),
+                            .black
+                        ]
+                    }
+                }(),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -2135,6 +2414,7 @@ private struct ChallengeReviewCard: View {
 struct ChallengeDetailView: View {
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
     @StateObject private var locationStore = ChallengeLocationStore()
 
     let challengeID: UUID
@@ -2161,6 +2441,11 @@ struct ChallengeDetailView: View {
 
                         if currentParticipant?.state == .invited {
                             invitationResponseCard(challenge)
+                        }
+
+                        if challenge.sport == .heartRate &&
+                            session.onboardingProfile?.maximumHeartRateBPM == nil {
+                            heartRateProfileRequiredCard
                         }
 
                         leaderboardCard(challenge)
@@ -2202,6 +2487,35 @@ struct ChallengeDetailView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .task {
                     challenges.refreshStatuses()
+
+                    if challenge.sport == .heartRate,
+                       let maxHR =
+                        session.onboardingProfile?.maximumHeartRateBPM {
+                        await challenges.syncHeartRateHealthWorkouts(
+                            health: health,
+                            userID: session.profile.userID,
+                            displayName: session.profile.displayName,
+                            maximumHeartRateBPM: maxHR
+                        )
+                    }
+                }
+                .onChange(
+                    of: session.onboardingProfile?.maximumHeartRateBPM
+                ) { _, maxHR in
+                    guard challenge.sport == .heartRate,
+                          let maxHR
+                    else {
+                        return
+                    }
+
+                    Task {
+                        await challenges.syncHeartRateHealthWorkouts(
+                            health: health,
+                            userID: session.profile.userID,
+                            displayName: session.profile.displayName,
+                            maximumHeartRateBPM: maxHR
+                        )
+                    }
                 }
                 .sheet(isPresented: $showingManualStrengthAttempt) {
                     if let currentParticipant {
@@ -2228,6 +2542,34 @@ struct ChallengeDetailView: View {
                 )
             }
         }
+    }
+
+    private var heartRateProfileRequiredCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(
+                "Set your maximum heart rate",
+                systemImage: "heart.text.square"
+            )
+            .font(.headline)
+            .foregroundStyle(.orange)
+
+            Text(
+                "This challenge uses personal heart-rate zones. Your max HR stays private and is used only to calculate your own zone boundaries."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            NavigationLink {
+                PersonalHealthProfileView()
+            } label: {
+                Text("Open Health Profile")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accent)
+        }
+        .padding()
+        .challengeCard()
     }
 
     private func invitationResponseCard(_ challenge: ATHLTHChallenge) -> some View {
@@ -2271,9 +2613,26 @@ struct ChallengeDetailView: View {
     private func detailHero(_ challenge: ATHLTHChallenge) -> some View {
         ZStack(alignment: .bottomLeading) {
             LinearGradient(
-                colors: challenge.sport == .running
-                    ? [ATHLTHTheme.accent.opacity(0.95), .black]
-                    : [.orange.opacity(0.86), .black],
+                colors: {
+                    switch challenge.sport {
+                    case .running:
+                        return [
+                            ATHLTHTheme.accent.opacity(0.95),
+                            .black
+                        ]
+                    case .strength:
+                        return [
+                            .orange.opacity(0.86),
+                            .black
+                        ]
+                    case .heartRate:
+                        return [
+                            .pink.opacity(0.92),
+                            .red.opacity(0.70),
+                            .black
+                        ]
+                    }
+                }(),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -2422,7 +2781,30 @@ struct ChallengeDetailView: View {
                     "\(Int(challenge.rules.minimumRouteMatchPercent ?? 90))%"
                 )
             } else if challenge.sport == .running {
-                ruleRow("Route", "Anywhere")
+                ruleRow("Course", "Run Anywhere")
+            }
+
+            if challenge.sport == .heartRate {
+                let zone = min(
+                    max(challenge.rules.heartRateZone ?? 5, 1),
+                    5
+                )
+                ruleRow("Zone", "Zone \(zone)")
+                ruleRow(
+                    "Zone range",
+                    challengeHeartRateZonePercentText(zone)
+                )
+                ruleRow(
+                    "Leaderboard",
+                    (
+                        challenge.rules.heartRateAggregation ??
+                        .totalChallenge
+                    ).title
+                )
+                ruleRow(
+                    "Heart-rate source",
+                    "Verified Apple Health"
+                )
             }
 
             if let exercise = challenge.rules.exerciseName {
@@ -2666,6 +3048,20 @@ struct ChallengeDetailView: View {
             return "\(Int(score.rounded())) reps"
         case .exerciseVolume, .workoutVolume:
             return String(format: "%.0f kg", score)
+        case .heartRateZoneTime:
+            return challengeDuration(score)
+        }
+    }
+
+    private func challengeHeartRateZonePercentText(
+        _ zone: Int
+    ) -> String {
+        switch zone {
+        case 1: return "50–60% of personal max HR"
+        case 2: return "60–70% of personal max HR"
+        case 3: return "70–80% of personal max HR"
+        case 4: return "80–90% of personal max HR"
+        default: return "90–100% of personal max HR"
         }
     }
 

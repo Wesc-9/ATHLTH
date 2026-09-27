@@ -3,6 +3,7 @@ import Foundation
 enum ATHLTHChallengeSport: String, CaseIterable, Identifiable, Codable, Hashable {
     case running
     case strength
+    case heartRate
 
     var id: String { rawValue }
 
@@ -10,6 +11,7 @@ enum ATHLTHChallengeSport: String, CaseIterable, Identifiable, Codable, Hashable
         switch self {
         case .running: return "Running"
         case .strength: return "Strength"
+        case .heartRate: return "Heart Rate"
         }
     }
 
@@ -17,6 +19,7 @@ enum ATHLTHChallengeSport: String, CaseIterable, Identifiable, Codable, Hashable
         switch self {
         case .running: return "figure.run"
         case .strength: return "dumbbell.fill"
+        case .heartRate: return "heart.circle.fill"
         }
     }
 }
@@ -30,6 +33,7 @@ enum ATHLTHChallengeScoring: String, CaseIterable, Identifiable, Codable, Hashab
     case mostReps
     case exerciseVolume
     case workoutVolume
+    case heartRateZoneTime
 
     var id: String { rawValue }
 
@@ -45,6 +49,7 @@ enum ATHLTHChallengeScoring: String, CaseIterable, Identifiable, Codable, Hashab
         case .mostReps: return "Most Reps"
         case .exerciseVolume: return "Exercise Volume"
         case .workoutVolume: return "Workout Volume"
+        case .heartRateZoneTime: return "Time in Zone"
         }
     }
 
@@ -133,6 +138,31 @@ enum ChallengeTimeBasis: String, CaseIterable, Identifiable, Codable, Hashable {
     }
 }
 
+enum ChallengeHeartRateAggregation: String, CaseIterable, Identifiable, Codable, Hashable {
+    case bestWorkout
+    case totalChallenge
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .bestWorkout:
+            return "Best Workout"
+        case .totalChallenge:
+            return "Total Challenge"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .bestWorkout:
+            return "Your single workout with the most time in the selected zone counts."
+        case .totalChallenge:
+            return "Time in the selected zone adds up across all qualifying workouts."
+        }
+    }
+}
+
 enum ATHLTHChallengeStatus: String, Codable, Hashable {
     case draft
     case invited
@@ -206,6 +236,11 @@ struct ATHLTHChallengeRules: Codable, Hashable {
 
     var exerciseName: String?
     var fixedWeightKilograms: Double?
+
+    // Heart-rate challenge rules use each participant's own private max HR.
+    // The actual max-HR value is intentionally never stored on the challenge.
+    var heartRateZone: Int? = nil
+    var heartRateAggregation: ChallengeHeartRateAggregation? = nil
 
     var startsAt: Date
     var endsAt: Date?
@@ -323,6 +358,19 @@ struct ChallengeLeaderboardEntry: Identifiable, Hashable {
     let score: Double?
     let attemptCount: Int
     let rank: Int?
+}
+
+struct ChallengeHeartRateEvidence: Hashable {
+    let startedAt: Date
+    let endedAt: Date
+    let zone: Int
+    let zoneTimeSeconds: TimeInterval
+    let averageHeartRateBPM: Double?
+    let peakHeartRateBPM: Double?
+    let score: Double
+    let detail: String
+    let isEligible: Bool
+    let ineligibilityReason: String?
 }
 
 struct ChallengeRunningEvidence: Hashable {

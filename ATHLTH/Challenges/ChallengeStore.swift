@@ -259,72 +259,257 @@ final class ChallengeStore: ObservableObject {
         _ result: WatchWorkoutResult,
         health: HealthKitManager,
         userID: UUID,
-        displayName: String
+        displayName: String,
+        maximumHeartRateBPM: Int?
     ) async {
-        guard result.kind == .running else { return }
-
         let candidateIDs = challenges
-            .filter {
-                $0.sport == .running &&
-                $0.rules.verificationPolicy.allowsVerified &&
-                isWithinWindow(result.startedAt, rules: $0.rules)
+            .filter { challenge in
+                guard challenge.rules.verificationPolicy.allowsVerified,
+                      isWithinWindow(
+                          result.startedAt,
+                          rules: challenge.rules
+                      )
+                else {
+                    return false
+                }
+
+                switch challenge.sport {
+                case .running:
+                    return result.kind == .running
+                case .heartRate:
+                    return result.healthKitWorkoutUUID != nil
+                case .strength:
+                    return false
+                }
             }
             .map(\.id)
 
         for challengeID in candidateIDs {
-            guard let challengeIndex = challenges.firstIndex(where: { $0.id == challengeID }),
+            guard let challengeIndex =
+                    challenges.firstIndex(
+                        where: { $0.id == challengeID }
+                    ),
                   let participant = participant(
-                    in: challenges[challengeIndex],
-                    userID: userID
+                      in: challenges[challengeIndex],
+                      userID: userID
                   )
             else {
                 continue
             }
 
             let challenge = challenges[challengeIndex]
-            let sourceKey = result.healthKitWorkoutUUID?.uuidString ?? result.id.uuidString
+            let sourceID =
+                result.healthKitWorkoutUUID ?? result.id
+            let sourceKey = sourceID.uuidString
 
-            guard !challenge.attempts.contains(where: {
-                $0.sourceWorkoutID?.uuidString == sourceKey ||
-                $0.manualNote == "watch-\(sourceKey)"
-            }) else {
+            guard !challenge.attempts.contains(
+                where: {
+                    $0.sourceWorkoutID == sourceID ||
+                    $0.manualNote == "watch-\(sourceKey)"
+                }
+            ) else {
                 continue
             }
 
-            let evidence = await health.challengeRunningEvidence(
-                for: result,
-                rules: challenge.rules
-            )
+            switch challenge.sport {
+            case .running:
+                let evidence =
+                    await health.challengeRunningEvidence(
+                        for: result,
+                        rules: challenge.rules
+                    )
 
-            let attempt = ChallengeAttempt(
-                id: UUID(),
-                challengeID: challenge.id,
-                participantID: participant.id,
-                userID: userID,
-                participantName: displayName,
-                submittedAt: result.endedAt,
-                startedAt: evidence.startedAt,
-                endedAt: evidence.endedAt,
-                verification: .appleHealth,
-                sourceWorkoutID: result.healthKitWorkoutUUID ?? result.id,
-                durationSeconds: evidence.durationSeconds,
-                distanceMeters: evidence.distanceMeters,
-                weightKilograms: nil,
-                reps: nil,
-                volumeKilograms: nil,
-                routeMatchPercent: evidence.routeMatchPercent,
-                score: evidence.score,
-                detail: evidence.detail,
-                manualNote: "watch-\(sourceKey)",
-                isEligible: evidence.isEligible,
-                ineligibilityReason: evidence.ineligibilityReason
-            )
+                let attempt = ChallengeAttempt(
+                    id: UUID(),
+                    challengeID: challenge.id,
+                    participantID: participant.id,
+                    userID: userID,
+                    participantName: displayName,
+                    submittedAt: result.endedAt,
+                    startedAt: evidence.startedAt,
+                    endedAt: evidence.endedAt,
+                    verification: .appleHealth,
+                    sourceWorkoutID: sourceID,
+                    durationSeconds:
+                        evidence.durationSeconds,
+                    distanceMeters:
+                        evidence.distanceMeters,
+                    weightKilograms: nil,
+                    reps: nil,
+                    volumeKilograms: nil,
+                    routeMatchPercent:
+                        evidence.routeMatchPercent,
+                    score: evidence.score,
+                    detail: evidence.detail,
+                    manualNote: "watch-\(sourceKey)",
+                    isEligible: evidence.isEligible,
+                    ineligibilityReason:
+                        evidence.ineligibilityReason
+                )
 
-            challenges[challengeIndex].attempts.append(attempt)
+                challenges[challengeIndex]
+                    .attempts.append(attempt)
+
+            case .heartRate:
+                guard let maximumHeartRateBPM,
+                      let workoutID =
+                        result.healthKitWorkoutUUID,
+                      let evidence =
+                        await health
+                            .challengeHeartRateEvidence(
+                                workoutID: workoutID,
+                                rules: challenge.rules,
+                                maximumHeartRateBPM:
+                                    maximumHeartRateBPM
+                            )
+                else {
+                    continue
+                }
+
+                let attempt = ChallengeAttempt(
+                    id: UUID(),
+                    challengeID: challenge.id,
+                    participantID: participant.id,
+                    userID: userID,
+                    participantName: displayName,
+                    submittedAt: result.endedAt,
+                    startedAt: evidence.startedAt,
+                    endedAt: evidence.endedAt,
+                    verification: .appleHealth,
+                    sourceWorkoutID: workoutID,
+                    durationSeconds:
+                        evidence.zoneTimeSeconds,
+                    distanceMeters: nil,
+                    weightKilograms: nil,
+                    reps: nil,
+                    volumeKilograms: nil,
+                    routeMatchPercent: nil,
+                    score: evidence.score,
+                    detail: evidence.detail,
+                    manualNote: "watch-\(sourceKey)",
+                    isEligible: evidence.isEligible,
+                    ineligibilityReason:
+                        evidence.ineligibilityReason
+                )
+
+                challenges[challengeIndex]
+                    .attempts.append(attempt)
+
+            case .strength:
+                break
+            }
         }
 
         refreshStatuses()
         persist()
+    }
+
+    func syncHeartRateHealthWorkouts(
+        health: HealthKitManager,
+        userID: UUID,
+        displayName: String,
+        maximumHeartRateBPM: Int
+    ) async {
+        let challengeIDs = challenges
+            .filter {
+                $0.sport == .heartRate &&
+                $0.rules.verificationPolicy.allowsVerified &&
+                $0.status != .cancelled &&
+                $0.status != .completed
+            }
+            .map(\.id)
+
+        guard !challengeIDs.isEmpty else {
+            return
+        }
+
+        var didChange = false
+
+        for challengeID in challengeIDs {
+            guard let challengeIndex =
+                    challenges.firstIndex(
+                        where: { $0.id == challengeID }
+                    ),
+                  let participant = participant(
+                      in: challenges[challengeIndex],
+                      userID: userID
+                  )
+            else {
+                continue
+            }
+
+            let challenge = challenges[challengeIndex]
+
+            for workout in health.workouts {
+                guard isWithinWindow(
+                    workout.startDate,
+                    rules: challenge.rules
+                ) else {
+                    continue
+                }
+
+                guard !challenges[challengeIndex]
+                    .attempts.contains(
+                        where: {
+                            $0.sourceWorkoutID == workout.id
+                        }
+                    )
+                else {
+                    continue
+                }
+
+                guard let evidence =
+                    await health.challengeHeartRateEvidence(
+                        workoutID: workout.id,
+                        rules: challenge.rules,
+                        maximumHeartRateBPM:
+                            maximumHeartRateBPM
+                    )
+                else {
+                    continue
+                }
+
+                let attempt = ChallengeAttempt(
+                    id: UUID(),
+                    challengeID: challenge.id,
+                    participantID: participant.id,
+                    userID: userID,
+                    participantName: displayName,
+                    submittedAt: workout.endDate,
+                    startedAt: evidence.startedAt,
+                    endedAt: evidence.endedAt,
+                    verification: .appleHealth,
+                    sourceWorkoutID: workout.id,
+                    durationSeconds:
+                        evidence.zoneTimeSeconds,
+                    distanceMeters: nil,
+                    weightKilograms: nil,
+                    reps: nil,
+                    volumeKilograms: nil,
+                    routeMatchPercent: nil,
+                    score: evidence.score,
+                    detail: evidence.detail,
+                    manualNote: "health-\(workout.id.uuidString)",
+                    isEligible: evidence.isEligible,
+                    ineligibilityReason:
+                        evidence.ineligibilityReason
+                )
+
+                challenges[challengeIndex]
+                    .attempts.append(attempt)
+                didChange = true
+
+                if challenge.rules.allowMultipleAttempts ==
+                    false {
+                    break
+                }
+            }
+        }
+
+        if didChange {
+            refreshStatuses()
+            persist()
+        }
     }
 
     func leaderboard(for challengeID: UUID) -> [ChallengeLeaderboardEntry] {
@@ -350,6 +535,31 @@ final class ChallengeStore: ObservableObject {
 
                 let representative = attempts.max {
                     ($0.distanceMeters ?? 0) < ($1.distanceMeters ?? 0)
+                }
+
+                scored.append(
+                    (
+                        participant,
+                        representative,
+                        attempts.isEmpty ? nil : totalScore,
+                        attempts.count
+                    )
+                )
+            } else if
+                challenge.rules.scoring ==
+                    .heartRateZoneTime &&
+                (
+                    challenge.rules
+                        .heartRateAggregation ??
+                    .totalChallenge
+                ) == .totalChallenge
+            {
+                let totalScore = attempts.reduce(0) {
+                    $0 + $1.score
+                }
+
+                let representative = attempts.max {
+                    $0.score < $1.score
                 }
 
                 scored.append(
@@ -544,7 +754,8 @@ final class ChallengeStore: ObservableObject {
                 "\(Self.kg(resolvedVolume)) kg volume · Manual"
             )
 
-        case .fastestDistance, .farthestInTime, .mostDistance, .fastestRoute:
+        case .fastestDistance, .farthestInTime, .mostDistance, .fastestRoute,
+                .heartRateZoneTime:
             throw ChallengeStoreError.invalidAttempt
         }
     }
@@ -687,7 +898,8 @@ final class ChallengeStore: ObservableObject {
                 nil
             )
 
-        case .fastestDistance, .farthestInTime, .mostDistance, .fastestRoute:
+        case .fastestDistance, .farthestInTime, .mostDistance, .fastestRoute,
+                .heartRateZoneTime:
             return nil
         }
     }
