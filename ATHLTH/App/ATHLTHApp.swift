@@ -143,6 +143,7 @@ struct AppRootView: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var communityEvents: CommunityEventStore
     @EnvironmentObject private var communityGroups: CommunityGroupStore
+    @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
@@ -765,6 +766,10 @@ struct AppRootView: View {
     var body: some View {
         lifecycleContent
         .onOpenURL { url in
+            if spotifyPlayback.handleOpenURL(url) {
+                return
+            }
+
             Task {
                 do {
                     if let bootstrap = try await accountService.handleAuthCallback(url) {
