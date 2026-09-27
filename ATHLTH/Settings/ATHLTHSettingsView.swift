@@ -105,6 +105,26 @@ struct ATHLTHSettingsView: View {
                                 Text("English")
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                             }
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                ATHLTHWidgetsAndSurfacesSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "rectangle.grid.2x2",
+                                    iconTint: ATHLTHTheme.vitality,
+                                    iconBackground: ATHLTHTheme.vitalitySoft,
+                                    title: "Widgets & Surfaces",
+                                    subtitle: "Home Screen, Live Activities, Siri and Lock Screen"
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(
+                                            ATHLTHTheme.mutedText.opacity(0.72)
+                                        )
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
 
