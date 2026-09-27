@@ -2,19 +2,20 @@ import Foundation
 
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
-    @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { persistCheckpoint() } }
-    @Published private(set) var currentExerciseIndex = 0 { didSet { persistCheckpoint() } }
-    @Published private(set) var currentSetIndex = 0 { didSet { persistCheckpoint() } }
-    @Published private(set) var restEndsAt: Date? { didSet { persistCheckpoint() } }
-    @Published private(set) var draftReps = 8 { didSet { persistCheckpoint() } }
-    @Published private(set) var draftWeightKilograms = 20.0 { didSet { persistCheckpoint() } }
-    @Published private(set) var draftRestSeconds = 90 { didSet { persistCheckpoint() } }
-    @Published private(set) var draftRPE = 8.0 { didSet { persistCheckpoint() } }
+    @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var currentExerciseIndex = 0 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var currentSetIndex = 0 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var restEndsAt: Date? { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var draftReps = 8 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var draftWeightKilograms = 20.0 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var draftRestSeconds = 90 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var draftRPE = 8.0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var completedWorkout: StrengthWorkoutLog?
     @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
 
     private var accountID: UUID?
     private var loadingAccount = false
+    private var checkpointSaveTask: Task<Void, Never>?
     @Published private(set) var hasLegacyHistory = false
 
     private struct Checkpoint: Codable {
@@ -32,6 +33,8 @@ final class StrengthWorkoutStore: ObservableObject {
 
     func switchAccount(_ userID: UUID?) {
         guard accountID != userID else { return }
+        checkpointSaveTask?.cancel()
+        checkpointSaveTask = nil
         loadingAccount = true
         defer { loadingAccount = false }
         accountID = userID
@@ -60,9 +63,41 @@ final class StrengthWorkoutStore: ObservableObject {
         hasLegacyHistory = false
     }
 
-    private func persistCheckpoint() {
+    private func scheduleCheckpointPersist() {
+        guard accountID != nil, !loadingAccount else { return }
+
+        checkpointSaveTask?.cancel()
+        checkpointSaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            self?.persistCheckpointNow()
+        }
+    }
+
+    private func persistCheckpointNow() {
         guard let accountID, !loadingAccount else { return }
-        AccountLocalStorage.write(Checkpoint(workout: activeWorkout, exerciseIndex: currentExerciseIndex, setIndex: currentSetIndex, restEndsAt: restEndsAt, reps: draftReps, weight: draftWeightKilograms, rest: draftRestSeconds, rpe: draftRPE), name: "strengthActive", userID: accountID)
+
+        checkpointSaveTask?.cancel()
+        checkpointSaveTask = nil
+
+        AccountLocalStorage.write(
+            Checkpoint(
+                workout: activeWorkout,
+                exerciseIndex: currentExerciseIndex,
+                setIndex: currentSetIndex,
+                restEndsAt: restEndsAt,
+                reps: draftReps,
+                weight: draftWeightKilograms,
+                rest: draftRestSeconds,
+                rpe: draftRPE
+            ),
+            name: "strengthActive",
+            userID: accountID
+        )
+    }
+
+    func checkpoint() {
+        persistCheckpointNow()
     }
 
     func trophySnapshot() -> TrophyStrengthSnapshot {
@@ -451,6 +486,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentSetIndex = 0
         restEndsAt = nil
         reloadDraftFromCurrentSet()
+        persistCheckpointNow()
     }
 
     func appendExercise(
@@ -549,6 +585,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentSetIndex = 0
         restEndsAt = nil
         reloadDraftFromCurrentSet()
+        persistCheckpointNow()
     }
 
     func completeCurrentSet(
@@ -589,6 +626,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
         activeWorkout = workout
         reloadDraftFromCurrentSet()
+        persistCheckpointNow()
     }
 
     func completeCurrentDraftSet() {
@@ -678,6 +716,7 @@ final class StrengthWorkoutStore: ObservableObject {
         draftWeightKilograms = 20
         draftRestSeconds = 90
         draftRPE = 8
+        persistCheckpointNow()
     }
 
     func goalEvidence(
