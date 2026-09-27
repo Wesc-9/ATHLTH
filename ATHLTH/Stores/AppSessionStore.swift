@@ -937,6 +937,18 @@ final class AppSessionStore: ObservableObject {
         return scheduledPlans.first { $0.id == planID }
     }
 
+    func trainingPlan(
+        containingSessionID sessionID: UUID
+    ) -> TrainingPlan? {
+        trainingPlans.first { plan in
+            plan.weeks.contains { week in
+                week.days.contains { day in
+                    day.sessions.contains { $0.id == sessionID }
+                }
+            }
+        }
+    }
+
     func trainingPlanEndDate(
         _ plan: TrainingPlan
     ) -> Date? {
