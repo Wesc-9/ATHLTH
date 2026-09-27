@@ -108,6 +108,7 @@ struct AppRootView: View {
     @EnvironmentObject private var officialWeeklyChallenges: OfficialWeeklyChallengeStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var communityEvents: CommunityEventStore
     @EnvironmentObject private var communityGroups: CommunityGroupStore
     @EnvironmentObject private var trophies: TrophyStore
 
@@ -548,6 +549,27 @@ struct AppRootView: View {
                 await syncSocialOwnedData()
             }
         }
+        .onChange(of: communityEvents.events) { _, _ in
+            guard appSession.signedIn else { return }
+
+            Task {
+                await syncCalendarIfAllowed()
+            }
+        }
+        .onChange(of: communityGroups.eventsByGroup) { _, _ in
+            guard appSession.signedIn else { return }
+
+            Task {
+                await syncCalendarIfAllowed()
+            }
+        }
+        .onChange(of: communityGroups.eventRSVPsByGroup) { _, _ in
+            guard appSession.signedIn else { return }
+
+            Task {
+                await syncCalendarIfAllowed()
+            }
+        }
         .onChange(of: goals.goals) { _, updatedGoals in
             notifications.syncGoalEvents(from: updatedGoals)
 
@@ -848,12 +870,31 @@ struct AppRootView: View {
     private func syncCalendarIfAllowed(
         plan: TrainingPlan? = nil
     ) async {
-        guard appSession.subscriptionAccess.hasPaidAccess else {
+        guard appSession.subscriptionAccess.hasPaidAccess,
+              calendarSync.isEnabled
+        else {
             return
         }
 
+        async let eventRefresh: Void =
+            communityEvents.refresh()
+        async let groupCalendarRefresh: Void =
+            communityGroups.refreshCalendarContent()
+
+        _ = await (
+            eventRefresh,
+            groupCalendarRefresh
+        )
+
         await calendarSync.syncIfEnabled(
-            plan: plan ?? appSession.activePlan
+            plan: plan ?? appSession.activePlan,
+            communityEvents: communityEvents.events,
+            groupEvents: communityGroups.calendarEvents,
+            groupEventRSVPs:
+                communityGroups.calendarEventRSVPs,
+            challenges: challengeStore.challenges,
+            currentUserID:
+                appSession.profile.userID
         )
     }
 
