@@ -128,8 +128,6 @@ struct AppRootView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var subscriptionBackend: SubscriptionBackendService
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
-    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
-    @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var trainingBackups: TrainingBackupStore
@@ -182,7 +180,6 @@ struct AppRootView: View {
             await subscriptionStore.start()
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
             await submitLatestStoreProofIfPossible()
-            publishATHLTHSurfaces()
 
             if appSession.signedIn {
                 // Keep launch responsive: load only Home-critical account
@@ -244,7 +241,6 @@ struct AppRootView: View {
             )
             await refreshTrophiesAndNotifications()
             await syncSocialOwnedData()
-            publishATHLTHSurfaces()
             lastFullLifecycleRefreshAt = Date()
         }
         .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) { IPhoneWorkoutView() }
@@ -391,16 +387,12 @@ struct AppRootView: View {
         }
         )
         .onChange(of: health.recovery) { _, _ in
-            publishATHLTHSurfaces()
         }
         .onChange(of: appSession.activePlan) { _, _ in
-            publishATHLTHSurfaces()
         }
         .onChange(of: goals.goals) { _, _ in
-            publishATHLTHSurfaces()
         }
         .onChange(of: workoutMirroring.snapshot) { _, snapshot in
-            publishATHLTHSurfaces()
             ATHLTHSurfaceCoordinator.syncLiveActivity(
                 with: snapshot
             )
@@ -803,6 +795,9 @@ struct AppRootView: View {
                 }
             }
         }
+        .background {
+            ATHLTHSurfaceRuntimeObserver()
+        }
     }
 
     var body: some View {
@@ -1045,14 +1040,6 @@ struct AppRootView: View {
         )
     }
 
-    private func publishATHLTHSurfaces() {
-        ATHLTHSurfaceCoordinator.publishSnapshot(
-            health: health,
-            session: appSession,
-            goals: goals,
-            workout: workoutMirroring.snapshot
-        )
-    }
 
     private func syncAppleHealthProfileDetailsIfNeeded() {
         guard let source = appSession.onboardingProfile?.personalDetailsSource,
