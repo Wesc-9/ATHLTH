@@ -58,7 +58,7 @@ enum WatchWorkoutState: Equatable {
 
 @MainActor
 final class WatchWorkoutManager: NSObject, ObservableObject {
-    static let shared = WatchWorkoutManager()
+    @MainActor static let shared = WatchWorkoutManager()
 
     @Published private(set) var state: WatchWorkoutState = .idle
     @Published private(set) var kind: WatchWorkoutKind = .running
