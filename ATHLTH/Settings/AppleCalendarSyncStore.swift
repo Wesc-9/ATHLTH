@@ -29,6 +29,39 @@ final class AppleCalendarSyncStore: ObservableObject {
         let currentUserID: UUID?
     }
 
+    private enum CalendarAttendanceState {
+        case going
+        case maybe
+        case unanswered
+        case waitlist
+
+        var titlePrefix: String? {
+            switch self {
+            case .going:
+                return nil
+            case .maybe:
+                return "Maybe"
+            case .unanswered:
+                return "No response"
+            case .waitlist:
+                return "Waitlist"
+            }
+        }
+
+        var noteLabel: String {
+            switch self {
+            case .going:
+                return "Going"
+            case .maybe:
+                return "Maybe"
+            case .unanswered:
+                return "No response"
+            case .waitlist:
+                return "Waitlist"
+            }
+        }
+    }
+
     private enum Key {
         static let enabled =
             "calendarSync.enabled"
@@ -702,6 +735,226 @@ final class AppleCalendarSyncStore: ObservableObject {
 
     private func configure(
         _ event: EKEvent,
+        communityEvent item: CommunityEventItem,
+        attendance: CalendarAttendanceState,
+        calendar: EKCalendar
+    ) {
+        let record = item.event
+
+        resetManagedEvent(event)
+        event.calendar = calendar
+        event.title = titled(
+            record.title,
+            attendance: attendance
+        )
+        event.startDate = record.startsAt
+        event.endDate =
+            record.endsAt ??
+            record.startsAt.addingTimeInterval(3_600)
+        event.isAllDay = false
+        event.location =
+            record.meetingName
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .isEmpty
+            ? nil
+            : record.meetingName
+
+        var lines = [
+            "ATHLTH · Community Event",
+            "RSVP: \(attendance.noteLabel)"
+        ]
+
+        if !record.summary
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty {
+            lines.append("")
+            lines.append(record.summary)
+        }
+
+        if let pace = record.paceLabel,
+           !pace.trimmingCharacters(
+                in: .whitespacesAndNewlines
+           ).isEmpty {
+            lines.append("Pace: \(pace)")
+        }
+
+        if let route = record.routeTitle,
+           !route.trimmingCharacters(
+                in: .whitespacesAndNewlines
+           ).isEmpty {
+            lines.append("Route: \(route)")
+        }
+
+        lines.append("")
+        lines.append("Synced from ATHLTH")
+        lines.append(
+            managedMarker(
+                type: "event",
+                id: record.id
+            )
+        )
+
+        event.notes = lines.joined(separator: "\n")
+    }
+
+    private func configure(
+        _ event: EKEvent,
+        groupEvent record: CommunityGroupEventRecord,
+        attendance: CalendarAttendanceState,
+        calendar: EKCalendar
+    ) {
+        resetManagedEvent(event)
+        event.calendar = calendar
+        event.title = titled(
+            record.title,
+            attendance: attendance
+        )
+        event.startDate = record.startsAt
+        event.endDate =
+            record.endsAt ??
+            record.startsAt.addingTimeInterval(3_600)
+        event.isAllDay = false
+        event.location =
+            record.meetingName
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .isEmpty
+            ? nil
+            : record.meetingName
+
+        if record.repeatRule == "weekly" {
+            let recurrenceEnd =
+                record.repeatUntil.map {
+                    EKRecurrenceEnd(end: $0)
+                }
+
+            event.addRecurrenceRule(
+                EKRecurrenceRule(
+                    recurrenceWith: .weekly,
+                    interval: 1,
+                    end: recurrenceEnd
+                )
+            )
+        }
+
+        var lines = [
+            "ATHLTH · Club Event",
+            "RSVP: \(attendance.noteLabel)"
+        ]
+
+        if attendance == .unanswered {
+            lines.append(
+                "Open ATHLTH to respond."
+            )
+        }
+
+        if !record.summary
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty {
+            lines.append("")
+            lines.append(record.summary)
+        }
+
+        lines.append("")
+        lines.append("Synced from ATHLTH")
+        lines.append(
+            managedMarker(
+                type: "group-event",
+                id: record.id
+            )
+        )
+
+        event.notes = lines.joined(separator: "\n")
+    }
+
+    private func configure(
+        _ event: EKEvent,
+        challenge: ATHLTHChallenge,
+        attendance: CalendarAttendanceState,
+        calendar: EKCalendar
+    ) {
+        resetManagedEvent(event)
+        event.calendar = calendar
+        event.title = titled(
+            "Challenge · \(challenge.title)",
+            attendance: attendance
+        )
+        event.startDate = challenge.rules.startsAt
+        event.endDate =
+            challenge.rules.endsAt ??
+            challenge.rules.startsAt
+                .addingTimeInterval(3_600)
+        event.isAllDay = false
+
+        var lines = [
+            "ATHLTH · Challenge",
+            "Response: \(attendance.noteLabel)"
+        ]
+
+        if attendance == .unanswered {
+            lines.append(
+                "Open ATHLTH to accept or decline the challenge."
+            )
+        }
+
+        lines.append(
+            "Sport: \(challenge.sport.rawValue.capitalized)"
+        )
+
+        if let distance =
+            challenge.rules.targetDistanceMeters {
+            lines.append(
+                String(
+                    format: "Target: %.1f km",
+                    distance / 1_000
+                )
+            )
+        }
+
+        lines.append("")
+        lines.append("Synced from ATHLTH")
+        lines.append(
+            managedMarker(
+                type: "challenge",
+                id: challenge.id
+            )
+        )
+
+        event.notes = lines.joined(separator: "\n")
+    }
+
+    private func titled(
+        _ base: String,
+        attendance: CalendarAttendanceState
+    ) -> String {
+        guard let prefix =
+            attendance.titlePrefix
+        else {
+            return base
+        }
+
+        return "\(prefix) · \(base)"
+    }
+
+    private func resetManagedEvent(
+        _ event: EKEvent
+    ) {
+        event.recurrenceRules?.forEach {
+            event.removeRecurrenceRule($0)
+        }
+        event.location = nil
+        event.url = nil
+    }
+
+    private func configure(
+        _ event: EKEvent,
         session: PlannedSession,
         plan: TrainingPlan,
         dayDate: Date,
@@ -802,6 +1055,12 @@ final class AppleCalendarSyncStore: ObservableObject {
         lines.append("")
         lines.append("Synced from ATHLTH")
         lines.append(
+            managedMarker(
+                type: "session",
+                id: session.id
+            )
+        )
+        lines.append(
             "[ATHLTH_SESSION:\(session.id.uuidString)]"
         )
         lines.append(
@@ -848,11 +1107,82 @@ final class AppleCalendarSyncStore: ObservableObject {
                 matching: predicate
             )
             .filter {
-                $0.notes?
-                    .contains(
-                        "[ATHLTH_SESSION:"
-                    ) == true
+                let notes = $0.notes ?? ""
+                return notes.contains(
+                    "[ATHLTH_MANAGED:"
+                ) ||
+                notes.contains(
+                    "[ATHLTH_SESSION:"
+                )
             }
+    }
+
+    private func managedKey(
+        type: String,
+        id: UUID
+    ) -> String {
+        "\(type):\(id.uuidString)"
+    }
+
+    private func managedMarker(
+        type: String,
+        id: UUID
+    ) -> String {
+        "[ATHLTH_MANAGED:\(type):\(id.uuidString)]"
+    }
+
+    private func managedKey(
+        from event: EKEvent
+    ) -> String? {
+        guard let notes = event.notes else {
+            return nil
+        }
+
+        if let markerRange =
+            notes.range(
+                of: "[ATHLTH_MANAGED:"
+            ) {
+            let valueStart =
+                markerRange.upperBound
+
+            guard let closing =
+                    notes[valueStart...]
+                        .firstIndex(of: "]")
+            else {
+                return nil
+            }
+
+            let payload = String(
+                notes[valueStart..<closing]
+            )
+            let parts = payload.split(
+                separator: ":",
+                maxSplits: 1
+            )
+
+            guard parts.count == 2,
+                  let id = UUID(
+                    uuidString: String(parts[1])
+                  )
+            else {
+                return nil
+            }
+
+            return managedKey(
+                type: String(parts[0]),
+                id: id
+            )
+        }
+
+        if let legacySessionID =
+            sessionID(from: event) {
+            return managedKey(
+                type: "session",
+                id: legacySessionID
+            )
+        }
+
+        return nil
     }
 
     private func sessionID(
