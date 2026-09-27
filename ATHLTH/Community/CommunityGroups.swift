@@ -783,6 +783,7 @@ final class CommunityGroupStore: ObservableObject {
     @Published var errorMessage: String?
 
     private let client: SupabaseClient
+    private var lastRefreshAt: Date?
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -1049,7 +1050,7 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
-    func refresh() async {
+    func refresh(force: Bool = false) async {
         guard let userID = currentUserID else {
             groups = []
             ownMemberships = []
@@ -1060,6 +1061,15 @@ final class CommunityGroupStore: ObservableObject {
             leaderboardByGroup = [:]
             return
         }
+
+        if !force,
+           let lastRefreshAt,
+           Date().timeIntervalSince(lastRefreshAt) < 180,
+           !groups.isEmpty {
+            return
+        }
+
+        guard !isLoading else { return }
 
         isLoading = true
         defer { isLoading = false }
@@ -1121,6 +1131,7 @@ final class CommunityGroupStore: ObservableObject {
                     .value
 
             groups = try await groupsQuery
+            lastRefreshAt = Date()
             ownMemberships = try await membershipsQuery
             communityActivity = try await activityQuery
                 .filter { $0.kind != "announcement" }
@@ -1428,7 +1439,7 @@ final class CommunityGroupStore: ObservableObject {
                 guard imageJPEGData.count <= 5_242_880 else {
                     errorMessage =
                         "Club image must be smaller than 5 MB."
-                    await refresh()
+                    await refresh(force: true)
                     return true
                 }
 
@@ -1491,7 +1502,7 @@ final class CommunityGroupStore: ObservableObject {
                 }
             }
 
-            await refresh()
+            await refresh(force: true)
 
             // A refresh may finish before the detail membership cache is
             // populated. Keep the owner visible and then hydrate the full
@@ -1574,7 +1585,7 @@ final class CommunityGroupStore: ObservableObject {
                 .eq("id", value: group.id)
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -1640,7 +1651,7 @@ final class CommunityGroupStore: ObservableObject {
                 .eq("id", value: group.id)
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -1673,7 +1684,7 @@ final class CommunityGroupStore: ObservableObject {
                 .eq("id", value: group.id)
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -1715,7 +1726,7 @@ final class CommunityGroupStore: ObservableObject {
             eventsByGroup[group.id] = nil
             challengesByGroup[group.id] = nil
 
-            await refresh()
+            await refresh(force: true)
             errorMessage = nil
             return true
         } catch {
@@ -1756,7 +1767,7 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
 
             await loadGroupContent(groupID)
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -1948,7 +1959,7 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
                 .value
 
-            await refresh()
+            await refresh(force: true)
 
             if result == "joined" {
                 await loadGroupContent(group.id)
@@ -1984,7 +1995,7 @@ final class CommunityGroupStore: ObservableObject {
                 )
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
             await loadGroupContent(groupID)
             return true
         } catch {
@@ -2036,7 +2047,7 @@ final class CommunityGroupStore: ObservableObject {
                 )
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
 
             if accept {
                 await loadGroupContent(groupID)
@@ -2144,7 +2155,7 @@ final class CommunityGroupStore: ObservableObject {
                 .neq("role", value: "owner")
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
             await loadGroupContent(groupID)
             return true
         } catch {
@@ -2199,7 +2210,7 @@ final class CommunityGroupStore: ObservableObject {
                 .eq("user_id", value: userID)
                 .execute()
 
-            await refresh()
+            await refresh(force: true)
             membersByGroup[group.id] = nil
             announcementsByGroup[group.id] = nil
             announcementReactionsByGroup[group.id] = nil
@@ -2454,7 +2465,7 @@ final class CommunityGroupStore: ObservableObject {
 
             errorMessage = nil
             await loadGroupContent(groupID)
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             if uploadedImage {
@@ -2557,7 +2568,7 @@ final class CommunityGroupStore: ObservableObject {
 
             errorMessage = nil
             await loadGroupContent(groupID)
-            await refresh()
+            await refresh(force: true)
             return true
         } catch {
             if uploadedImage {
