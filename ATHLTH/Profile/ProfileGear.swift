@@ -1790,9 +1790,18 @@ struct ProfileGearEditorView: View {
             guard !didLoadDetails else { return }
             didLoadDetails = true
 
+            async let catalogRefresh: Void =
+                catalog.refresh(category: category)
+
+            if category == .watch {
+                watchConnection.refreshStatus()
+            }
+
             if gear.items.isEmpty {
                 await gear.refresh()
             }
+
+            _ = await catalogRefresh
 
             if let existing,
                let record = gear.details(for: existing) {
@@ -1810,6 +1819,8 @@ struct ProfileGearEditorView: View {
                     replacementTargetText =
                         String(format: "%.0f", target)
                 }
+
+                reconcileCatalogSelection()
             } else if category == .shoes,
                       gear.defaultRunningShoe == nil {
                 detailDraft.isDefaultForRunning = true
@@ -1817,11 +1828,364 @@ struct ProfileGearEditorView: View {
         }
     }
 
+    private var catalogBrands: [String] {
+        catalog.brands(for: category)
+    }
+
+    private var catalogModels: [GearCatalogEntry] {
+        guard !detailDraft.brand.isEmpty else { return [] }
+        return catalog.models(
+            for: category,
+            brand: detailDraft.brand
+        )
+    }
+
+    private var suggestedModels: [GearCatalogEntry] {
+        guard !detailDraft.brand.isEmpty else {
+            return catalog.featured(
+                for: category,
+                limit: 6
+            )
+        }
+
+        return catalog.featured(
+            for: category,
+            brand: detailDraft.brand,
+            limit: 6
+        )
+    }
+
+    private var selectedCatalogEntry: GearCatalogEntry? {
+        if let item = catalog.entry(id: detailDraft.catalogItemID) {
+            return item
+        }
+
+        return catalog.matchingEntry(
+            category: category,
+            brand: detailDraft.brand,
+            model: detailDraft.model
+        )
+    }
+
+    @ViewBuilder
+    private var catalogSelectionSection: some View {
+        Section("Gear Catalog") {
+            if category == .watch,
+               watchConnection.paired == true {
+                Button {
+                    selectCatalogBrand("Apple")
+                } label: {
+                    HStack(spacing: 11) {
+                        Image(systemName: "applewatch")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .frame(width: 38, height: 38)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 11,
+                                    style: .continuous
+                                )
+                            )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Apple Watch detected")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(
+                                detailDraft.brand == "Apple"
+                                    ? "Apple is selected. Choose the exact model below."
+                                    : "Use Apple as the brand and choose your model."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        if detailDraft.brand == "Apple" {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(ATHLTHTheme.accent)
+                        } else {
+                            Text("Use")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accent)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            if category == .other {
+                TextField(
+                    "Type, e.g. chest strap or vest",
+                    text: $detailDraft.gearTypeLabel
+                )
+                TextField("Brand", text: $detailDraft.brand)
+                TextField("Model", text: $detailDraft.model)
+            } else {
+                if manualBrand || catalogBrands.isEmpty {
+                    TextField(
+                        "Brand",
+                        text: $detailDraft.brand
+                    )
+
+                    if !catalogBrands.isEmpty {
+                        Button("Choose from Gear Catalog") {
+                            manualBrand = false
+                            manualModel = false
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
+                } else {
+                    LabeledContent("Brand") {
+                        Menu {
+                            ForEach(catalogBrands, id: \.self) { brand in
+                                Button(brand) {
+                                    selectCatalogBrand(brand)
+                                }
+                            }
+
+                            Divider()
+
+                            Button {
+                                detailDraft.catalogItemID = nil
+                                detailDraft.brand = ""
+                                detailDraft.model = ""
+                                detailDraft.variantLabel = ""
+                                manualBrand = true
+                                manualModel = true
+                            } label: {
+                                Label(
+                                    "Enter manually",
+                                    systemImage: "square.and.pencil"
+                                )
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(
+                                    detailDraft.brand.isEmpty
+                                        ? "Choose"
+                                        : detailDraft.brand
+                                )
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+
+                if !detailDraft.brand
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    .isEmpty {
+                    if manualModel || catalogModels.isEmpty {
+                        TextField(
+                            "Model",
+                            text: $detailDraft.model
+                        )
+                        .onChange(of: detailDraft.model) { _, _ in
+                            detailDraft.catalogItemID = nil
+                            detailDraft.variantLabel = ""
+                        }
+
+                        if !catalogModels.isEmpty {
+                            Button("Choose a suggested model") {
+                                manualModel = false
+                            }
+                            .font(.caption.weight(.semibold))
+                        }
+                    } else {
+                        LabeledContent("Model") {
+                            Menu {
+                                ForEach(catalogModels) { item in
+                                    Button(item.model) {
+                                        selectCatalogEntry(item)
+                                    }
+                                }
+
+                                Divider()
+
+                                Button {
+                                    detailDraft.catalogItemID = nil
+                                    detailDraft.model = ""
+                                    detailDraft.variantLabel = ""
+                                    manualModel = true
+                                } label: {
+                                    Label(
+                                        "Enter manually",
+                                        systemImage: "square.and.pencil"
+                                    )
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Text(
+                                        detailDraft.model.isEmpty
+                                            ? "Choose"
+                                            : detailDraft.model
+                                    )
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption2)
+                                }
+                            }
+                        }
+                    }
+
+                    if !suggestedModels.isEmpty &&
+                       detailDraft.model.isEmpty &&
+                       !manualModel {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Suggested")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                            ScrollView(
+                                .horizontal,
+                                showsIndicators: false
+                            ) {
+                                HStack(spacing: 8) {
+                                    ForEach(suggestedModels) { item in
+                                        Button {
+                                            selectCatalogEntry(item)
+                                        } label: {
+                                            Text(item.model)
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(
+                                                    ATHLTHTheme.primaryText
+                                                )
+                                                .padding(.horizontal, 11)
+                                                .frame(height: 34)
+                                                .background(
+                                                    ATHLTHTheme.accentSoft,
+                                                    in: Capsule()
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if editorMode == .advanced,
+               category != .other {
+                if let selectedCatalogEntry,
+                   !selectedCatalogEntry.variants.isEmpty {
+                    Picker(
+                        "Variant",
+                        selection: $detailDraft.variantLabel
+                    ) {
+                        Text("Not specified").tag("")
+
+                        ForEach(
+                            selectedCatalogEntry.variants,
+                            id: \.self
+                        ) { variant in
+                            Text(variant).tag(variant)
+                        }
+                    }
+                } else {
+                    TextField(
+                        category == .watch
+                            ? "Variant / case size"
+                            : "Variant",
+                        text: $detailDraft.variantLabel
+                    )
+                }
+            }
+
+            TextField(
+                "Color",
+                text: $detailDraft.colorName
+            )
+
+            if catalog.isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Loading Gear Catalog…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if let error = catalog.errorMessage {
+                Label(
+                    "Catalog unavailable. You can still enter gear manually.",
+                    systemImage: "wifi.exclamationmark"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityHint(error)
+            }
+        }
+    }
+
+    private func selectCatalogBrand(
+        _ brand: String
+    ) {
+        detailDraft.brand = brand
+        detailDraft.model = ""
+        detailDraft.variantLabel = ""
+        detailDraft.catalogItemID = nil
+        manualBrand = false
+        manualModel = false
+    }
+
+    private func selectCatalogEntry(
+        _ item: GearCatalogEntry
+    ) {
+        detailDraft.catalogItemID = item.id
+        detailDraft.brand = item.brand
+        detailDraft.model = item.model
+        detailDraft.variantLabel = ""
+        manualBrand = false
+        manualModel = false
+
+        let generatedName = item.displayName
+
+        if name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty ||
+            name == lastAutoName {
+            name = generatedName
+        }
+
+        lastAutoName = generatedName
+    }
+
+    private func reconcileCatalogSelection() {
+        if let matched = catalog.matchingEntry(
+            category: category,
+            brand: detailDraft.brand,
+            model: detailDraft.model
+        ) {
+            detailDraft.catalogItemID =
+                detailDraft.catalogItemID ?? matched.id
+            manualBrand = false
+            manualModel = false
+            return
+        }
+
+        manualBrand = !detailDraft.brand.isEmpty &&
+            !catalogBrands.contains {
+                $0.compare(
+                    detailDraft.brand,
+                    options: [
+                        .caseInsensitive,
+                        .diacriticInsensitive
+                    ]
+                ) == .orderedSame
+            }
+
+        manualModel =
+            !detailDraft.model.isEmpty &&
+            catalogModels.isEmpty
+    }
+
     private var shoeDetailsSection: some View {
         Section("Shoe Details") {
-            TextField("Brand", text: $detailDraft.brand)
-            TextField("Model", text: $detailDraft.model)
-            TextField("Color", text: $detailDraft.colorName)
             TextField("Size", text: $detailDraft.sizeLabel)
 
             Picker(
@@ -1897,20 +2261,51 @@ struct ProfileGearEditorView: View {
     }
 
     private var generalDetailsSection: some View {
-        Section("Details") {
-            if category == .other {
-                TextField(
-                    "Type, e.g. chest strap or vest",
-                    text: $detailDraft.gearTypeLabel
+        Section("Lifecycle") {
+            Toggle(
+                "Purchased date",
+                isOn: $hasPurchasedDate
+            )
+
+            if hasPurchasedDate {
+                DatePicker(
+                    "Purchased",
+                    selection: Binding(
+                        get: {
+                            detailDraft.purchasedAt ?? Date()
+                        },
+                        set: {
+                            detailDraft.purchasedAt = $0
+                        }
+                    ),
+                    in: ...Date(),
+                    displayedComponents: .date
                 )
             }
 
-            TextField("Brand", text: $detailDraft.brand)
-            TextField("Model", text: $detailDraft.model)
-            TextField("Color", text: $detailDraft.colorName)
+            Toggle(
+                "First used date",
+                isOn: $hasFirstUsedDate
+            )
+
+            if hasFirstUsedDate {
+                DatePicker(
+                    "First used",
+                    selection: Binding(
+                        get: {
+                            detailDraft.firstUsedAt ?? Date()
+                        },
+                        set: {
+                            detailDraft.firstUsedAt = $0
+                        }
+                    ),
+                    in: ...Date(),
+                    displayedComponents: .date
+                )
+            }
 
             Text(
-                "Other gear tracks workout count, total time and last use. Distance is only emphasized for shoes."
+                "ATHLTH tracks workout count, total time and last use whenever this gear is linked to a workout."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
