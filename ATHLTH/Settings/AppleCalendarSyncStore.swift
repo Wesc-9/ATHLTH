@@ -525,30 +525,28 @@ final class AppleCalendarSyncStore: ObservableObject {
         if let currentUserID = snapshot.currentUserID {
             let now = Date()
 
+            // Public Community events only enter Calendar after the user has
+            // explicitly selected Going or Maybe.
             for item in snapshot.communityEvents {
                 let record = item.event
-                let isParticipant =
-                    record.creatorID == currentUserID ||
-                    item.participantRows.contains {
-                        $0.userID == currentUserID
-                    }
+                let attendance = item.participantRows.first {
+                    $0.userID == currentUserID
+                }?.attendanceStatus
                 let effectiveEnd =
                     record.endsAt ??
-                    record.startsAt
-                        .addingTimeInterval(3_600)
+                    record.startsAt.addingTimeInterval(3_600)
 
-                guard isParticipant,
+                guard let attendance,
                       record.status == "upcoming",
                       effectiveEnd >= now
                 else {
                     continue
                 }
 
-                let key =
-                    managedKey(
-                        type: "event",
-                        id: record.id
-                    )
+                let key = managedKey(
+                    type: "event",
+                    id: record.id
+                )
                 activeKeys.insert(key)
 
                 let event =
@@ -558,6 +556,10 @@ final class AppleCalendarSyncStore: ObservableObject {
                 configure(
                     event,
                     communityEvent: item,
+                    attendance:
+                        attendance == .maybe
+                            ? .maybe
+                            : .going,
                     calendar: calendar
                 )
 
@@ -568,29 +570,87 @@ final class AppleCalendarSyncStore: ObservableObject {
                 )
             }
 
-            for challenge in snapshot.challenges {
-                let isParticipant =
-                    challenge.creatorID == currentUserID ||
-                    challenge.participants.contains {
-                        $0.userID == currentUserID &&
-                        (
-                            $0.state == .creator ||
-                            $0.state == .accepted
-                        )
-                    }
+            // Club membership makes an upcoming Club event relevant to the
+            // user. No RSVP is shown as "No response" until they answer.
+            for record in snapshot.groupEvents {
+                let effectiveEnd =
+                    record.endsAt ??
+                    record.startsAt.addingTimeInterval(3_600)
 
-                guard isParticipant,
-                      challenge.status == .upcoming ||
-                      challenge.status == .active
+                guard (
+                    record.status == "upcoming" ||
+                    record.status == "live"
+                ),
+                effectiveEnd >= now
                 else {
                     continue
                 }
 
-                let key =
-                    managedKey(
-                        type: "challenge",
-                        id: challenge.id
-                    )
+                let rsvp = snapshot.groupEventRSVPs.first {
+                    $0.eventID == record.id &&
+                    $0.userID == currentUserID
+                }?.status
+
+                guard rsvp != "not_going" else {
+                    continue
+                }
+
+                let attendance: CalendarAttendanceState
+                switch rsvp {
+                case "going":
+                    attendance = .going
+                case "maybe":
+                    attendance = .maybe
+                case "waitlist":
+                    attendance = .waitlist
+                default:
+                    attendance = .unanswered
+                }
+
+                let key = managedKey(
+                    type: "group-event",
+                    id: record.id
+                )
+                activeKeys.insert(key)
+
+                let event =
+                    existingByKey[key] ??
+                    EKEvent(eventStore: eventStore)
+
+                configure(
+                    event,
+                    groupEvent: record,
+                    attendance: attendance,
+                    calendar: calendar
+                )
+
+                try eventStore.save(
+                    event,
+                    span: .thisEvent,
+                    commit: false
+                )
+            }
+
+            // Only challenges where this user was actually challenged are
+            // synced. An invitation remains visible as "No response" until
+            // accepted or declined.
+            for challenge in snapshot.challenges {
+                guard let participant = challenge.participants.first(
+                    where: { $0.userID == currentUserID }
+                ),
+                participant.state == .invited ||
+                    participant.state == .accepted,
+                challenge.status == .invited ||
+                    challenge.status == .upcoming ||
+                    challenge.status == .active
+                else {
+                    continue
+                }
+
+                let key = managedKey(
+                    type: "challenge",
+                    id: challenge.id
+                )
                 activeKeys.insert(key)
 
                 let event =
@@ -600,39 +660,10 @@ final class AppleCalendarSyncStore: ObservableObject {
                 configure(
                     event,
                     challenge: challenge,
-                    calendar: calendar
-                )
-
-                try eventStore.save(
-                    event,
-                    span: .thisEvent,
-                    commit: false
-                )
-            }
-
-            for challenge in snapshot.officialChallenges {
-                guard snapshot
-                    .joinedOfficialChallengeIDs
-                    .contains(challenge.id),
-                      challenge.endsAt >= now
-                else {
-                    continue
-                }
-
-                let key =
-                    managedKey(
-                        type: "official-challenge",
-                        id: challenge.id
-                    )
-                activeKeys.insert(key)
-
-                let event =
-                    existingByKey[key] ??
-                    EKEvent(eventStore: eventStore)
-
-                configure(
-                    event,
-                    officialChallenge: challenge,
+                    attendance:
+                        participant.state == .invited
+                            ? .unanswered
+                            : .going,
                     calendar: calendar
                 )
 
