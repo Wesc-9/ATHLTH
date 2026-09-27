@@ -263,10 +263,9 @@ final class AppleCalendarSyncStore: ObservableObject {
         let snapshot = CalendarSyncSnapshot(
             plan: plan,
             communityEvents: communityEvents,
+            groupEvents: groupEvents,
+            groupEventRSVPs: groupEventRSVPs,
             challenges: challenges,
-            officialChallenges: officialChallenges,
-            joinedOfficialChallengeIDs:
-                joinedOfficialChallengeIDs,
             currentUserID: currentUserID
         )
 
