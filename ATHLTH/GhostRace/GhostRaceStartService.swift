@@ -26,111 +26,33 @@ enum GhostRaceStartService {
             route: route
         )
 
-        guard let raceRoute =
-                ghostRace.temporaryRoute(
-                    ownerID: ownerID
-                )
-        else {
-            ghostRace.cancel()
-            throw GhostRacePreparationError.missingRoute
-        }
+        try await launchPrepared(
+            title: title,
+            ownerID: ownerID,
+            ghostRace: ghostRace,
+            watchConnection: watchConnection,
+            settings: settings
+        )
+    }
 
-        do {
-            try watchConnection.sendRoute(raceRoute)
-            watchConnection.sendWorkoutRouteSelection(
-                raceRoute.id
-            )
+    static func start(
+        reference: GhostRaceReference,
+        ownerID: UUID,
+        ghostRace: GhostRaceStore,
+        watchConnection: AppleWatchConnectionStore,
+        settings: AppSettingsStore
+    ) async throws {
+        try ghostRace.prepare(
+            reference: reference
+        )
 
-            if let reference = ghostRace.reference {
-                let watchPointStep =
-                    max(
-                        reference.points.count / 320,
-                        1
-                    )
-
-                var watchPoints =
-                    reference.points.enumerated()
-                        .compactMap {
-                            index,
-                            point
-                            -> WatchGhostRaceTimingPoint? in
-
-                            guard index % watchPointStep == 0 ||
-                                    index ==
-                                    reference.points.count - 1
-                            else {
-                                return nil
-                            }
-
-                            return WatchGhostRaceTimingPoint(
-                                elapsedTime:
-                                    point.elapsedTime,
-                                cumulativeMeters:
-                                    point.cumulativeMeters
-                            )
-                        }
-
-                if let final = reference.points.last,
-                   watchPoints.last?.cumulativeMeters !=
-                    final.cumulativeMeters {
-                    watchPoints.append(
-                        WatchGhostRaceTimingPoint(
-                            elapsedTime:
-                                final.elapsedTime,
-                            cumulativeMeters:
-                                final.cumulativeMeters
-                        )
-                    )
-                }
-
-                watchConnection.sendGhostRace(
-                    WatchGhostRaceTransfer(
-                        title: reference.title,
-                        referenceDuration:
-                            reference.durationSeconds,
-                        routeDistanceMeters:
-                            reference.routeDistanceMeters,
-                        points: watchPoints,
-                        audio:
-                            settings
-                                .ghostRaceAudioConfiguration
-                    )
-                )
-            }
-
-            try await watchConnection
-                .startWorkoutOnWatch(.running)
-
-            watchConnection
-                .sendAudioCoachConfiguration(
-                    settings.audioCoachConfiguration(
-                        enabled:
-                            settings
-                                .audioCoachEnabledByDefault,
-                        routeDistanceMeters:
-                            raceRoute
-                                .distanceKilometers *
-                                1_000
-                    )
-                )
-
-            watchConnection.sendRunningWorkout(
-                WatchRunningWorkoutTransfer(
-                    title:
-                        "Ghost Race · \(title)",
-                    steps: [],
-                    routeAlerts:
-                        settings
-                            .routeAlertConfiguration
-                )
-            )
-        } catch {
-            ghostRace.cancel()
-            watchConnection
-                .sendWorkoutRouteSelection(nil)
-            watchConnection.clearGhostRace()
-            throw error
-        }
+        try await launchPrepared(
+            title: reference.title,
+            ownerID: ownerID,
+            ghostRace: ghostRace,
+            watchConnection: watchConnection,
+            settings: settings
+        )
     }
 
     static func start(
@@ -214,5 +136,140 @@ enum GhostRaceStartService {
             watchConnection: watchConnection,
             settings: settings
         )
+    }
+
+    private static func launchPrepared(
+        title: String,
+        ownerID: UUID,
+        ghostRace: GhostRaceStore,
+        watchConnection: AppleWatchConnectionStore,
+        settings: AppSettingsStore
+    ) async throws {
+        guard let raceRoute =
+                ghostRace.temporaryRoute(
+                    ownerID: ownerID
+                ),
+              let reference =
+                ghostRace.reference
+        else {
+            ghostRace.cancel()
+            throw GhostRacePreparationError
+                .missingRoute
+        }
+
+        do {
+            try watchConnection.sendRoute(
+                raceRoute
+            )
+            watchConnection
+                .sendWorkoutRouteSelection(
+                    raceRoute.id
+                )
+
+            let watchPointStep =
+                max(
+                    reference.points.count /
+                        320,
+                    1
+                )
+
+            var watchPoints =
+                reference.points
+                    .enumerated()
+                    .compactMap {
+                        index,
+                        point
+                        -> WatchGhostRaceTimingPoint? in
+
+                        guard index %
+                                    watchPointStep ==
+                                    0 ||
+                                index ==
+                                    reference
+                                        .points
+                                        .count -
+                                    1
+                        else {
+                            return nil
+                        }
+
+                        return WatchGhostRaceTimingPoint(
+                            elapsedTime:
+                                point.elapsedTime,
+                            cumulativeMeters:
+                                point
+                                    .cumulativeMeters
+                        )
+                    }
+
+            if let final =
+                    reference.points.last,
+               watchPoints.last?
+                .cumulativeMeters !=
+                    final.cumulativeMeters {
+                watchPoints.append(
+                    WatchGhostRaceTimingPoint(
+                        elapsedTime:
+                            final.elapsedTime,
+                        cumulativeMeters:
+                            final.cumulativeMeters
+                    )
+                )
+            }
+
+            watchConnection.sendGhostRace(
+                WatchGhostRaceTransfer(
+                    title: reference.title,
+                    referenceDuration:
+                        reference
+                            .durationSeconds,
+                    routeDistanceMeters:
+                        reference
+                            .routeDistanceMeters,
+                    points: watchPoints,
+                    audio:
+                        settings
+                            .ghostRaceAudioConfiguration
+                )
+            )
+
+            try await watchConnection
+                .startWorkoutOnWatch(
+                    .running
+                )
+
+            watchConnection
+                .sendAudioCoachConfiguration(
+                    settings
+                        .audioCoachConfiguration(
+                            enabled:
+                                settings
+                                    .audioCoachEnabledByDefault,
+                            routeDistanceMeters:
+                                raceRoute
+                                    .distanceKilometers *
+                                    1_000
+                        )
+                )
+
+            watchConnection
+                .sendRunningWorkout(
+                    WatchRunningWorkoutTransfer(
+                        title:
+                            "Ghost Race · \(title)",
+                        steps: [],
+                        routeAlerts:
+                            settings
+                                .routeAlertConfiguration
+                    )
+                )
+        } catch {
+            ghostRace.cancel()
+            watchConnection
+                .sendWorkoutRouteSelection(nil)
+            watchConnection
+                .clearGhostRace()
+            throw error
+        }
     }
 }
