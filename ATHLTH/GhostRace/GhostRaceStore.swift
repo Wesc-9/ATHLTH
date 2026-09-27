@@ -522,14 +522,39 @@ final class GhostRaceStore: ObservableObject {
             }
         }
 
-        return nearestIndex(
-            to: location,
-            points: reference.points,
-            range:
-                0...(
-                    reference.points.count - 1
+        let initialUpper =
+            min(
+                max(
+                    Int(
+                        Double(reference.points.count) *
+                        0.18
+                    ),
+                    24
+                ),
+                reference.points.count - 1
+            )
+
+        guard let initial =
+                nearestIndex(
+                    to: location,
+                    points: reference.points,
+                    range: 0...initialUpper
                 )
-        )
+        else {
+            return nil
+        }
+
+        let initialDistance =
+            location.distance(
+                from:
+                    reference.points[
+                        initial
+                    ].location
+            )
+
+        return initialDistance <= 250
+            ? initial
+            : nil
     }
 
     private func nearestIndex(
