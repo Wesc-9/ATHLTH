@@ -97,6 +97,7 @@ enum GhostRacePreparationError: LocalizedError {
     case runningOnly
     case missingRoute
     case routeTooShort
+    case invalidTargetTime
 
     var errorDescription: String? {
         switch self {
@@ -106,6 +107,8 @@ enum GhostRacePreparationError: LocalizedError {
             return "This workout does not contain a GPS route, so it cannot be used as a ghost."
         case .routeTooShort:
             return "There is not enough GPS data in this workout to create a reliable ghost."
+        case .invalidTargetTime:
+            return "Choose a valid target finish time before starting the target ghost."
         }
     }
 }
@@ -251,6 +254,108 @@ final class GhostRaceStore: ObservableObject {
                     distanceMeters ?? 0,
                     totalGeometry
                 ),
+            points: points
+        )
+
+        comparison = nil
+        result = nil
+        errorMessage = nil
+        lastMatchedIndex = nil
+    }
+
+    func prepareTarget(
+        route: TrainingRoute,
+        targetDurationSeconds: TimeInterval
+    ) throws {
+        guard targetDurationSeconds >= 60 else {
+            throw GhostRacePreparationError
+                .invalidTargetTime
+        }
+
+        let routeCoordinates =
+            route.coordinates
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+
+        guard routeCoordinates.count >= 2 else {
+            throw GhostRacePreparationError
+                .missingRoute
+        }
+
+        let locations =
+            routeCoordinates.map {
+                CLLocation(
+                    latitude: $0.latitude,
+                    longitude: $0.longitude
+                )
+            }
+
+        let cumulative =
+            cumulativeDistances(
+                for: locations
+            )
+
+        guard let totalDistance =
+                cumulative.last,
+              totalDistance >= 200
+        else {
+            throw GhostRacePreparationError
+                .routeTooShort
+        }
+
+        let sampledIndices =
+            downsampleIndices(
+                count:
+                    routeCoordinates.count,
+                maximumPoints: 900
+            )
+
+        let points =
+            sampledIndices.map {
+                index -> GhostRacePoint in
+
+                let coordinate =
+                    routeCoordinates[index]
+                let distance =
+                    cumulative[index]
+                let progress =
+                    totalDistance > 0
+                        ? distance /
+                            totalDistance
+                        : 0
+
+                return GhostRacePoint(
+                    id: index,
+                    latitude:
+                        coordinate.latitude,
+                    longitude:
+                        coordinate.longitude,
+                    altitude:
+                        coordinate.altitude,
+                    elapsedTime:
+                        targetDurationSeconds *
+                        progress,
+                    cumulativeMeters:
+                        distance
+                )
+            }
+
+        guard points.count >= 2 else {
+            throw GhostRacePreparationError
+                .routeTooShort
+        }
+
+        reference = GhostRaceReference(
+            id: UUID(),
+            sourceWorkoutID: route.id,
+            title:
+                "Target · \(route.title)",
+            startedAt: Date(),
+            durationSeconds:
+                targetDurationSeconds,
+            distanceMeters:
+                totalDistance,
             points: points
         )
 
