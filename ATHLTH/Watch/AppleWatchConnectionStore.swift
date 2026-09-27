@@ -268,6 +268,17 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    func clearGhostRace() {
+        sendGhostRace(
+            WatchGhostRaceTransfer(
+                title: "",
+                referenceDuration: 0,
+                routeDistanceMeters: 0,
+                points: []
+            )
+        )
+    }
+
     func sendStrengthSnapshot(
         _ snapshot: WatchStrengthSessionSnapshot
     ) {
