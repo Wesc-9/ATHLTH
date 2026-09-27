@@ -32,6 +32,17 @@ struct AIProgramGoalInput: Codable, Hashable {
     let notes: String?
     let milestones: [String]
 
+    init(focus: TrainingFocus) {
+        id = UUID()
+        title = "Build a sustainable \(focus.title.lowercased()) routine"
+        category = "generalFitness"
+        deadline = nil
+        targetSummary = nil
+        whyItMatters = nil
+        notes = "Use the confirmed experience, equipment and availability. No performance target has been selected."
+        milestones = []
+    }
+
     init(goal: ATHLTHGoal) {
         id = goal.id
         title = goal.title

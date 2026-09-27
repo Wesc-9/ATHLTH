@@ -3,7 +3,7 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
-private enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
+enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
     case library
     case mine
 
@@ -21,6 +21,7 @@ struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
 
+    let source: ExerciseLibrarySection?
     let selectionTitle: String?
     let onSelect: ((ExerciseLibraryEntry) -> Void)?
 
@@ -31,10 +32,13 @@ struct ExerciseLibraryView: View {
     @State private var selectedSection: ExerciseLibrarySection = .library
 
     init(
+        source: ExerciseLibrarySection? = nil,
         initialBodyPart: String = "All",
         selectionTitle: String? = nil,
         onSelect: ((ExerciseLibraryEntry) -> Void)? = nil
     ) {
+        self.source = source
+        _selectedSection = State(initialValue: source ?? .library)
         self.selectionTitle = selectionTitle
         self.onSelect = onSelect
         _selectedBodyPart = State(initialValue: initialBodyPart)
@@ -58,15 +62,17 @@ struct ExerciseLibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Exercise source", selection: $selectedSection) {
-                ForEach(ExerciseLibrarySection.allCases) { section in
-                    Text(section.title).tag(section)
+            if source == nil {
+                Picker("Exercise source", selection: $selectedSection) {
+                    ForEach(ExerciseLibrarySection.allCases) { section in
+                        Text(section.title).tag(section)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
 
             filters
 

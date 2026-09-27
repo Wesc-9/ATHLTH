@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum RunningWorkoutLibrarySection: String, CaseIterable, Identifiable {
+enum RunningWorkoutLibrarySection: String, CaseIterable, Identifiable {
     case library
     case mine
 
@@ -17,6 +17,7 @@ private enum RunningWorkoutLibrarySection: String, CaseIterable, Identifiable {
 struct RunningWorkoutLibraryView: View {
     @EnvironmentObject private var library: RunningWorkoutLibraryStore
 
+    let source: RunningWorkoutLibrarySection?
     let selectionTitle: String?
     let onSelect: ((RunningWorkoutTemplate) -> Void)?
     let onStart: ((RunningWorkoutTemplate) -> Void)?
@@ -27,10 +28,13 @@ struct RunningWorkoutLibraryView: View {
     @State private var selectedSection: RunningWorkoutLibrarySection = .library
 
     init(
+        source: RunningWorkoutLibrarySection? = nil,
         selectionTitle: String? = nil,
         onSelect: ((RunningWorkoutTemplate) -> Void)? = nil,
         onStart: ((RunningWorkoutTemplate) -> Void)? = nil
     ) {
+        self.source = source
+        _selectedSection = State(initialValue: source ?? .library)
         self.selectionTitle = selectionTitle
         self.onSelect = onSelect
         self.onStart = onStart
@@ -67,15 +71,17 @@ struct RunningWorkoutLibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Workout source", selection: $selectedSection) {
-                ForEach(RunningWorkoutLibrarySection.allCases) { section in
-                    Text(section.title).tag(section)
+            if source == nil {
+                Picker("Workout source", selection: $selectedSection) {
+                    ForEach(RunningWorkoutLibrarySection.allCases) { section in
+                        Text(section.title).tag(section)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {

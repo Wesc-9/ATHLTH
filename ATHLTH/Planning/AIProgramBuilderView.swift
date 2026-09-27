@@ -34,6 +34,20 @@ struct AIProgramBuilderView: View {
     @State private var sessionDurationMinutes = 60
     @State private var availableDays: Set<Int> = Set(1...7)
     @State private var userNotes = ""
+    @State private var showingQuestions = true
+    @State private var experience = ""
+    @State private var trainingFocus: TrainingFocus = .generalFitness
+    @State private var gymAccess = ""
+    @State private var homeEquipment: Set<String> = []
+    @State private var otherEquipment = ""
+    @State private var limitations = ""
+    @State private var currentSessionsPerWeek = 0
+    @State private var useProfileInterests = true
+
+    private let equipmentOptions = [
+        "Dumbbells", "Kettlebells", "Resistance bands", "Barbell & plates",
+        "Bench", "Squat rack", "Pull-up bar", "Treadmill", "Exercise bike"
+    ]
 
     @State private var preview: AIProgramDraft?
     @State private var isGenerating = false
@@ -72,7 +86,7 @@ struct AIProgramBuilderView: View {
     }
 
     private var canGenerate: Bool {
-        !selectedGoalIDs.isEmpty &&
+        questionsAnswered &&
         !availableDays.isEmpty &&
         sessionsPerWeek >= 1 &&
         !isGenerating
@@ -81,89 +95,104 @@ struct AIProgramBuilderView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Label(
-                        mode == .generate
-                            ? "Build a new program from your goals"
-                            : "Fill the gaps in your current program",
-                        systemImage: "sparkles"
-                    )
-                    .font(.headline)
-
-                    Text(
-                        mode == .generate
-                            ? "ATHLTH AI uses only the goals and training constraints you select here. You review the program before it replaces anything."
-                            : "ATHLTH AI suggests sessions for empty days only. Existing sessions remain untouched."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                goalsSection
-                timelineSection
-                availabilitySection
-
-                Section("Preferences") {
-                    Stepper(
-                        "\(sessionsPerWeek) sessions per week",
-                        value: $sessionsPerWeek,
-                        in: 1...7
-                    )
-
-                    Stepper(
-                        "About \(sessionDurationMinutes) min per session",
-                        value: $sessionDurationMinutes,
-                        in: 20...180,
-                        step: 5
-                    )
-
-                    TextField(
-                        "Anything AI should consider? Equipment, experience, preferred split, race details…",
-                        text: $userNotes,
-                        axis: .vertical
-                    )
-                    .lineLimit(3...7)
-                }
-
-                if let preview {
-                    previewSection(preview)
+                if showingQuestions {
+                    coachQuestions
                 } else {
                     Section {
-                        Button {
-                            Task { await generatePreview() }
-                        } label: {
-                            HStack {
-                                Spacer()
-                                if isGenerating {
-                                    ProgressView()
-                                        .padding(.trailing, 6)
-                                } else {
-                                    Image(systemName: "sparkles")
+                        Label(
+                            mode == .generate
+                                ? "Build a new program from your goals"
+                                : "Fill the gaps in your current program",
+                            systemImage: "sparkles"
+                        )
+                        .font(.headline)
+
+                        Text(
+                            mode == .generate
+                                ? "ATHLTH Coach uses your confirmed training profile, selected goals and answers. Review the draft before adding it to your calendar."
+                                : "ATHLTH Coach suggests sessions for empty days only. Existing sessions remain untouched."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Section("Your training profile") {
+                        LabeledContent("Experience", value: experience)
+                        LabeledContent("Focus", value: trainingFocus.title)
+                        LabeledContent("Gym access", value: gymAccess)
+                        Button("Edit coach answers") { showingQuestions = true }
+                        Text("Your answers, selected goals and optional interests are sent to ATHLTH Coach. Apple Health records are not included.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    goalsSection
+                    timelineSection
+                    availabilitySection
+
+                    Section("Preferences") {
+                        Stepper(
+                            "\(sessionsPerWeek) sessions per week",
+                            value: $sessionsPerWeek,
+                            in: 1...max(availableDays.count, 1)
+                        )
+                        .onChange(of: sessionsPerWeek) { _, _ in preview = nil }
+
+                        Stepper(
+                            "About \(sessionDurationMinutes) min per session",
+                            value: $sessionDurationMinutes,
+                            in: 20...180,
+                            step: 5
+                        )
+                        .onChange(of: sessionDurationMinutes) { _, _ in preview = nil }
+
+                        TextField(
+                            "Any other preferences? Preferred split, race details…",
+                            text: $userNotes,
+                            axis: .vertical
+                        )
+                        .lineLimit(3...7)
+                        .onChange(of: userNotes) { _, _ in preview = nil }
+                    }
+
+                    if let preview {
+                        previewSection(preview)
+                    } else {
+                        Section {
+                            Button {
+                                Task { await generatePreview() }
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    if isGenerating {
+                                        ProgressView()
+                                            .padding(.trailing, 6)
+                                    } else {
+                                        Image(systemName: "sparkles")
+                                    }
+                                    Text(
+                                        isGenerating
+                                            ? "Building Program…"
+                                            : mode.actionTitle
+                                    )
+                                    Spacer()
                                 }
-                                Text(
-                                    isGenerating
-                                        ? "Building Program…"
-                                        : mode.actionTitle
-                                )
-                                Spacer()
                             }
-                        }
-                        .disabled(!canGenerate)
-                    } footer: {
-                        if selectedGoalIDs.isEmpty {
-                            Text("Select at least one goal.")
-                        } else if availableDays.isEmpty {
-                            Text("Choose at least one available training day.")
-                        } else {
-                            Text(
-                                "AI suggestions are a starting point. Review volume, exercise choice and intensity before using the program."
-                            )
+                            .disabled(!canGenerate)
+                        } footer: {
+                            if availableDays.isEmpty {
+                                Text("Choose at least one available training day.")
+                            } else {
+                                Text(
+                                    "AI suggestions are a starting point. Review volume, exercise choice and intensity before using the program."
+                                )
+                            }
                         }
                     }
                 }
             }
+            .disabled(isGenerating)
+            .onChange(of: coachContext) { _, _ in preview = nil }
             .navigationTitle(
-                mode == .generate ? "AI Program" : "AI Complete"
+                showingQuestions ? "Meet your coach" : "ATHLTH Coach"
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -192,10 +221,113 @@ struct AIProgramBuilderView: View {
         }
     }
 
+    private var questionsAnswered: Bool {
+        !experience.isEmpty && !gymAccess.isEmpty
+    }
+
+    private var coachContext: String {
+        let interests = useProfileInterests
+            ? (session.onboardingProfile?.interests.map(\.title).sorted().joined(separator: ", ") ?? "")
+            : "Not shared"
+        let equipment = homeEquipment.sorted().joined(separator: ", ")
+        return """
+        Confirmed training profile:
+        Experience: \(experience).
+        Training focus: \(trainingFocus.title). Match workout types to this focus.
+        Current training: \(currentSessionsPerWeek) sessions per week.
+        Gym access: \(gymAccess).
+        Home equipment: \(equipment.isEmpty ? "Bodyweight only" : equipment).
+        Other available equipment: \(String(otherEquipment.prefix(300))).
+        Limitations or movements to avoid: \(limitations.isEmpty ? "None reported" : String(limitations.prefix(500))).
+        Profile interests: \(interests).
+        Only prescribe equipment the user can access. With no gym or listed home equipment, use bodyweight or outdoor sessions.
+        Scale volume to experience and current training; do not treat an experienced athlete as a beginner or overload a beginner.
+        """
+    }
+
+    @ViewBuilder
+    private var coachQuestions: some View {
+        Section {
+            Label("A plan that fits your life", systemImage: "sparkles")
+                .font(.headline)
+            Text("Confirm a few details. Your training focus is filled from your profile, and your goals are available on the next screen.")
+                .font(.subheadline).foregroundStyle(.secondary)
+        }
+
+        Section("1. How experienced are you?") {
+            Picker("Training experience", selection: $experience) {
+                Text("Choose your level").tag("")
+                Text("Beginner").tag("Beginner")
+                Text("Intermediate").tag("Intermediate")
+                Text("Experienced / train regularly").tag("Experienced")
+            }
+            Stepper("Currently \(currentSessionsPerWeek) sessions per week", value: $currentSessionsPerWeek, in: 0...14)
+        }
+
+        Section("2. What do you want to train?") {
+            Picker("Training focus", selection: $trainingFocus) {
+                ForEach(TrainingFocus.allCases) { focus in
+                    Text(focus.title).tag(focus)
+                }
+            }
+            Text(trainingFocus.subtitle).font(.caption).foregroundStyle(.secondary)
+            if let interests = session.onboardingProfile?.interests, !interests.isEmpty {
+                Toggle("Use my profile interests", isOn: $useProfileInterests)
+                if useProfileInterests {
+                    Text(interests.map(\.title).sorted().joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        Section("3. Where can you train?") {
+            Picker("Gym access", selection: $gymAccess) {
+                Text("Choose an option").tag("")
+                Text("Yes — I can use a gym").tag("Yes")
+                Text("No — home or outdoors").tag("No")
+            }
+            Text("Equipment available at home")
+                .font(.subheadline.weight(.semibold))
+            ForEach(equipmentOptions, id: \.self) { equipment in
+                Toggle(equipment, isOn: Binding(
+                    get: { homeEquipment.contains(equipment) },
+                    set: { enabled in
+                        if enabled { homeEquipment.insert(equipment) }
+                        else { homeEquipment.remove(equipment) }
+                    }
+                ))
+            }
+            TextField("Other equipment (optional)", text: $otherEquipment, axis: .vertical)
+            Text("Leave all equipment off for bodyweight training at home.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+
+        Section("4. Anything we should adapt?") {
+            TextField("Injuries, limitations or movements to avoid (optional)", text: $limitations, axis: .vertical)
+                .lineLimit(2...5)
+            Text("Only include details you want the coach to use when planning your workouts.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+
+        Section {
+            Button {
+                showingQuestions = false
+            } label: {
+                Label("Continue to goals & schedule", systemImage: "arrow.right")
+                    .frame(maxWidth: .infinity)
+            }
+            .disabled(!questionsAnswered)
+        } footer: {
+            if !questionsAnswered {
+                Text("Choose your experience level and gym access to continue.")
+            }
+        }
+    }
+
     private var goalsSection: some View {
         Section("Goals") {
             if goalStore.activeGoals.isEmpty {
-                Text("Create a goal in Progress first.")
+                Text("No active goals yet. Coach will build a routine around your training focus. You can add a specific goal from your profile later.")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(goalStore.activeGoals) { goal in
@@ -323,6 +455,7 @@ struct AIProgramBuilderView: View {
                         } else {
                             availableDays.insert(index)
                         }
+                        sessionsPerWeek = min(sessionsPerWeek, max(availableDays.count, 1))
                         preview = nil
                     } label: {
                         Text(dayNames[index - 1])
@@ -432,10 +565,7 @@ struct AIProgramBuilderView: View {
 
     @MainActor
     private func generatePreview() async {
-        guard !selectedGoals.isEmpty else {
-            errorMessage = AIProgramError.noGoals.localizedDescription
-            return
-        }
+        guard canGenerate else { return }
 
         isGenerating = true
         defer { isGenerating = false }
@@ -447,8 +577,10 @@ struct AIProgramBuilderView: View {
             sessionsPerWeek: sessionsPerWeek,
             preferredDays: availableDays.sorted(),
             sessionDurationMinutes: sessionDurationMinutes,
-            userNotes: userNotes.trimmingCharacters(in: .whitespacesAndNewlines),
-            goals: selectedGoals.map(AIProgramGoalInput.init),
+            userNotes: coachContext + "\nAdditional preferences: " + String(userNotes.prefix(700)),
+            goals: selectedGoals.isEmpty
+                ? [AIProgramGoalInput(focus: trainingFocus)]
+                : selectedGoals.map(AIProgramGoalInput.init),
             existingDays: existingDays
         )
 
@@ -526,6 +658,7 @@ struct AIProgramBuilderView: View {
     private func loadDefaultsIfNeeded() {
         guard !didLoadDefaults else { return }
         didLoadDefaults = true
+        trainingFocus = session.onboardingProfile?.trainingFocus ?? .generalFitness
 
         if mode == .generate {
             startDate = session.suggestedTrainingPlanStartDate

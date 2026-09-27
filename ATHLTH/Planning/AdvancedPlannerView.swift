@@ -4,6 +4,7 @@ struct AdvancedPlannerView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     let planID: UUID?
+    let showsEmptyState: Bool
     let onOpenPrograms: () -> Void
 
     @State private var selectedWeekID: UUID?
@@ -17,9 +18,11 @@ struct AdvancedPlannerView: View {
 
     init(
         planID: UUID? = nil,
+        showsEmptyState: Bool = true,
         onOpenPrograms: @escaping () -> Void = {}
     ) {
         self.planID = planID
+        self.showsEmptyState = showsEmptyState
         self.onOpenPrograms = onOpenPrograms
     }
 
@@ -50,7 +53,7 @@ struct AdvancedPlannerView: View {
 
                     weekOverview(plan, week: week)
                 }
-            } else {
+            } else if showsEmptyState {
                 emptyPlanState
             }
         }
@@ -1622,6 +1625,7 @@ struct TrainingPlanManagerView: View {
     let onOpenCalendar: () -> Void
 
     @State private var showingProgramCreation = false
+    @State private var showingAllPlans = false
     @State private var programToStart: TrainingPlan?
     @State private var aiMode: AIProgramGenerationMode?
     @State private var showingAISubscriptionOffer = false
@@ -1633,109 +1637,38 @@ struct TrainingPlanManagerView: View {
     var body: some View {
         VStack(spacing: 16) {
             ATHLTHCard {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "square.stack.3d.up.fill")
-                        .font(.title2)
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 46, height: 46)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 14)
-                        )
-
+                VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Programs")
+                        Text("Build your training plan")
                             .font(.title3.weight(.bold))
-                        Text(
-                            "Create or start a reusable training program. Schedule its workouts in Plan."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Text("Create it yourself, or let ATHLTH Coach build a draft around your profile, goals and everyday life.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
-                    Spacer()
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) { creationButtons }
+                        VStack(spacing: 10) { creationButtons }
+                    }
 
                     Button {
-                        showingProgramCreation = true
+                        showingAllPlans = true
                     } label: {
-                        Label("Create", systemImage: "plus")
+                        Label("All plans", systemImage: "square.stack.3d.up")
+                            .font(.caption.weight(.semibold))
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .tint(ATHLTHTheme.accent)
-                }
-            }
 
-            ATHLTHCard {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "sparkles")
-                        .font(.title2)
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 46, height: 46)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 14)
-                        )
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack(spacing: 7) {
-                            Text("ATHLTH AI")
-                                .font(.title3.weight(.bold))
-
-                            if !session.canAccess(.aiTrainingPrograms) {
-                                Label("ATHLTH+", systemImage: "lock.fill")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        ATHLTHTheme.accentSoft,
-                                        in: Capsule()
-                                    )
-                            }
+                    if session.activePlan != nil {
+                        Button {
+                            openAI(.complete)
+                        } label: {
+                            Label("Let Coach fill empty days", systemImage: "wand.and.stars")
+                                .font(.caption.weight(.semibold))
                         }
-                        Text(
-                            "Generate a program from your goals, dates and available training days — or let AI fill only the gaps in the program you already started."
-                        )
-                        .font(.caption)
+                    }
+                    Text("Review every coach plan before adding it to your calendar. Existing plans are kept.")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
-
-                        HStack(spacing: 8) {
-                            Button {
-                                openAI(.generate)
-                            } label: {
-                                Label(
-                                    "Generate",
-                                    systemImage: "sparkles"
-                                )
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                            .tint(ATHLTHTheme.accent)
-
-                            if session.activePlan != nil {
-                                Button {
-                                    openAI(.complete)
-                                } label: {
-                                    Label(
-                                        "Complete",
-                                        systemImage: "wand.and.stars"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                        }
-                        .padding(.top, 4)
-
-                        if goalStore.activeGoals.isEmpty {
-                            Text("Create a goal in Progress first to use goal-based generation.")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
                 }
             }
 
@@ -1784,6 +1717,9 @@ struct TrainingPlanManagerView: View {
             }
 
         }
+        .sheet(isPresented: $showingAllPlans) {
+            AllTrainingPlansView()
+        }
         .sheet(isPresented: $showingProgramCreation) {
             TrainingPlanCreationView()
         }
@@ -1808,6 +1744,26 @@ struct TrainingPlanManagerView: View {
             }
             .environmentObject(subscriptionStore)
         }
+    }
+
+    @ViewBuilder
+    private var creationButtons: some View {
+        Button {
+            showingProgramCreation = true
+        } label: {
+            Label("Create a plan", systemImage: "plus")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+
+        Button {
+            openAI(.generate)
+        } label: {
+            Label("ATHLTH Coach", systemImage: "sparkles")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(ATHLTHTheme.accent)
     }
 
     private func openAI(_ mode: AIProgramGenerationMode) {
