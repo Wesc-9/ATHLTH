@@ -121,10 +121,13 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
             message = "Allow location access in iPhone Settings before resuming."
             return
         }
-        workout.resumedAt = Date(); workout.lastCheckpoint = Date()
-        active = workout; lastLocation = nil
+        workout.resumedAt = Date()
+        workout.lastCheckpoint = Date()
+        active = workout
+        lastLocation = nil
         manager.allowsBackgroundLocationUpdates = true
-        manager.startUpdatingLocation(); persist()
+        manager.startUpdatingLocation()
+        persistActiveCheckpoint(force: true)
     }
 
     func finish() async {
@@ -188,14 +191,69 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
 
     func checkpoint() {
         guard var workout = active else { return }
-        workout.lastCheckpoint = Date(); active = workout; persist()
+        workout.lastCheckpoint = Date()
+        active = workout
+        persistActiveCheckpoint(force: true)
     }
 
-    private func persist() {
-        guard let accountID, !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: accountID)) else { return }
-        if let active { AccountLocalStorage.write(active, name: "phoneActive", userID: accountID) }
-        else { UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key("phoneActive", userID: accountID)) }
-        AccountLocalStorage.write(history, name: "phoneHistory", userID: accountID)
+    private func persistActiveCheckpoint(
+        force: Bool = false
+    ) {
+        guard let accountID,
+              !UserDefaults.standard.bool(
+                forKey: AccountLocalStorage.key(
+                    "deleted",
+                    userID: accountID
+                )
+              )
+        else {
+            return
+        }
+
+        let now = Date()
+
+        if !force,
+           let lastActiveCheckpointWriteAt,
+           now.timeIntervalSince(lastActiveCheckpointWriteAt) <
+                activeCheckpointInterval {
+            return
+        }
+
+        if let active {
+            AccountLocalStorage.write(
+                active,
+                name: "phoneActive",
+                userID: accountID
+            )
+        } else {
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key(
+                    "phoneActive",
+                    userID: accountID
+                )
+            )
+        }
+
+        lastActiveCheckpointWriteAt = now
+    }
+
+    private func persistHistory() {
+        guard let accountID,
+              !UserDefaults.standard.bool(
+                forKey: AccountLocalStorage.key(
+                    "deleted",
+                    userID: accountID
+                )
+              )
+        else {
+            return
+        }
+
+        AccountLocalStorage.write(
+            history,
+            name: "phoneHistory",
+            userID: accountID
+        )
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -230,6 +288,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
             workout.lastCheckpoint = Date()
             message = nil
         }
-        active = workout; persist()
+        active = workout
+        persistActiveCheckpoint()
     }
 }
