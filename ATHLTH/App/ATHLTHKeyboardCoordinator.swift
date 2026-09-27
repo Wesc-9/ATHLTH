@@ -125,9 +125,11 @@ final class ATHLTHKeyboardCoordinator {
     private static let accessoryTag = 0xA7_11_7
 }
 
+@MainActor
 private var athlthCapturedFirstResponder: UIResponder?
 
 private extension UIResponder {
+    @MainActor
     @objc
     func athlthCaptureFirstResponder() {
         athlthCapturedFirstResponder = self
