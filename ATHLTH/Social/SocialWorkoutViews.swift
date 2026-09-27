@@ -286,6 +286,7 @@ struct HomeActivitySection: View {
     @State private var workoutAIInsights: [UUID: WorkoutAIInsight] = [:]
     @State private var loadingAIInsightIDs: Set<UUID> = []
     @State private var publishedActivities: [UUID: SocialActivityRecord] = [:]
+    @State private var selectedCoachInsight: CoachInsightPresentation?
 
     private var ownWorkouts: [SocialPublishableWorkout] {
         let healthItems = health.workouts.map(SocialPublishableWorkout.init)
@@ -437,7 +438,17 @@ struct HomeActivitySection: View {
                                 workoutAIInsights[workout.id],
                             isAIInsightLoading:
                                 loadingAIInsightIDs
-                                    .contains(workout.id)
+                                    .contains(workout.id),
+                            onCoach: { insight in
+                                selectedCoachInsight =
+                                    CoachInsightPresentation(
+                                        id: workout.id,
+                                        activityTitle:
+                                            workout.activity.rawValue,
+                                        date: workout.startDate,
+                                        insight: insight
+                                    )
+                            }
                         ) {
                             presentPublish(workout)
                         }
@@ -488,6 +499,11 @@ struct HomeActivitySection: View {
                     .padding(.vertical, 10)
                 }
             }
+        }
+        .sheet(item: $selectedCoachInsight) { presentation in
+            WorkoutCoachInsightDetailView(
+                presentation: presentation
+            )
         }
         .sheet(
             isPresented: $showingPublish,
@@ -660,6 +676,7 @@ private struct HomeActivityOutdoorCard: View {
     let caption: String?
     let aiInsight: WorkoutAIInsight?
     let isAIInsightLoading: Bool
+    let onCoach: (WorkoutAIInsight) -> Void
     let onPost: () -> Void
 
     private var routeCoordinates: [CLLocationCoordinate2D] {
@@ -817,7 +834,7 @@ private struct HomeActivityOutdoorCard: View {
 
                     VStack(alignment: .leading, spacing: 5) {
                         Text(workout.title)
-                            .font(.system(size: 28, weight: .bold))
+                            .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .lineLimit(2)
                             .minimumScaleFactor(0.78)
@@ -830,7 +847,7 @@ private struct HomeActivityOutdoorCard: View {
                             .lineLimit(2)
                     }
 
-                    Spacer(minLength: 38)
+                    Spacer(minLength: 18)
                 }
                 .padding(16)
 
@@ -864,7 +881,7 @@ private struct HomeActivityOutdoorCard: View {
                     .allowsHitTesting(false)
                 }
             }
-            .frame(height: 265)
+            .frame(height: 248)
             .clipped()
 
             VStack(spacing: 10) {
@@ -916,8 +933,10 @@ private struct HomeActivityOutdoorCard: View {
                     }
                 }
 
-                NavigationLink {
-                    WorkoutHistoryDetailView(workout: workout)
+                Button {
+                    if let aiInsight {
+                        onCoach(aiInsight)
+                    }
                 } label: {
                     HStack(spacing: 11) {
                         Image(
@@ -1040,6 +1059,7 @@ private struct HomeActivityOutdoorCard: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .disabled(aiInsight == nil)
             }
             .padding(12)
             .background(
@@ -1299,6 +1319,108 @@ private struct HomeActivityOutdoorCard: View {
             .frame(width: 1, height: 34)
     }
 }
+
+private struct CoachInsightPresentation: Identifiable {
+    let id: UUID
+    let activityTitle: String
+    let date: Date
+    let insight: WorkoutAIInsight
+}
+
+private struct WorkoutCoachInsightDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let presentation: CoachInsightPresentation
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Label(
+                                "ATHLTH COACH",
+                                systemImage: "sparkles"
+                            )
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.indigo)
+
+                            Text("ATHLTH+")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    ATHLTHTheme.champagneSoft,
+                                    in: Capsule()
+                                )
+                        }
+
+                        Text(presentation.insight.headline)
+                            .font(
+                                .system(
+                                    size: 28,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+
+                        Text(
+                            presentation.activityTitle.capitalized +
+                            " · " +
+                            presentation.date.formatted(
+                                date: .abbreviated,
+                                time: .shortened
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Coach analysis")
+                            .font(.headline)
+
+                        Text(presentation.insight.summary)
+                            .font(.body)
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText.opacity(0.82)
+                            )
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
+                    }
+                    .padding(18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color.white.opacity(0.82),
+                        in: RoundedRectangle(
+                            cornerRadius: 22,
+                            style: .continuous
+                        )
+                    )
+                }
+                .padding()
+            }
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: Color.indigo.opacity(0.14)
+                )
+            )
+            .navigationTitle("Coach Insight")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 private struct HomeActivityRouteArtwork: View {
     let coordinates: [CLLocationCoordinate2D]
