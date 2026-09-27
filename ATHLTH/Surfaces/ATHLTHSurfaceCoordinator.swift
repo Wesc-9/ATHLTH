@@ -15,16 +15,14 @@ enum ATHLTHSurfaceCoordinator {
             referenceDate: Date()
         )
 
-        let activeWorkout = workout.flatMap { snapshot in
-            guard snapshot.state == .preparing ||
-                    snapshot.state == .running ||
-                    snapshot.state == .paused ||
-                    snapshot.state == .ending
-            else {
-                return nil
-            }
+        let activeWorkout: ATHLTHSurfaceWorkoutSnapshot?
 
-            return ATHLTHSurfaceWorkoutSnapshot(
+        if let snapshot = workout,
+           snapshot.state == .preparing ||
+            snapshot.state == .running ||
+            snapshot.state == .paused ||
+            snapshot.state == .ending {
+            activeWorkout = ATHLTHSurfaceWorkoutSnapshot(
                 title: snapshot.kind.title,
                 systemImage: snapshot.kind.systemImage,
                 state: snapshot.state.rawValue,
@@ -34,6 +32,8 @@ enum ATHLTHSurfaceCoordinator {
                 heartRate: snapshot.heartRate,
                 updatedAt: snapshot.capturedAt
             )
+        } else {
+            activeWorkout = nil
         }
 
         let goal = goals.primaryGoal
