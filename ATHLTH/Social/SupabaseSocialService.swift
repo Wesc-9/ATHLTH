@@ -1,7 +1,7 @@
 import Foundation
 import Supabase
 
-final class SupabaseSocialService {
+final class SupabaseSocialService: Sendable {
     let client: SupabaseClient
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
