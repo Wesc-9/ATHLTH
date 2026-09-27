@@ -543,6 +543,14 @@ struct ChallengeCreationView: View {
     @State private var usesSpecificRoute = false
     @State private var gpsRequired = true
     @State private var routeMatchPercent = 90.0
+    @State private var distanceTolerancePercent = 2.0
+    @State private var startFinishToleranceMeters = 100.0
+    @State private var routeDirection:
+        ChallengeRouteDirection = .sameDirection
+    @State private var attemptPolicy:
+        ChallengeAttemptPolicy = .best
+    @State private var attemptLimit = 0
+    @State private var allowTreadmill = false
     @State private var advancedRules = false
 
     @State private var heartRateZone = 5
@@ -654,8 +662,14 @@ struct ChallengeCreationView: View {
             .onChange(of: usesSpecificRoute) { _, enabled in
                 if enabled {
                     gpsRequired = true
+                    allowTreadmill = false
                 } else {
                     selectedRouteID = nil
+                }
+            }
+            .onChange(of: gpsRequired) { _, required in
+                if required {
+                    allowTreadmill = false
                 }
             }
             .onChange(of: heartRateAggregation) { _, aggregation in
@@ -790,6 +804,7 @@ struct ChallengeCreationView: View {
             }
 
             if advancedRules &&
+                sport != .running &&
                 !(sport == .heartRate &&
                   heartRateAggregation == .totalChallenge) {
                 Toggle(
@@ -957,6 +972,36 @@ struct ChallengeCreationView: View {
                 }
 
                 if scoring == .fastestDistance &&
+                    !usesSpecificRoute {
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack {
+                            Text("Distance tolerance")
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text(
+                                "±\(distanceTolerancePercent.formatted(.number.precision(.fractionLength(0...1))))%"
+                            )
+                            .font(.subheadline.bold())
+                            .monospacedDigit()
+                        }
+
+                        Slider(
+                            value: $distanceTolerancePercent,
+                            in: 0.5...5,
+                            step: 0.5
+                        )
+
+                        Text(
+                            distanceToleranceDescription
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .challengeCard()
+                }
+
+                if scoring == .fastestDistance &&
                     usesSpecificRoute {
                     VStack(alignment: .leading, spacing: 9) {
                         HStack {
@@ -983,10 +1028,128 @@ struct ChallengeCreationView: View {
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                        Divider()
+
+                        HStack {
+                            Text("Start & finish tolerance")
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text(
+                                "\(Int(startFinishToleranceMeters)) m"
+                            )
+                            .font(.subheadline.bold())
+                            .monospacedDigit()
+                        }
+
+                        Slider(
+                            value: $startFinishToleranceMeters,
+                            in: 25...500,
+                            step: 25
+                        )
+
+                        Text(
+                            "The attempt must start and finish within this distance of the saved route endpoints."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        Divider()
+
+                        Text("Route direction")
+                            .font(.subheadline.weight(.semibold))
+
+                        Picker(
+                            "Route direction",
+                            selection: $routeDirection
+                        ) {
+                            ForEach(
+                                ChallengeRouteDirection.allCases
+                            ) { direction in
+                                Text(direction.title)
+                                    .tag(direction)
+                            }
+                        }
+                        .pickerStyle(.segmented)
                     }
                     .padding()
                     .challengeCard()
                 }
+
+                if !usesSpecificRoute {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Toggle(
+                            "Allow treadmill",
+                            isOn: $allowTreadmill
+                        )
+                        .disabled(gpsRequired)
+
+                        Text(
+                            gpsRequired
+                                ? "Turn off GPS verification to allow indoor treadmill runs."
+                                : "When enabled, verified indoor runs may qualify without a GPS route."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .challengeCard()
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle(
+                        "Allow multiple attempts",
+                        isOn: $allowMultipleAttempts
+                    )
+
+                    if allowMultipleAttempts {
+                        Divider()
+
+                        Text("Attempt policy")
+                            .font(.subheadline.weight(.semibold))
+
+                        Picker(
+                            "Attempt policy",
+                            selection: $attemptPolicy
+                        ) {
+                            ForEach(
+                                ChallengeAttemptPolicy.allCases
+                            ) { policy in
+                                Text(policy.title)
+                                    .tag(policy)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Picker(
+                            "Maximum attempts",
+                            selection: $attemptLimit
+                        ) {
+                            Text("Unlimited").tag(0)
+                            Text("3").tag(3)
+                            Text("5").tag(5)
+                        }
+                    } else {
+                        Text(
+                            "Only the first qualifying attempt is recorded."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .padding()
+                .challengeCard()
+
+                Button {
+                    resetRunningAdvancedRules()
+                } label: {
+                    Label(
+                        "Reset to Recommended",
+                        systemImage: "arrow.counterclockwise"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
             }
         }
     }
@@ -1659,7 +1822,7 @@ struct ChallengeCreationView: View {
 
             reviewRow(
                 "Attempts",
-                allowMultipleAttempts ? "Multiple · best counts" : "One"
+                runningAttemptSummary
             )
 
             if sport == .running &&
@@ -1671,8 +1834,16 @@ struct ChallengeCreationView: View {
 
                     if advancedRules {
                         reviewRow(
-                            "Allowed deviation",
+                            "Route deviation",
                             "\(Int(allowedRouteDeviationPercent))%"
+                        )
+                        reviewRow(
+                            "Start/finish",
+                            "Within \(Int(startFinishToleranceMeters)) m"
+                        )
+                        reviewRow(
+                            "Direction",
+                            routeDirection.title
                         )
                     }
                 } else {
@@ -1684,6 +1855,29 @@ struct ChallengeCreationView: View {
                                 "%.1f km",
                             targetDistanceKm
                         )
+                    )
+
+                    if advancedRules {
+                        reviewRow(
+                            "Distance tolerance",
+                            "±\(distanceTolerancePercent.formatted(.number.precision(.fractionLength(0...1))))%"
+                        )
+                        reviewRow(
+                            "Treadmill",
+                            allowTreadmill
+                                ? "Allowed"
+                                : "Not allowed"
+                        )
+                    }
+                }
+
+                if advancedRules {
+                    reviewRow("Timing", timeBasis.title)
+                    reviewRow(
+                        "GPS",
+                        usesSpecificRoute || gpsRequired
+                            ? "Required"
+                            : "Optional"
                     )
                 }
             }
@@ -1913,6 +2107,41 @@ struct ChallengeCreationView: View {
                 usesSpecificRoute
                     ? routeMatchPercent
                     : nil,
+            distanceTolerancePercent:
+                sport == .running &&
+                scoring == .fastestDistance &&
+                !usesSpecificRoute
+                    ? distanceTolerancePercent
+                    : nil,
+            startFinishToleranceMeters:
+                sport == .running &&
+                usesSpecificRoute
+                    ? startFinishToleranceMeters
+                    : nil,
+            routeDirection:
+                sport == .running &&
+                usesSpecificRoute
+                    ? routeDirection
+                    : nil,
+            attemptPolicy:
+                sport == .running
+                    ? (allowMultipleAttempts
+                        ? attemptPolicy
+                        : .first)
+                    : nil,
+            maximumAttempts:
+                sport == .running
+                    ? (allowMultipleAttempts
+                        ? (attemptLimit == 0
+                            ? nil
+                            : attemptLimit)
+                        : 1)
+                    : nil,
+            allowTreadmill:
+                sport == .running &&
+                !usesSpecificRoute
+                    ? allowTreadmill
+                    : nil,
             exerciseName: sport == .strength && scoring != .workoutVolume
                 ? exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
                 : nil,
@@ -1948,6 +2177,59 @@ struct ChallengeCreationView: View {
         )
 
         dismiss()
+    }
+
+    private var runningAttemptSummary: String {
+        guard sport == .running else {
+            return allowMultipleAttempts
+                ? "Multiple · best counts"
+                : "One"
+        }
+
+        guard allowMultipleAttempts else {
+            return "One · first counts"
+        }
+
+        let limitText =
+            attemptLimit == 0
+                ? "Unlimited"
+                : "Max \(attemptLimit)"
+
+        return "\(limitText) · \(attemptPolicy.shortTitle)"
+    }
+
+    private var distanceToleranceDescription: String {
+        let target = targetDistanceKm
+        let tolerance =
+            target * distanceTolerancePercent / 100
+        let lower = max(target - tolerance, 0)
+        let upper = target + tolerance
+
+        return String(
+            format:
+                "A %.1f km challenge accepts approximately %.2f–%.2f km.",
+            target,
+            lower,
+            upper
+        )
+    }
+
+    private func resetRunningAdvancedRules() {
+        timeBasis = .elapsed
+        distanceTolerancePercent = 2
+        routeMatchPercent = 90
+        startFinishToleranceMeters = 100
+        routeDirection = .sameDirection
+        allowMultipleAttempts = true
+        attemptPolicy = .best
+        attemptLimit = 0
+        allowTreadmill = false
+
+        if usesSpecificRoute {
+            gpsRequired = true
+        } else {
+            gpsRequired = true
+        }
     }
 
     private var maximumHeartRateBPM: Int? {
@@ -2780,8 +3062,76 @@ struct ChallengeDetailView: View {
                     "Match required",
                     "\(Int(challenge.rules.minimumRouteMatchPercent ?? 90))%"
                 )
+
+                if let tolerance =
+                    challenge.rules.startFinishToleranceMeters {
+                    ruleRow(
+                        "Start/finish",
+                        "Within \(Int(tolerance)) m"
+                    )
+                }
+
+                if let direction =
+                    challenge.rules.routeDirection {
+                    ruleRow(
+                        "Direction",
+                        direction.title
+                    )
+                }
             } else if challenge.sport == .running {
                 ruleRow("Course", "Run Anywhere")
+
+                if let tolerance =
+                    challenge.rules.distanceTolerancePercent,
+                   challenge.rules.scoring == .fastestDistance {
+                    ruleRow(
+                        "Distance tolerance",
+                        "±\(tolerance.formatted(.number.precision(.fractionLength(0...1))))%"
+                    )
+                }
+
+                if let allowTreadmill =
+                    challenge.rules.allowTreadmill {
+                    ruleRow(
+                        "Treadmill",
+                        allowTreadmill
+                            ? "Allowed"
+                            : "Not allowed"
+                    )
+                }
+            }
+
+            if challenge.sport == .running {
+                ruleRow(
+                    "Timing",
+                    challenge.rules.timeBasis.title
+                )
+                ruleRow(
+                    "GPS",
+                    challenge.rules.gpsRequired
+                        ? "Required"
+                        : "Optional"
+                )
+
+                let attemptPolicy =
+                    challenge.rules.attemptPolicy ??
+                    .best
+                let maxAttempts =
+                    challenge.rules.maximumAttempts
+
+                if challenge.rules.allowMultipleAttempts {
+                    ruleRow(
+                        "Attempt policy",
+                        attemptPolicy.title
+                    )
+                    ruleRow(
+                        "Attempt limit",
+                        maxAttempts.map(String.init)
+                            ?? "Unlimited"
+                    )
+                } else {
+                    ruleRow("Attempts", "One")
+                }
             }
 
             if challenge.sport == .heartRate {

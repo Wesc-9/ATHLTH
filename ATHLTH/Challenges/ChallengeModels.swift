@@ -138,6 +138,44 @@ enum ChallengeTimeBasis: String, CaseIterable, Identifiable, Codable, Hashable {
     }
 }
 
+enum ChallengeRouteDirection: String, CaseIterable, Identifiable, Codable, Hashable {
+    case sameDirection
+    case eitherDirection
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .sameDirection: return "Same Direction"
+        case .eitherDirection: return "Either Direction"
+        }
+    }
+}
+
+enum ChallengeAttemptPolicy: String, CaseIterable, Identifiable, Codable, Hashable {
+    case best
+    case first
+    case latest
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .best: return "Best Attempt"
+        case .first: return "First Attempt"
+        case .latest: return "Latest Attempt"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .best: return "Best counts"
+        case .first: return "First counts"
+        case .latest: return "Latest counts"
+        }
+    }
+}
+
 enum ChallengeHeartRateAggregation: String, CaseIterable, Identifiable, Codable, Hashable {
     case bestWorkout
     case totalChallenge
@@ -233,6 +271,15 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var route: ChallengeRouteSnapshot?
     var gpsRequired: Bool
     var minimumRouteMatchPercent: Double?
+
+    // Optional so challenges created before 1.4.2 keep their original
+    // qualification behaviour when decoded from disk/Supabase.
+    var distanceTolerancePercent: Double? = nil
+    var startFinishToleranceMeters: Double? = nil
+    var routeDirection: ChallengeRouteDirection? = nil
+    var attemptPolicy: ChallengeAttemptPolicy? = nil
+    var maximumAttempts: Int? = nil
+    var allowTreadmill: Bool? = nil
 
     var exerciseName: String?
     var fixedWeightKilograms: Double?

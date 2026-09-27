@@ -812,52 +812,75 @@ final class HealthKitManager: ObservableObject {
         rules: ATHLTHChallengeRules
     ) async -> ChallengeRunningEvidence {
         let elapsedDuration = max(
-            result.endedAt.timeIntervalSince(result.startedAt),
+            result.endedAt.timeIntervalSince(
+                result.startedAt
+            ),
             0
         )
         let movingDuration = max(result.duration, 0)
-        let selectedDuration = rules.timeBasis == .elapsed
-            ? elapsedDuration
-            : movingDuration
+        let selectedDuration =
+            rules.timeBasis == .elapsed
+                ? elapsedDuration
+                : movingDuration
 
         var route: [CLLocation] = []
+        var workout: HKWorkout?
 
-        if let workoutUUID = result.healthKitWorkoutUUID,
-           let workout = try? await workoutForChallenge(uuid: workoutUUID) {
-            route = (try? await fetchRoute(for: workout)) ?? []
+        if let workoutUUID =
+                result.healthKitWorkoutUUID,
+           let resolvedWorkout =
+                try? await workoutForChallenge(
+                    uuid: workoutUUID
+                ) {
+            workout = resolvedWorkout
+            route =
+                (try? await fetchRoute(
+                    for: resolvedWorkout
+                )) ?? []
+        }
+
+        let isIndoor =
+            workout?.workoutActivities.first?
+                .workoutConfiguration
+                .locationType == .indoor
+        let treadmillAllowed =
+            rules.allowTreadmill ?? false
+
+        if isIndoor &&
+            !treadmillAllowed {
+            return challengeEvidenceFailure(
+                result: result,
+                duration: selectedDuration,
+                routeMatch: nil,
+                reason:
+                    "Indoor treadmill runs are not allowed for this challenge."
+            )
+        }
+
+        if isIndoor &&
+            rules.gpsRequired {
+            return challengeEvidenceFailure(
+                result: result,
+                duration: selectedDuration,
+                routeMatch: nil,
+                reason:
+                    "GPS verification is required, so an indoor treadmill run cannot qualify."
+            )
         }
 
         let routeNeeded =
             rules.gpsRequired ||
             rules.route != nil ||
-            rules.scoring == .fastestDistance ||
             rules.scoring == .farthestInTime
 
-        if routeNeeded && route.count < 2 {
-            if rules.scoring == .mostDistance && !rules.gpsRequired && rules.route == nil {
-                return ChallengeRunningEvidence(
-                    startedAt: result.startedAt,
-                    endedAt: result.endedAt,
-                    durationSeconds: selectedDuration,
-                    distanceMeters: result.distanceMeters,
-                    routeMatchPercent: nil,
-                    score: result.distanceMeters,
-                    detail: String(format: "%.2f km", result.distanceMeters / 1_000),
-                    isEligible: true,
-                    ineligibilityReason: nil
-                )
-            }
-
-            return ChallengeRunningEvidence(
-                startedAt: result.startedAt,
-                endedAt: result.endedAt,
-                durationSeconds: selectedDuration,
-                distanceMeters: result.distanceMeters,
-                routeMatchPercent: nil,
-                score: 0,
-                detail: String(format: "%.2f km", result.distanceMeters / 1_000),
-                isEligible: false,
-                ineligibilityReason: "No qualifying GPS route was available for this attempt."
+        if routeNeeded &&
+            route.count < 2 {
+            return challengeEvidenceFailure(
+                result: result,
+                duration: selectedDuration,
+                routeMatch: nil,
+                reason:
+                    "No qualifying GPS route was available for this attempt."
             )
         }
 
@@ -866,77 +889,190 @@ final class HealthKitManager: ObservableObject {
         if let requiredRoute = rules.route {
             routeMatch = routeMatchPercent(
                 actualLocations: route,
-                referenceCoordinates: requiredRoute.coordinates
+                referenceCoordinates:
+                    requiredRoute.coordinates
             )
 
-            let requiredMatch = rules.minimumRouteMatchPercent ?? 90
+            let requiredMatch =
+                rules.minimumRouteMatchPercent ??
+                90
 
-            if (routeMatch ?? 0) < requiredMatch {
+            if (routeMatch ?? 0) <
+                requiredMatch {
                 return ChallengeRunningEvidence(
                     startedAt: result.startedAt,
                     endedAt: result.endedAt,
-                    durationSeconds: selectedDuration,
-                    distanceMeters: result.distanceMeters,
-                    routeMatchPercent: routeMatch,
+                    durationSeconds:
+                        selectedDuration,
+                    distanceMeters:
+                        result.distanceMeters,
+                    routeMatchPercent:
+                        routeMatch,
                     score: 0,
                     detail: String(
-                        format: "%.0f%% route match",
+                        format:
+                            "%.0f%% route match",
                         routeMatch ?? 0
                     ),
                     isEligible: false,
                     ineligibilityReason: String(
-                        format: "Route match %.0f%% · required %.0f%%.",
+                        format:
+                            "Route match %.0f%% · required %.0f%%.",
                         routeMatch ?? 0,
                         requiredMatch
                     )
+                )
+            }
+
+            if let tolerance =
+                    rules.startFinishToleranceMeters,
+               tolerance > 0,
+               !challengeEndpointsMatch(
+                   actualLocations: route,
+                   referenceCoordinates:
+                       requiredRoute.coordinates,
+                   toleranceMeters: tolerance,
+                   direction:
+                       rules.routeDirection ??
+                       .sameDirection
+               ) {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason:
+                        "Start or finish was outside the allowed \(Int(tolerance)) m tolerance."
                 )
             }
         }
 
         switch rules.scoring {
         case .fastestDistance:
-            guard let target = rules.targetDistanceMeters, target > 0 else {
+            guard let target =
+                    rules.targetDistanceMeters,
+                  target > 0
+            else {
                 return challengeEvidenceFailure(
                     result: result,
                     duration: selectedDuration,
                     routeMatch: routeMatch,
-                    reason: "This challenge has no valid target distance."
+                    reason:
+                        "This challenge has no valid target distance."
                 )
             }
 
-            guard result.distanceMeters >= target else {
-                return challengeEvidenceFailure(
-                    result: result,
-                    duration: selectedDuration,
-                    routeMatch: routeMatch,
-                    reason: String(
-                        format: "%.2f km completed · %.2f km required.",
-                        result.distanceMeters / 1_000,
-                        target / 1_000
+            if let tolerancePercent =
+                    rules.distanceTolerancePercent {
+                let tolerance =
+                    target *
+                    max(
+                        min(
+                            tolerancePercent,
+                            25
+                        ),
+                        0
+                    ) /
+                    100
+                let lower =
+                    max(target - tolerance, 0)
+                let upper =
+                    target + tolerance
+
+                guard
+                    result.distanceMeters >= lower &&
+                    result.distanceMeters <= upper
+                else {
+                    return challengeEvidenceFailure(
+                        result: result,
+                        duration:
+                            selectedDuration,
+                        routeMatch:
+                            routeMatch,
+                        reason: String(
+                            format:
+                                "%.2f km completed · allowed %.2f–%.2f km.",
+                            result.distanceMeters /
+                                1_000,
+                            lower / 1_000,
+                            upper / 1_000
+                        )
                     )
-                )
+                }
+            } else {
+                // Legacy challenges keep the original minimum-distance
+                // behaviour unless they were created with tolerance rules.
+                guard result.distanceMeters >=
+                        target
+                else {
+                    return challengeEvidenceFailure(
+                        result: result,
+                        duration:
+                            selectedDuration,
+                        routeMatch:
+                            routeMatch,
+                        reason: String(
+                            format:
+                                "%.2f km completed · %.2f km required.",
+                            result.distanceMeters /
+                                1_000,
+                            target / 1_000
+                        )
+                    )
+                }
             }
 
-            guard let segmentDuration = fastestSegmentDuration(
-                in: route,
-                targetDistance: target
-            ) else {
+            let qualifyingDuration:
+                TimeInterval
+
+            if route.count >= 2 {
+                guard let segmentDuration =
+                        fastestSegmentDuration(
+                            in: route,
+                            targetDistance: target
+                        )
+                else {
+                    return challengeEvidenceFailure(
+                        result: result,
+                        duration:
+                            selectedDuration,
+                        routeMatch:
+                            routeMatch,
+                        reason:
+                            "ATHLTH could not verify the target distance from the GPS track."
+                    )
+                }
+
+                qualifyingDuration =
+                    segmentDuration
+            } else if
+                !rules.gpsRequired {
+                // Apple Health/Watch distance can qualify without a route
+                // when GPS is optional. This is what enables treadmill use.
+                qualifyingDuration =
+                    selectedDuration
+            } else {
                 return challengeEvidenceFailure(
                     result: result,
-                    duration: selectedDuration,
-                    routeMatch: routeMatch,
-                    reason: "ATHLTH could not verify the target distance from the GPS track."
+                    duration:
+                        selectedDuration,
+                    routeMatch:
+                        routeMatch,
+                    reason:
+                        "GPS verification is required for this attempt."
                 )
             }
 
             return ChallengeRunningEvidence(
                 startedAt: result.startedAt,
                 endedAt: result.endedAt,
-                durationSeconds: segmentDuration,
+                durationSeconds:
+                    qualifyingDuration,
                 distanceMeters: target,
-                routeMatchPercent: routeMatch,
-                score: segmentDuration,
-                detail: "\(challengeClock(segmentDuration)) · \(String(format: "%.2f", target / 1_000)) km",
+                routeMatchPercent:
+                    routeMatch,
+                score: qualifyingDuration,
+                detail:
+                    "\(challengeClock(qualifyingDuration)) · \(String(format: "%.2f", target / 1_000)) km",
                 isEligible: true,
                 ineligibilityReason: nil
             )
@@ -947,54 +1083,67 @@ final class HealthKitManager: ObservableObject {
                     result: result,
                     duration: selectedDuration,
                     routeMatch: routeMatch,
-                    reason: "A specific route is required for this challenge."
+                    reason:
+                        "A specific route is required for this challenge."
                 )
             }
 
             return ChallengeRunningEvidence(
                 startedAt: result.startedAt,
                 endedAt: result.endedAt,
-                durationSeconds: selectedDuration,
-                distanceMeters: result.distanceMeters,
-                routeMatchPercent: routeMatch,
+                durationSeconds:
+                    selectedDuration,
+                distanceMeters:
+                    result.distanceMeters,
+                routeMatchPercent:
+                    routeMatch,
                 score: selectedDuration,
-                detail: "\(challengeClock(selectedDuration)) · \(String(format: "%.0f%%", routeMatch ?? 0)) route match",
+                detail:
+                    "\(challengeClock(selectedDuration)) · \(String(format: "%.0f%%", routeMatch ?? 0)) route match",
                 isEligible: true,
                 ineligibilityReason: nil
             )
 
         case .farthestInTime:
-            guard let targetDuration = rules.targetDurationSeconds,
+            guard let targetDuration =
+                    rules.targetDurationSeconds,
                   targetDuration > 0
             else {
                 return challengeEvidenceFailure(
                     result: result,
                     duration: selectedDuration,
                     routeMatch: routeMatch,
-                    reason: "This challenge has no valid time target."
+                    reason:
+                        "This challenge has no valid time target."
                 )
             }
 
-            guard let distance = maximumRouteDistance(
-                in: route,
-                within: targetDuration
-            ) else {
+            guard let distance =
+                    maximumRouteDistance(
+                        in: route,
+                        within: targetDuration
+                    )
+            else {
                 return challengeEvidenceFailure(
                     result: result,
                     duration: selectedDuration,
                     routeMatch: routeMatch,
-                    reason: "ATHLTH could not verify distance inside the required time window."
+                    reason:
+                        "ATHLTH could not verify distance inside the required time window."
                 )
             }
 
             return ChallengeRunningEvidence(
                 startedAt: result.startedAt,
                 endedAt: result.endedAt,
-                durationSeconds: targetDuration,
+                durationSeconds:
+                    targetDuration,
                 distanceMeters: distance,
-                routeMatchPercent: routeMatch,
+                routeMatchPercent:
+                    routeMatch,
                 score: distance,
-                detail: "\(String(format: "%.2f km", distance / 1_000)) in \(challengeClock(targetDuration))",
+                detail:
+                    "\(String(format: "%.2f km", distance / 1_000)) in \(challengeClock(targetDuration))",
                 isEligible: true,
                 ineligibilityReason: nil
             )
@@ -1003,22 +1152,35 @@ final class HealthKitManager: ObservableObject {
             return ChallengeRunningEvidence(
                 startedAt: result.startedAt,
                 endedAt: result.endedAt,
-                durationSeconds: selectedDuration,
-                distanceMeters: result.distanceMeters,
-                routeMatchPercent: routeMatch,
-                score: result.distanceMeters,
-                detail: String(format: "%.2f km", result.distanceMeters / 1_000),
+                durationSeconds:
+                    selectedDuration,
+                distanceMeters:
+                    result.distanceMeters,
+                routeMatchPercent:
+                    routeMatch,
+                score:
+                    result.distanceMeters,
+                detail: String(
+                    format:
+                        "%.2f km",
+                    result.distanceMeters /
+                        1_000
+                ),
                 isEligible: true,
                 ineligibilityReason: nil
             )
 
-        case .heaviestWeight, .mostReps, .exerciseVolume, .workoutVolume,
+        case .heaviestWeight,
+                .mostReps,
+                .exerciseVolume,
+                .workoutVolume,
                 .heartRateZoneTime:
             return challengeEvidenceFailure(
                 result: result,
                 duration: selectedDuration,
                 routeMatch: routeMatch,
-                reason: "This is not a running scoring rule."
+                reason:
+                    "This is not a running scoring rule."
             )
         }
     }
@@ -3317,6 +3479,63 @@ final class HealthKitManager: ObservableObject {
         }
 
         return bestDuration
+    }
+
+    private func challengeEndpointsMatch(
+        actualLocations: [CLLocation],
+        referenceCoordinates: [RouteCoordinate],
+        toleranceMeters: Double,
+        direction: ChallengeRouteDirection
+    ) -> Bool {
+        let actual = actualLocations
+            .filter {
+                $0.horizontalAccuracy >= 0 &&
+                $0.horizontalAccuracy <= 65
+            }
+            .sorted {
+                $0.timestamp < $1.timestamp
+            }
+
+        guard let actualStart = actual.first,
+              let actualFinish = actual.last,
+              let referenceStart =
+                referenceCoordinates.first,
+              let referenceFinish =
+                referenceCoordinates.last
+        else {
+            return false
+        }
+
+        let requiredStart = CLLocation(
+            latitude: referenceStart.latitude,
+            longitude: referenceStart.longitude
+        )
+        let requiredFinish = CLLocation(
+            latitude: referenceFinish.latitude,
+            longitude: referenceFinish.longitude
+        )
+
+        let direct =
+            actualStart.distance(
+                from: requiredStart
+            ) <= toleranceMeters &&
+            actualFinish.distance(
+                from: requiredFinish
+            ) <= toleranceMeters
+
+        guard direction == .eitherDirection else {
+            return direct
+        }
+
+        let reverse =
+            actualStart.distance(
+                from: requiredFinish
+            ) <= toleranceMeters &&
+            actualFinish.distance(
+                from: requiredStart
+            ) <= toleranceMeters
+
+        return direct || reverse
     }
 
     private func workoutForChallenge(uuid: UUID) async throws -> HKWorkout? {

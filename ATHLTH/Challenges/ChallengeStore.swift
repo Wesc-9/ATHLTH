@@ -298,6 +298,14 @@ final class ChallengeStore: ObservableObject {
             }
 
             let challenge = challenges[challengeIndex]
+
+            guard canRecordVerifiedAttempt(
+                in: challenge,
+                participantID: participant.id
+            ) else {
+                continue
+            }
+
             let sourceID =
                 result.healthKitWorkoutUUID ?? result.id
             let sourceKey = sourceID.uuidString
@@ -570,18 +578,38 @@ final class ChallengeStore: ObservableObject {
                     )
                 )
             } else {
-                let best = attempts.sorted { lhs, rhs in
-                    if challenge.rules.scoring.prefersLowerScore {
-                        return lhs.score < rhs.score
-                    }
-                    return lhs.score > rhs.score
-                }.first
+                let selectedAttempt: ChallengeAttempt?
+
+                switch challenge.rules.attemptPolicy ?? .best {
+                case .best:
+                    selectedAttempt =
+                        attempts.sorted { lhs, rhs in
+                            if challenge.rules.scoring
+                                .prefersLowerScore {
+                                return lhs.score < rhs.score
+                            }
+                            return lhs.score > rhs.score
+                        }
+                        .first
+
+                case .first:
+                    selectedAttempt =
+                        attempts.min {
+                            $0.submittedAt < $1.submittedAt
+                        }
+
+                case .latest:
+                    selectedAttempt =
+                        attempts.max {
+                            $0.submittedAt < $1.submittedAt
+                        }
+                }
 
                 scored.append(
                     (
                         participant,
-                        best,
-                        best?.score,
+                        selectedAttempt,
+                        selectedAttempt?.score,
                         attempts.count
                     )
                 )
@@ -675,6 +703,30 @@ final class ChallengeStore: ObservableObject {
         if changed {
             persist()
         }
+    }
+
+    private func canRecordVerifiedAttempt(
+        in challenge: ATHLTHChallenge,
+        participantID: UUID
+    ) -> Bool {
+        let eligibleAttempts =
+            challenge.attempts.filter {
+                $0.participantID == participantID &&
+                $0.isEligible
+            }
+
+        if !challenge.rules.allowMultipleAttempts {
+            return eligibleAttempts.isEmpty
+        }
+
+        guard let maximum =
+                challenge.rules.maximumAttempts,
+              maximum > 0
+        else {
+            return true
+        }
+
+        return eligibleAttempts.count < maximum
     }
 
     private func participant(
