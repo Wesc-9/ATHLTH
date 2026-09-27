@@ -34,26 +34,39 @@ struct OnboardingHeroPhoto: View {
     private static let image = UIImage(named: "OnboardingHero")
 
     var body: some View {
-        Group {
-            if let image = Self.image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.17, green: 0.14, blue: 0.12),
-                        Color(red: 0.05, green: 0.05, blue: 0.05)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .overlay {
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .font(.system(size: 72, weight: .thin))
-                        .foregroundStyle(.white.opacity(0.72))
+        GeometryReader { proxy in
+            Group {
+                if let image = Self.image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .scaledToFill()
+                        .frame(
+                            width: proxy.size.width,
+                            height: proxy.size.height
+                        )
+                        .clipped()
+                } else {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.17, green: 0.14, blue: 0.12),
+                            Color(red: 0.05, green: 0.05, blue: 0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay {
+                        Image(systemName: "figure.strengthtraining.traditional")
+                            .font(.system(size: 72, weight: .thin))
+                            .foregroundStyle(.white.opacity(0.72))
+                    }
                 }
             }
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height
+            )
         }
         .accessibilityHidden(true)
     }
