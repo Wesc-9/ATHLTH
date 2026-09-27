@@ -44,8 +44,19 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     private var pendingPlaybackURI: String?
 
     private var clientID: String {
-        (Bundle.main.object(forInfoDictionaryKey: "ATHLTHSpotifyClientID") as? String)?
+        let value =
+            (Bundle.main.object(
+                forInfoDictionaryKey: "ATHLTHSpotifyClientID"
+            ) as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        guard !value.isEmpty,
+              !value.contains("$(")
+        else {
+            return ""
+        }
+
+        return value
     }
 
     private var redirectURI: String {
