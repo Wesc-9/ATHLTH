@@ -46,35 +46,96 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Regenerate app icons from approved source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/generate_app_icons.py
+
       - name: Verify approved app icons
         shell: bash
         run: |
           set -euo pipefail
-          EXPECTED_ICON_BLOB="e4846875813cad789aaf6b694a30d861e1af1d5a"
-          ICONS=(
-            ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon.png
-            ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png
-            ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png
-            ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png
-          )
+          python3 - <<'PY'
+          from __future__ import annotations
 
-          for icon in "${ICONS[@]}"; do
-            test -s "$icon"
-            ACTUAL_BLOB=$(git hash-object "$icon")
-            if [ "$ACTUAL_BLOB" != "$EXPECTED_ICON_BLOB" ]; then
-              echo "::error::Unexpected ATHLTH app icon at $icon ($ACTUAL_BLOB)"
-              exit 1
-            fi
+          import struct
+          import zlib
+          from pathlib import Path
 
-            WIDTH=$(sips -g pixelWidth "$icon" | awk '/pixelWidth/ {print $2}')
-            HEIGHT=$(sips -g pixelHeight "$icon" | awk '/pixelHeight/ {print $2}')
-            if [ "$WIDTH" != "1024" ] || [ "$HEIGHT" != "1024" ]; then
-              echo "::error::App icon must be 1024x1024: $icon is ${WIDTH}x${HEIGHT}"
-              exit 1
-            fi
-          done
+          icons = [
+              Path("ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon.png"),
+              Path("ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png"),
+              Path("ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png"),
+              Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png"),
+          ]
 
-          echo "Approved flat ATHLTH icon verified for iPhone, dark, tinted and Watch assets."
+          def validate_png(path: Path) -> bytes:
+              payload = path.read_bytes()
+              if payload[:8] != b"\x89PNG\r\n\x1a\n":
+                  raise SystemExit(f"{path}: invalid PNG signature")
+
+              offset = 8
+              width = height = None
+              idat = bytearray()
+              saw_iend = False
+
+              while offset + 12 <= len(payload):
+                  length = struct.unpack(">I", payload[offset:offset + 4])[0]
+                  kind = payload[offset + 4:offset + 8]
+                  data_start = offset + 8
+                  data_end = data_start + length
+                  crc_end = data_end + 4
+                  if crc_end > len(payload):
+                      raise SystemExit(f"{path}: truncated PNG chunk {kind!r}")
+
+                  data = payload[data_start:data_end]
+                  stored_crc = struct.unpack(">I", payload[data_end:crc_end])[0]
+                  actual_crc = zlib.crc32(kind + data) & 0xFFFFFFFF
+                  if stored_crc != actual_crc:
+                      raise SystemExit(f"{path}: CRC mismatch in {kind!r}")
+
+                  if kind == b"IHDR":
+                      width, height, bit_depth, color_type, _, _, _ = struct.unpack(
+                          ">IIBBBBB", data
+                      )
+                      if (width, height) != (1024, 1024):
+                          raise SystemExit(
+                              f"{path}: expected 1024x1024, got {width}x{height}"
+                          )
+                      if bit_depth != 8 or color_type != 2:
+                          raise SystemExit(
+                              f"{path}: expected 8-bit RGB PNG, got bit_depth={bit_depth}, color_type={color_type}"
+                          )
+                  elif kind == b"IDAT":
+                      idat.extend(data)
+                  elif kind == b"IEND":
+                      saw_iend = True
+                      offset = crc_end
+                      break
+
+                  offset = crc_end
+
+              if not saw_iend:
+                  raise SystemExit(f"{path}: missing IEND")
+              if width is None or height is None or not idat:
+                  raise SystemExit(f"{path}: incomplete PNG structure")
+
+              raw = zlib.decompress(bytes(idat))
+              expected = 1024 * (1 + 1024 * 3)
+              if len(raw) != expected:
+                  raise SystemExit(
+                      f"{path}: decoded image length {len(raw)} != {expected}"
+                  )
+
+              return payload
+
+          payloads = [validate_png(path) for path in icons]
+          if any(payload != payloads[0] for payload in payloads[1:]):
+              raise SystemExit("ATHLTH normal, dark, tinted and Watch icons must match")
+
+          print("Approved 1024x1024 ATHLTH icon is structurally valid for iPhone and Watch.")
+          PY
 
       - name: Optimize hero assets for runtime memory
         shell: bash
