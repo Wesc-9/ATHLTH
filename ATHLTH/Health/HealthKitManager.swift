@@ -57,6 +57,10 @@ final class HealthKitManager: ObservableObject {
     private var profilePerformanceCache: (stats: ProfilePerformanceStats, generatedAt: Date)?
     private var personalRecordsCache: (records: [HealthPersonalRecord], generatedAt: Date)?
     private var trophySnapshotCache: (snapshot: TrophyHealthSnapshot, generatedAt: Date)?
+    private var trophyCacheLatestWorkoutID: UUID?
+    private var trophyCacheLatestWorkoutEnd: Date?
+    private var trophyCacheLatestSleepDuration: TimeInterval?
+    private let trophySnapshotDiskKey = "athlth.health.trophySnapshotCache.v1"
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
     private let currentAuthorizationVersion = 2
@@ -67,6 +71,25 @@ final class HealthKitManager: ObservableObject {
 
     init() {
         let defaults = UserDefaults.standard
+
+        if let data = defaults.data(forKey: trophySnapshotDiskKey),
+           let cached = try? JSONDecoder().decode(
+               TrophySnapshotDiskCache.self,
+               from: data
+           ),
+           Date().timeIntervalSince(cached.generatedAt) < 900 {
+            trophySnapshotCache = (
+                cached.snapshot,
+                cached.generatedAt
+            )
+            trophyCacheLatestWorkoutID =
+                cached.latestWorkoutID
+            trophyCacheLatestWorkoutEnd =
+                cached.latestWorkoutEnd
+            trophyCacheLatestSleepDuration =
+                cached.latestSleepDuration
+        }
+
         lastSuccessfulRefreshAt = defaults.object(
             forKey: lastSuccessfulRefreshKey
         ) as? Date
@@ -413,7 +436,25 @@ final class HealthKitManager: ObservableObject {
                 result[workout.uuid] = workout
             }
 
-            if Set(summaries.map(\.id)) != previousWorkoutIDs {
+            let latestFetchedWorkout = fetched.max {
+                $0.endDate < $1.endDate
+            }
+
+            let recentWorkoutsChanged: Bool
+            if previousWorkoutIDs.isEmpty,
+               trophySnapshotCache != nil {
+                recentWorkoutsChanged =
+                    latestFetchedWorkout?.uuid !=
+                        trophyCacheLatestWorkoutID ||
+                    latestFetchedWorkout?.endDate !=
+                        trophyCacheLatestWorkoutEnd
+            } else {
+                recentWorkoutsChanged =
+                    Set(summaries.map(\.id)) !=
+                        previousWorkoutIDs
+            }
+
+            if recentWorkoutsChanged {
                 invalidateWorkoutDerivedCaches()
             }
 
@@ -425,8 +466,22 @@ final class HealthKitManager: ObservableObject {
         do {
             let fetchedSleep = try await sleepTask
             sleep = fetchedSleep
-            if fetchedSleep.totalAsleep != previousSleepDuration {
-                trophySnapshotCache = nil
+
+            let sleepChanged: Bool
+            if previousSleepDuration == 0,
+               let cachedDuration =
+                    trophyCacheLatestSleepDuration {
+                sleepChanged =
+                    fetchedSleep.totalAsleep !=
+                    cachedDuration
+            } else {
+                sleepChanged =
+                    fetchedSleep.totalAsleep !=
+                    previousSleepDuration
+            }
+
+            if sleepChanged {
+                invalidateTrophySnapshotCache()
             }
             completedRead = true
         } catch {
@@ -862,7 +917,37 @@ final class HealthKitManager: ObservableObject {
             qualifyingSleepNightsReachedAt: qualifyingSleepNightsReachedAt
         )
 
-        trophySnapshotCache = (snapshot, Date())
+        let generatedAt = Date()
+        trophySnapshotCache = (
+            snapshot,
+            generatedAt
+        )
+
+        let latestWorkout = workouts.last
+        trophyCacheLatestWorkoutID =
+            latestWorkout?.uuid
+        trophyCacheLatestWorkoutEnd =
+            latestWorkout?.endDate
+        trophyCacheLatestSleepDuration =
+            sleep.totalAsleep
+
+        let diskCache = TrophySnapshotDiskCache(
+            snapshot: snapshot,
+            generatedAt: generatedAt,
+            latestWorkoutID: latestWorkout?.uuid,
+            latestWorkoutEnd: latestWorkout?.endDate,
+            latestSleepDuration: sleep.totalAsleep
+        )
+
+        if let data = try? JSONEncoder().encode(
+            diskCache
+        ) {
+            UserDefaults.standard.set(
+                data,
+                forKey: trophySnapshotDiskKey
+            )
+        }
+
         return snapshot
     }
 
@@ -2639,11 +2724,29 @@ final class HealthKitManager: ObservableObject {
         }
     }
 
+    private struct TrophySnapshotDiskCache: Codable {
+        let snapshot: TrophyHealthSnapshot
+        let generatedAt: Date
+        let latestWorkoutID: UUID?
+        let latestWorkoutEnd: Date?
+        let latestSleepDuration: TimeInterval
+    }
+
     private func invalidateWorkoutDerivedCaches() {
         allWorkoutsCache = nil
         profilePerformanceCache = nil
         personalRecordsCache = nil
+        invalidateTrophySnapshotCache()
+    }
+
+    private func invalidateTrophySnapshotCache() {
         trophySnapshotCache = nil
+        trophyCacheLatestWorkoutID = nil
+        trophyCacheLatestWorkoutEnd = nil
+        trophyCacheLatestSleepDuration = nil
+        UserDefaults.standard.removeObject(
+            forKey: trophySnapshotDiskKey
+        )
     }
 
     private func fetchAllWorkoutsCached(
