@@ -4,6 +4,8 @@ import UIKit
 import UserNotifications
 
 extension Notification.Name {
+    static let athlthRemoteNotificationReceived =
+        Notification.Name("athlth.remoteNotificationReceived")
     static let athlthRemoteNotificationTapped =
         Notification.Name("athlth.remoteNotificationTapped")
 }
@@ -226,7 +228,15 @@ final class ATHLTHAppDelegate: NSObject,
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound, .badge, .list]
+        let userInfo = notification.request.content.userInfo
+
+        NotificationCenter.default.post(
+            name: .athlthRemoteNotificationReceived,
+            object: nil,
+            userInfo: userInfo
+        )
+
+        return [.banner, .sound, .badge, .list]
     }
 
     nonisolated func userNotificationCenter(
@@ -234,6 +244,12 @@ final class ATHLTHAppDelegate: NSObject,
         didReceive response: UNNotificationResponse
     ) async {
         let userInfo = response.notification.request.content.userInfo
+
+        NotificationCenter.default.post(
+            name: .athlthRemoteNotificationReceived,
+            object: nil,
+            userInfo: userInfo
+        )
 
         NotificationCenter.default.post(
             name: .athlthRemoteNotificationTapped,
