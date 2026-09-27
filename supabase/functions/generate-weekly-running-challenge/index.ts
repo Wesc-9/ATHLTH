@@ -36,7 +36,8 @@ async function recordGroqQuota(
   response: Response,
   feature: string,
 ) {
-  const supabaseURL = Deno.env.get("SUPABASE_URL");
+  try {
+    const supabaseURL = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseURL || !serviceRoleKey) return;
 
@@ -74,10 +75,19 @@ async function recordGroqQuota(
       { onConflict: "provider,model" },
     );
 
-  if (error) {
-    console.error("Unable to record AI quota", {
+    if (error) {
+      console.error("Unable to record AI quota", {
+        feature,
+        message: error.message,
+      });
+    }
+  } catch (error) {
+    console.error("AI quota telemetry skipped", {
       feature,
-      message: error.message,
+      message:
+        error instanceof Error
+          ? error.message
+          : String(error),
     });
   }
 }
