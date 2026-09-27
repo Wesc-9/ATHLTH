@@ -532,6 +532,19 @@ struct AdminCenterView: View {
                     adminMetricRow("Marketing delivery", value: "Disabled")
                     adminMetricRow("Signed-in role", value: session.currentRole.title)
 
+                    Divider()
+
+                    NavigationLink {
+                        GhostReplaySimulatorView()
+                    } label: {
+                        adminNavigationRow(
+                            title: "Ghost Replay Simulator",
+                            subtitle: "Replay saved GPS runs through Ghost Race without starting a real workout",
+                            icon: "play.rectangle.on.rectangle.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
                     Label(
                         "Individual Apple Health / HealthKit values are not shown in Control Center.",
                         systemImage: "lock.shield.fill"
