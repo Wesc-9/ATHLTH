@@ -2,6 +2,11 @@ name: Archive Preflight
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - release/v1.4.3
+    paths:
+      - .github/archive-preflight-trigger
   pull_request:
     branches:
       - main
@@ -58,4 +63,19 @@ jobs:
           echo "Watch bundle: $WATCH_BUNDLE_ID"
           echo "WKApplication: $WK_APPLICATION"
           echo "Watch companion: $COMPANION_BUNDLE_ID"
-          echo "App Store required Info.plist metadata verified."
+
+          ICON=$(find "$APP" -maxdepth 1 -type f -name 'AppIcon*.png' -print -quit)
+          if [ -z "$ICON" ]; then
+            echo "::error::No compiled AppIcon PNG was found in the archived iOS app bundle."
+            find "$APP" -maxdepth 1 -type f -print | sort
+            exit 1
+          fi
+          test -s "$ICON"
+
+          ICON_WIDTH=$(sips -g pixelWidth "$ICON" | awk '/pixelWidth/ {print $2}')
+          ICON_HEIGHT=$(sips -g pixelHeight "$ICON" | awk '/pixelHeight/ {print $2}')
+          echo "Compiled app icon: $ICON (${ICON_WIDTH}x${ICON_HEIGHT})"
+
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon' "$APP/Info.plist" >/dev/null
+
+          echo "App Store required Info.plist metadata and compiled AppIcon verified."
