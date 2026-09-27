@@ -1459,146 +1459,27 @@ struct OfficialWeeklyChallengeDetailView: View {
             if let challenge {
                 ScrollView {
                     VStack(spacing: 18) {
-                        OfficialWeeklyChallengeArtwork(
-                            challenge: challenge
-                        )
-                        .frame(height: 220)
-                        .clipped()
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 24,
-                                style: .continuous
-                            )
-                        )
-
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(challenge.title)
-                                .font(.largeTitle.bold())
-
-                            Text(challenge.subtitle)
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-
-                            Label(
-                                challenge.kind.targetText(
-                                    challenge.targetValue
-                                ),
-                                systemImage: challenge.kind.icon
-                            )
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        ATHLTHCard {
-                            Text("Your progress")
-                                .font(.headline)
-
-                            ProgressView(
-                                value: resolvedProgress(
-                                    for: challenge
-                                )
-                            )
-                            .tint(ATHLTHTheme.vitality)
-
-                            Text(
-                                resolvedProgressText(
-                                    for: challenge
-                                )
-                            )
-                            .font(.title3.bold())
-
-                            HStack(spacing: 6) {
-                                Text("\(store.participantCount(for: challenge.id)) joined")
-                                Text("·")
-                                Text("\(store.completedCount(for: challenge.id)) completed")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                            if store.isCompleted(challenge.id) {
-                                Label(
-                                    "Challenge completed",
-                                    systemImage: "checkmark.seal.fill"
-                                )
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(Color.green)
-                            }
-                        }
-
-                        ATHLTHCard {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Counted workouts")
-                                        .font(.headline)
-
-                                    Text("Registered runs and walks during the challenge window count automatically.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-
-                                Text("\(countedWorkouts.count)")
-                                    .font(.title3.bold())
-                                    .monospacedDigit()
-                            }
-
-                            if countedWorkouts.isEmpty {
-                                ContentUnavailableView(
-                                    "No qualifying workouts yet",
-                                    systemImage: "figure.walk.motion",
-                                    description: Text(
-                                        "Complete a run or walk and it will appear here after Health syncs."
-                                    )
-                                )
-                                .padding(.vertical, 12)
-                            } else {
-                                VStack(spacing: 0) {
-                                    ForEach(countedWorkouts) { workout in
-                                        OfficialWeeklyCountedWorkoutRow(
-                                            workout: workout
-                                        )
-
-                                        if workout.id != countedWorkouts.last?.id {
-                                            Divider()
-                                                .padding(.leading, 46)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Button {
-                            Task {
-                                if store.isJoined(challenge.id) {
-                                    await store.leave(challenge)
-                                } else {
-                                    await store.join(challenge)
-                                    await store.syncCompletionState(
-                                        workouts: health.workouts
-                                    )
-                                }
-                            }
-                        } label: {
-                            Text(
-                                store.isJoined(challenge.id)
-                                    ? "Leave Challenge"
-                                    : "Join Challenge"
-                            )
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(
-                            store.isJoined(challenge.id)
-                                ? .secondary
-                                : ATHLTHTheme.accent
-                        )
+                        premiumHeroCard(challenge)
+                        progressSection(challenge)
+                        countedWorkoutsSection
+                        rulesSection(challenge)
                     }
-                    .padding(16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 32)
                 }
+                .background(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.canvasTop,
+                            ATHLTHTheme.surfaceStone.opacity(0.70),
+                            ATHLTHTheme.canvasBottom
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                )
                 .navigationTitle("Weekly Challenge")
                 .navigationBarTitleDisplayMode(.inline)
                 .task(id: health.workouts.map(\.id)) {
@@ -1619,7 +1500,407 @@ struct OfficialWeeklyChallengeDetailView: View {
         }
     }
 
-    private func resolvedProgress(
+    private func premiumHeroCard(
+        _ challenge: OfficialWeeklyChallenge
+    ) -> some View {
+        VStack(spacing: 0) {
+            ZStack(alignment: .bottomLeading) {
+                OfficialWeeklyChallengeArtwork(
+                    challenge: challenge
+                )
+                .frame(height: 300)
+                .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.10),
+                        Color.black.opacity(0.62)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("WEEKLY CHALLENGE")
+                        .font(.caption.weight(.semibold))
+                        .tracking(2.6)
+                        .foregroundStyle(.white.opacity(0.88))
+
+                    Text(challenge.title)
+                        .font(
+                            .system(
+                                size: 38,
+                                weight: .semibold,
+                                design: .serif
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+
+                    Text(challenge.subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.90))
+                        .lineLimit(3)
+
+                    HStack(spacing: 7) {
+                        Label(
+                            challenge.kind.targetText(
+                                challenge.targetValue
+                            ),
+                            systemImage: challenge.kind.icon
+                        )
+
+                        Text("·")
+
+                        Text(timeRemaining(for: challenge))
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.88))
+                }
+                .padding(20)
+            }
+
+            VStack(spacing: 16) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(
+                            store.isJoined(challenge.id)
+                                ? "YOUR CHALLENGE"
+                                : "READY WHEN YOU ARE"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(.secondary)
+
+                        Text(primaryProgressText(for: challenge))
+                            .font(
+                                .system(
+                                    size: 30,
+                                    weight: .semibold,
+                                    design: .serif
+                                )
+                            )
+                            .foregroundStyle(.primary)
+                    }
+
+                    Spacer()
+
+                    if store.isCompleted(challenge.id) {
+                        Label(
+                            "Completed",
+                            systemImage: "checkmark.seal.fill"
+                        )
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.green)
+                    } else if store.isJoined(challenge.id) {
+                        Text(progressStatus(for: challenge))
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(.horizontal, 11)
+                            .frame(height: 30)
+                            .background(
+                                ATHLTHTheme.accent.opacity(0.10),
+                                in: Capsule()
+                            )
+                    }
+                }
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    OfficialWeeklyChallengeStatTile(
+                        icon: "chart.bar.fill",
+                        title: "Progress",
+                        value: progressPercentText(for: challenge),
+                        detail: resolvedProgressText(for: challenge)
+                    )
+
+                    OfficialWeeklyChallengeStatTile(
+                        icon: "flag.checkered",
+                        title: "Remaining",
+                        value: remainingText(for: challenge),
+                        detail: remainingDetail(for: challenge)
+                    )
+
+                    OfficialWeeklyChallengeStatTile(
+                        icon: "calendar",
+                        title: "Time left",
+                        value: shortTimeRemaining(for: challenge),
+                        detail: dateRangeText(for: challenge)
+                    )
+
+                    OfficialWeeklyChallengeStatTile(
+                        icon: "person.3.fill",
+                        title: "Community",
+                        value: "\(store.participantCount(for: challenge.id))",
+                        detail:
+                            "\(store.completedCount(for: challenge.id)) completed"
+                    )
+                }
+
+                Button {
+                    Task {
+                        if store.isJoined(challenge.id) {
+                            await store.syncCompletionState(
+                                workouts: health.workouts
+                            )
+                        } else {
+                            await store.join(challenge)
+                            await store.syncCompletionState(
+                                workouts: health.workouts
+                            )
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(
+                            systemName:
+                                store.isJoined(challenge.id)
+                                    ? "figure.run"
+                                    : "plus"
+                        )
+
+                        Text(
+                            store.isJoined(challenge.id)
+                                ? "Continue Challenge"
+                                : "Join Challenge"
+                        )
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(
+                        ATHLTHTheme.accentDeep,
+                        in: RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+
+                if store.isJoined(challenge.id) {
+                    Button(role: .destructive) {
+                        Task {
+                            await store.leave(challenge)
+                        }
+                    } label: {
+                        Text("Leave Challenge")
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+            }
+            .padding(18)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.98),
+                        ATHLTHTheme.surfaceStone.opacity(0.92)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        }
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 30,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 30,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.08),
+            radius: 24,
+            x: 0,
+            y: 12
+        )
+    }
+
+    private func progressSection(
+        _ challenge: OfficialWeeklyChallenge
+    ) -> some View {
+        ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Your progress")
+                        .font(.title3.bold())
+
+                    Text(
+                        store.isJoined(challenge.id)
+                            ? progressStatusDescription(for: challenge)
+                            : "Join to track your progress automatically."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(progressPercentText(for: challenge))
+                    .font(.title2.bold())
+                    .monospacedDigit()
+            }
+
+            ProgressView(
+                value: resolvedProgress(
+                    for: challenge
+                )
+            )
+            .tint(ATHLTHTheme.vitality)
+            .scaleEffect(x: 1, y: 1.35)
+
+            HStack {
+                Text(resolvedProgressText(for: challenge))
+                    .font(.subheadline.weight(.semibold))
+
+                Spacer()
+
+                Text(remainingText(for: challenge))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var countedWorkoutsSection: some View {
+        ATHLTHCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Counted workouts")
+                        .font(.title3.bold())
+
+                    Text(
+                        "Qualifying activity during the challenge window."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text("\(countedWorkouts.count)")
+                    .font(.title3.bold())
+                    .monospacedDigit()
+            }
+
+            if countedWorkouts.isEmpty {
+                ContentUnavailableView(
+                    "No qualifying workouts yet",
+                    systemImage: "figure.walk.motion",
+                    description: Text(
+                        "Complete a qualifying workout and it will appear here after Health syncs."
+                    )
+                )
+                .padding(.vertical, 12)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(countedWorkouts) { workout in
+                        OfficialWeeklyCountedWorkoutRow(
+                            workout: workout
+                        )
+
+                        if workout.id != countedWorkouts.last?.id {
+                            Divider()
+                                .padding(.leading, 46)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func rulesSection(
+        _ challenge: OfficialWeeklyChallenge
+    ) -> some View {
+        ATHLTHCard {
+            Text("How it works")
+                .font(.title3.bold())
+
+            VStack(alignment: .leading, spacing: 13) {
+                detailRuleRow(
+                    icon: "calendar",
+                    title: "Challenge window",
+                    detail: dateRangeText(for: challenge)
+                )
+
+                detailRuleRow(
+                    icon: challenge.kind.icon,
+                    title: "Target",
+                    detail: challenge.kind.targetText(
+                        challenge.targetValue
+                    )
+                )
+
+                detailRuleRow(
+                    icon: "checkmark.shield",
+                    title: "What counts",
+                    detail: ruleDescription(for: challenge)
+                )
+
+                detailRuleRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Automatic tracking",
+                    detail:
+                        "ATHLTH checks synced workouts and updates your progress automatically while you participate."
+                )
+            }
+        }
+    }
+
+    private func detailRuleRow(
+        icon: String,
+        title: String,
+        detail: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 34, height: 34)
+                .background(
+                    ATHLTHTheme.accent.opacity(0.09),
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func resolvedCurrentValue(
         for challenge: OfficialWeeklyChallenge
     ) -> Double {
         let localValue =
@@ -1627,28 +1908,45 @@ struct OfficialWeeklyChallengeDetailView: View {
                 challenge: challenge,
                 workouts: health.workouts
             )
-        let storedValue =
-            store.completionValue(for: challenge.id) ?? 0
 
-        return min(
-            max(localValue, storedValue) /
+        return max(
+            localValue,
+            store.completionValue(for: challenge.id) ?? 0
+        )
+    }
+
+    private func resolvedProgress(
+        for challenge: OfficialWeeklyChallenge
+    ) -> Double {
+        min(
+            resolvedCurrentValue(for: challenge) /
                 max(challenge.targetValue, 0.0001),
             1
         )
     }
 
+    private func progressPercentText(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        "\(Int((resolvedProgress(for: challenge) * 100).rounded()))%"
+    }
+
+    private func primaryProgressText(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        guard store.isJoined(challenge.id) else {
+            return challenge.kind.targetText(
+                challenge.targetValue
+            )
+        }
+
+        return resolvedProgressText(for: challenge)
+    }
+
     private func resolvedProgressText(
         for challenge: OfficialWeeklyChallenge
     ) -> String {
-        let localValue =
-            OfficialWeeklyChallengeProgress.currentValue(
-                challenge: challenge,
-                workouts: health.workouts
-            )
-        let value = max(
-            localValue,
-            store.completionValue(for: challenge.id) ?? 0
-        )
+        let value = resolvedCurrentValue(for: challenge)
 
         switch challenge.kind {
         case .distance:
@@ -1663,6 +1961,226 @@ struct OfficialWeeklyChallengeDetailView: View {
             return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) min"
         case .streak:
             return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) days"
+        }
+    }
+
+    private func remainingText(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        let remaining = max(
+            challenge.targetValue -
+                resolvedCurrentValue(for: challenge),
+            0
+        )
+
+        switch challenge.kind {
+        case .distance:
+            return String(format: "%.1f km", remaining)
+        case .sessions:
+            return "\(Int(remaining.rounded(.up)))"
+        case .minutes:
+            return "\(Int(remaining.rounded(.up))) min"
+        case .streak:
+            return "\(Int(remaining.rounded(.up))) days"
+        }
+    }
+
+    private func remainingDetail(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        resolvedProgress(for: challenge) >= 1
+            ? "Goal reached"
+            : "to complete"
+    }
+
+    private func progressStatus(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        let progress = resolvedProgress(for: challenge)
+
+        if progress >= 1 {
+            return "Completed"
+        }
+
+        let elapsed = elapsedFraction(for: challenge)
+
+        if progress + 0.08 >= elapsed {
+            return "On track"
+        }
+
+        return "Keep going"
+    }
+
+    private func progressStatusDescription(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        switch progressStatus(for: challenge) {
+        case "Completed":
+            return "You reached this week's target."
+        case "On track":
+            return "Your progress is keeping pace with the challenge window."
+        default:
+            return "There is still time to move toward the weekly target."
+        }
+    }
+
+    private func elapsedFraction(
+        for challenge: OfficialWeeklyChallenge
+    ) -> Double {
+        let total = challenge.endsAt.timeIntervalSince(
+            challenge.startsAt
+        )
+
+        guard total > 0 else { return 1 }
+
+        let elapsed = Date().timeIntervalSince(
+            challenge.startsAt
+        )
+
+        return min(
+            max(elapsed / total, 0),
+            1
+        )
+    }
+
+    private func shortTimeRemaining(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        if challenge.startsAt > Date() {
+            let days = max(
+                Calendar.current.dateComponents(
+                    [.day],
+                    from: Date(),
+                    to: challenge.startsAt
+                ).day ?? 0,
+                0
+            )
+
+            return days == 0 ? "Today" : "\(days)d"
+        }
+
+        let days = max(
+            Calendar.current.dateComponents(
+                [.day],
+                from: Date(),
+                to: challenge.endsAt
+            ).day ?? 0,
+            0
+        )
+
+        return days == 0 ? "Today" : "\(days)d"
+    }
+
+    private func timeRemaining(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        if challenge.startsAt > Date() {
+            return "Starts " +
+                challenge.startsAt.formatted(
+                    .dateTime.month(.abbreviated).day()
+                )
+        }
+
+        let days = max(
+            Calendar.current.dateComponents(
+                [.day],
+                from: Date(),
+                to: challenge.endsAt
+            ).day ?? 0,
+            0
+        )
+
+        return days == 0
+            ? "Ends today"
+            : "\(days) day\(days == 1 ? "" : "s") left"
+    }
+
+    private func dateRangeText(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        let start = challenge.startsAt.formatted(
+            .dateTime.month(.abbreviated).day()
+        )
+        let end = challenge.endsAt.formatted(
+            .dateTime.month(.abbreviated).day()
+        )
+
+        return "\(start) – \(end)"
+    }
+
+    private func ruleDescription(
+        for challenge: OfficialWeeklyChallenge
+    ) -> String {
+        switch challenge.kind {
+        case .distance:
+            return "Registered running and walking distance inside the challenge window counts toward the target."
+        case .sessions:
+            return "Qualifying registered workouts inside the challenge window count toward the session target."
+        case .minutes:
+            return "Qualifying workout minutes inside the challenge window count toward the target."
+        case .streak:
+            return "Complete qualifying activity on separate days to build the required streak."
+        }
+    }
+}
+
+private struct OfficialWeeklyChallengeStatTile: View {
+    let icon: String
+    let title: String
+    let value: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.title3.bold())
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .frame(minHeight: 28, alignment: .topLeading)
+        }
+        .padding(13)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 126,
+            alignment: .topLeading
+        )
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.76),
+                    ATHLTHTheme.surfaceStone.opacity(0.82)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.58),
+                lineWidth: 0.7
+            )
         }
     }
 }
