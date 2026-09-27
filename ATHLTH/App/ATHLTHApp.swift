@@ -971,10 +971,18 @@ struct AppRootView: View {
 
     @MainActor
     private func resolveStartupAuthentication() async {
-        // A network/auth restoration must never leave the app parked on the
-        // launch gate indefinitely. This is especially important on a fresh
-        // install where a Keychain-backed Supabase session can outlive local
-        // UserDefaults state.
+        // UserDefaults is removed with the app, while Supabase's iOS
+        // Keychain-backed session can survive an uninstall. Never use that
+        // orphaned session to bypass the account/onboarding screen.
+        guard appSession.signedIn else {
+            await accountService
+                .discardUnexpectedPersistedSession()
+            startupAuthenticationResolved = true
+            return
+        }
+
+        // A network/auth restoration must never leave a previously signed-in
+        // user parked on the launch gate indefinitely.
         let timeoutTask = Task { @MainActor in
             try? await Task.sleep(
                 nanoseconds: 10_000_000_000
@@ -995,14 +1003,6 @@ struct AppRootView: View {
         defer {
             timeoutTask.cancel()
             startupAuthenticationResolved = true
-        }
-
-        // UserDefaults is removed with the app, while Supabase's iOS
-        // Keychain-backed session can survive an uninstall. Never use that
-        // orphaned session to bypass the account/onboarding screen.
-        guard appSession.signedIn else {
-            await accountService.discardUnexpectedPersistedSession()
-            return
         }
 
         // Existing installs may restore silently, but the main product UI is
