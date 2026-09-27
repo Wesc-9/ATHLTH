@@ -13,3 +13,5 @@ final-swift6-release-dryrun
 ephemeral-signing-release-dryrun
 
 exact-bundle-signing-release-dryrun
+
+verify-app-group-association
