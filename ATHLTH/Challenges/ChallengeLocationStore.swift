@@ -2,7 +2,7 @@ import CoreLocation
 import Foundation
 
 @MainActor
-final class ChallengeLocationStore: NSObject, ObservableObject, CLLocationManagerDelegate {
+final class ChallengeLocationStore: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
     @Published private(set) var authorizationStatus: CLAuthorizationStatus
     @Published private(set) var isLocating = false
     @Published private(set) var lastError: String?
