@@ -114,6 +114,8 @@ struct AppRootView: View {
     @State private var authCallbackError: String?
     @State private var startupAuthenticationResolved = false
     @State private var pendingWorkoutReview: SocialPublishableWorkout?
+    @State private var pendingWorkoutReviewVisibilityOverride: ProfileVisibility?
+    @State private var pendingFirstWorkoutSharePrompt: SocialPublishableWorkout?
     @State private var queuedWorkoutReviewIDs: Set<UUID> = []
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
     @State private var processedStrengthCommandIDs: Set<UUID> = []
@@ -654,10 +656,40 @@ struct AppRootView: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Share your first workout?",
+            isPresented: Binding(
+                get: { pendingFirstWorkoutSharePrompt != nil },
+                set: { shown in
+                    if !shown {
+                        pendingFirstWorkoutSharePrompt = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Review & Share") {
+                reviewFirstWorkoutForSharing()
+            }
+
+            Button("Turn On Auto Share") {
+                enableAutoShareFromFirstWorkout()
+            }
+
+            Button("Keep Private") {
+                keepFirstWorkoutPrivate()
+            }
+        } message: {
+            Text(
+                "Completed workouts are private by default. You can share this workout, automatically share future workouts, or keep them private. You can change this later in Settings."
+            )
+        }
         .sheet(item: $pendingWorkoutReview) { workout in
             PostWorkoutReviewView(
                 workout: workout,
-                wasAutoPublished: settings.autoPublishCompletedWorkouts
+                wasAutoPublished: settings.autoPublishCompletedWorkouts,
+                initialVisibilityOverride:
+                    pendingWorkoutReviewVisibilityOverride
             )
         }
         .sheet(
@@ -889,6 +921,14 @@ struct AppRootView: View {
         queuedWorkoutReviewIDs.insert(workout.id)
         lastQueuedWorkoutReview = workout
 
+        if !settings.workoutSharingChoiceCompleted &&
+            !settings.autoPublishCompletedWorkouts {
+            pendingFirstWorkoutSharePrompt = workout
+            return
+        }
+
+        pendingWorkoutReviewVisibilityOverride = nil
+
         if settings.autoPublishCompletedWorkouts {
             _ = await social.publishWorkout(
                 workout,
@@ -897,6 +937,60 @@ struct AppRootView: View {
         }
 
         pendingWorkoutReview = workout
+    }
+
+    @MainActor
+    private func reviewFirstWorkoutForSharing() {
+        guard let workout = pendingFirstWorkoutSharePrompt else {
+            return
+        }
+
+        settings.workoutSharingChoiceCompleted = true
+        pendingFirstWorkoutSharePrompt = nil
+        pendingWorkoutReviewVisibilityOverride = .friends
+        pendingWorkoutReview = workout
+    }
+
+    @MainActor
+    private func keepFirstWorkoutPrivate() {
+        guard let workout = pendingFirstWorkoutSharePrompt else {
+            return
+        }
+
+        settings.workoutSharingChoiceCompleted = true
+        settings.autoPublishCompletedWorkouts = false
+        pendingFirstWorkoutSharePrompt = nil
+        pendingWorkoutReviewVisibilityOverride = .privateOnly
+        pendingWorkoutReview = workout
+    }
+
+    @MainActor
+    private func enableAutoShareFromFirstWorkout() {
+        guard let workout = pendingFirstWorkoutSharePrompt else {
+            return
+        }
+
+        settings.workoutSharingChoiceCompleted = true
+        settings.autoPublishCompletedWorkouts = true
+
+        if settings.defaultActivityVisibility == .privateOnly {
+            settings.defaultActivityVisibility = .friends
+        }
+
+        let visibility = settings.defaultActivityVisibility
+        pendingFirstWorkoutSharePrompt = nil
+        pendingWorkoutReviewVisibilityOverride = visibility
+
+        Task {
+            _ = await social.publishWorkout(
+                workout,
+                visibility: visibility
+            )
+
+            await MainActor.run {
+                pendingWorkoutReview = workout
+            }
+        }
     }
 
     private func refreshSocialCore() async {
