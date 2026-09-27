@@ -1026,6 +1026,9 @@ private struct AppleCalendarSettingsView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
+    @EnvironmentObject private var communityEvents: CommunityEventStore
+    @EnvironmentObject private var communityGroups: CommunityGroupStore
+    @EnvironmentObject private var challenges: ChallengeStore
 
     @State private var showingRemoveConfirmation = false
 
@@ -1086,11 +1089,11 @@ private struct AppleCalendarSettingsView: View {
 
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Sync Training Plan")
+                                Text("Sync ATHLTH Calendar")
                                     .font(.system(size: 16.5, weight: .medium))
                                     .foregroundStyle(ATHLTHTheme.primaryText)
 
-                                Text("Keep your active ATHLTH plan in Calendar.")
+                                Text("Keep your plan, event responses and challenge invitations in Calendar.")
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                             }
@@ -1165,13 +1168,9 @@ private struct AppleCalendarSettingsView: View {
                         Button {
                             Task {
                                 if calendarSync.hasFullAccess {
-                                    await calendarSync.sync(
-                                        plan: session.activePlan
-                                    )
+                                    await syncAllCalendarContent()
                                 } else {
-                                    await calendarSync.enable(
-                                        plan: session.activePlan
-                                    )
+                                    await enableCalendarSync()
                                 }
                             }
                         } label: {
@@ -1337,9 +1336,7 @@ private struct AppleCalendarSettingsView: View {
             }
 
             if calendarSync.isEnabled {
-                await calendarSync.syncIfEnabled(
-                    plan: session.activePlan
-                )
+                await syncAllCalendarContent()
             }
         }
         .confirmationDialog(
@@ -1403,9 +1400,7 @@ private struct AppleCalendarSettingsView: View {
                 }
 
                 Task {
-                    await calendarSync.sync(
-                        plan: session.activePlan
-                    )
+                    await syncAllCalendarContent()
                 }
             }
         )
@@ -1423,14 +1418,52 @@ private struct AppleCalendarSettingsView: View {
 
                 if enabled {
                     Task {
-                        await calendarSync.enable(
-                            plan: session.activePlan
-                        )
+                        await enableCalendarSync()
                     }
                 } else {
                     calendarSync.disable()
                 }
             }
+        )
+    }
+
+    private func refreshCalendarSources() async {
+        async let eventRefresh: Void =
+            communityEvents.refresh()
+        async let groupRefresh: Void =
+            communityGroups.refreshCalendarContent()
+
+        _ = await (
+            eventRefresh,
+            groupRefresh
+        )
+    }
+
+    private func syncAllCalendarContent() async {
+        await refreshCalendarSources()
+
+        await calendarSync.sync(
+            plan: session.activePlan,
+            communityEvents: communityEvents.events,
+            groupEvents: communityGroups.calendarEvents,
+            groupEventRSVPs:
+                communityGroups.calendarEventRSVPs,
+            challenges: challenges.challenges,
+            currentUserID: session.profile.userID
+        )
+    }
+
+    private func enableCalendarSync() async {
+        await refreshCalendarSources()
+
+        await calendarSync.enable(
+            plan: session.activePlan,
+            communityEvents: communityEvents.events,
+            groupEvents: communityGroups.calendarEvents,
+            groupEventRSVPs:
+                communityGroups.calendarEventRSVPs,
+            challenges: challenges.challenges,
+            currentUserID: session.profile.userID
         )
     }
 
