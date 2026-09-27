@@ -103,7 +103,10 @@ final class MessagingStore: ObservableObject {
 
             conversations = try await conversationsTask
             recentMessages = try await messagesTask
+        } catch is CancellationError {
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -184,7 +187,10 @@ final class MessagingStore: ObservableObject {
             }
 
             await refresh()
+        } catch is CancellationError {
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
