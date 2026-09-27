@@ -185,14 +185,29 @@ struct AppRootView: View {
             publishATHLTHSurfaces()
 
             if appSession.signedIn {
-                await APNsPushManager.shared.syncCurrentToken()
-                await syncPushPreferences()
-                await refreshSocialCore()
-                await messaging.refresh()
-                await gear.refresh()
-                await communityGroups.refresh()
-                await officialWeeklyChallenges.refresh()
-                await syncCalendarIfAllowed()
+                // Keep launch responsive: load only Home-critical account
+                // context first and let independent network work overlap.
+                async let pushToken: Void =
+                    APNsPushManager.shared.syncCurrentToken()
+                async let pushPreferences: Void =
+                    syncPushPreferences()
+                async let socialHome: Void =
+                    refreshSocialHomeCore()
+                async let messages: Void =
+                    messaging.refresh()
+                async let gearRefresh: Void =
+                    gear.refresh()
+                async let calendarRefresh: Void =
+                    syncCalendarIfAllowed()
+
+                _ = await (
+                    pushToken,
+                    pushPreferences,
+                    socialHome,
+                    messages,
+                    gearRefresh,
+                    calendarRefresh
+                )
             }
 
             if health.needsHealthRefreshRecovery {
@@ -212,7 +227,7 @@ struct AppRootView: View {
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
-            await health.refreshAll()
+            await health.refreshIfStale(maxAge: 90)
             await officialWeeklyChallenges.syncCompletionState(
                 workouts: health.workouts
             )
@@ -243,6 +258,17 @@ struct AppRootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             phoneWorkout.checkpoint()
+
+            if phase != .active,
+               appSession.signedIn {
+                let userID = appSession.profile.userID
+                Task {
+                    await trainingBackups.backUp(
+                        userID: userID
+                    )
+                }
+            }
+
             guard phase == .active else { return }
 
             // Only touch WatchConnectivity when Apple Watch is the selected
@@ -261,10 +287,18 @@ struct AppRootView: View {
 
             Task {
                 if appSession.signedIn {
-                    await refreshSocialCore()
-                    await messaging.refresh()
-                    await officialWeeklyChallenges.refresh()
-                    await syncCalendarIfAllowed()
+                    async let socialHome: Void =
+                        refreshSocialHomeCore()
+                    async let messages: Void =
+                        messaging.refresh()
+                    async let calendarRefresh: Void =
+                        syncCalendarIfAllowed()
+
+                    _ = await (
+                        socialHome,
+                        messages,
+                        calendarRefresh
+                    )
                 }
 
                 guard health.hasRequestedAuthorization,
@@ -273,7 +307,9 @@ struct AppRootView: View {
                     return
                 }
 
-                await health.refreshAll()
+                await health.refreshIfStale(
+                    maxAge: minimumLifecycleRefreshInterval
+                )
                 await officialWeeklyChallenges.syncCompletionState(
                     workouts: health.workouts
                 )
@@ -304,8 +340,9 @@ struct AppRootView: View {
                 // Pull the authoritative inbox immediately so the Home bell
                 // updates while ATHLTH is open, without scheduling a duplicate
                 // local system notification for the same event.
-                await refreshSocialCore(
-                    deliverSystemAlertsForImportedInbox: false
+                await refreshSocialHomeCore(
+                    deliverSystemAlertsForImportedInbox: false,
+                    force: true
                 )
             }
         }
@@ -741,7 +778,7 @@ struct AppRootView: View {
             guard appSession.signedIn else { return }
             let userID = appSession.profile.userID
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .minutes(5))
                 guard !Task.isCancelled, appSession.signedIn, appSession.profile.userID == userID else { return }
                 await trainingBackups.backUp(userID: userID)
             }
@@ -754,7 +791,9 @@ struct AppRootView: View {
                 await APNsPushManager.shared.syncCurrentToken()
                 await syncPushPreferences()
                 await submitLatestStoreProofIfPossible()
-                await refreshSocialCore()
+                await refreshSocialHomeCore(
+                    force: true
+                )
                 await syncCalendarIfAllowed()
                 if health.hasRequestedAuthorization {
                     await syncSocialOwnedData()
@@ -1176,6 +1215,34 @@ struct AppRootView: View {
         // Keep review mandatory. Nothing is published until the user
         // confirms the completed workout from the review screen.
         pendingWorkoutReview = workout
+    }
+
+    private func refreshSocialHomeCore(
+        deliverSystemAlertsForImportedInbox: Bool = true,
+        force: Bool = false
+    ) async {
+        await social.refreshHomeContext(
+            notificationStore: notifications,
+            deliverSystemAlertsForImportedInbox:
+                deliverSystemAlertsForImportedInbox,
+            force: force
+        )
+
+        if let privacy = social.privacy {
+            if let visibility = ProfileVisibility(
+                rawValue: privacy.profileVisibility
+            ) {
+                settings.profileVisibility = visibility
+            }
+            settings.shareTrainingPresence =
+                privacy.shareTrainingPresence
+        }
+
+        if social.privacy?.shareTrainingPresence == true {
+            await social.syncPresence(
+                appSession.profile.presence
+            )
+        }
     }
 
     private func refreshSocialCore(
