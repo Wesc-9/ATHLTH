@@ -304,11 +304,30 @@ struct WatchGhostRaceTimingPoint: Codable, Hashable {
     var cumulativeMeters: Double
 }
 
+struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
+    var enabled: Bool
+    var distanceIntervalMeters: Double?
+    var timeIntervalSeconds: TimeInterval?
+    var announceLeadChanges: Bool
+    var leadChangeThresholdMeters: Double
+    var delivery: WatchAlertDelivery
+
+    static let standard = WatchGhostRaceAudioConfiguration(
+        enabled: true,
+        distanceIntervalMeters: 1_000,
+        timeIntervalSeconds: nil,
+        announceLeadChanges: true,
+        leadChangeThresholdMeters: 25,
+        delivery: .voice
+    )
+}
+
 struct WatchGhostRaceTransfer: Codable, Hashable {
     var title: String
     var referenceDuration: TimeInterval
     var routeDistanceMeters: Double
     var points: [WatchGhostRaceTimingPoint]
+    var audio: WatchGhostRaceAudioConfiguration? = nil
 }
 
 struct WatchWorkoutMirrorCommand: Codable, Hashable {
