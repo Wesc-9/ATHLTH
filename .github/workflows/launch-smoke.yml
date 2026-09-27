@@ -232,7 +232,58 @@ jobs:
               )
           PY
 
-            echo "ATHLTH remained alive and rendered non-blank UI on $DEVICE_NAME (PID $PID)."
+            echo "ATHLTH remained alive and rendered non-blank onboarding UI on $DEVICE_NAME (PID $PID)."
+
+            xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+
+            for TAB in 0 1 2 3 4; do
+              echo "Rendering main tab $TAB on $DEVICE_NAME"
+
+              set +e
+              TAB_LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth \
+                --athlth-compatibility-preview \
+                "--athlth-compatibility-tab=$TAB" 2>&1)
+              TAB_LAUNCH_STATUS=$?
+              set -e
+
+              echo "$TAB_LAUNCH_OUTPUT"
+
+              if [ "$TAB_LAUNCH_STATUS" -ne 0 ]; then
+                echo "::error::ATHLTH tab $TAB failed to launch on $DEVICE_NAME."
+                exit 1
+              fi
+
+              TAB_PID=$(echo "$TAB_LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+              sleep 5
+
+              if [ -z "$TAB_PID" ] || ! kill -0 "$TAB_PID" 2>/dev/null; then
+                echo "::error::ATHLTH tab $TAB exited on $DEVICE_NAME."
+                xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+                exit 1
+              fi
+
+              TAB_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-tab-$TAB.png"
+              xcrun simctl io "$UDID" screenshot "$TAB_SCREENSHOT"
+              test -s "$TAB_SCREENSHOT"
+
+              TAB_ENTROPY=$(magick "$TAB_SCREENSHOT" -colorspace Gray -format "%[entropy]" info:)
+              echo "$DEVICE_NAME tab $TAB screenshot entropy: $TAB_ENTROPY"
+
+              python3 - "$TAB_ENTROPY" "$DEVICE_NAME" "$TAB" <<'PY'
+          import sys
+          entropy=float(sys.argv[1])
+          device=sys.argv[2]
+          tab=sys.argv[3]
+          if entropy < 0.025:
+              raise SystemExit(
+                  f"ATHLTH tab {tab} appears visually blank on {device}: entropy={entropy:.5f}"
+              )
+          PY
+
+              xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+            done
+
+            echo "All five main tabs rendered on $DEVICE_NAME."
 
             cleanup_device "$UDID"
             trap - EXIT
