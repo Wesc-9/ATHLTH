@@ -923,9 +923,9 @@ struct PostWorkoutReviewView: View {
 
                             if settings.autoPublishCompletedWorkouts {
                                 Label(
-                                    alreadyPublished || wasAutoPublished
-                                        ? "This workout was published automatically. Saving updates it."
-                                        : "Automatic workout publishing is enabled.",
+                                    alreadyPublished
+                                        ? "This workout is already shared. Saving updates it."
+                                        : "Sharing is selected by default. Nothing is posted until you save this review.",
                                     systemImage: "bolt.fill"
                                 )
                                 .font(.caption.weight(.semibold))
