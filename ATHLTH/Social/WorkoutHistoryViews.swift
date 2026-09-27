@@ -412,8 +412,9 @@ struct WorkoutHistoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: workout.id) {
             healthDetailLoaded = false
+            let shouldRefreshGear = gear.items.isEmpty
             async let gearRefresh: Void = {
-                if gear.items.isEmpty {
+                if shouldRefreshGear {
                     await gear.refresh()
                 }
             }()
