@@ -281,6 +281,10 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var maximumAttempts: Int? = nil
     var allowTreadmill: Bool? = nil
 
+    // Optional for backwards compatibility. Existing route challenges
+    // created before Target Ghost support default to allowing the pacing aid.
+    var allowTargetGhost: Bool? = nil
+
     var exerciseName: String?
     var fixedWeightKilograms: Double?
 
@@ -295,6 +299,10 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var lockRulesAtStart: Bool
 
     var meetup: ChallengeMeetup?
+
+    var targetGhostAllowed: Bool {
+        allowTargetGhost ?? true
+    }
 }
 
 struct ChallengeAttempt: Identifiable, Codable, Hashable {
