@@ -121,6 +121,16 @@ private struct OfficialWeeklyChallengeAIRequest: Encodable {
     let notes: String
 }
 
+private struct OfficialWeeklyChallengeCoverRequest: Encodable {
+    let challengeId: UUID
+}
+
+private struct OfficialWeeklyChallengeCoverResponse: Decodable {
+    let generated: Bool
+    let heroAsset: String?
+    let reason: String?
+}
+
 private struct OfficialWeeklyChallengeWrite: Encodable {
     let id: UUID
     let title: String
@@ -187,6 +197,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
     @Published private(set) var participants: [OfficialWeeklyChallengeParticipant] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isGeneratingAI = false
+    @Published private(set) var isGeneratingCover = false
     @Published var errorMessage: String?
 
     private let client: SupabaseClient
@@ -430,15 +441,28 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         }
 
         let now = Date()
+        let challengeID = existing?.id ?? UUID()
+        let previousHeroAsset =
+            existing?.heroAsset == "CommunityHero"
+                ? ""
+                : (existing?.heroAsset ?? "")
+        let coverNeedsRefresh =
+            existing == nil ||
+            previousHeroAsset.isEmpty ||
+            existing?.title != cleanTitle ||
+            existing?.subtitle != cleanSubtitle ||
+            existing?.kind != kind ||
+            existing?.targetValue != targetValue
+
         let write = OfficialWeeklyChallengeWrite(
-            id: existing?.id ?? UUID(),
+            id: challengeID,
             title: cleanTitle,
             subtitle: cleanSubtitle,
             kind: kind.rawValue,
             targetValue: targetValue,
             startsAt: startsAt,
             endsAt: endsAt,
-            heroAsset: existing?.heroAsset ?? "CommunityHero",
+            heroAsset: previousHeroAsset,
             source: source,
             createdBy: existing?.createdBy ?? currentUserID,
             createdAt: existing?.createdAt ?? now,
@@ -452,6 +476,17 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                 .execute()
 
             await refresh()
+
+            if coverNeedsRefresh {
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    _ = await self.generateCover(
+                        for: challengeID,
+                        reportError: false
+                    )
+                }
+            }
+
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -529,6 +564,58 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
             return nil
+        }
+    }
+
+    func generateCover(
+        for challengeID: UUID,
+        reportError: Bool = true
+    ) async -> Bool {
+        guard !isGeneratingCover else {
+            return false
+        }
+
+        isGeneratingCover = true
+        defer { isGeneratingCover = false }
+
+        do {
+            let response: OfficialWeeklyChallengeCoverResponse =
+                try await client.functions.invoke(
+                    "generate-weekly-challenge-cover",
+                    options: FunctionInvokeOptions(
+                        body: OfficialWeeklyChallengeCoverRequest(
+                            challengeId: challengeID
+                        )
+                    )
+                )
+
+            if response.generated,
+               response.heroAsset?.isEmpty == false {
+                errorMessage = nil
+                await refresh()
+                return true
+            }
+
+            if reportError {
+                switch response.reason {
+                case "image_ai_not_configured":
+                    errorMessage =
+                        "AI cover generation is not configured yet."
+                case "image_generation_failed":
+                    errorMessage =
+                        "AI could not generate a cover right now. Try again later."
+                default:
+                    errorMessage =
+                        "The challenge was saved, but its AI cover could not be generated."
+                }
+            }
+
+            return false
+        } catch {
+            if reportError {
+                errorMessage = error.localizedDescription
+            }
+            return false
         }
     }
 
@@ -1390,15 +1477,19 @@ struct OfficialWeeklyChallengeAdminListView: View {
                     }
                 }
                 .overlay {
-                    if isWorking || store.isGeneratingAI {
+                    if isWorking || store.isGeneratingAI || store.isGeneratingCover {
                         ZStack {
                             Color.black.opacity(0.08)
                                 .ignoresSafeArea()
 
                             ProgressView(
-                                store.isGeneratingAI
-                                    ? "Generating challenge…"
-                                    : "Updating schedule…"
+                                store.isGeneratingCover
+                                    ? "Generating cover…"
+                                    : (
+                                        store.isGeneratingAI
+                                            ? "Generating challenge…"
+                                            : "Updating schedule…"
+                                    )
                             )
                             .padding(18)
                             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -1516,6 +1607,17 @@ struct OfficialWeeklyChallengeAdminListView: View {
         }
         .buttonStyle(.plain)
         .swipeActions {
+            Button {
+                Task {
+                    _ = await store.generateCover(
+                        for: challenge.id
+                    )
+                }
+            } label: {
+                Label("AI Cover", systemImage: "photo.badge.plus")
+            }
+            .tint(.purple)
+
             Button(role: .destructive) {
                 challengeToDelete = challenge
             } label: {
@@ -1744,9 +1846,25 @@ struct OfficialWeeklyChallengeEditorView: View {
                     )
                 }
                 .disabled(store.isGeneratingAI)
+
+                if let existing = seed.existing {
+                    Button {
+                        Task {
+                            _ = await store.generateCover(
+                                for: existing.id
+                            )
+                        }
+                    } label: {
+                        Label(
+                            "Generate AI cover",
+                            systemImage: "photo.badge.plus"
+                        )
+                    }
+                    .disabled(store.isGeneratingCover)
+                }
             } footer: {
                 Text(
-                    "AI only drafts the challenge. Nothing becomes public until you review and save it."
+                    "AI can draft the challenge and create its cover image. The challenge text is not published until you review and save it."
                 )
             }
 
@@ -1786,11 +1904,15 @@ struct OfficialWeeklyChallengeEditorView: View {
             }
         }
         .overlay {
-            if saving || store.isGeneratingAI {
+            if saving || store.isGeneratingAI || store.isGeneratingCover {
                 ProgressView(
-                    store.isGeneratingAI
-                        ? "Generating…"
-                        : "Saving…"
+                    store.isGeneratingCover
+                        ? "Generating cover…"
+                        : (
+                            store.isGeneratingAI
+                                ? "Generating…"
+                                : "Saving…"
+                        )
                 )
                 .padding(18)
                 .background(
