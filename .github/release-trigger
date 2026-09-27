@@ -11,3 +11,5 @@ v1.4.2-preflight-retry-key-normalization
 final-swift6-release-dryrun
 
 ephemeral-signing-release-dryrun
+
+exact-bundle-signing-release-dryrun
