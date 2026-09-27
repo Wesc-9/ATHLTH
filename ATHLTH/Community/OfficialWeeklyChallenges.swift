@@ -1533,20 +1533,27 @@ struct OfficialWeeklyChallengeDetailView: View {
     var body: some View {
         Group {
             if let challenge {
-                ScrollView {
-                    VStack(spacing: 18) {
-                        premiumHeroCard(challenge)
-                        challengeOverviewSection(challenge)
-                        progressSection(challenge)
-                        leaderboardSection(challenge)
-                        countedWorkoutsSection
-                        rulesSection(challenge)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 18) {
+                            premiumHeroCard(
+                                challenge,
+                                scrollProxy: proxy
+                            )
+                            challengeOverviewSection(challenge)
+                            progressSection(challenge)
+                                .id("weekly-progress")
+                            leaderboardSection(challenge)
+                                .id("weekly-leaderboard")
+                            countedWorkoutsSection
+                            rulesSection(challenge)
+                                .id("weekly-rules")
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                        .padding(.bottom, 32)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .padding(.bottom, 32)
-                }
-                .background(
+                    .background(
                     LinearGradient(
                         colors: [
                             ATHLTHTheme.canvasTop,
@@ -1560,11 +1567,12 @@ struct OfficialWeeklyChallengeDetailView: View {
                 )
                 .navigationTitle("Weekly Challenge")
                 .navigationBarTitleDisplayMode(.inline)
-                .task(id: health.workouts.map(\.id)) {
-                    guard store.isJoined(challenge.id) else { return }
-                    await store.syncCompletionState(
-                        workouts: health.workouts
-                    )
+                    .task(id: health.workouts.map(\.id)) {
+                        guard store.isJoined(challenge.id) else { return }
+                        await store.syncCompletionState(
+                            workouts: health.workouts
+                        )
+                    }
                 }
             } else {
                 ContentUnavailableView(
@@ -1579,7 +1587,8 @@ struct OfficialWeeklyChallengeDetailView: View {
     }
 
     private func premiumHeroCard(
-        _ challenge: OfficialWeeklyChallenge
+        _ challenge: OfficialWeeklyChallenge,
+        scrollProxy: ScrollViewProxy
     ) -> some View {
         VStack(spacing: 0) {
             ZStack(alignment: .bottomLeading) {
@@ -1863,6 +1872,13 @@ struct OfficialWeeklyChallengeDetailView: View {
                             await store.syncCompletionState(
                                 workouts: health.workouts
                             )
+
+                            withAnimation(.easeInOut(duration: 0.32)) {
+                                scrollProxy.scrollTo(
+                                    "weekly-progress",
+                                    anchor: .top
+                                )
+                            }
                         } else {
                             await store.join(challenge)
                             await store.syncCompletionState(
@@ -1910,6 +1926,80 @@ struct OfficialWeeklyChallengeDetailView: View {
                     )
                 }
                 .buttonStyle(.plain)
+
+                HStack(spacing: 10) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.32)) {
+                            scrollProxy.scrollTo(
+                                "weekly-leaderboard",
+                                anchor: .top
+                            )
+                        }
+                    } label: {
+                        Label(
+                            "Leaderboard",
+                            systemImage: "trophy"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(
+                            Color.white.opacity(0.78),
+                            in: RoundedRectangle(
+                                cornerRadius: 15,
+                                style: .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style: .continuous
+                            )
+                            .stroke(
+                                ATHLTHTheme.accentDeep.opacity(0.10),
+                                lineWidth: 0.8
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.32)) {
+                            scrollProxy.scrollTo(
+                                "weekly-rules",
+                                anchor: .top
+                            )
+                        }
+                    } label: {
+                        Label(
+                            "How it works",
+                            systemImage: "info.circle"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(
+                            Color.white.opacity(0.78),
+                            in: RoundedRectangle(
+                                cornerRadius: 15,
+                                style: .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style: .continuous
+                            )
+                            .stroke(
+                                ATHLTHTheme.accentDeep.opacity(0.10),
+                                lineWidth: 0.8
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 if store.isJoined(challenge.id) {
                     HStack {
