@@ -7,54 +7,24 @@ struct MessageInboxView: View {
 
     var onNewMessage: () -> Void = {}
 
+    @State private var searchText = ""
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Messages")
-                            .font(.title2.bold())
-                        Text("Chat, share training and review message requests.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+            LazyVStack(alignment: .leading, spacing: 18) {
+                inboxHero
+                inboxSearch
 
-                    Spacer()
-
-                    if messaging.unreadCount > 0 || messaging.messageRequestCount > 0 {
-                        HStack(spacing: 6) {
-                            if messaging.messageRequestCount > 0 {
-                                Label(
-                                    "\(messaging.messageRequestCount)",
-                                    systemImage: "person.crop.circle.badge.questionmark"
-                                )
-                            }
-
-                            if messaging.unreadCount > 0 {
-                                Label(
-                                    "\(messaging.unreadCount)",
-                                    systemImage: "message.fill"
-                                )
-                            }
-                        }
-                        .font(.caption.bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(ATHLTHTheme.accent, in: Capsule())
-                    }
-                }
-
-                if let error = messaging.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                if let error = displayableError {
+                    inboxErrorCard(error)
                 }
 
                 if !incomingRequestItems.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        sectionLabel("MESSAGE REQUESTS")
-
+                    premiumSection(
+                        eyebrow: "REQUESTS",
+                        title: "Waiting for you",
+                        detail: "Review new message requests before they enter your inbox."
+                    ) {
                         ForEach(incomingRequestItems) { item in
                             MessageRequestRow(
                                 friend: item.friend,
@@ -62,27 +32,32 @@ struct MessageInboxView: View {
                                 direction: .incoming,
                                 onAccept: {
                                     Task {
-                                        _ = await messaging.respondToMessageRequest(
-                                            item.conversation.id,
-                                            accept: true
-                                        )
+                                        _ = await messaging
+                                            .respondToMessageRequest(
+                                                item.conversation.id,
+                                                accept: true
+                                            )
                                     }
                                 },
                                 onDecline: {
                                     Task {
-                                        _ = await messaging.respondToMessageRequest(
-                                            item.conversation.id,
-                                            accept: false
-                                        )
+                                        _ = await messaging
+                                            .respondToMessageRequest(
+                                                item.conversation.id,
+                                                accept: false
+                                            )
                                     }
                                 },
                                 onBlock: {
                                     Task {
-                                        _ = await messaging.respondToMessageRequest(
-                                            item.conversation.id,
-                                            accept: false
+                                        _ = await messaging
+                                            .respondToMessageRequest(
+                                                item.conversation.id,
+                                                accept: false
+                                            )
+                                        await social.block(
+                                            item.friend.userID
                                         )
-                                        await social.block(item.friend.userID)
                                         await messaging.refresh()
                                     }
                                 }
@@ -91,13 +66,43 @@ struct MessageInboxView: View {
                     }
                 }
 
-                if !outgoingRequestItems.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        sectionLabel("REQUESTS SENT")
+                if !filteredActiveConversations.isEmpty {
+                    premiumSection(
+                        eyebrow: "INBOX",
+                        title: "Conversations",
+                        detail: conversationDetail
+                    ) {
+                        ForEach(filteredActiveConversations) { item in
+                            NavigationLink {
+                                DirectMessageThreadView(
+                                    friend: item.friend
+                                )
+                            } label: {
+                                MessageConversationRow(
+                                    friend: item.friend,
+                                    lastMessage: item.lastMessage,
+                                    unreadCount:
+                                        messaging.unreadCount(
+                                            for: item.conversation.id
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
 
+                if !outgoingRequestItems.isEmpty {
+                    premiumSection(
+                        eyebrow: "PENDING",
+                        title: "Requests sent",
+                        detail: "These conversations unlock after the other athlete accepts."
+                    ) {
                         ForEach(outgoingRequestItems) { item in
                             NavigationLink {
-                                DirectMessageThreadView(friend: item.friend)
+                                DirectMessageThreadView(
+                                    friend: item.friend
+                                )
                             } label: {
                                 MessageRequestRow(
                                     friend: item.friend,
@@ -113,102 +118,26 @@ struct MessageInboxView: View {
                     }
                 }
 
-                if !activeConversations.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        sectionLabel("CONVERSATIONS")
-
-                        ForEach(activeConversations) { item in
-                            NavigationLink {
-                                DirectMessageThreadView(friend: item.friend)
-                            } label: {
-                                MessageConversationRow(
-                                    friend: item.friend,
-                                    lastMessage: item.lastMessage,
-                                    unreadCount: messaging.unreadCount(for: item.conversation.id)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                if !friendsWithoutConversation.isEmpty &&
+                    normalizedSearch.isEmpty {
+                    startConversationSection
                 }
 
-                if !friendsWithoutConversation.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        sectionLabel("START A CONVERSATION")
-
-                        ForEach(friendsWithoutConversation) { friend in
-                            NavigationLink {
-                                DirectMessageThreadView(friend: friend)
-                            } label: {
-                                HStack(spacing: 13) {
-                                    SocialAvatar(profile: friend, size: 48)
-
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(friend.resolvedName)
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(.primary)
-                                        Text(friend.usernameLabel)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    Image(systemName: "message.fill")
-                                        .foregroundStyle(ATHLTHTheme.accent)
-                                }
-                                .padding(14)
-                                .background(
-                                    Color.white.opacity(0.96),
-                                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                )
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                        .stroke(ATHLTHTheme.border, lineWidth: 1)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                if activeConversations.isEmpty &&
-                    incomingRequestItems.isEmpty &&
-                    outgoingRequestItems.isEmpty &&
-                    friendsWithoutConversation.isEmpty {
-                    VStack(spacing: 18) {
-                        ContentUnavailableView(
-                            "No messages yet",
-                            systemImage: "message",
-                            description: Text(
-                                "Start with a friend or find another athlete. Non-friends can receive one message request when their privacy settings allow it."
-                            )
-                        )
-
-                        Button(action: onNewMessage) {
-                            Label(
-                                "Start a Conversation",
-                                systemImage: "plus.message.fill"
-                            )
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
-
-                        NavigationLink {
-                            SocialHubView(initialTab: .discover)
-                        } label: {
-                            Text("Explore Community")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                    }
-                    .padding(.vertical, 42)
+                if shouldShowEmptyState {
+                    premiumEmptyState
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 34)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.accent.opacity(0.16)
+            )
+        )
         .refreshable {
             await social.refresh()
             await messaging.refresh()
@@ -217,6 +146,415 @@ struct MessageInboxView: View {
             await social.refresh()
             await messaging.refresh()
         }
+    }
+
+    private var inboxHero: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "message.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 54, height: 54)
+                    .background(
+                        Color.white.opacity(0.13),
+                        in: RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Inbox")
+                        .font(
+                            .system(
+                                size: 30,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(.white)
+
+                    Text(
+                        "Your ATHLTH conversations, requests and shared training — in one place."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.78))
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 9) {
+                inboxMetric(
+                    value: messaging.unreadCount,
+                    title: "Unread",
+                    icon: "circle.fill"
+                )
+
+                inboxMetric(
+                    value: messaging.messageRequestCount,
+                    title: "Requests",
+                    icon: "person.crop.circle.badge.questionmark"
+                )
+
+                Spacer()
+
+                Button(action: onNewMessage) {
+                    Label("New", systemImage: "plus")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.horizontal, 13)
+                        .frame(height: 38)
+                        .background(.white, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.accentDeep,
+                    ATHLTHTheme.accent
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        }
+    }
+
+    private func inboxMetric(
+        value: Int,
+        title: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .bold))
+
+            Text("\(value)")
+                .font(.caption.weight(.bold).monospacedDigit())
+
+            Text(title)
+                .font(.caption2.weight(.medium))
+        }
+        .foregroundStyle(.white.opacity(0.92))
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .background(
+            Color.white.opacity(0.12),
+            in: Capsule()
+        )
+    }
+
+    private var inboxSearch: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            TextField(
+                "Search conversations",
+                text: $searchText
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 48)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.70), lineWidth: 1)
+        }
+    }
+
+    private var startConversationSection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("START A CONVERSATION")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.6)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text("People you train with")
+                        .font(.headline)
+                }
+
+                Spacer()
+
+                Button("See all") {
+                    onNewMessage()
+                }
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+                HStack(spacing: 10) {
+                    ForEach(
+                        friendsWithoutConversation.prefix(8)
+                    ) { friend in
+                        NavigationLink {
+                            DirectMessageThreadView(
+                                friend: friend
+                            )
+                        } label: {
+                            VStack(spacing: 9) {
+                                SocialAvatar(
+                                    profile: friend,
+                                    size: 52
+                                )
+
+                                Text(friend.resolvedName)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+                                    .lineLimit(1)
+                            }
+                            .frame(width: 92)
+                            .padding(.vertical, 13)
+                            .background(
+                                Color.white.opacity(0.78),
+                                in: RoundedRectangle(
+                                    cornerRadius: 18,
+                                    style: .continuous
+                                )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var premiumEmptyState: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(ATHLTHTheme.accentSoft)
+                    .frame(width: 76, height: 76)
+
+                Image(systemName: "message.badge.waveform.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+
+            VStack(spacing: 5) {
+                Text(
+                    normalizedSearch.isEmpty
+                        ? "Your inbox is ready"
+                        : "No conversations found"
+                )
+                .font(.title3.weight(.bold))
+
+                Text(
+                    normalizedSearch.isEmpty
+                        ? "Start a private conversation, or message another athlete when their privacy settings allow requests."
+                        : "Try another name or username."
+                )
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .multilineTextAlignment(.center)
+            }
+
+            if normalizedSearch.isEmpty {
+                Button(action: onNewMessage) {
+                    Label(
+                        "Start a Conversation",
+                        systemImage: "plus.message.fill"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
+        .background(
+            Color.white.opacity(0.76),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.76), lineWidth: 1)
+        }
+    }
+
+    private func inboxErrorCard(
+        _ message: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Inbox could not refresh")
+                    .font(.subheadline.weight(.semibold))
+
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            Button {
+                Task {
+                    await messaging.refresh()
+                }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(
+            Color.white.opacity(0.78),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+    }
+
+    @ViewBuilder
+    private func premiumSection<Content: View>(
+        eyebrow: String,
+        title: String,
+        detail: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(eyebrow)
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.6)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                Text(title)
+                    .font(.title3.weight(.bold))
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+            }
+
+            content()
+        }
+    }
+
+    private var conversationDetail: String {
+        if messaging.unreadCount > 0 {
+            return "\(messaging.unreadCount) unread message\(messaging.unreadCount == 1 ? "" : "s")."
+        }
+
+        return "Recent conversations and shared training."
+    }
+
+    private var displayableError: String? {
+        guard let error = messaging.errorMessage else {
+            return nil
+        }
+
+        if error.localizedCaseInsensitiveContains(
+            "CancellationError"
+        ) {
+            return nil
+        }
+
+        return error
+    }
+
+    private var normalizedSearch: String {
+        searchText
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .lowercased()
+    }
+
+    private var filteredActiveConversations:
+        [MessageConversationItem] {
+        guard !normalizedSearch.isEmpty else {
+            return activeConversations
+        }
+
+        return activeConversations.filter {
+            $0.friend.resolvedName.lowercased()
+                .contains(normalizedSearch) ||
+            $0.friend.usernameLabel.lowercased()
+                .contains(normalizedSearch) ||
+            ($0.lastMessage?.body?.lowercased()
+                .contains(normalizedSearch) ?? false)
+        }
+    }
+
+    private var shouldShowEmptyState: Bool {
+        if !normalizedSearch.isEmpty {
+            return filteredActiveConversations.isEmpty
+        }
+
+        return activeConversations.isEmpty &&
+            incomingRequestItems.isEmpty &&
+            outgoingRequestItems.isEmpty &&
+            friendsWithoutConversation.isEmpty
     }
 
     private var activeConversations: [MessageConversationItem] {
@@ -240,10 +578,15 @@ struct MessageInboxView: View {
     private func items(
         from conversations: [DirectConversationRecord]
     ) -> [MessageConversationItem] {
-        guard let currentUserID = messaging.currentUserID else { return [] }
+        guard let currentUserID = messaging.currentUserID else {
+            return []
+        }
 
         return conversations.compactMap { conversation in
-            guard let otherID = conversation.otherUserID(for: currentUserID),
+            guard let otherID =
+                    conversation.otherUserID(
+                        for: currentUserID
+                    ),
                   let profile = profile(for: otherID)
             else {
                 return nil
@@ -252,43 +595,55 @@ struct MessageInboxView: View {
             return MessageConversationItem(
                 conversation: conversation,
                 friend: profile,
-                lastMessage: messaging.lastMessage(for: conversation.id)
+                lastMessage:
+                    messaging.lastMessage(
+                        for: conversation.id
+                    )
             )
         }
         .sorted {
-            ($0.conversation.lastMessageAt ?? $0.conversation.createdAt) >
-            ($1.conversation.lastMessageAt ?? $1.conversation.createdAt)
+            ($0.conversation.lastMessageAt ??
+                $0.conversation.createdAt) >
+            ($1.conversation.lastMessageAt ??
+                $1.conversation.createdAt)
         }
     }
 
-    private func profile(for userID: UUID) -> SocialProfileCard? {
-        social.friends.first { $0.userID == userID }
-            ?? social.visibleProfiles.first { $0.userID == userID }
-            ?? social.discoverResults.first { $0.userID == userID }
+    private func profile(
+        for userID: UUID
+    ) -> SocialProfileCard? {
+        social.friends.first {
+            $0.userID == userID
+        } ??
+        social.visibleProfiles.first {
+            $0.userID == userID
+        } ??
+        social.discoverResults.first {
+            $0.userID == userID
+        }
     }
 
-    private var friendsWithoutConversation: [SocialProfileCard] {
-        guard let currentUserID = messaging.currentUserID else {
+    private var friendsWithoutConversation:
+        [SocialProfileCard] {
+        guard let currentUserID =
+                messaging.currentUserID
+        else {
             return social.friends
         }
 
         let conversationUserIDs = Set(
             messaging.conversations.compactMap {
-                $0.otherUserID(for: currentUserID)
+                $0.otherUserID(
+                    for: currentUserID
+                )
             }
         )
 
         return social.friends.filter {
-            !conversationUserIDs.contains($0.userID)
+            !conversationUserIDs.contains(
+                $0.userID
+            )
         }
-    }
-
-    @ViewBuilder
-    private func sectionLabel(_ title: String) -> some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .tracking(2)
-            .foregroundStyle(ATHLTHTheme.mutedText)
     }
 }
 
