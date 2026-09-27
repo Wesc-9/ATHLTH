@@ -278,10 +278,13 @@ struct HomeActivitySection: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var session: AppSessionStore
 
     @State private var showingPublish = false
     @State private var selectedPublishWorkoutID: UUID?
     @State private var workoutDetails: [UUID: WorkoutDetail] = [:]
+    @State private var workoutAIInsights: [UUID: WorkoutAIInsight] = [:]
+    @State private var loadingAIInsightIDs: Set<UUID> = []
     @State private var publishedActivities: [UUID: SocialActivityRecord] = [:]
 
     private var ownWorkouts: [SocialPublishableWorkout] {
@@ -429,7 +432,12 @@ struct HomeActivitySection: View {
                             workout: workout,
                             detail: workoutDetails[workout.id],
                             isPublished: isPublished(workout),
-                            caption: caption(for: workout)
+                            caption: caption(for: workout),
+                            aiInsight:
+                                workoutAIInsights[workout.id],
+                            isAIInsightLoading:
+                                loadingAIInsightIDs
+                                    .contains(workout.id)
                         ) {
                             presentPublish(workout)
                         }
@@ -497,6 +505,7 @@ struct HomeActivitySection: View {
         .task(id: detailLoadKey) {
             await social.refreshHomeFeed()
             await loadFeaturedWorkoutDetails()
+            await loadWorkoutAIInsights()
             await loadPublishedActivityRecords()
         }
     }
@@ -587,6 +596,61 @@ struct HomeActivitySection: View {
             )
         }
     }
+
+    @MainActor
+    private func loadWorkoutAIInsights() async {
+        guard session.hasPaidAccess else {
+            workoutAIInsights.removeAll()
+            loadingAIInsightIDs.removeAll()
+            return
+        }
+
+        let service = WorkoutInsightAIService()
+
+        for workout in featuredWorkouts
+            where workout.activity == .running ||
+                  workout.activity == .walking {
+            guard workoutAIInsights[workout.id] == nil,
+                  let summary =
+                    health.workouts.first(
+                        where: {
+                            $0.id == workout.id
+                        }
+                    )
+            else {
+                continue
+            }
+
+            loadingAIInsightIDs.insert(
+                workout.id
+            )
+
+            let context =
+                await health
+                    .workoutAIInsightContext(
+                        for: summary,
+                        maximumHeartRateBPM:
+                            session
+                                .onboardingProfile?
+                                .maximumHeartRateBPM
+                    )
+
+            do {
+                workoutAIInsights[workout.id] =
+                    try await service.generate(
+                        workoutID: workout.id,
+                        context: context
+                    )
+            } catch {
+                // Keep the deterministic local insight as a graceful
+                // fallback when Coach is unavailable.
+            }
+
+            loadingAIInsightIDs.remove(
+                workout.id
+            )
+        }
+    }
 }
 
 private struct HomeActivityOutdoorCard: View {
@@ -594,6 +658,8 @@ private struct HomeActivityOutdoorCard: View {
     let detail: WorkoutDetail?
     let isPublished: Bool
     let caption: String?
+    let aiInsight: WorkoutAIInsight?
+    let isAIInsightLoading: Bool
     let onPost: () -> Void
 
     private var routeCoordinates: [CLLocationCoordinate2D] {
@@ -854,27 +920,107 @@ private struct HomeActivityOutdoorCard: View {
                     WorkoutHistoryDetailView(workout: workout)
                 } label: {
                     HStack(spacing: 11) {
-                        Image(systemName: "chart.bar.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.vitality)
-                            .frame(width: 38, height: 38)
-                            .background(
-                                ATHLTHTheme.vitalitySoft,
-                                in: RoundedRectangle(
-                                    cornerRadius: 11,
-                                    style: .continuous
-                                )
+                        Image(
+                            systemName:
+                                aiInsight != nil ||
+                                isAIInsightLoading
+                                    ? "sparkles"
+                                    : "chart.bar.fill"
+                        )
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(
+                            aiInsight != nil ||
+                            isAIInsightLoading
+                                ? .indigo
+                                : ATHLTHTheme.vitality
+                        )
+                        .frame(width: 38, height: 38)
+                        .background(
+                            (
+                                aiInsight != nil ||
+                                isAIInsightLoading
+                                    ? Color.indigo.opacity(0.08)
+                                    : ATHLTHTheme.vitalitySoft
+                            ),
+                            in: RoundedRectangle(
+                                cornerRadius: 11,
+                                style: .continuous
                             )
+                        )
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Insight")
+                            HStack(spacing: 6) {
+                                Text(
+                                    aiInsight != nil ||
+                                    isAIInsightLoading
+                                        ? "ATHLTH COACH"
+                                        : "Insight"
+                                )
                                 .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
 
-                            Text(insightText)
+                                if aiInsight != nil ||
+                                    isAIInsightLoading {
+                                    Text("ATHLTH+")
+                                        .font(
+                                            .system(
+                                                size: 8,
+                                                weight: .bold
+                                            )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme.accentDeep
+                                        )
+                                        .padding(
+                                            .horizontal,
+                                            5
+                                        )
+                                        .padding(
+                                            .vertical,
+                                            2
+                                        )
+                                        .background(
+                                            ATHLTHTheme
+                                                .champagneSoft,
+                                            in: Capsule()
+                                        )
+                                }
+                            }
+
+                            if isAIInsightLoading &&
+                                aiInsight == nil {
+                                HStack(spacing: 7) {
+                                    ProgressView()
+                                        .controlSize(
+                                            .mini
+                                        )
+                                    Text(
+                                        "Analyzing route, effort and heart-rate response…"
+                                    )
+                                    .font(
+                                        .caption.weight(
+                                            .medium
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    aiInsight.map {
+                                        "\($0.headline) — \($0.summary)"
+                                    } ?? insightText
+                                )
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .lineLimit(2)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                                .lineLimit(3)
+                            }
                         }
 
                         Spacer()

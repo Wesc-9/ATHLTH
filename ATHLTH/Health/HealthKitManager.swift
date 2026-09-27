@@ -2180,6 +2180,321 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    func workoutAIInsightContext(
+        for summary: WorkoutSummary,
+        maximumHeartRateBPM: Int?
+    ) async -> WorkoutAIInsightContext {
+        let detail = await workoutDetail(for: summary)
+
+        let workout: HKWorkout?
+        if let cached = workoutObjects[summary.id] {
+            workout = cached
+        } else {
+            workout = try? await workoutForChallenge(
+                uuid: summary.id
+            )
+            if let workout {
+                workoutObjects[workout.uuid] = workout
+            }
+        }
+
+        let heartSamples: [HKQuantitySample]
+        if let workout {
+            heartSamples =
+                (try? await fetchHeartRateSamplesForInsight(
+                    for: workout
+                )) ?? []
+        } else {
+            heartSamples = []
+        }
+
+        let route = detail.route
+            .filter {
+                $0.horizontalAccuracy >= 0 &&
+                $0.horizontalAccuracy <= 65
+            }
+            .sorted { $0.timestamp < $1.timestamp }
+
+        let elevationGain =
+            workoutInsightElevationGain(route)
+
+        let pace: Double?
+        if let distance = summary.distanceMeters,
+           distance > 0 {
+            pace = summary.duration /
+                (distance / 1_000)
+        } else {
+            pace = nil
+        }
+
+        return WorkoutAIInsightContext(
+            activity: summary.activity.rawValue,
+            durationSeconds: summary.duration,
+            distanceMeters: summary.distanceMeters,
+            activeEnergyKilocalories:
+                summary.activeEnergyKilocalories,
+            averageHeartRateBPM:
+                detail.averageHeartRate,
+            maxHeartRateBPM:
+                detail.maxHeartRate,
+            personalMaximumHeartRateBPM:
+                maximumHeartRateBPM,
+            elevationGainMeters:
+                elevationGain > 0
+                    ? elevationGain
+                    : nil,
+            routePointCount: route.count,
+            averagePaceSecondsPerKilometer:
+                pace,
+            averageRunningPowerWatts:
+                detail.averageRunningPowerWatts,
+            averageRunningStrideLengthMeters:
+                detail.averageRunningStrideLengthMeters,
+            averageRunningVerticalOscillationCentimeters:
+                detail.averageRunningVerticalOscillationCentimeters,
+            averageRunningGroundContactTimeMilliseconds:
+                detail.averageRunningGroundContactTimeMilliseconds,
+            segments:
+                workoutInsightSegments(
+                    route: route,
+                    heartSamples: heartSamples,
+                    startDate: summary.startDate,
+                    endDate: summary.endDate
+                )
+        )
+    }
+
+    private func fetchHeartRateSamplesForInsight(
+        for workout: HKWorkout
+    ) async throws -> [HKQuantitySample] {
+        guard let type =
+                HKObjectType.quantityType(
+                    forIdentifier: .heartRate
+                )
+        else {
+            return []
+        }
+
+        let predicate =
+            HKQuery.predicateForObjects(
+                from: workout
+            )
+        let sort = NSSortDescriptor(
+            key: HKSampleSortIdentifierStartDate,
+            ascending: true
+        )
+
+        return try await withCheckedThrowingContinuation {
+            (
+                continuation:
+                    CheckedContinuation<
+                        [HKQuantitySample],
+                        Error
+                    >
+            ) in
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [sort]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(
+                        throwing: error
+                    )
+                } else {
+                    continuation.resume(
+                        returning:
+                            samples
+                                as? [HKQuantitySample]
+                                ?? []
+                    )
+                }
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    private func workoutInsightSegments(
+        route: [CLLocation],
+        heartSamples: [HKQuantitySample],
+        startDate: Date,
+        endDate: Date
+    ) -> [WorkoutRouteHealthSegment] {
+        let duration =
+            max(
+                endDate.timeIntervalSince(
+                    startDate
+                ),
+                1
+            )
+        let labels = [
+            "Opening quarter",
+            "Second quarter",
+            "Third quarter",
+            "Final quarter"
+        ]
+        let heartUnit =
+            HKUnit.count()
+                .unitDivided(by: .minute())
+
+        return (0..<4).map { index in
+            let segmentStart =
+                startDate.addingTimeInterval(
+                    duration *
+                    Double(index) / 4
+                )
+            let segmentEnd =
+                index == 3
+                    ? endDate
+                    : startDate
+                        .addingTimeInterval(
+                            duration *
+                            Double(index + 1) /
+                            4
+                        )
+
+            let points = route.filter {
+                $0.timestamp >= segmentStart &&
+                $0.timestamp <= segmentEnd
+            }
+
+            var segmentDistance = 0.0
+            var gain = 0.0
+            var loss = 0.0
+
+            if points.count >= 2 {
+                for pointIndex in 1..<points.count {
+                    let previous =
+                        points[pointIndex - 1]
+                    let current =
+                        points[pointIndex]
+                    let elapsed =
+                        current.timestamp
+                            .timeIntervalSince(
+                                previous.timestamp
+                            )
+
+                    if elapsed > 0 {
+                        let distance =
+                            current.distance(
+                                from: previous
+                            )
+                        let speed =
+                            distance / elapsed
+
+                        if distance >= 0 &&
+                            speed <= 12.5 {
+                            segmentDistance +=
+                                distance
+                        }
+                    }
+
+                    let altitudeDelta =
+                        current.altitude -
+                        previous.altitude
+
+                    if altitudeDelta > 0 &&
+                        altitudeDelta < 50 {
+                        gain += altitudeDelta
+                    } else if
+                        altitudeDelta < 0 &&
+                        altitudeDelta > -50 {
+                        loss +=
+                            abs(altitudeDelta)
+                    }
+                }
+            }
+
+            let heartValues =
+                heartSamples.compactMap {
+                    sample -> Double? in
+                    guard
+                        sample.startDate >=
+                            segmentStart,
+                        sample.startDate <
+                            segmentEnd
+                    else {
+                        return nil
+                    }
+
+                    let value =
+                        Self.safeDoubleValue(
+                            sample.quantity,
+                            unit: heartUnit
+                        ) ?? 0
+
+                    guard value >= 30,
+                          value <= 260
+                    else {
+                        return nil
+                    }
+
+                    return value
+                }
+
+            let averageHR =
+                heartValues.isEmpty
+                    ? nil
+                    : heartValues.reduce(0, +) /
+                        Double(
+                            heartValues.count
+                        )
+            let maxHR =
+                heartValues.max()
+            let segmentDuration =
+                segmentEnd.timeIntervalSince(
+                    segmentStart
+                )
+            let segmentPace =
+                segmentDistance >= 50
+                    ? segmentDuration /
+                        (
+                            segmentDistance /
+                            1_000
+                        )
+                    : nil
+
+            return WorkoutRouteHealthSegment(
+                label: labels[index],
+                durationSeconds:
+                    segmentDuration,
+                distanceMeters:
+                    segmentDistance,
+                elevationGainMeters: gain,
+                elevationLossMeters: loss,
+                averageHeartRateBPM:
+                    averageHR,
+                maxHeartRateBPM: maxHR,
+                paceSecondsPerKilometer:
+                    segmentPace
+            )
+        }
+    }
+
+    private func workoutInsightElevationGain(
+        _ route: [CLLocation]
+    ) -> Double {
+        guard route.count >= 2 else {
+            return 0
+        }
+
+        var gain = 0.0
+
+        for index in 1..<route.count {
+            let delta =
+                route[index].altitude -
+                route[index - 1].altitude
+
+            if delta > 0 && delta < 50 {
+                gain += delta
+            }
+        }
+
+        return gain
+    }
+
     private func storedWorkoutLocation(
         for workout: HKWorkout
     ) -> CLLocation? {

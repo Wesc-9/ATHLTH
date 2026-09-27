@@ -39,6 +39,40 @@ struct WorkoutDetail {
     var swimmingStrokeCount: Double?
 }
 
+struct WorkoutRouteHealthSegment: Codable, Hashable {
+    let label: String
+    let durationSeconds: Double
+    let distanceMeters: Double
+    let elevationGainMeters: Double
+    let elevationLossMeters: Double
+    let averageHeartRateBPM: Double?
+    let maxHeartRateBPM: Double?
+    let paceSecondsPerKilometer: Double?
+}
+
+struct WorkoutAIInsightContext: Codable, Hashable {
+    let activity: String
+    let durationSeconds: Double
+    let distanceMeters: Double?
+    let activeEnergyKilocalories: Double?
+    let averageHeartRateBPM: Double?
+    let maxHeartRateBPM: Double?
+    let personalMaximumHeartRateBPM: Int?
+    let elevationGainMeters: Double?
+    let routePointCount: Int
+    let averagePaceSecondsPerKilometer: Double?
+    let averageRunningPowerWatts: Double?
+    let averageRunningStrideLengthMeters: Double?
+    let averageRunningVerticalOscillationCentimeters: Double?
+    let averageRunningGroundContactTimeMilliseconds: Double?
+    let segments: [WorkoutRouteHealthSegment]
+}
+
+struct WorkoutAIInsight: Codable, Hashable {
+    let headline: String
+    let summary: String
+}
+
 struct TrainingHealthSummary: Equatable {
     var stepsToday: Double?
     var activeEnergyKilocaloriesToday: Double?
