@@ -1124,21 +1124,31 @@ struct ChallengeCreationView: View {
                         .tint(ATHLTHTheme.accent)
                     }
 
-                    NavigationLink {
-                        RunRouteBuilderView()
-                    } label: {
-                        Label(
-                            "Create New",
-                            systemImage: "plus"
-                        )
-                        .frame(maxWidth: .infinity)
+                    if session.savedRoutes.isEmpty {
+                        NavigationLink {
+                            RunRouteBuilderView()
+                        } label: {
+                            Label(
+                                "Create New",
+                                systemImage: "plus"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accent)
+                    } else {
+                        NavigationLink {
+                            RunRouteBuilderView()
+                        } label: {
+                            Label(
+                                "Create New",
+                                systemImage: "plus"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accent)
                     }
-                    .buttonStyle(
-                        session.savedRoutes.isEmpty
-                            ? .borderedProminent
-                            : .bordered
-                    )
-                    .tint(ATHLTHTheme.accent)
                 }
             }
         }
