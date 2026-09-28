@@ -123,6 +123,7 @@ struct CustomQuickWorkoutConfiguration: Hashable {
     var workSeconds: Int
     var restSeconds: Int
     var rounds: Int
+    var audioCoach: WatchAudioCoachConfiguration
 
     var title: String {
         method == .open
@@ -150,6 +151,7 @@ struct CustomQuickWorkoutConfiguration: Hashable {
 
 struct CustomQuickStartSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: AppSettingsStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
@@ -161,6 +163,8 @@ struct CustomQuickStartSheet: View {
     @State private var workSeconds = 40
     @State private var restSeconds = 20
     @State private var rounds = 8
+    @State private var audioCoachDraft = AudioCoachDraft()
+    @State private var audioCoachLoaded = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 10),
@@ -211,6 +215,14 @@ struct CustomQuickStartSheet: View {
                     }
 
                     configurationControls
+
+                    AudioCoachSetupCard(
+                        draft: $audioCoachDraft,
+                        showRouteOptions: false,
+                        showStructuredOptions:
+                            method == .intervals ||
+                            method == .emom
+                    )
 
                     ATHLTHCard {
                         HStack(spacing: 12) {
@@ -297,6 +309,12 @@ struct CustomQuickStartSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .task {
+            if !audioCoachLoaded {
+                audioCoachDraft.load(from: settings)
+                audioCoachLoaded = true
+            }
+        }
     }
 
     private var previewConfiguration: CustomQuickWorkoutConfiguration {
@@ -306,7 +324,8 @@ struct CustomQuickStartSheet: View {
             durationMinutes: durationMinutes,
             workSeconds: workSeconds,
             restSeconds: restSeconds,
-            rounds: rounds
+            rounds: rounds,
+            audioCoach: audioCoachDraft.configuration()
         )
     }
 
