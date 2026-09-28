@@ -175,7 +175,8 @@ jobs:
               "filter[version]": os.environ["BUILD_NUMBER"],
               "sort": "-uploadedDate",
               "limit": "10",
-              "include": "preReleaseVersion,buildBetaDetail,betaGroups",
+              "include": "preReleaseVersion,buildBetaDetail,betaGroups,buildBundles",
+              "fields[buildBundles]": "bundleId,bundleType,sdkBuild,platformBuild,supportedArchitectures,requiredCapabilities,minimumOsVersion,entitlements",
           })
           data = builds.get("data", [])
           if not data:
@@ -209,6 +210,19 @@ jobs:
                   print(f"BUILD[{index}].INTERNAL_BUILD_STATE={ba.get('internalBuildState')}")
                   print(f"BUILD[{index}].EXTERNAL_BUILD_STATE={ba.get('externalBuildState')}")
                   print(f"BUILD[{index}].AUTO_NOTIFY={ba.get('autoNotifyEnabled')}")
+
+              bundles = rels.get("buildBundles", {}).get("data", [])
+              print(f"BUILD[{index}].BUNDLE_COUNT={len(bundles)}")
+              for bi, bundle_ref in enumerate(bundles):
+                  item = included.get((bundle_ref.get("type"), bundle_ref.get("id")), {})
+                  bba = item.get("attributes", {})
+                  print(f"BUILD[{index}].BUNDLE[{bi}].BUNDLE_ID={bba.get('bundleId')}")
+                  print(f"BUILD[{index}].BUNDLE[{bi}].BUNDLE_TYPE={bba.get('bundleType')}")
+                  print(f"BUILD[{index}].BUNDLE[{bi}].MIN_OS={bba.get('minimumOsVersion')}")
+                  print(f"BUILD[{index}].BUNDLE[{bi}].ARCHS={bba.get('supportedArchitectures')}")
+                  print(f"BUILD[{index}].BUNDLE[{bi}].REQUIRED_CAPABILITIES={bba.get('requiredCapabilities')}")
+                  print(f"BUILD[{index}].BUNDLE[{bi}].SDK_BUILD={bba.get('sdkBuild')}")
+                  print(f"BUILD[{index}].BUNDLE[{bi}].PLATFORM_BUILD={bba.get('platformBuild')}")
 
               groups = rels.get("betaGroups", {}).get("data", [])
               print(f"BUILD[{index}].BETA_GROUP_COUNT={len(groups)}")
