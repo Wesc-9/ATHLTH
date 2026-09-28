@@ -1794,7 +1794,7 @@ private final class HomeActivityRouteSnapshotRenderer {
         options.size =
             CGSize(width: 460, height: 285)
         options.scale = 2
-        options.mapType = .satellite
+        options.mapType = .mutedStandard
         options.pointOfInterestFilter =
             .excludingAll
         options.traitCollection =
