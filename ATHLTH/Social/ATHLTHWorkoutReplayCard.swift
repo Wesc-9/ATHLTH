@@ -261,7 +261,7 @@ struct ATHLTHWorkoutReplayCard: View {
                         distance / 1_000,
                         durationText(workout.duration)
                     ),
-                    icon: workout.activity.systemImage,
+                    icon: activitySystemImage,
                     tint: ATHLTHTheme.accentDeep
                 )
             )
@@ -292,6 +292,37 @@ struct ATHLTHWorkoutReplayCard: View {
         }
 
         return Array(moments.prefix(3))
+    }
+
+    private var activitySystemImage: String {
+        switch workout.activity {
+        case .running:
+            return "figure.run"
+        case .walking:
+            return "figure.walk"
+        case .cycling:
+            return "figure.outdoor.cycle"
+        case .swimming:
+            return "figure.pool.swim"
+        case .hiking:
+            return "figure.hiking"
+        case .strength:
+            return "dumbbell.fill"
+        case .hiit:
+            return "figure.highintensity.intervaltraining"
+        case .rowing:
+            return "figure.rower"
+        case .elliptical:
+            return "figure.elliptical"
+        case .stairClimbing:
+            return "figure.stair.stepper"
+        case .yoga:
+            return "figure.yoga"
+        case .coreTraining:
+            return "figure.core.training"
+        case .other:
+            return "figure.mixed.cardio"
+        }
     }
 
     private func paceText(
