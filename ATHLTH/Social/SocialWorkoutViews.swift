@@ -866,7 +866,7 @@ private struct HomeActivityOutdoorCard: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(workout.title)
+                        Text(displayTitle)
                             .font(.system(size: 25, weight: .bold, design: .rounded))
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .lineLimit(2)
@@ -1177,6 +1177,53 @@ private struct HomeActivityOutdoorCard: View {
         case .hiking: return "Hike"
         default: return workout.activity.rawValue
         }
+    }
+
+    private var displayTitle: String {
+        let trimmed =
+            workout.title
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        let genericTitles =
+            Set([
+                workout.activity.rawValue.lowercased(),
+                activityTitle.lowercased(),
+                "running",
+                "walking",
+                "cycling",
+                "hiking",
+                "workout"
+            ])
+
+        guard trimmed.isEmpty ||
+              genericTitles.contains(
+                trimmed.lowercased()
+              )
+        else {
+            return trimmed
+        }
+
+        let hour =
+            Calendar.current.component(
+                .hour,
+                from: workout.startDate
+            )
+        let daypart: String
+
+        switch hour {
+        case 5..<12:
+            daypart = "Morning"
+        case 12..<17:
+            daypart = "Afternoon"
+        case 17..<22:
+            daypart = "Evening"
+        default:
+            daypart = "Night"
+        }
+
+        return "\(daypart) \(activityTitle)"
     }
 
     private var outdoorDescription: String {
@@ -1862,6 +1909,23 @@ private final class HomeActivityRouteSnapshotRenderer {
                 )
         }
 
+        let latitudeDelta =
+            max(
+                (
+                    maxLatitude -
+                    minLatitude
+                ) * 1.58,
+                0.009
+            )
+        let longitudeDelta =
+            max(
+                (
+                    maxLongitude -
+                    minLongitude
+                ) * 1.62,
+                0.009
+            )
+
         return MKCoordinateRegion(
             center:
                 CLLocationCoordinate2D(
@@ -1874,23 +1938,14 @@ private final class HomeActivityRouteSnapshotRenderer {
                         (
                             minLongitude +
                             maxLongitude
-                        ) / 2
+                        ) / 2 -
+                        longitudeDelta * 0.075
                 ),
             span: MKCoordinateSpan(
-                latitudeDelta: max(
-                    (
-                        maxLatitude -
-                        minLatitude
-                    ) * 1.48,
-                    0.009
-                ),
-                longitudeDelta: max(
-                    (
-                        maxLongitude -
-                        minLongitude
-                    ) * 1.48,
-                    0.009
-                )
+                latitudeDelta:
+                    latitudeDelta,
+                longitudeDelta:
+                    longitudeDelta
             )
         )
     }
@@ -2618,7 +2673,7 @@ private struct HomeActivityStrengthCard: View {
 
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(workout.title)
+                    Text(displayTitle)
                         .font(.system(size: 23, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .lineLimit(2)
@@ -2754,6 +2809,82 @@ private struct HomeActivityStrengthCard: View {
                 .map { $0.capitalized }
                 .prefix(4)
         )
+    }
+
+    private var displayTitle: String {
+        let trimmed =
+            workout.title
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+        let normalizedTitle =
+            trimmed.lowercased()
+        let generic =
+            trimmed.isEmpty ||
+            normalizedTitle == "strength" ||
+            normalizedTitle == "strength training" ||
+            normalizedTitle == "functional strength training" ||
+            normalizedTitle == "traditional strength training" ||
+            normalizedTitle == "workout"
+
+        guard generic else {
+            return trimmed
+        }
+
+        let normalizedAreas =
+            Set(
+                focusAreas.map {
+                    $0.lowercased()
+                }
+            )
+        let upperKeywords: Set<String> = [
+            "chest",
+            "shoulders",
+            "back",
+            "arms",
+            "biceps",
+            "triceps"
+        ]
+        let lowerKeywords: Set<String> = [
+            "legs",
+            "quads",
+            "quadriceps",
+            "hamstrings",
+            "glutes",
+            "calves"
+        ]
+
+        let hasUpper =
+            !normalizedAreas
+                .intersection(
+                    upperKeywords
+                )
+                .isEmpty
+        let hasLower =
+            !normalizedAreas
+                .intersection(
+                    lowerKeywords
+                )
+                .isEmpty
+
+        if hasUpper && hasLower {
+            return "Full Body Strength"
+        }
+
+        if hasUpper {
+            return "Upper Body Strength"
+        }
+
+        if hasLower {
+            return "Lower Body Strength"
+        }
+
+        if normalizedAreas.contains("core") ||
+            normalizedAreas.contains("abs") {
+            return "Core Strength"
+        }
+
+        return "Strength Session"
     }
 
     private var strengthDescription: String {
