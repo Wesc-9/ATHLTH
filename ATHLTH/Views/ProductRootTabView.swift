@@ -352,7 +352,7 @@ struct ATHLTHHomeView: View {
                         ATHLTHCard {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text("Daily Readiness")
+                                    Text("ATHLTH Pulse")
                                         .font(.title3.weight(.bold))
                                     Text(homeHealthSourceText)
                                         .font(.caption)
