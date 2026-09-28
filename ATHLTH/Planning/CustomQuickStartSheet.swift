@@ -219,9 +219,7 @@ struct CustomQuickStartSheet: View {
                     AudioCoachSetupCard(
                         draft: $audioCoachDraft,
                         showRouteOptions: false,
-                        showStructuredOptions:
-                            method == .intervals ||
-                            method == .emom
+                        showStructuredOptions: false
                     )
 
                     ATHLTHCard {
