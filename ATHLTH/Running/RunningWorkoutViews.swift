@@ -16,6 +16,7 @@ enum RunningWorkoutLibrarySection: String, CaseIterable, Identifiable {
 
 struct RunningWorkoutLibraryView: View {
     @EnvironmentObject private var library: RunningWorkoutLibraryStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
 
     let source: RunningWorkoutLibrarySection?
     let selectionTitle: String?
@@ -24,6 +25,7 @@ struct RunningWorkoutLibraryView: View {
 
     @State private var query = ""
     @State private var selectedType: RunningWorkoutType?
+    @State private var favoritesOnly = false
     @State private var showingBuilder = false
     @State private var confirmingLegacyRestore = false
     @State private var selectedSection: RunningWorkoutLibrarySection = .library
@@ -58,12 +60,22 @@ struct RunningWorkoutLibraryView: View {
             typeFiltered = sourceTemplates
         }
 
+        let favoriteFiltered =
+            favoritesOnly
+                ? typeFiltered.filter {
+                    favorites.isFavorite(
+                        .workout,
+                        itemID: $0.id.uuidString
+                    )
+                }
+                : typeFiltered
+
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanQuery.isEmpty else {
-            return typeFiltered
+            return favoriteFiltered
         }
 
-        return typeFiltered.filter {
+        return favoriteFiltered.filter {
             $0.title.localizedCaseInsensitiveContains(cleanQuery) ||
             $0.summary.localizedCaseInsensitiveContains(cleanQuery) ||
             $0.type.title.localizedCaseInsensitiveContains(cleanQuery)
@@ -86,6 +98,16 @@ struct RunningWorkoutLibraryView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    Button {
+                        favoritesOnly.toggle()
+                    } label: {
+                        typeChip(
+                            "Favorites",
+                            selected: favoritesOnly
+                        )
+                    }
+                    .buttonStyle(.plain)
+
                     Button {
                         selectedType = nil
                     } label: {
@@ -140,17 +162,28 @@ struct RunningWorkoutLibraryView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(templates) { workout in
-                            NavigationLink {
-                                RunningWorkoutDetailView(
-                                    workout: workout,
-                                    selectionTitle: selectionTitle,
-                                    onSelect: onSelect,
-                                    onStart: onStart
+                            ZStack(alignment: .topTrailing) {
+                                NavigationLink {
+                                    RunningWorkoutDetailView(
+                                        workout: workout,
+                                        selectionTitle: selectionTitle,
+                                        onSelect: onSelect,
+                                        onStart: onStart
+                                    )
+                                } label: {
+                                    workoutCard(workout)
+                                }
+                                .buttonStyle(.plain)
+
+                                LibraryFavoriteButton(
+                                    kind: .workout,
+                                    itemID: workout.id.uuidString,
+                                    title: workout.title,
+                                    subtitle: workout.type.title,
+                                    icon: workout.type.systemImage
                                 )
-                            } label: {
-                                workoutCard(workout)
+                                .padding(9)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding()
@@ -167,6 +200,9 @@ struct RunningWorkoutLibraryView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(selectionTitle ?? "Running Workouts")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await favorites.refresh()
+        }
         .searchable(
             text: $query,
             placement: .navigationBarDrawer(displayMode: .always),
