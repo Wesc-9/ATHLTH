@@ -480,7 +480,7 @@ struct ATHLTHHomeView: View {
                         watchConnection.isReady,
                     defaultCapture: settings.preferredWorkoutCapture,
                     defaultTracking: settings.defaultStrengthTracking
-                ) { captureDevice, trackingMode, selectedFriends in
+                ) { captureDevice, trackingMode, selectedFriends, audioCoach in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
                             title: workout.title,
@@ -493,6 +493,9 @@ struct ATHLTHHomeView: View {
                         if captureDevice == .appleWatch {
                             do {
                                 try await watchConnection.startWorkoutOnWatch(.strength)
+                                watchConnection.sendAudioCoachConfiguration(
+                                    audioCoach
+                                )
                                 session.beginTrainingStatus(for: workout)
                                 strengthWorkout.start(
                                     session: workout,
@@ -3056,7 +3059,7 @@ struct ATHLTHTrainView: View {
                         watchConnection.isReady,
                     defaultCapture: settings.preferredWorkoutCapture,
                     defaultTracking: settings.defaultStrengthTracking
-                ) { captureDevice, trackingMode, selectedFriends in
+                ) { captureDevice, trackingMode, selectedFriends, audioCoach in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
                             title: workout.title,
@@ -3069,6 +3072,9 @@ struct ATHLTHTrainView: View {
                         if captureDevice == .appleWatch {
                             do {
                                 try await watchConnection.startWorkoutOnWatch(.strength)
+                                watchConnection.sendAudioCoachConfiguration(
+                                    audioCoach
+                                )
                                 session.beginTrainingStatus(for: workout)
                                 strengthWorkout.start(
                                     session: workout,
