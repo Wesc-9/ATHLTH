@@ -1154,6 +1154,7 @@ struct ATHLTHSettingsView: View {
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
+            _ = await health.refreshWorkoutImportInbox()
             await health.refreshAll()
             syncHealthProfileFromAppleHealthIfAppropriate()
             healthRequestInProgress = false
@@ -1173,6 +1174,7 @@ struct ATHLTHSettingsView: View {
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
+            _ = await health.refreshWorkoutImportInbox()
             await health.refreshAll()
             syncHealthProfileFromAppleHealthIfAppropriate()
             healthRequestInProgress = false
