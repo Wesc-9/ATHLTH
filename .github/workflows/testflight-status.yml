@@ -134,6 +134,42 @@ jobs:
               for state, count in sorted(states.items()):
                   print(f"GROUP[{gi}].TESTER_STATE[{state}]={count}")
 
+          all_builds = get("/v1/builds", {
+              "filter[app]": app_id,
+              "limit": "200",
+              "include": "buildBetaDetail,betaAppReviewSubmission,preReleaseVersion,betaGroups",
+          })
+          all_inc = {(x.get("type"), x.get("id")): x for x in all_builds.get("included", [])}
+          for build in all_builds.get("data", []):
+              ba = build.get("attributes", {})
+              if str(ba.get("version")) not in {"43", "45", "47"}:
+                  continue
+              bid = build.get("id")
+              print(f"COMPARE_BUILD[{ba.get('version')}].ID={bid}")
+              print(f"COMPARE_BUILD[{ba.get('version')}].PROCESSING_STATE={ba.get('processingState')}")
+              print(f"COMPARE_BUILD[{ba.get('version')}].EXPIRED={ba.get('expired')}")
+              print(f"COMPARE_BUILD[{ba.get('version')}].EXPIRATION_DATE={ba.get('expirationDate')}")
+              rels = build.get("relationships", {})
+              bd = rels.get("buildBetaDetail", {}).get("data")
+              if bd:
+                  item = all_inc.get((bd.get("type"), bd.get("id")), {})
+                  bda = item.get("attributes", {})
+                  print(f"COMPARE_BUILD[{ba.get('version')}].INTERNAL_STATE={bda.get('internalBuildState')}")
+                  print(f"COMPARE_BUILD[{ba.get('version')}].EXTERNAL_STATE={bda.get('externalBuildState')}")
+              br = rels.get("betaAppReviewSubmission", {}).get("data")
+              if br:
+                  item = all_inc.get((br.get("type"), br.get("id")), {})
+                  bra = item.get("attributes", {})
+                  print(f"COMPARE_BUILD[{ba.get('version')}].BETA_REVIEW_STATE={bra.get('betaReviewState')}")
+                  print(f"COMPARE_BUILD[{ba.get('version')}].BETA_REVIEW_SUBMITTED={bra.get('submittedDate')}")
+              else:
+                  print(f"COMPARE_BUILD[{ba.get('version')}].BETA_REVIEW_STATE=None")
+              groups_ref = rels.get("betaGroups", {}).get("data", [])
+              for gi, gr in enumerate(groups_ref):
+                  item = all_inc.get((gr.get("type"), gr.get("id")), {})
+                  ga = item.get("attributes", {})
+                  print(f"COMPARE_BUILD[{ba.get('version')}].GROUP[{gi}]={ga.get('name')}|internal={ga.get('isInternalGroup')}")
+
           builds = get("/v1/builds", {
               "filter[app]": app_id,
               "filter[version]": os.environ["BUILD_NUMBER"],
