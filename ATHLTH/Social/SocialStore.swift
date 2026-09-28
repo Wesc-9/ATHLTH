@@ -365,11 +365,11 @@ final class SocialStore: ObservableObject {
         }
     }
 
-    func sendFriendRequest(to profile: SocialProfileCard) async {
+    func sendFollowRequest(to profile: SocialProfileCard) async {
         errorMessage = nil
 
         do {
-            try await service.sendFriendRequest(to: profile.userID)
+            try await service.sendFollowRequest(to: profile.userID)
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
@@ -621,6 +621,20 @@ final class SocialStore: ObservableObject {
     func syncOwnTrophies(_ trophies: [TrophyProgressItem]) async {
         do {
             try await service.syncTrophyShowcase(trophies)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func syncOwnGoals(
+        _ goals: [ATHLTHGoal],
+        enabled: Bool
+    ) async {
+        do {
+            try await service.syncGoalShowcase(
+                goals,
+                enabled: enabled
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
