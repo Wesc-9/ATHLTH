@@ -64,6 +64,55 @@ final class TrainingContinuityTests: XCTestCase {
         XCTAssertEqual(workout.elapsed(at: start.addingTimeInterval(3600)), 120)
     }
 
+    func testLegacyPhoneWorkoutStillDecodesWithoutPauseTimeline() throws {
+        let start = Date(timeIntervalSince1970: 2_000)
+        let legacy = PhoneWorkout(
+            walking: true,
+            start: start,
+            accumulatedSeconds: 180,
+            resumedAt: nil,
+            lastCheckpoint: start.addingTimeInterval(180),
+            pauses: nil
+        )
+
+        let data = try JSONEncoder().encode(legacy)
+        let decoded = try JSONDecoder().decode(
+            PhoneWorkout.self,
+            from: data
+        )
+
+        XCTAssertEqual(decoded.id, legacy.id)
+        XCTAssertEqual(decoded.accumulatedSeconds, 180)
+        XCTAssertNil(decoded.pauses)
+    }
+
+    func testPhoneWorkoutPauseTimelineRoundTrips() throws {
+        let start = Date(timeIntervalSince1970: 3_000)
+        let pauseStart = start.addingTimeInterval(60)
+        let pauseEnd = pauseStart.addingTimeInterval(30)
+        let workout = PhoneWorkout(
+            walking: false,
+            start: start,
+            accumulatedSeconds: 120,
+            resumedAt: nil,
+            lastCheckpoint: pauseEnd,
+            pauses: [
+                PhoneWorkoutPauseInterval(
+                    startedAt: pauseStart,
+                    endedAt: pauseEnd
+                )
+            ]
+        )
+
+        let data = try JSONEncoder().encode(workout)
+        let decoded = try JSONDecoder().decode(
+            PhoneWorkout.self,
+            from: data
+        )
+
+        XCTAssertEqual(decoded.pauses, workout.pauses)
+    }
+
     @MainActor
     func testPhoneRecoveryStopsAtCheckpointAndIsAccountScoped() {
         let first = UUID(), second = UUID()
