@@ -112,14 +112,18 @@ final class MessagingStore: ObservableObject {
     }
 
     func openConversation(with userID: UUID) async throws -> UUID {
-        if let existing = conversation(with: userID) {
-            guard existing.requestStatus != .declined else {
-                throw MessagingStoreError.requestDeclined
-            }
+        if let existing = conversation(with: userID),
+           existing.requestStatus == .accepted {
             return existing.id
         }
 
-        let conversationID = try await service.getOrCreateConversation(with: userID)
+        // Pending conversations are intentionally re-checked by the backend.
+        // If the two athletes have become mutual followers since the request
+        // was created, the conversation can be promoted to accepted without
+        // forcing a second request.
+        let conversationID = try await service.getOrCreateConversation(
+            with: userID
+        )
         await refresh()
         return conversationID
     }
