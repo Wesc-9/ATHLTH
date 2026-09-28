@@ -283,7 +283,7 @@ struct ATHLTHHomeView: View {
                             ZStack(alignment: .topTrailing) {
                                 Image(
                                     systemName:
-                                        notifications.unreadCount > 0
+                                        homeNotificationCount > 0
                                             ? "bell.fill"
                                             : "bell"
                                 )
@@ -296,22 +296,28 @@ struct ATHLTHHomeView: View {
                                         .stroke(.white.opacity(0.38), lineWidth: 1)
                                 }
 
-                                if notifications.unreadCount > 0 {
-                                    Circle()
-                                        .fill(.red)
-                                        .frame(width: 9, height: 9)
+                                if homeNotificationCount > 0 {
+                                    Text(homeNotificationBadgeText)
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(minWidth: 14, minHeight: 14)
+                                        .padding(
+                                            .horizontal,
+                                            homeNotificationCount > 9 ? 2 : 0
+                                        )
+                                        .background(.red, in: Capsule())
                                         .overlay {
-                                            Circle()
-                                                .stroke(.white, lineWidth: 1.5)
+                                            Capsule()
+                                                .stroke(.white, lineWidth: 1)
                                         }
-                                        .offset(x: 1, y: -1)
+                                        .offset(x: 4, y: -4)
                                 }
                             }
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(
-                            notifications.unreadCount > 0
-                                ? "Notifications, \(notifications.unreadCount) unread"
+                            homeNotificationCount > 0
+                                ? "Notifications, \(homeNotificationCount) pending"
                                 : "Notifications"
                         )
 
@@ -563,6 +569,7 @@ struct ATHLTHHomeView: View {
                     social.refreshHomeFeed(force: true)
 
                 if !health.shouldDeferAutomaticHealthWork {
+                    _ = await health.refreshWorkoutImportInbox()
                     await health.refreshAll()
 
                     async let streakRefresh: Void = loadHomeStreak()
@@ -591,6 +598,8 @@ struct ATHLTHHomeView: View {
                     _ = await (communityRefresh, activityRefresh)
                     return
                 }
+
+                _ = await health.refreshWorkoutImportInbox()
 
                 if health.lastSuccessfulRefreshAt == nil {
                     await health.refreshAll()
@@ -679,6 +688,14 @@ struct ATHLTHHomeView: View {
 
     private var homeInboxBadgeText: String {
         homeInboxUnreadCount > 99 ? "99+" : "\(homeInboxUnreadCount)"
+    }
+
+    private var homeNotificationCount: Int {
+        notifications.unreadCount + health.pendingWorkoutImportCount
+    }
+
+    private var homeNotificationBadgeText: String {
+        homeNotificationCount > 99 ? "99+" : "\(homeNotificationCount)"
     }
 
     private var homeStreakCount: Int {
