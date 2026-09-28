@@ -261,7 +261,7 @@ struct ATHLTHWorkoutReplayCard: View {
                         distance / 1_000,
                         durationText(workout.duration)
                     ),
-                    icon: workout.activity.systemImage,
+                    icon: workout.activity.icon,
                     tint: ATHLTHTheme.accentDeep
                 )
             )
