@@ -376,10 +376,24 @@ struct WorkoutSummary: Identifiable, Hashable {
             distanceMeters = nil
         }
 
-        if let energy = workout.totalEnergyBurned,
-           energy.is(compatibleWith: .kilocalorie()) {
-            let value = energy.doubleValue(for: .kilocalorie())
-            activeEnergyKilocalories = value.isFinite ? value : nil
+        if let activeEnergyType =
+                HKObjectType.quantityType(
+                    forIdentifier:
+                        .activeEnergyBurned
+                ),
+           let energy =
+                workout.statistics(
+                    for: activeEnergyType
+                )?.sumQuantity(),
+           energy.is(
+                compatibleWith: .kilocalorie()
+           ) {
+            let value =
+                energy.doubleValue(
+                    for: .kilocalorie()
+                )
+            activeEnergyKilocalories =
+                value.isFinite ? value : nil
         } else {
             activeEnergyKilocalories = nil
         }
