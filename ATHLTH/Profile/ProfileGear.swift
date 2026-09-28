@@ -1621,7 +1621,12 @@ struct ProfileGearEditorView: View {
     }
 
     var body: some View {
-        Form {
+        let photoButtonTitle =
+            imageData == nil
+                ? "Choose photo"
+                : "Change photo"
+
+        return Form {
             Section {
                 Picker("Setup", selection: $editorMode) {
                     ForEach(ProfileGearEditorMode.allCases) { mode in
@@ -1704,9 +1709,7 @@ struct ProfileGearEditorView: View {
                         matching: .images
                     ) {
                         Label(
-                            imageData == nil
-                                ? "Choose photo"
-                                : "Change photo",
+                            photoButtonTitle,
                             systemImage: "photo"
                         )
                     }
