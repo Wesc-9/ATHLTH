@@ -1,0 +1,129 @@
+name: Diagnose TestFlight build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.4.3
+    paths:
+      - .github/testflight-status-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      BUNDLE_ID: com.wesc9.athlth
+      BUILD_NUMBER: "47"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Query App Store Connect build status
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyjwt cryptography
+
+          python3 - <<'PY'
+          import json, os, time, urllib.parse, urllib.request
+          import jwt
+
+          key = os.environ["ASC_API_KEY_P8"].strip()
+          if len(key) >= 2 and key[0] == key[-1] and key[0] in {"'", '"'}:
+              if key[0] == '"':
+                  try:
+                      key = json.loads(key)
+                  except json.JSONDecodeError:
+                      key = key[1:-1]
+              else:
+                  key = key[1:-1]
+          key = key.replace("\\r\\n", "\n").replace("\\n", "\n")
+
+          now = int(time.time())
+          token = jwt.encode(
+              {
+                  "iss": os.environ["ASC_ISSUER_ID"],
+                  "iat": now - 30,
+                  "exp": now + 600,
+                  "aud": "appstoreconnect-v1",
+              },
+              key,
+              algorithm="ES256",
+              headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"},
+          )
+
+          def get(path, params=None):
+              url = "https://api.appstoreconnect.apple.com" + path
+              if params:
+                  url += "?" + urllib.parse.urlencode(params, doseq=True)
+              req = urllib.request.Request(
+                  url,
+                  headers={"Authorization": f"Bearer {token}"}
+              )
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  return json.load(resp)
+
+          apps = get("/v1/apps", {
+              "filter[bundleId]": os.environ["BUNDLE_ID"],
+              "limit": "5",
+          })
+          if not apps.get("data"):
+              raise SystemExit("APP_NOT_FOUND")
+          app = apps["data"][0]
+          app_id = app["id"]
+          print(f"APP_ID={app_id}")
+
+          builds = get("/v1/builds", {
+              "filter[app]": app_id,
+              "filter[version]": os.environ["BUILD_NUMBER"],
+              "sort": "-uploadedDate",
+              "limit": "10",
+              "include": "preReleaseVersion,buildBetaDetail,betaGroups",
+          })
+          data = builds.get("data", [])
+          if not data:
+              print("BUILD_FOUND=false")
+              raise SystemExit(0)
+
+          included = { (x.get("type"), x.get("id")): x for x in builds.get("included", []) }
+
+          for index, build in enumerate(data):
+              a = build.get("attributes", {})
+              print(f"BUILD[{index}].ID={build.get('id')}")
+              print(f"BUILD[{index}].NUMBER={a.get('version')}")
+              print(f"BUILD[{index}].PROCESSING_STATE={a.get('processingState')}")
+              print(f"BUILD[{index}].UPLOADED_DATE={a.get('uploadedDate')}")
+              print(f"BUILD[{index}].EXPIRED={a.get('expired')}")
+              print(f"BUILD[{index}].AUDIENCE_TYPE={a.get('buildAudienceType')}")
+              print(f"BUILD[{index}].USES_NON_EXEMPT_ENCRYPTION={a.get('usesNonExemptEncryption')}")
+
+              rels = build.get("relationships", {})
+              pv = rels.get("preReleaseVersion", {}).get("data")
+              if pv:
+                  item = included.get((pv.get("type"), pv.get("id")), {})
+                  pa = item.get("attributes", {})
+                  print(f"BUILD[{index}].MARKETING_VERSION={pa.get('version')}")
+                  print(f"BUILD[{index}].PLATFORM={pa.get('platform')}")
+
+              bd = rels.get("buildBetaDetail", {}).get("data")
+              if bd:
+                  item = included.get((bd.get("type"), bd.get("id")), {})
+                  ba = item.get("attributes", {})
+                  print(f"BUILD[{index}].INTERNAL_BUILD_STATE={ba.get('internalBuildState')}")
+                  print(f"BUILD[{index}].EXTERNAL_BUILD_STATE={ba.get('externalBuildState')}")
+                  print(f"BUILD[{index}].AUTO_NOTIFY={ba.get('autoNotifyEnabled')}")
+
+              groups = rels.get("betaGroups", {}).get("data", [])
+              print(f"BUILD[{index}].BETA_GROUP_COUNT={len(groups)}")
+              for gi, group_ref in enumerate(groups):
+                  item = included.get((group_ref.get("type"), group_ref.get("id")), {})
+                  ga = item.get("attributes", {})
+                  print(f"BUILD[{index}].BETA_GROUP[{gi}].NAME={ga.get('name')}")
+                  print(f"BUILD[{index}].BETA_GROUP[{gi}].INTERNAL={ga.get('isInternalGroup')}")
+                  print(f"BUILD[{index}].BETA_GROUP[{gi}].ALL_BUILDS={ga.get('hasAccessToAllBuilds')}")
+          PY
