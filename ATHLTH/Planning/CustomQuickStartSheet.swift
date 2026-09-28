@@ -123,7 +123,7 @@ struct CustomQuickWorkoutConfiguration: Hashable {
     var workSeconds: Int
     var restSeconds: Int
     var rounds: Int
-    var audioCoach: WatchAudioCoachConfiguration
+    var audioCoach: WatchAudioCoachConfiguration = .disabled
 
     var title: String {
         method == .open
