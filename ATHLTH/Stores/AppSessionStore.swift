@@ -50,6 +50,7 @@ final class AppSessionStore: ObservableObject {
     @Published var accountCreatedAt: Date
     @Published private(set) var currentRole: AccountRole
     @Published private(set) var subscriptionAccess: SubscriptionAccess
+    @Published private(set) var aiHealthDataSharingEnabled: Bool
 
     private let defaults: UserDefaults
     private var localAccountID: UUID?
@@ -131,6 +132,7 @@ final class AppSessionStore: ObservableObject {
         self.signInMethod = defaults.string(forKey: "session.signInMethod").flatMap(SignInMethod.init(rawValue:))
 
         self.onboardingProfile = nil
+        self.aiHealthDataSharingEnabled = false
         // Legacy data stays untouched until its owner is authenticated.
         if defaults.data(forKey: "legacy.onboardingProfile") == nil,
            let legacy = defaults.data(forKey: "session.onboardingProfile") {
@@ -348,6 +350,24 @@ final class AppSessionStore: ObservableObject {
         persistAccountContent()
     }
 
+    func setAIHealthDataSharingEnabled(
+        _ enabled: Bool
+    ) {
+        guard signedIn else {
+            aiHealthDataSharingEnabled = false
+            return
+        }
+
+        let userID = profile.userID
+        aiHealthDataSharingEnabled = enabled
+        AccountLocalStorage.write(
+            enabled,
+            name: "aiHealthDataConsent",
+            userID: userID,
+            defaults: defaults
+        )
+    }
+
     func setPersonalizedOfferConsent(_ consent: PersonalizedOfferConsent) {
         guard var profile = onboardingProfile else { return }
         profile.personalizedOfferConsent = consent
@@ -445,7 +465,7 @@ final class AppSessionStore: ObservableObject {
         if let deletedID {
             defaults.removeObject(forKey: AccountLocalStorage.key("training", userID: deletedID))
             defaults.removeObject(forKey: AccountLocalStorage.key("coach", userID: deletedID))
-            for name in ["goals", "strengthHistory", "strengthActive", "phoneHistory", "phoneActive", "coachHistoryConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt"] {
+            for name in ["goals", "strengthHistory", "strengthActive", "phoneHistory", "phoneActive", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt"] {
                 defaults.removeObject(forKey: AccountLocalStorage.key(name, userID: deletedID))
             }
             AccountLocalStorage.write([RunningWorkoutTemplate](), name: "runningLibrary", userID: deletedID, defaults: defaults)
@@ -478,6 +498,7 @@ final class AppSessionStore: ObservableObject {
         onboardingCompleted = false
         signInMethod = nil
         onboardingProfile = nil
+        aiHealthDataSharingEnabled = false
         defaults.removeObject(forKey: "session.signedIn")
         defaults.removeObject(forKey: "session.onboardingCompleted")
         defaults.removeObject(forKey: "session.signInMethod")
@@ -2373,6 +2394,13 @@ final class AppSessionStore: ObservableObject {
         persistAccountContent()
         loadingAccountContent = true
         localAccountID = userID
+        aiHealthDataSharingEnabled =
+            AccountLocalStorage.read(
+                Bool.self,
+                name: "aiHealthDataConsent",
+                userID: userID,
+                defaults: defaults
+            ) ?? false
         let stored = AccountLocalStorage.read(AccountTrainingContent.self, name: "training", userID: userID, defaults: defaults)
         let mayMigrate = !defaults.bool(forKey: AccountLocalStorage.key("legacyMigrated", userID: userID))
         let ownsUnlabelledLegacy = defaults.string(forKey: "legacy.trainingOwner") == userID.uuidString
