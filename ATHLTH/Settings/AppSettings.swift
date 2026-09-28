@@ -283,6 +283,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachAnnounceCurrentWorkoutStep: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceRemainingStepTime: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceRemainingStepDistance: Bool { didSet { persist() } }
+    @Published var audioCoachDuckOtherAudio: Bool { didSet { persist() } }
 
     @Published var ghostRaceAudioEnabled: Bool { didSet { persist() } }
     @Published var ghostRaceAudioDistanceIntervalKilometers: Double { didSet { persist() } }
@@ -499,6 +500,10 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.audioCoach.announceRemainingStepDistance"
             ) as? Bool ?? true
+        audioCoachDuckOtherAudio =
+            defaults.object(
+                forKey: "settings.audioCoach.duckOtherAudio"
+            ) as? Bool ?? true
 
         ghostRaceAudioEnabled =
             defaults.object(
@@ -679,6 +684,10 @@ final class AppSettingsStore: ObservableObject {
             audioCoachAnnounceRemainingStepDistance,
             forKey: "settings.audioCoach.announceRemainingStepDistance"
         )
+        defaults.set(
+            audioCoachDuckOtherAudio,
+            forKey: "settings.audioCoach.duckOtherAudio"
+        )
 
         defaults.set(
             ghostRaceAudioEnabled,
@@ -783,7 +792,9 @@ final class AppSettingsStore: ObservableObject {
             announceRemainingStepTime:
                 audioCoachAnnounceRemainingStepTime,
             announceRemainingStepDistance:
-                audioCoachAnnounceRemainingStepDistance
+                audioCoachAnnounceRemainingStepDistance,
+            duckOtherAudio:
+                audioCoachDuckOtherAudio
         )
     }
 
