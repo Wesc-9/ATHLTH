@@ -972,28 +972,30 @@ struct TrainingPlanLibraryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("PLAN LIBRARY")
-                        .font(.caption2.weight(.bold))
-                        .tracking(2.2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-
-                    Text("Start with a structure")
-                        .font(
-                            .system(
-                                size: 30,
-                                weight: .bold,
-                                design: .serif
-                            )
+                LibraryPremiumIntro(
+                    eyebrow: "PLAN LIBRARY",
+                    title: "Train with a clear direction",
+                    subtitle:
+                        "Start from a curated structure, save it to My Plans, then make every week and workout your own.",
+                    icon: "sparkles.rectangle.stack.fill",
+                    accent: Color.orange
+                ) {
+                    HStack(spacing: 8) {
+                        LibraryStatPill(
+                            value: "\(catalog.entries.count)",
+                            label: "plans",
+                            icon: "square.stack.3d.up.fill",
+                            tint: Color.orange
                         )
 
-                    Text(
-                        "Save a plan to My Plans, then tailor every week and workout to you."
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                        LibraryStatPill(
+                            value: "\(favorites.count(for: .plan))",
+                            label: "saved",
+                            icon: "star.fill",
+                            tint: ATHLTHTheme.premiumGold
+                        )
+                    }
                 }
-                .padding(.bottom, 2)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -1107,23 +1109,57 @@ struct TrainingPlanLibraryView: View {
         .foregroundStyle(
             selected
                 ? Color.white
-                : ATHLTHTheme.primaryText
+                : ATHLTHTheme.primaryText.opacity(0.82)
         )
-        .padding(.horizontal, 12)
-        .frame(height: 36)
+        .padding(.horizontal, 13)
+        .frame(height: 38)
         .background(
-            selected
-                ? ATHLTHTheme.accent
-                : Color.white.opacity(0.82),
+            Group {
+                if selected {
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.accent,
+                            ATHLTHTheme.accentDeep
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                } else {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.94),
+                            Color.white.opacity(0.74)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            },
             in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    selected
+                        ? Color.white.opacity(0.18)
+                        : Color.black.opacity(0.035),
+                    lineWidth: 0.8
+                )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(
+                selected ? 0.10 : 0.025
+            ),
+            radius: selected ? 8 : 5,
+            y: 3
         )
     }
 
     private func catalogCard(
         _ entry: TrainingPlanCatalogEntry
     ) -> some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 13) {
                 Image(
                     systemName:
                         entry.category == "strength"
@@ -1133,17 +1169,34 @@ struct TrainingPlanLibraryView: View {
                                 : "figure.run"
                 )
                 .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
-                .frame(width: 48, height: 48)
+                .foregroundStyle(planAccent(entry))
+                .frame(width: 50, height: 50)
                 .background(
-                    ATHLTHTheme.accentSoft,
+                    planAccent(entry).opacity(0.10),
                     in: RoundedRectangle(
-                        cornerRadius: 15,
+                        cornerRadius: 16,
                         style: .continuous
                     )
                 )
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text(entry.categoryTitle.uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.3)
+                            .foregroundStyle(planAccent(entry))
+
+                        Text("CURATED")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Color.black.opacity(0.035),
+                                in: Capsule()
+                            )
+                    }
+
                     Text(entry.title)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
@@ -1151,7 +1204,9 @@ struct TrainingPlanLibraryView: View {
 
                     Text(entry.goal)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText.opacity(0.70)
+                        )
                 }
 
                 Spacer(minLength: 0)
@@ -1161,8 +1216,9 @@ struct TrainingPlanLibraryView: View {
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .multilineTextAlignment(.leading)
+                .lineSpacing(2)
 
-            HStack(spacing: 9) {
+            HStack(spacing: 7) {
                 planMetric(
                     "\(entry.durationWeeks) wk",
                     icon: "calendar"
@@ -1178,29 +1234,46 @@ struct TrainingPlanLibraryView: View {
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
+                Image(systemName: "arrow.right")
                     .font(.caption.bold())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(planAccent(entry))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        planAccent(entry).opacity(0.08),
+                        in: Circle()
+                    )
             }
         }
-        .padding(16)
+        .padding(17)
         .background(
-            Color.white.opacity(0.86),
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.97),
+                    planAccent(entry).opacity(0.035)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
-                cornerRadius: 23,
+                cornerRadius: 25,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 23,
+                cornerRadius: 25,
                 style: .continuous
             )
             .stroke(
-                Color.black.opacity(0.04),
-                lineWidth: 0.8
+                Color.white.opacity(0.96),
+                lineWidth: 1
             )
         }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.035),
+            radius: 14,
+            y: 7
+        )
     }
 
     private func planMetric(
@@ -1210,6 +1283,25 @@ struct TrainingPlanLibraryView: View {
         Label(text, systemImage: icon)
             .font(.caption2.weight(.semibold))
             .foregroundStyle(ATHLTHTheme.mutedText)
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .background(
+                Color.white.opacity(0.62),
+                in: Capsule()
+            )
+    }
+
+    private func planAccent(
+        _ entry: TrainingPlanCatalogEntry
+    ) -> Color {
+        switch entry.category {
+        case "strength":
+            return Color.indigo
+        case "hybrid":
+            return ATHLTHTheme.premiumGold
+        default:
+            return ATHLTHTheme.vitality
+        }
     }
 }
 
