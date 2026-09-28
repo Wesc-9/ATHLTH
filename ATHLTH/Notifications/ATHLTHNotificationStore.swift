@@ -20,6 +20,32 @@ final class ATHLTHNotificationStore: ObservableObject {
         items.filter(\.isUnread).count
     }
 
+    /// Direct-message events belong to the Messages inbox. Keeping them out of
+    /// the bell prevents one request/message from producing two unread badges.
+    var notificationCenterItems: [ATHLTHNotificationItem] {
+        items.filter { !isMessageInboxOwned($0) }
+    }
+
+    var notificationCenterUnreadCount: Int {
+        notificationCenterItems.filter(\.isUnread).count
+    }
+
+    private func isMessageInboxOwned(
+        _ item: ATHLTHNotificationItem
+    ) -> Bool {
+        guard item.kind == .social else { return false }
+
+        switch item.socialEventKind?.lowercased() {
+        case "message",
+             "message_request",
+             "message_request_accepted",
+             "mention":
+            return true
+        default:
+            return false
+        }
+    }
+
     private func preferenceEnabled(_ key: String, defaultValue: Bool = true) -> Bool {
         let defaults = UserDefaults.standard
         guard defaults.object(forKey: key) != nil else {
