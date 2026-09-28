@@ -154,12 +154,19 @@ final class SocialStore: ObservableObject {
             let workoutSessions = try await workoutSessionsTask
             let workoutParticipants = try await workoutParticipantsTask
 
-            visibleProfiles = cards
+            let blockedIDs = Set(blocked.map { $0.profile.userID })
+            let visibleCards = cards.filter {
+                !blockedIDs.contains($0.userID)
+            }
+
+            visibleProfiles = visibleCards
             followerIDs = Set(followerRows.map(\.followerID))
+                .subtracting(blockedIDs)
             followingIDs = Set(followingRows.map(\.followingID))
+                .subtracting(blockedIDs)
 
             applyRelationships(
-                cards: cards,
+                cards: visibleCards,
                 friendships: friendships,
                 requests: requests
             )
@@ -174,7 +181,7 @@ final class SocialStore: ObservableObject {
             applyWorkoutSessions(
                 sessions: workoutSessions,
                 participants: workoutParticipants,
-                cards: cards
+                cards: visibleCards
             )
 
             if let challengeStore {
@@ -332,7 +339,11 @@ final class SocialStore: ObservableObject {
         errorMessage = nil
 
         do {
+            let blockedIDs = Set(
+                blockedUsers.map { $0.profile.userID }
+            )
             discoverResults = try await service.searchProfiles(query)
+                .filter { !blockedIDs.contains($0.userID) }
         } catch {
             discoverResults = []
             errorMessage = error.localizedDescription
@@ -484,6 +495,12 @@ final class SocialStore: ObservableObject {
         _ userID: UUID,
         forceRefresh: Bool = false
     ) async -> SocialFriendProfile? {
+        if blockedUsers.contains(where: {
+            $0.profile.userID == userID
+        }) {
+            return nil
+        }
+
         if !forceRefresh, let cached = profileCache[userID] {
             return cached
         }
