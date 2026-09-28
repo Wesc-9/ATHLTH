@@ -333,7 +333,23 @@ private struct LibraryPremiumIntro<Accessory: View>: View {
     let subtitle: String
     let icon: String
     let accent: Color
-    @ViewBuilder let accessory: () -> Accessory
+    private let accessory: Accessory
+
+    init(
+        eyebrow: String,
+        title: String,
+        subtitle: String,
+        icon: String,
+        accent: Color,
+        @ViewBuilder accessory: () -> Accessory
+    ) {
+        self.eyebrow = eyebrow
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.accent = accent
+        self.accessory = accessory()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -386,7 +402,7 @@ private struct LibraryPremiumIntro<Accessory: View>: View {
                     vertical: true
                 )
 
-            accessory()
+            accessory
         }
         .padding(18)
         .background(
