@@ -14,7 +14,7 @@ struct NewMessageView: View {
 
     private var filteredFriends: [SocialProfileCard] {
         guard !cleanQuery.isEmpty else {
-            return social.friends.sorted {
+            return social.mutualFollows.sorted {
                 $0.resolvedName.localizedCaseInsensitiveCompare(
                     $1.resolvedName
                 ) == .orderedAscending
@@ -23,7 +23,7 @@ struct NewMessageView: View {
 
         let term = cleanQuery.lowercased()
 
-        return social.friends.filter {
+        return social.mutualFollows.filter {
             $0.resolvedName.lowercased().contains(term) ||
             $0.usernameLabel.lowercased().contains(term)
         }
@@ -32,7 +32,7 @@ struct NewMessageView: View {
     private var searchedPeople: [SocialProfileCard] {
         guard cleanQuery.count >= 2 else { return [] }
 
-        let friendIDs = Set(social.friends.map(\.userID))
+        let friendIDs = Set(social.mutualFollows.map(\.userID))
 
         return social.discoverResults.filter {
             !friendIDs.contains($0.userID) &&
@@ -57,7 +57,7 @@ struct NewMessageView: View {
                         } else {
                             if !filteredFriends.isEmpty {
                                 peopleSection(
-                                    title: "FRIENDS",
+                                    title: "MUTUAL FOLLOWS",
                                     people: filteredFriends
                                 )
                             }
@@ -100,7 +100,7 @@ struct NewMessageView: View {
                 }
             }
             .task {
-                if social.friends.isEmpty {
+                if social.mutualFollows.isEmpty {
                     await social.refresh()
                 }
                 searchFocused = true
@@ -141,7 +141,7 @@ struct NewMessageView: View {
                     Text("Start a conversation")
                         .font(.headline)
                     Text(
-                        "Friends can chat immediately. Other athletes can receive one message request if their privacy settings allow it."
+                        "Mutual followers can chat immediately. Everyone else receives one message request to approve or decline before the conversation continues."
                     )
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -155,13 +155,13 @@ struct NewMessageView: View {
 
     @ViewBuilder
     private var friendsSection: some View {
-        if social.friends.isEmpty {
+        if social.mutualFollows.isEmpty {
             VStack(spacing: 14) {
                 ContentUnavailableView(
                     "Find someone to message",
                     systemImage: "person.2.wave.2",
                     description: Text(
-                        "Search by name or @username. You can send one message request before becoming friends when the recipient allows it."
+                        "Search by name or @username. If you do not follow each other, your first message is sent as a request for the other athlete to approve or decline."
                     )
                 )
 
@@ -173,8 +173,8 @@ struct NewMessageView: View {
             .padding(.vertical, 44)
         } else {
             peopleSection(
-                title: "FRIENDS",
-                people: Array(social.friends.prefix(20))
+                title: "MUTUAL FOLLOWS",
+                people: Array(social.mutualFollows.prefix(20))
             )
         }
     }
@@ -242,16 +242,13 @@ private struct NewMessagePersonRow: View {
             return "Open"
         }
 
-        switch relationship {
-        case .friends:
-            return "Message"
-        default:
-            return "Request"
-        }
+        return social.isMutualFollow(profile.userID)
+            ? "Message"
+            : "Request"
     }
 
     private var actionIcon: String {
-        relationship == .friends || hasConversation
+        social.isMutualFollow(profile.userID) || hasConversation
             ? "message.fill"
             : "paperplane.fill"
     }
@@ -271,8 +268,8 @@ private struct NewMessagePersonRow: View {
                         Text(profile.usernameLabel)
                     }
 
-                    if relationship == .friends {
-                        Text("• Friend")
+                    if social.isMutualFollow(profile.userID) {
+                        Text("• Mutual follow")
                     } else if !hasConversation {
                         Text("• Message request")
                     }
