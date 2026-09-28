@@ -2579,9 +2579,20 @@ final class AppSessionStore: ObservableObject {
             return nil
         }
 
-        let resolvedStartDate = Calendar.current.startOfDay(
-            for: startDate ?? Date()
-        )
+        let requestedStart =
+            Calendar.current.startOfDay(
+                for: startDate ?? Date()
+            )
+        let isCatalogTemplate =
+            template.tags.contains {
+                $0.hasPrefix("catalog:")
+            }
+        let resolvedStartDate =
+            isCatalogTemplate
+                ? Self.catalogWeekStart(
+                    onOrAfter: requestedStart
+                )
+                : requestedStart
         let resolvedEndDate = Calendar.current.date(
             byAdding: .day,
             value: max(template.weeks.count * 7 - 1, 0),
@@ -2653,8 +2664,8 @@ final class AppSessionStore: ObservableObject {
         startDate: Date,
         preferredDayIndexes: [Int]
     ) -> TrainingPlan? {
-        let start = Calendar.current.startOfDay(
-            for: startDate
+        let start = Self.catalogWeekStart(
+            onOrAfter: startDate
         )
         let plan = makeCatalogPlan(
             entry,
@@ -2799,6 +2810,25 @@ final class AppSessionStore: ObservableObject {
             startDate: resolvedStart,
             endDate: resolvedEnd
         )
+    }
+
+    static func catalogWeekStart(
+        onOrAfter date: Date
+    ) -> Date {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: date)
+        let weekday = calendar.component(
+            .weekday,
+            from: day
+        )
+        let daysToMonday =
+            (9 - weekday) % 7
+
+        return calendar.date(
+            byAdding: .day,
+            value: daysToMonday,
+            to: day
+        ) ?? day
     }
 
     private func resolvedCatalogDayIndexes(
