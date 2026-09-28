@@ -56,7 +56,7 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
         )
     }
 
-    func testPlannedWorkoutResolvesRouteAndCoachDistance() {
+    func testPlannedWorkoutResolvesRouteAndCoachDistance() throws {
         let owner = UUID()
         let routeID = UUID()
 
@@ -104,13 +104,15 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
 
         XCTAssertTrue(configuration.enabled)
         XCTAssertEqual(
-            configuration.routeDistanceMeters,
+            try XCTUnwrap(
+                configuration.routeDistanceMeters
+            ),
             7_250,
             accuracy: 0.001
         )
     }
 
-    func testPlannedRunningFallbackTransferUsesDistance() {
+    func testPlannedRunningFallbackTransferUsesDistance() throws {
         var workout = PlannedSession(
             id: UUID(),
             title: "5K",
@@ -134,7 +136,9 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
             .distance
         )
         XCTAssertEqual(
-            transfer.steps.first?.distanceMeters,
+            try XCTUnwrap(
+                transfer.steps.first?.distanceMeters
+            ),
             5_000,
             accuracy: 0.001
         )
