@@ -3653,6 +3653,9 @@ struct ATHLTHTrainView: View {
                 try await watchConnection.startWorkoutOnWatch(
                     configuration.activity.watchKind
                 )
+                watchConnection.sendAudioCoachConfiguration(
+                    configuration.audioCoach
+                )
                 watchTransferMessage =
                     "\(configuration.title) started on Apple Watch · \(configuration.detail)."
             } catch {
