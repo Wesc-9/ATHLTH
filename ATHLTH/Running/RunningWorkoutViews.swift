@@ -17,6 +17,7 @@ enum RunningWorkoutLibrarySection: String, CaseIterable, Identifiable {
 struct RunningWorkoutLibraryView: View {
     @EnvironmentObject private var library: RunningWorkoutLibraryStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var recents: LibraryRecentsStore
 
     let source: RunningWorkoutLibrarySection?
     let selectionTitle: String?
@@ -174,6 +175,17 @@ struct RunningWorkoutLibraryView: View {
                                     workoutCard(workout)
                                 }
                                 .buttonStyle(.plain)
+                                .simultaneousGesture(
+                                    TapGesture().onEnded {
+                                        recents.markUsed(
+                                            .workout,
+                                            itemID: workout.id.uuidString,
+                                            title: workout.title,
+                                            subtitle: workout.type.title,
+                                            icon: workout.type.systemImage
+                                        )
+                                    }
+                                )
 
                                 LibraryFavoriteButton(
                                     kind: .workout,
@@ -201,6 +213,7 @@ struct RunningWorkoutLibraryView: View {
         .navigationTitle(selectionTitle ?? "Running Workouts")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            recents.refresh()
             await favorites.refresh()
         }
         .searchable(
