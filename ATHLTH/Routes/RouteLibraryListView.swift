@@ -60,6 +60,7 @@ private struct RouteLibraryEntry: Decodable, Identifiable {
 struct RouteLibraryListView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
     @StateObject private var locationStore = HomeLocationStore()
     let source: RouteLibrarySource
 
@@ -67,6 +68,7 @@ struct RouteLibraryListView: View {
     @State private var query = ""
     @State private var sort: RouteLibrarySort = .newest
     @State private var lengthFilter = 0
+    @State private var favoritesOnly = false
     @State private var loading = false
     @State private var errorMessage: String?
     @State private var hasMore = false
@@ -79,7 +81,17 @@ struct RouteLibraryListView: View {
     }
 
     private var entries: [RouteLibraryEntry] {
-        if source == .database { return catalog }
+        if source == .database {
+            return favoritesOnly
+                ? catalog.filter {
+                    favorites.isFavorite(
+                        .route,
+                        itemID: $0.id.uuidString
+                    )
+                }
+                : catalog
+        }
+
         let values = session.savedRoutes.map(RouteLibraryEntry.init(route:))
         let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return values.filter { entry in
@@ -95,7 +107,15 @@ struct RouteLibraryListView: View {
             case 4: matchesLength = length >= 21.1
             default: matchesLength = true
             }
-            return matchesSearch && matchesLength
+            let favoriteMatches =
+                !favoritesOnly ||
+                favorites.isFavorite(
+                    .route,
+                    itemID: entry.id.uuidString
+                )
+            return matchesSearch &&
+                matchesLength &&
+                favoriteMatches
         }.sorted { left, right in
             func ascending(_ a: Double?, _ b: Double?, descending: Bool = false) -> Bool {
                 switch (a, b) {
@@ -140,6 +160,15 @@ struct RouteLibraryListView: View {
                     Text("10–21.1 km").tag(3)
                     Text("21.1 km and more").tag(4)
                 }
+
+                Toggle(isOn: $favoritesOnly) {
+                    Label(
+                        "Favorites only",
+                        systemImage: "star.fill"
+                    )
+                }
+                .tint(ATHLTHTheme.accent)
+
                 if sort == .nearest {
                     if locationStore.isUpdating {
                         ProgressView("Finding your location…")
@@ -166,32 +195,77 @@ struct RouteLibraryListView: View {
             }
             Section("\(entries.count) routes\(hasMore ? " loaded" : "")") {
                 ForEach(entries) { entry in
-                    NavigationLink {
-                        if source == .mine,
-                           let route = session.savedRoutes.first(where: { $0.id == entry.id }) {
-                            RouteDetailView(route: route)
-                        } else {
-                            RouteLibraryDetailLoader(routeID: entry.id)
-                        }
-                    } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(entry.title).font(.headline)
-                            HStack(spacing: 10) {
-                                Text(settings.measurementPreference.distance(fromKilometers: entry.distanceKilometers))
-                                if let elevation = entry.elevationGainMeters {
-                                    Text("\(Int(elevation)) m ascent")
+                    HStack(spacing: 8) {
+                        NavigationLink {
+                            if source == .mine,
+                               let route = session.savedRoutes.first(
+                                where: { $0.id == entry.id }
+                               ) {
+                                RouteDetailView(route: route)
+                            } else {
+                                RouteLibraryDetailLoader(
+                                    routeID: entry.id
+                                )
+                            }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(entry.title)
+                                    .font(.headline)
+
+                                HStack(spacing: 10) {
+                                    Text(
+                                        settings.measurementPreference
+                                            .distance(
+                                                fromKilometers:
+                                                    entry.distanceKilometers
+                                            )
+                                    )
+                                    if let elevation =
+                                            entry.elevationGainMeters {
+                                        Text(
+                                            "\(Int(elevation)) m ascent"
+                                        )
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                                if let start = entry.startName,
+                                   !start.isEmpty {
+                                    Text(start)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                if sort == .nearest,
+                                   let distance = entry.distance(
+                                    from: locationStore.location
+                                   ) {
+                                    Label(
+                                        "\(settings.measurementPreference.distance(fromKilometers: distance)) away",
+                                        systemImage: "location"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.accent
+                                    )
                                 }
                             }
-                            .font(.caption).foregroundStyle(.secondary)
-                            if let start = entry.startName, !start.isEmpty {
-                                Text(start).font(.caption).foregroundStyle(.secondary)
-                            }
-                            if sort == .nearest, let distance = entry.distance(from: locationStore.location) {
-                                Label("\(settings.measurementPreference.distance(fromKilometers: distance)) away", systemImage: "location")
-                                    .font(.caption).foregroundStyle(ATHLTHTheme.accent)
-                            }
+                            .padding(.vertical, 5)
                         }
-                        .padding(.vertical, 5)
+
+                        LibraryFavoriteButton(
+                            kind: .route,
+                            itemID: entry.id.uuidString,
+                            title: entry.title,
+                            subtitle:
+                                settings.measurementPreference
+                                    .distance(
+                                        fromKilometers:
+                                            entry.distanceKilometers
+                                    ),
+                            icon: "map.fill"
+                        )
                     }
                 }
                 if source == .database && hasMore {
@@ -222,7 +296,13 @@ struct RouteLibraryListView: View {
                 }
             }
         }
-        .task(id: catalogKey) { if source == .database { await loadCatalog() } }
+        .task(id: catalogKey) {
+            async let favoriteRefresh: Void = favorites.refresh()
+            if source == .database {
+                await loadCatalog()
+            }
+            _ = await favoriteRefresh
+        }
         .refreshable { if source == .database { await loadCatalog() } }
         .onChange(of: sort) { _, value in
             if value == .nearest { locationStore.refresh() }
@@ -265,7 +345,7 @@ struct RouteLibraryListView: View {
 
 }
 
-private struct RouteLibraryDetailLoader: View {
+struct RouteLibraryDetailLoader: View {
     let routeID: UUID
     @State private var route: TrainingRoute?
     @State private var errorMessage: String?
