@@ -140,6 +140,7 @@ struct RunQuickStartConfiguration {
     let mode: RunQuickStartMode
     let route: TrainingRoute?
     let workout: RunningWorkoutTemplate?
+    let captureDevice: WorkoutCaptureDevice
     let audioCoach: WatchAudioCoachConfiguration
     let friends: [SocialProfileCard]
     let gearIDs: Set<UUID>
@@ -157,9 +158,120 @@ struct RunQuickStartConfiguration {
 }
 
 struct WalkQuickStartConfiguration {
+    let captureDevice: WorkoutCaptureDevice
     let audioCoach: WatchAudioCoachConfiguration
     let friends: [SocialProfileCard]
     let gearIDs: Set<UUID>
+}
+
+private struct QuickStartWorkoutDeviceCard: View {
+    @Binding var selection: WorkoutCaptureDevice
+    let watchConnected: Bool
+    let iPhoneEnabled: Bool
+    let iPhoneSubtitle: String
+
+    var body: some View {
+        ATHLTHCard {
+            ATHLTHSectionHeader(title: "Workout device")
+
+            VStack(spacing: 10) {
+                deviceRow(
+                    title: "iPhone",
+                    subtitle: iPhoneSubtitle,
+                    icon: "iphone",
+                    selected: selection == .iPhone,
+                    disabled: !iPhoneEnabled
+                ) {
+                    selection = .iPhone
+                }
+
+                deviceRow(
+                    title: "Apple Watch",
+                    subtitle: watchConnected
+                        ? "Record with Apple Watch, including live workout metrics."
+                        : "Finish Apple Watch setup in Settings to use this option.",
+                    icon: "applewatch",
+                    selected: selection == .appleWatch,
+                    disabled: !watchConnected
+                ) {
+                    selection = .appleWatch
+                }
+            }
+            .padding(.top, 10)
+        }
+    }
+
+    private func deviceRow(
+        title: String,
+        subtitle: String,
+        icon: String,
+        selected: Bool,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(
+                        disabled
+                            ? Color.secondary
+                            : selected
+                                ? Color.white
+                                : ATHLTHTheme.accent
+                    )
+                    .frame(width: 40, height: 40)
+                    .background(
+                        disabled
+                            ? Color.primary.opacity(0.04)
+                            : selected
+                                ? ATHLTHTheme.accent
+                                : ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(
+                            disabled
+                                ? ATHLTHTheme.mutedText
+                                : ATHLTHTheme.primaryText
+                        )
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        selected
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                )
+                .foregroundStyle(
+                    selected && !disabled
+                        ? ATHLTHTheme.accent
+                        : Color.secondary.opacity(0.55)
+                )
+            }
+            .padding(10)
+            .background(
+                selected && !disabled
+                    ? ATHLTHTheme.accentSoft.opacity(0.55)
+                    : Color.primary.opacity(0.02),
+                in: RoundedRectangle(cornerRadius: 15)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.66 : 1)
+    }
 }
 
 struct RunQuickStartSheet: View {
@@ -179,6 +291,7 @@ struct RunQuickStartSheet: View {
     @State private var selectedWorkout: RunningWorkoutTemplate?
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
+    @State private var captureDevice: WorkoutCaptureDevice = .iPhone
 
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
@@ -187,10 +300,11 @@ struct RunQuickStartSheet: View {
     @State private var didLoadAudioCoachDefaults = false
 
     private var canStart: Bool {
-        if trainingDeviceProvider == .none { return mode == .free }
-        guard trainingDeviceProvider == .appleWatch,
-              watchConnected
-        else {
+        if captureDevice == .iPhone {
+            return mode == .free
+        }
+
+        guard watchConnected else {
             return false
         }
 
@@ -210,30 +324,40 @@ struct RunQuickStartSheet: View {
                 VStack(spacing: 16) {
                     introCard
                     modeCard
+
+                    QuickStartWorkoutDeviceCard(
+                        selection: $captureDevice,
+                        watchConnected: watchConnected,
+                        iPhoneEnabled: mode == .free,
+                        iPhoneSubtitle:
+                            mode == .free
+                                ? "Keep your iPhone with you to record GPS distance, pace and time."
+                                : "iPhone capture currently supports Free Run. Routes and structured workouts require Apple Watch."
+                    )
+
                     selectionCard
 
-                    if trainingDeviceProvider == .appleWatch {
                     WorkoutGearSelectionCard(
                         selectedGearIDs: $selectedGearIDs,
                         activity: .running
                     )
 
-                    ATHLTHPlusFeatureGate(
-                        feature: .audioCoach,
-                        title: "Audio Coach · ATHLTH+",
-                        message:
-                            "Choose spoken pace, time, route progress and workout-step updates."
-                    ) {
-                        AudioCoachSetupCard(
-                            draft: $audioCoachDraft,
-                            showRouteOptions:
-                                mode == .route ||
-                                selectedWorkout?.routeID != nil,
-                            showStructuredOptions:
-                                mode == .structured
-                        )
-                    }
-
+                    if captureDevice == .appleWatch {
+                        ATHLTHPlusFeatureGate(
+                            feature: .audioCoach,
+                            title: "Audio Coach · ATHLTH+",
+                            message:
+                                "Choose spoken pace, time, route progress and workout-step updates."
+                        ) {
+                            AudioCoachSetupCard(
+                                draft: $audioCoachDraft,
+                                showRouteOptions:
+                                    mode == .route ||
+                                    selectedWorkout?.routeID != nil,
+                                showStructuredOptions:
+                                    mode == .structured
+                            )
+                        }
                     }
                     ATHLTHCard {
                         WorkoutFriendPicker(
@@ -258,6 +382,13 @@ struct RunQuickStartSheet: View {
             )
             .navigationTitle("Start Run")
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: mode) { _, newMode in
+                if newMode != .free,
+                   captureDevice == .iPhone,
+                   watchConnected {
+                    captureDevice = .appleWatch
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -286,6 +417,8 @@ struct RunQuickStartSheet: View {
                 }
             }
             .task {
+                captureDevice = watchConnected ? .appleWatch : .iPhone
+
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
                     didLoadAudioCoachDefaults = true
@@ -326,9 +459,7 @@ struct RunQuickStartSheet: View {
                         .font(.title3.weight(.bold))
 
                     Text(
-                        (trainingDeviceProvider == .appleWatch && watchConnected)
-                            ? "Apple Watch is ready. Choose a free run, route or structured workout."
-                            : deviceStatusText
+                        "Choose the run type and then decide whether this workout should be recorded with iPhone or Apple Watch."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -556,6 +687,7 @@ struct RunQuickStartSheet: View {
                     mode: mode,
                     route: selectedRoute,
                     workout: selectedWorkout,
+                    captureDevice: captureDevice,
                     audioCoach: audioCoachConfiguration,
                     friends: friends,
                     gearIDs: selectedGearIDs
@@ -577,32 +709,28 @@ struct RunQuickStartSheet: View {
     }
 
     private var startButtonTitle: String {
-        if trainingDeviceProvider == .none { return mode == .free ? "Start on iPhone" : "Apple Watch Required" }
-        if !watchConnected {
+        if captureDevice == .iPhone {
+            return mode == .free
+                ? "Start on iPhone"
+                : "Apple Watch Required"
+        }
+
+        guard watchConnected else {
             return "Apple Watch Required"
         }
 
         switch mode {
-        case .free: return "Start Free Run"
-        case .route: return "Start Route"
-        case .structured: return "Start Workout"
-        }
-    }
-
-    private var deviceStatusText: String {
-        switch trainingDeviceProvider {
-        case .appleWatch:
-            return "Finish Apple Watch setup before starting a live run."
-        case .garmin:
-            return "Garmin live launch is not available yet."
-        case .none:
-            return "Carry your iPhone throughout the run. iPhone supports Free Run; guided routes and structured intervals currently require Apple Watch."
+        case .free: return "Start Free Run on Watch"
+        case .route: return "Start Route on Watch"
+        case .structured: return "Start Workout on Watch"
         }
     }
 
     private var audioCoachConfiguration:
         WatchAudioCoachConfiguration {
-        guard session.canAccess(.audioCoach) else {
+        guard captureDevice == .appleWatch,
+              session.canAccess(.audioCoach)
+        else {
             return .disabled
         }
 
@@ -642,6 +770,7 @@ struct WalkQuickStartSheet: View {
 
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
+    @State private var captureDevice: WorkoutCaptureDevice = .iPhone
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var didLoadAudioCoachDefaults = false
 
@@ -667,9 +796,7 @@ struct WalkQuickStartSheet: View {
                                     .font(.title3.weight(.bold))
 
                                 Text(
-                                    (trainingDeviceProvider == .appleWatch && watchConnected)
-                                        ? "Start immediately and let ATHLTH record time, distance, GPS and available heart-rate data."
-                                        : deviceStatusText
+                                    "Choose whether this walk should be recorded with iPhone or Apple Watch."
                                 )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -679,25 +806,32 @@ struct WalkQuickStartSheet: View {
                         }
                     }
 
-                    if trainingDeviceProvider == .appleWatch {
+                    QuickStartWorkoutDeviceCard(
+                        selection: $captureDevice,
+                        watchConnected: watchConnected,
+                        iPhoneEnabled: true,
+                        iPhoneSubtitle:
+                            "Keep your iPhone with you to record GPS distance, pace and time."
+                    )
+
                     WorkoutGearSelectionCard(
                         selectedGearIDs: $selectedGearIDs,
                         activity: .walking
                     )
 
-                    ATHLTHPlusFeatureGate(
-                        feature: .audioCoach,
-                        title: "Audio Coach · ATHLTH+",
-                        message:
-                            "Unlock spoken distance, time, pace and heart-rate updates."
-                    ) {
-                        AudioCoachSetupCard(
-                            draft: $audioCoachDraft,
-                            showRouteOptions: false,
-                            showStructuredOptions: false
-                        )
-                    }
-
+                    if captureDevice == .appleWatch {
+                        ATHLTHPlusFeatureGate(
+                            feature: .audioCoach,
+                            title: "Audio Coach · ATHLTH+",
+                            message:
+                                "Unlock spoken distance, time, pace and heart-rate updates."
+                        ) {
+                            AudioCoachSetupCard(
+                                draft: $audioCoachDraft,
+                                showRouteOptions: false,
+                                showStructuredOptions: false
+                            )
+                        }
                     }
                     ATHLTHCard {
                         WorkoutFriendPicker(
@@ -712,7 +846,9 @@ struct WalkQuickStartSheet: View {
 
                         onStart(
                             WalkQuickStartConfiguration(
+                                captureDevice: captureDevice,
                                 audioCoach:
+                                    captureDevice == .appleWatch &&
                                     session.canAccess(.audioCoach)
                                         ? audioCoachDraft.configuration()
                                         : .disabled,
@@ -723,10 +859,15 @@ struct WalkQuickStartSheet: View {
                         dismiss()
                     } label: {
                         Label(
-                            (watchConnected || trainingDeviceProvider == .none)
-                                ? "Start Walk"
-                                : "Apple Watch Required",
-                            systemImage: "play.fill"
+                            captureDevice == .appleWatch
+                                ? (watchConnected
+                                    ? "Start Walk on Watch"
+                                    : "Apple Watch Required")
+                                : "Start on iPhone",
+                            systemImage:
+                                captureDevice == .appleWatch
+                                    ? "applewatch"
+                                    : "iphone"
                         )
                         .font(.headline)
                         .frame(maxWidth: .infinity)
@@ -735,7 +876,7 @@ struct WalkQuickStartSheet: View {
                     .controlSize(.large)
                     .tint(ATHLTHTheme.accent)
                     .disabled(
-                        trainingDeviceProvider != .none && (trainingDeviceProvider != .appleWatch || !watchConnected)
+                        captureDevice == .appleWatch && !watchConnected
                     )
                 }
                 .padding()
@@ -750,6 +891,8 @@ struct WalkQuickStartSheet: View {
                 }
             }
             .task {
+                captureDevice = watchConnected ? .appleWatch : .iPhone
+
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
                     didLoadAudioCoachDefaults = true
@@ -766,16 +909,6 @@ struct WalkQuickStartSheet: View {
         }
     }
 
-    private var deviceStatusText: String {
-        switch trainingDeviceProvider {
-        case .appleWatch:
-            return "Finish Apple Watch setup before starting a live walk."
-        case .garmin:
-            return "Garmin live launch is not available yet."
-        case .none:
-            return "Carry your iPhone throughout the walk to record GPS distance and pace."
-        }
-    }
 }
 
 struct StrengthQuickStartSheet: View {
