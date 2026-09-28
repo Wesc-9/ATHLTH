@@ -6,6 +6,8 @@ struct TrainingLibraryHomeView: View {
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
+    @State private var showingCreatePlan = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 5) {
@@ -77,8 +79,8 @@ struct TrainingLibraryHomeView: View {
                     )
                 }
 
-                NavigationLink {
-                    TrainingPlanCreationView()
+                Button {
+                    showingCreatePlan = true
                 } label: {
                     LibraryDestinationTile(
                         title: "Create Plan",
@@ -177,6 +179,9 @@ struct TrainingLibraryHomeView: View {
             }
         }
         .buttonStyle(.plain)
+        .sheet(isPresented: $showingCreatePlan) {
+            TrainingPlanCreationView()
+        }
         .task {
             await favorites.refresh()
         }
