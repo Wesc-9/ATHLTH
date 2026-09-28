@@ -619,7 +619,8 @@ struct ATHLTHCommunityView: View {
             ATHLTHPinnedHeroLayout(
                 accent: Color.purple.opacity(0.42),
                 softTransition: true,
-                immersiveTransition: useImmersiveCommunityHero
+                immersiveTransition: useImmersiveCommunityHero,
+                scrollFadeTransition: true
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
