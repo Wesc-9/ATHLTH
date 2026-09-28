@@ -500,6 +500,90 @@ enum LibraryFavoriteKind: String, Codable, CaseIterable, Identifiable, Hashable 
     }
 }
 
+struct LibraryRecentRecord: Codable, Hashable, Identifiable {
+    let itemType: LibraryFavoriteKind
+    let itemID: String
+    let title: String
+    let subtitle: String?
+    let icon: String?
+    let lastOpenedAt: Date
+
+    var id: String {
+        "\(itemType.rawValue)|\(itemID)"
+    }
+}
+
+@MainActor
+final class LibraryRecentsStore: ObservableObject {
+    @Published private(set) var items: [LibraryRecentRecord] = []
+
+    private let client: SupabaseClient
+    private var activeUserID: UUID?
+
+    init(client: SupabaseClient = SupabaseEnvironment.client) {
+        self.client = client
+    }
+
+    func refresh() {
+        guard let user = client.auth.currentUser else {
+            activeUserID = nil
+            items = []
+            return
+        }
+
+        guard activeUserID != user.id else { return }
+        activeUserID = user.id
+        items =
+            AccountLocalStorage.read(
+                [LibraryRecentRecord].self,
+                name: "libraryRecents",
+                userID: user.id
+            ) ?? []
+    }
+
+    func markUsed(
+        _ kind: LibraryFavoriteKind,
+        itemID: String,
+        title: String,
+        subtitle: String? = nil,
+        icon: String? = nil
+    ) {
+        guard let user = client.auth.currentUser else { return }
+
+        if activeUserID != user.id {
+            activeUserID = user.id
+            items =
+                AccountLocalStorage.read(
+                    [LibraryRecentRecord].self,
+                    name: "libraryRecents",
+                    userID: user.id
+                ) ?? []
+        }
+
+        let record = LibraryRecentRecord(
+            itemType: kind,
+            itemID: itemID,
+            title: title,
+            subtitle: subtitle,
+            icon: icon,
+            lastOpenedAt: Date()
+        )
+
+        items.removeAll { $0.id == record.id }
+        items.insert(record, at: 0)
+
+        if items.count > 20 {
+            items = Array(items.prefix(20))
+        }
+
+        AccountLocalStorage.write(
+            items,
+            name: "libraryRecents",
+            userID: user.id
+        )
+    }
+}
+
 struct LibraryFavoriteRecord: Codable, Hashable, Identifiable {
     let userID: UUID
     let itemType: LibraryFavoriteKind
