@@ -17,6 +17,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                     contentCard
                     routeCard
                     structuredWorkoutCard
+                    musicCard
                     languageCard
                 }
             }
@@ -165,6 +166,28 @@ struct ATHLTHAudioCoachSettingsView: View {
                 isOn:
                     $settings.audioCoachAnnounceRemainingStepDistance
             )
+        }
+    }
+
+    private var musicCard: some View {
+        settingsCard(
+            title: "Music & other audio",
+            subtitle:
+                "Controls how Audio Coach behaves while Spotify or another audio app is playing."
+        ) {
+            Toggle(
+                "Lower music while coach speaks",
+                isOn: $settings.audioCoachDuckOtherAudio
+            )
+
+            Text(
+                settings.audioCoachDuckOtherAudio
+                    ? "Music is temporarily reduced only while the coach is speaking, then returns automatically."
+                    : "Coach speech mixes with other audio at its current level."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
