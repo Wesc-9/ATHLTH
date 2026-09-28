@@ -487,6 +487,23 @@ struct SocialHubView: View {
             Text("Following")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(ATHLTHTheme.accent)
+        } else if social.isFollowedBy(profile.userID) {
+            Button(
+                profile.isPrivateProfile
+                    ? "Request back"
+                    : "Follow back"
+            ) {
+                Task {
+                    if profile.isPrivateProfile {
+                        await social.sendFollowRequest(to: profile)
+                    } else {
+                        await social.follow(profile)
+                    }
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .tint(ATHLTHTheme.accent)
         } else {
             switch social.relationshipState(
                 with: profile.userID
