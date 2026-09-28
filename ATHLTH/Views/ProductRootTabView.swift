@@ -4069,7 +4069,7 @@ struct ATHLTHRecoveryView: View {
                 LazyVStack(spacing: 16) {
                     if shouldShowWearableRecoveryContent {
                         if session.hasPaidAccess &&
-                            settings.aiHealthDataSharingEnabled {
+                            session.aiHealthDataSharingEnabled {
                             RecoveryAIInsightCard(
                                 insight: recoveryAIInsight ?? fallbackRecoveryAIInsight,
                                 context: recoveryAIContext,
@@ -4201,7 +4201,7 @@ struct ATHLTHRecoveryView: View {
                 RecoveryGuidedToolView(tool: tool)
             }
             .sheet(isPresented: $showingRecoveryCoach) {
-                if settings.aiHealthDataSharingEnabled {
+                if session.aiHealthDataSharingEnabled {
                     RecoveryCoachView(
                         context: recoveryAIContext,
                         insight: recoveryAIInsight ?? fallbackRecoveryAIInsight
@@ -5017,7 +5017,7 @@ struct ATHLTHRecoveryView: View {
         force: Bool = false
     ) async {
         guard session.hasPaidAccess,
-              settings.aiHealthDataSharingEnabled,
+              session.aiHealthDataSharingEnabled,
               shouldShowWearableRecoveryContent else {
             recoveryAIInsight = nil
             recoveryAIError = nil
