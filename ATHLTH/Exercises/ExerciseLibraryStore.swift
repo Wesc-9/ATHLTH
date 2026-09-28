@@ -354,6 +354,7 @@ final class ExerciseLibraryStore: ObservableObject {
     private func persistCustomExercises() {
         guard let accountID else { return }
         AccountLocalStorage.write(customExercises.map(\.exercise), name: "exerciseLibrary", userID: accountID)
+        ATHLTHTrainingDataChangeSignal.post(userID: accountID)
     }
 
     private static var storageDirectory: URL? {
