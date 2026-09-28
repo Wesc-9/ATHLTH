@@ -614,7 +614,7 @@ final class TrainingPlanLibraryStore: ObservableObject {
     }
 }
 
-private extension TrainingPlanCatalogEntry {
+extension TrainingPlanCatalogEntry {
     static let fallbackCatalog: [TrainingPlanCatalogEntry] = [
         TrainingPlanCatalogEntry(
             id: UUID(uuidString: "B1000000-0000-0000-0000-000000000001")!,
