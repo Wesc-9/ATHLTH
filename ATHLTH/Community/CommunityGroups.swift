@@ -1101,14 +1101,6 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
                 .value
 
-            async let profilesQuery: [SocialProfileCard] = client
-                .from("social_profile_cards")
-                .select()
-                .order("updated_at", ascending: false)
-                .limit(120)
-                .execute()
-                .value
-
             async let invitesQuery: [CommunityGroupInviteRecord] = client
                 .from("community_group_invites")
                 .select()
@@ -1133,18 +1125,58 @@ final class CommunityGroupStore: ObservableObject {
                     .execute()
                     .value
 
-            groups = try await groupsQuery
-            canLoadMoreGroups =
-                groups.count >= groupFetchLimit
-            lastRefreshAt = Date()
-            ownMemberships = try await membershipsQuery
-            communityActivity = try await activityQuery
+            let loadedGroups = try await groupsQuery
+            let loadedMemberships =
+                try await membershipsQuery
+            let loadedActivity =
+                try await activityQuery
                 .filter { $0.kind != "announcement" }
-            ownInvites = try await invitesQuery
-            ownJoinRequests = try await joinRequestsQuery
-
+            let loadedInvites = try await invitesQuery
+            let loadedJoinRequests =
+                try await joinRequestsQuery
             let notificationPreferences =
                 try await notificationPreferencesQuery
+
+            var neededProfileIDs: Set<UUID> = [
+                userID
+            ]
+            neededProfileIDs.formUnion(
+                loadedGroups.map(\.creatorID)
+            )
+            neededProfileIDs.formUnion(
+                loadedActivity.compactMap(\.actorID)
+            )
+            neededProfileIDs.formUnion(
+                loadedInvites.map(\.invitedBy)
+            )
+
+            let profiles: [SocialProfileCard]
+            if neededProfileIDs.isEmpty {
+                profiles = []
+            } else {
+                profiles = try await client
+                    .from("social_profile_cards")
+                    .select()
+                    .in(
+                        "user_id",
+                        values:
+                            neededProfileIDs.map(
+                                \.uuidString
+                            )
+                    )
+                    .execute()
+                    .value
+            }
+
+            groups = loadedGroups
+            canLoadMoreGroups =
+                loadedGroups.count >= groupFetchLimit
+            lastRefreshAt = Date()
+            ownMemberships = loadedMemberships
+            communityActivity = loadedActivity
+            ownInvites = loadedInvites
+            ownJoinRequests = loadedJoinRequests
+
             notificationPreferencesByGroup = Dictionary(
                 uniqueKeysWithValues:
                     notificationPreferences.map {
@@ -1152,7 +1184,6 @@ final class CommunityGroupStore: ObservableObject {
                     }
             )
 
-            let profiles = try await profilesQuery
             profileCardsByID = Dictionary(
                 uniqueKeysWithValues: profiles.map {
                     ($0.userID, $0)
@@ -1304,14 +1335,6 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
                 .value
 
-            async let profilesQuery: [SocialProfileCard] = client
-                .from("social_profile_cards")
-                .select()
-                .order("updated_at", ascending: false)
-                .limit(500)
-                .execute()
-                .value
-
             async let joinRequestsQuery:
                 [CommunityGroupJoinRequestRecord] = client
                     .from("community_group_join_requests")
@@ -1336,9 +1359,56 @@ final class CommunityGroupStore: ObservableObject {
             let loadedChallenges = try await challengesQuery
             let loadedAnnouncements = try await announcementsQuery
             let loadedActivity = try await activityQuery
-            let loadedProfiles = try await profilesQuery
             let loadedJoinRequests = try await joinRequestsQuery
             let loadedEventRSVPs = try await eventRSVPsQuery
+
+            var neededProfileIDs: Set<UUID> = []
+            neededProfileIDs.formUnion(
+                loadedMembers.map(\.userID)
+            )
+            neededProfileIDs.formUnion(
+                loadedMessages.map(\.senderID)
+            )
+            neededProfileIDs.formUnion(
+                loadedEvents.map(\.creatorID)
+            )
+            neededProfileIDs.formUnion(
+                loadedAnnouncements.map(\.authorID)
+            )
+            neededProfileIDs.formUnion(
+                loadedActivity.compactMap(\.actorID)
+            )
+            neededProfileIDs.formUnion(
+                loadedJoinRequests.map(\.userID)
+            )
+            neededProfileIDs.formUnion(
+                loadedJoinRequests.compactMap(
+                    \.respondedBy
+                )
+            )
+            if let currentUserID {
+                neededProfileIDs.insert(
+                    currentUserID
+                )
+            }
+
+            let loadedProfiles: [SocialProfileCard]
+            if neededProfileIDs.isEmpty {
+                loadedProfiles = []
+            } else {
+                loadedProfiles = try await client
+                    .from("social_profile_cards")
+                    .select()
+                    .in(
+                        "user_id",
+                        values:
+                            neededProfileIDs.map(
+                                \.uuidString
+                            )
+                    )
+                    .execute()
+                    .value
+            }
 
             membersByGroup[groupID] = loadedMembers
             messagesByGroup[groupID] = loadedMessages
