@@ -482,43 +482,24 @@ struct ATHLTHHomeView: View {
                     defaultTracking: settings.defaultStrengthTracking
                 ) { captureDevice, trackingMode, selectedFriends, audioCoach in
                     Task { @MainActor in
-                        await social.beginWorkoutWithFriends(
-                            title: workout.title,
-                            kind: .strength,
-                            friends: selectedFriends,
-                            creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username
-                        )
-
-                        if captureDevice == .appleWatch {
-                            do {
-                                try await watchConnection.startWorkoutOnWatch(.strength)
-                                watchConnection.sendAudioCoachConfiguration(
-                                    audioCoach
-                                )
-                                session.beginTrainingStatus(for: workout)
-                                strengthWorkout.start(
-                                    session: workout,
-                                    watchSessionID: UUID(),
-                                    trackingMode: trackingMode,
-                                    captureDevice: .appleWatch
-                                )
-                                startSpotifyForPlannedWorkoutIfNeeded(workout)
-                                showingHomeStrengthWorkout = true
-                            } catch {
-                                homeWatchTransferError =
-                                    error.localizedDescription
-                            }
-                        } else {
-                            session.beginTrainingStatus(for: workout)
-                            strengthWorkout.start(
-                                session: workout,
-                                watchSessionID: nil,
+                        do {
+                            try await WorkoutLaunchCoordinator.startStrength(
+                                workout: workout,
+                                captureDevice: captureDevice,
                                 trackingMode: trackingMode,
-                                captureDevice: .iPhone
+                                selectedFriends: selectedFriends,
+                                audioCoach: audioCoach,
+                                session: session,
+                                settings: settings,
+                                social: social,
+                                strengthWorkout: strengthWorkout,
+                                watchConnection: watchConnection,
+                                spotify: spotifyPlayback
                             )
-                            startSpotifyForPlannedWorkoutIfNeeded(workout)
                             showingHomeStrengthWorkout = true
+                        } catch {
+                            homeWatchTransferError =
+                                error.localizedDescription
                         }
                     }
                 }
@@ -1866,21 +1847,6 @@ struct ATHLTHHomeView: View {
         }
     }
 
-    private func homeWatchKind(
-        _ kind: WorkoutKind
-    ) -> WatchWorkoutKind? {
-        switch kind {
-        case .running:
-            return .running
-        case .walking:
-            return .walking
-        case .strength:
-            return .strength
-        case .mobility, .recovery, .custom:
-            return nil
-        }
-    }
-
     private func startHomeQuickWorkoutOnWatch(
         _ kind: WorkoutKind,
         gearIDs: Set<UUID>,
@@ -1888,7 +1854,7 @@ struct ATHLTHHomeView: View {
     ) {
         guard settings.trainingDeviceProvider == .appleWatch,
               watchConnection.isReady,
-              let watchKind = homeWatchKind(kind)
+              let watchKind = PlannedWorkoutWatchBuilder.watchKind(for: kind)
         else {
             homeWatchTransferError =
                 "Apple Watch is not ready for this workout."
@@ -1913,7 +1879,7 @@ struct ATHLTHHomeView: View {
     private func startHomePlannedWorkoutOnWatch(
         _ workout: PlannedSession
     ) {
-        guard let watchKind = homeWatchKind(workout.kind),
+        guard let watchKind = PlannedWorkoutWatchBuilder.watchKind(for: workout.kind),
               settings.trainingDeviceProvider == .appleWatch,
               watchConnection.isReady
         else {
@@ -1922,15 +1888,11 @@ struct ATHLTHHomeView: View {
             return
         }
 
-        let selectedRoute: TrainingRoute?
-
-        if let routeID = workout.routeID {
-            selectedRoute = session.savedRoutes.first(
-                where: { $0.id == routeID }
+        let selectedRoute =
+            PlannedWorkoutWatchBuilder.route(
+                for: workout,
+                routes: session.savedRoutes
             )
-        } else {
-            selectedRoute = nil
-        }
 
         do {
             if let selectedRoute {
@@ -1967,22 +1929,17 @@ struct ATHLTHHomeView: View {
                     gear.clearPreparedWorkoutGear()
                 }
 
-                let routeDistanceMeters =
-                    selectedRoute.map {
-                        $0.distanceKilometers * 1_000
-                    }
-                    ?? workout.targetDistanceKilometers.map {
-                        $0 * 1_000
-                    }
-
-                var coachConfiguration =
-                    workout.audioCoachConfiguration ??
-                    settings.audioCoachConfiguration(
-                        enabled:
-                            settings.audioCoachEnabledByDefault
-                    )
-                coachConfiguration.routeDistanceMeters =
-                    routeDistanceMeters
+                let coachConfiguration =
+                    PlannedWorkoutWatchBuilder
+                        .audioCoachConfiguration(
+                            for: workout,
+                            selectedRoute: selectedRoute,
+                            defaultConfiguration:
+                                settings.audioCoachConfiguration(
+                                    enabled:
+                                        settings.audioCoachEnabledByDefault
+                                )
+                        )
 
                 watchConnection.sendAudioCoachConfiguration(
                     coachConfiguration
@@ -1990,8 +1947,10 @@ struct ATHLTHHomeView: View {
 
                 if workout.kind == .running {
                     watchConnection.sendRunningWorkout(
-                        homeRunningWorkoutTransfer(
-                            from: workout
+                        PlannedWorkoutWatchBuilder.runningTransfer(
+                            from: workout,
+                            routeAlerts:
+                                settings.routeAlertConfiguration
                         )
                     )
                 } else {
@@ -2011,7 +1970,12 @@ struct ATHLTHHomeView: View {
                 }
 
                 session.beginTrainingStatus(for: workout)
-                startSpotifyForPlannedWorkoutIfNeeded(workout)
+                WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
+                        workout: workout,
+                        session: session,
+                        settings: settings,
+                        spotify: spotifyPlayback
+                    )
 
                 // No success modal: the Home card/live mirror becomes the
                 // confirmation that the planned workout has started.
@@ -2068,7 +2032,12 @@ struct ATHLTHHomeView: View {
                         trackingMode: trackingMode,
                         captureDevice: .appleWatch
                     )
-                    startSpotifyForPlannedWorkoutIfNeeded(workout)
+                    WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
+                        workout: workout,
+                        session: session,
+                        settings: settings,
+                        spotify: spotifyPlayback
+                    )
                     showingHomeStrengthWorkout = true
                 } catch {
                     homeWatchTransferError =
@@ -2083,244 +2052,15 @@ struct ATHLTHHomeView: View {
                 trackingMode: trackingMode,
                 captureDevice: .iPhone
             )
-            startSpotifyForPlannedWorkoutIfNeeded(workout)
+            WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
+                        workout: workout,
+                        session: session,
+                        settings: settings,
+                        spotify: spotifyPlayback
+                    )
             homeDirectStartInProgress = false
             showingHomeStrengthWorkout = true
         }
-    }
-
-    private func startSpotifyForPlannedWorkoutIfNeeded(
-        _ workout: PlannedSession
-    ) {
-        guard settings.spotifyAutoplayLinkedPlaylists,
-              let plan =
-                session.trainingPlan(
-                    containingSessionID: workout.id
-                ),
-              plan.spotifyAutoplayOnWorkoutStart,
-              let playlist = plan.spotifyPlaylist
-        else {
-            return
-        }
-
-        Task { @MainActor in
-            await spotifyPlayback.startLinkedPlaylist(
-                playlist,
-                settings: settings
-            )
-        }
-    }
-
-    private func homeRunningWorkoutTransfer(
-        from workout: PlannedSession
-    ) -> WatchRunningWorkoutTransfer {
-        let structured = workout.resolvedRunningWorkouts
-
-        if !structured.isEmpty {
-            let steps = structured.flatMap {
-                homeRunningSteps(from: $0)
-            }
-
-            return WatchRunningWorkoutTransfer(
-                title: workout.title,
-                steps: steps,
-                routeAlerts:
-                    settings.routeAlertConfiguration,
-                targetAlerts:
-                    workout.targetAlertConfiguration
-            )
-        }
-
-        let fallback: WatchRunningWorkoutStep
-
-        if let distance = workout.targetDistanceKilometers,
-           distance > 0 {
-            fallback = WatchRunningWorkoutStep(
-                id: UUID(),
-                title: workout.title,
-                measure: .distance,
-                distanceMeters: distance * 1_000,
-                durationSeconds: nil,
-                intensityText: homePlannedPaceText(workout),
-                targetPaceMinSecondsPerKilometer:
-                    workout.targetPaceSecondsPerKilometer,
-                targetPaceMaxSecondsPerKilometer:
-                    workout.targetPaceSecondsPerKilometer
-            )
-        } else if let minutes = workout.durationMinutes,
-                  minutes > 0 {
-            fallback = WatchRunningWorkoutStep(
-                id: UUID(),
-                title: workout.title,
-                measure: .time,
-                distanceMeters: nil,
-                durationSeconds:
-                    TimeInterval(minutes * 60),
-                intensityText: homePlannedPaceText(workout),
-                targetPaceMinSecondsPerKilometer:
-                    workout.targetPaceSecondsPerKilometer,
-                targetPaceMaxSecondsPerKilometer:
-                    workout.targetPaceSecondsPerKilometer
-            )
-        } else {
-            fallback = WatchRunningWorkoutStep(
-                id: UUID(),
-                title: workout.title,
-                measure: .open,
-                distanceMeters: nil,
-                durationSeconds: nil,
-                intensityText: homePlannedPaceText(workout),
-                targetPaceMinSecondsPerKilometer:
-                    workout.targetPaceSecondsPerKilometer,
-                targetPaceMaxSecondsPerKilometer:
-                    workout.targetPaceSecondsPerKilometer
-            )
-        }
-
-        return WatchRunningWorkoutTransfer(
-            title: workout.title,
-            steps: [fallback],
-            routeAlerts:
-                settings.routeAlertConfiguration,
-            targetAlerts:
-                workout.targetAlertConfiguration
-        )
-    }
-
-    private func homeRunningSteps(
-        from template: RunningWorkoutTemplate
-    ) -> [WatchRunningWorkoutStep] {
-        template.blocks.flatMap { block in
-            let repetitions = max(block.repetitions, 1)
-            var result: [WatchRunningWorkoutStep] = []
-
-            for repetition in 0..<repetitions {
-                result.append(
-                    homeRunningStep(
-                        title:
-                            repetitions > 1
-                                ? "\(block.title) \(repetition + 1)/\(repetitions)"
-                                : block.title,
-                        target: block.work
-                    )
-                )
-
-                if repetition < repetitions - 1,
-                   let recovery = block.recovery {
-                    result.append(
-                        homeRunningStep(
-                            title: "Recovery",
-                            target: recovery
-                        )
-                    )
-                }
-            }
-
-            return result
-        }
-    }
-
-    private func homeRunningStep(
-        title: String,
-        target: RunningStepTarget
-    ) -> WatchRunningWorkoutStep {
-        let measure: WatchRunningStepMeasure
-
-        switch target.measure {
-        case .distance:
-            measure = .distance
-        case .time:
-            measure = .time
-        case .open:
-            measure = .open
-        }
-
-        return WatchRunningWorkoutStep(
-            id: UUID(),
-            title: title,
-            measure: measure,
-            distanceMeters: target.distanceMeters,
-            durationSeconds: target.durationSeconds,
-            intensityText:
-                homeRunningIntensityText(
-                    target.intensity
-                ),
-            targetPaceMinSecondsPerKilometer:
-                target.intensity.paceMinSecondsPerKilometer,
-            targetPaceMaxSecondsPerKilometer:
-                target.intensity.paceMaxSecondsPerKilometer
-        )
-    }
-
-    private func homeRunningIntensityText(
-        _ intensity: RunningIntensityTarget
-    ) -> String? {
-        switch intensity.kind {
-        case .none:
-            return nil
-
-        case .easy:
-            return "Easy effort"
-
-        case .pace:
-            if let minimum =
-                    intensity.paceMinSecondsPerKilometer,
-               let maximum =
-                    intensity.paceMaxSecondsPerKilometer {
-                return
-                    "\(homePaceText(minimum))–\(homePaceText(maximum)) /km"
-            }
-
-            if let pace =
-                    intensity.paceMinSecondsPerKilometer ??
-                    intensity.paceMaxSecondsPerKilometer {
-                return "\(homePaceText(pace)) /km"
-            }
-
-            return "Pace target"
-
-        case .heartRateZone:
-            if let zone = intensity.heartRateZone {
-                return "Heart-rate zone \(zone)"
-            }
-            return "Heart-rate target"
-
-        case .rpe:
-            if let rpe = intensity.rpe {
-                return String(
-                    format: "RPE %.1f",
-                    rpe
-                )
-            }
-            return "RPE target"
-        }
-    }
-
-    private func homePlannedPaceText(
-        _ workout: PlannedSession
-    ) -> String? {
-        guard let pace =
-                workout.targetPaceSecondsPerKilometer,
-              pace > 0
-        else {
-            return nil
-        }
-
-        return "\(homePaceText(pace)) /km"
-    }
-
-    private func homePaceText(
-        _ secondsPerKilometer: Double
-    ) -> String {
-        let total = max(
-            Int(secondsPerKilometer.rounded()),
-            0
-        )
-        return String(
-            format: "%d:%02d",
-            total / 60,
-            total % 60
-        )
     }
 
     private var homeNextUp: HomeNextUpItem? {
@@ -3061,42 +2801,24 @@ struct ATHLTHTrainView: View {
                     defaultTracking: settings.defaultStrengthTracking
                 ) { captureDevice, trackingMode, selectedFriends, audioCoach in
                     Task { @MainActor in
-                        await social.beginWorkoutWithFriends(
-                            title: workout.title,
-                            kind: .strength,
-                            friends: selectedFriends,
-                            creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username
-                        )
-
-                        if captureDevice == .appleWatch {
-                            do {
-                                try await watchConnection.startWorkoutOnWatch(.strength)
-                                watchConnection.sendAudioCoachConfiguration(
-                                    audioCoach
-                                )
-                                session.beginTrainingStatus(for: workout)
-                                strengthWorkout.start(
-                                    session: workout,
-                                    watchSessionID: UUID(),
-                                    trackingMode: trackingMode,
-                                    captureDevice: .appleWatch
-                                )
-                                startTrainSpotifyForPlannedWorkoutIfNeeded(workout)
-                                showingStrengthWorkout = true
-                            } catch {
-                                watchTransferError = error.localizedDescription
-                            }
-                        } else {
-                            session.beginTrainingStatus(for: workout)
-                            strengthWorkout.start(
-                                session: workout,
-                                watchSessionID: nil,
+                        do {
+                            try await WorkoutLaunchCoordinator.startStrength(
+                                workout: workout,
+                                captureDevice: captureDevice,
                                 trackingMode: trackingMode,
-                                captureDevice: .iPhone
+                                selectedFriends: selectedFriends,
+                                audioCoach: audioCoach,
+                                session: session,
+                                settings: settings,
+                                social: social,
+                                strengthWorkout: strengthWorkout,
+                                watchConnection: watchConnection,
+                                spotify: spotifyPlayback
                             )
-                            startTrainSpotifyForPlannedWorkoutIfNeeded(workout)
                             showingStrengthWorkout = true
+                        } catch {
+                            watchTransferError =
+                                error.localizedDescription
                         }
                     }
                 }
@@ -3614,28 +3336,6 @@ struct ATHLTHTrainView: View {
 
         case .none:
             EmptyView()
-        }
-    }
-
-    private func startTrainSpotifyForPlannedWorkoutIfNeeded(
-        _ workout: PlannedSession
-    ) {
-        guard settings.spotifyAutoplayLinkedPlaylists,
-              let plan =
-                session.trainingPlan(
-                    containingSessionID: workout.id
-                ),
-              plan.spotifyAutoplayOnWorkoutStart,
-              let playlist = plan.spotifyPlaylist
-        else {
-            return
-        }
-
-        Task { @MainActor in
-            await spotifyPlayback.startLinkedPlaylist(
-                playlist,
-                settings: settings
-            )
         }
     }
 
