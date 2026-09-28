@@ -245,7 +245,7 @@ struct ATHLTHTabHero: View {
     // participate in layout, so the hero/content boundary stays exactly where
     // it is. The bleed only becomes visible while the ScrollView is pulled
     // downward, preventing the light app canvas from flashing through.
-    private let scrollRevealBleed: CGFloat = 180
+    private let scrollRevealBleed: CGFloat = 240
 
     var body: some View {
         GeometryReader { proxy in
@@ -654,8 +654,11 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     let accent: Color
     let softTransition: Bool
     let immersiveTransition: Bool
+    let scrollFadeTransition: Bool
     private let hero: Hero
     private let content: Content
+
+    @State private var scrollOffset: CGFloat = 0
 
     // Tab heroes reserve extra space below their copy for the fade and overlap.
     // Other screens retain their existing layout.
@@ -664,6 +667,19 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     }
     private var sheetCornerRadius: CGFloat {
         immersiveTransition ? 36 : 30
+    }
+
+    private var scrollFadeProgress: CGFloat {
+        guard scrollFadeTransition else { return 0 }
+        return min(max(scrollOffset / 180, 0), 1)
+    }
+
+    private var scrollFadeHeight: CGFloat {
+        70 + (94 * scrollFadeProgress)
+    }
+
+    private var scrollFadeTopOpacity: CGFloat {
+        max(0.015, 0.16 - (0.145 * scrollFadeProgress))
     }
 
     private var usesTabletContentWidth: Bool {
@@ -681,12 +697,14 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         accent: Color,
         softTransition: Bool = false,
         immersiveTransition: Bool = false,
+        scrollFadeTransition: Bool = false,
         @ViewBuilder hero: () -> Hero,
         @ViewBuilder content: () -> Content
     ) {
         self.accent = accent
         self.softTransition = softTransition
         self.immersiveTransition = immersiveTransition
+        self.scrollFadeTransition = scrollFadeTransition
         self.hero = hero()
         self.content = content()
     }
@@ -697,6 +715,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
 
             VStack(spacing: -sheetOverlap) {
                 hero
+                    .ignoresSafeArea(edges: .top)
                     .environment(
                         \.athlthHeroBottomInset,
                         immersiveTransition
@@ -791,7 +810,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                         .allowsHitTesting(false)
                     }
                     .overlay(alignment: .top) {
-                        if immersiveTransition {
+                        if immersiveTransition && !scrollFadeTransition {
                             LinearGradient(
                                 colors: [
                                     Color.white.opacity(0.38),
@@ -812,13 +831,27 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                     }
                     .shadow(
                         color: ATHLTHTheme.accentDeep.opacity(
-                            immersiveTransition
-                                ? 0.065
-                                : (softTransition ? 0.045 : 0.075)
+                            scrollFadeTransition
+                                ? 0
+                                : (
+                                    immersiveTransition
+                                        ? 0.065
+                                        : (softTransition ? 0.045 : 0.075)
+                                )
                         ),
-                        radius: immersiveTransition ? 28 : 20,
+                        radius:
+                            scrollFadeTransition
+                                ? 0
+                                : (immersiveTransition ? 28 : 20),
                         x: 0,
-                        y: immersiveTransition ? -2 : (softTransition ? 4 : -4)
+                        y:
+                            scrollFadeTransition
+                                ? 0
+                                : (
+                                    immersiveTransition
+                                        ? -2
+                                        : (softTransition ? 4 : -4)
+                                )
                     )
                     .padding(
                         .horizontal,
@@ -830,6 +863,49 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
                 .background(Color.clear)
+                .mask {
+                    if scrollFadeTransition {
+                        VStack(spacing: 0) {
+                            LinearGradient(
+                                stops: [
+                                    .init(
+                                        color: Color.black.opacity(
+                                            scrollFadeTopOpacity
+                                        ),
+                                        location: 0
+                                    ),
+                                    .init(
+                                        color: Color.black.opacity(
+                                            0.44 + (0.04 * scrollFadeProgress)
+                                        ),
+                                        location: 0.24
+                                    ),
+                                    .init(
+                                        color: Color.black.opacity(0.84),
+                                        location: 0.62
+                                    ),
+                                    .init(
+                                        color: Color.black,
+                                        location: 1
+                                    )
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: scrollFadeHeight)
+
+                            Color.black
+                        }
+                    } else {
+                        Color.black
+                    }
+                }
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    max(0, geometry.contentOffset.y)
+                } action: { _, newOffset in
+                    guard scrollFadeTransition else { return }
+                    scrollOffset = newOffset
+                }
                 .zIndex(1)
             }
         }
