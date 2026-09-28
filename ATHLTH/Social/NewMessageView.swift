@@ -191,12 +191,17 @@ struct NewMessageView: View {
 
             VStack(spacing: 0) {
                 ForEach(people) { profile in
-                    NavigationLink {
-                        DirectMessageThreadView(friend: profile)
-                    } label: {
+                    if isDeclinedRequester(profile) {
                         NewMessagePersonRow(profile: profile)
+                            .opacity(0.72)
+                    } else {
+                        NavigationLink {
+                            DirectMessageThreadView(friend: profile)
+                        } label: {
+                            NewMessagePersonRow(profile: profile)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
 
                     if profile.id != people.last?.id {
                         Divider()
@@ -221,6 +226,20 @@ struct NewMessageView: View {
             }
         }
     }
+
+    private func isDeclinedRequester(
+        _ profile: SocialProfileCard
+    ) -> Bool {
+        guard let conversation =
+                messaging.conversation(with: profile.userID),
+              let currentUserID = messaging.currentUserID
+        else {
+            return false
+        }
+
+        return conversation.requestStatus == .declined &&
+            conversation.requestedBy == currentUserID
+    }
 }
 
 private struct NewMessagePersonRow: View {
@@ -233,11 +252,30 @@ private struct NewMessagePersonRow: View {
         social.relationshipState(with: profile.userID)
     }
 
+    private var conversation: DirectConversationRecord? {
+        messaging.conversation(with: profile.userID)
+    }
+
     private var hasConversation: Bool {
-        messaging.conversation(with: profile.userID) != nil
+        conversation != nil
+    }
+
+    private var isDeclinedRequester: Bool {
+        guard let conversation,
+              let currentUserID = messaging.currentUserID
+        else {
+            return false
+        }
+
+        return conversation.requestStatus == .declined &&
+            conversation.requestedBy == currentUserID
     }
 
     private var actionTitle: String {
+        if isDeclinedRequester {
+            return "Declined"
+        }
+
         if hasConversation {
             return "Open"
         }
@@ -248,7 +286,11 @@ private struct NewMessagePersonRow: View {
     }
 
     private var actionIcon: String {
-        social.isMutualFollow(profile.userID) || hasConversation
+        if isDeclinedRequester {
+            return "xmark.circle.fill"
+        }
+
+        return social.isMutualFollow(profile.userID) || hasConversation
             ? "message.fill"
             : "paperplane.fill"
     }
@@ -270,6 +312,8 @@ private struct NewMessagePersonRow: View {
 
                     if social.isMutualFollow(profile.userID) {
                         Text("• Mutual follow")
+                    } else if isDeclinedRequester {
+                        Text("• Request declined")
                     } else if !hasConversation {
                         Text("• Message request")
                     }
