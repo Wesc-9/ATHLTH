@@ -540,10 +540,12 @@ struct HomeActivitySection: View {
             )
         }
         .task(id: detailLoadKey) {
-            await social.refreshHomeFeed()
+            // Keep Home responsive: render the workout visual first,
+            // then enrich the card with social state and Coach data.
             await loadFeaturedWorkoutDetails()
-            await loadWorkoutAIInsights()
+            await social.refreshHomeFeed()
             await loadPublishedActivityRecords()
+            await loadWorkoutAIInsights()
         }
     }
 
@@ -779,9 +781,9 @@ private struct HomeActivityOutdoorCard: View {
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.90),
-                        Color.white.opacity(0.52),
-                        Color.clear
+                        Color.white.opacity(0.96),
+                        Color.white.opacity(0.72),
+                        Color.white.opacity(0.08)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -789,9 +791,9 @@ private struct HomeActivityOutdoorCard: View {
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.04),
+                        Color.white.opacity(0.02),
                         Color.clear,
-                        Color.black.opacity(0.34)
+                        Color.black.opacity(0.42)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -807,7 +809,10 @@ private struct HomeActivityOutdoorCard: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(ATHLTHTheme.primaryText)
                                     .frame(width: 40, height: 40)
-                                    .background(.ultraThinMaterial, in: Circle())
+                                    .background(
+                                        Color.white.opacity(0.88),
+                                        in: Circle()
+                                    )
                                     .overlay {
                                         Circle()
                                             .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
@@ -848,7 +853,10 @@ private struct HomeActivityOutdoorCard: View {
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                                 .frame(width: 36, height: 36)
-                                .background(.ultraThinMaterial, in: Circle())
+                                .background(
+                                    Color.white.opacity(0.88),
+                                    in: Circle()
+                                )
                                 .overlay {
                                     Circle()
                                         .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
@@ -905,7 +913,7 @@ private struct HomeActivityOutdoorCard: View {
                     .allowsHitTesting(false)
                 }
             }
-            .frame(height: 252)
+            .frame(height: 240)
             .clipped()
 
             VStack(spacing: 10) {
@@ -1085,10 +1093,10 @@ private struct HomeActivityOutdoorCard: View {
             .stroke(Color.white.opacity(0.84), lineWidth: 0.8)
         }
         .shadow(
-            color: Color.black.opacity(0.10),
-            radius: 18,
+            color: Color.black.opacity(0.075),
+            radius: 12,
             x: 0,
-            y: 9
+            y: 6
         )
     }
 
@@ -1489,9 +1497,9 @@ private final class HomeActivityRouteSnapshotRenderer {
         NSCache<NSString, UIImage>()
 
     private init() {
-        cache.countLimit = 12
+        cache.countLimit = 8
         cache.totalCostLimit =
-            32 * 1_024 * 1_024
+            20 * 1_024 * 1_024
     }
 
     static func cacheKey(
@@ -1541,7 +1549,7 @@ private final class HomeActivityRouteSnapshotRenderer {
         if coordinates.count >= 2 {
             points = Self.sampled(
                 coordinates,
-                maximumCount: 220
+                maximumCount: 180
             )
         } else if let singleLocation {
             points = [singleLocation]
@@ -1554,7 +1562,7 @@ private final class HomeActivityRouteSnapshotRenderer {
         options.region =
             Self.region(for: points)
         options.size =
-            CGSize(width: 520, height: 320)
+            CGSize(width: 460, height: 285)
         options.scale = 2
         options.mapType = .satellite
         options.pointOfInterestFilter =
@@ -2623,38 +2631,32 @@ private struct HomeActivityStrengthCard: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                HomeActivityMuscleArtwork(
-                    muscleGroups: focusAreas
-                )
-                .frame(width: 126, height: 150)
-            }
+                HStack(alignment: .center, spacing: 8) {
+                    HomeActivityMuscleArtwork(
+                        muscleGroups: focusAreas
+                    )
+                    .frame(width: 92, height: 128)
 
-            if !focusAreas.isEmpty {
-                HStack(spacing: 7) {
-                    Text("Focus Areas")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    if !focusAreas.isEmpty {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Focus Areas")
+                                .font(.system(size: 9.5, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(focusAreas, id: \.self) { group in
+                            ForEach(focusAreas.prefix(4), id: \.self) { group in
                                 HStack(spacing: 5) {
                                     Circle()
                                         .fill(Color.indigo.opacity(0.72))
                                         .frame(width: 6, height: 6)
 
                                     Text(group)
-                                        .font(.caption2.weight(.semibold))
+                                        .font(.system(size: 9.5, weight: .medium))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .lineLimit(1)
                                 }
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 5)
-                                .background(
-                                    Color.indigo.opacity(0.06),
-                                    in: Capsule()
-                                )
                             }
                         }
+                        .frame(width: 72, alignment: .leading)
                     }
                 }
             }
@@ -2739,10 +2741,10 @@ private struct HomeActivityStrengthCard: View {
             .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
         }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.055),
-            radius: 13,
+            color: ATHLTHTheme.accentDeep.opacity(0.045),
+            radius: 9,
             x: 0,
-            y: 6
+            y: 4
         )
     }
 
