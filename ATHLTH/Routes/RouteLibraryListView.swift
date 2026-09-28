@@ -61,6 +61,7 @@ struct RouteLibraryListView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var recents: LibraryRecentsStore
     @StateObject private var locationStore = HomeLocationStore()
     let source: RouteLibrarySource
 
@@ -253,6 +254,22 @@ struct RouteLibraryListView: View {
                             }
                             .padding(.vertical, 5)
                         }
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                recents.markUsed(
+                                    .route,
+                                    itemID: entry.id.uuidString,
+                                    title: entry.title,
+                                    subtitle:
+                                        settings.measurementPreference
+                                            .distance(
+                                                fromKilometers:
+                                                    entry.distanceKilometers
+                                            ),
+                                    icon: "map.fill"
+                                )
+                            }
+                        )
 
                         LibraryFavoriteButton(
                             kind: .route,
@@ -297,6 +314,7 @@ struct RouteLibraryListView: View {
             }
         }
         .task(id: catalogKey) {
+            recents.refresh()
             async let favoriteRefresh: Void = favorites.refresh()
             if source == .database {
                 await loadCatalog()
