@@ -55,6 +55,11 @@ final class HealthKitManager: ObservableObject {
     private var observerQueries: [HKObserverQuery] = []
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var profilePerformanceCache: (stats: ProfilePerformanceStats, generatedAt: Date)?
+    private var runningRoutePerformanceCache:
+        [UUID: RunningRoutePerformanceEntry] = [:]
+    private var runningRoutePerformanceCacheLoaded = false
+    private let runningRoutePerformanceDiskKey =
+        "athlth.health.runningRoutePerformance.v1"
     private var recoveryTrendCache:
         [Int: (snapshot: RecoveryTrendSnapshot, generatedAt: Date)] = [:]
     private var personalRecordsCache: (records: [HealthPersonalRecord], generatedAt: Date)?
@@ -1705,60 +1710,43 @@ final class HealthKitManager: ObservableObject {
             partial + (Self.safeDoubleValue(workout.totalDistance, unit: .meter()) ?? 0)
         }
 
-        var fastestOneK: TimedDistancePerformanceRecord?
-        var fastestFiveK: TimedDistancePerformanceRecord?
-        var fastestMarathon: TimedDistancePerformanceRecord?
+        let runningPerformance =
+            await runningRoutePerformanceEntries(
+                for: runningWorkouts
+            )
 
-        for workout in runningWorkouts {
-            let reportedDistance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()) ?? 0
-            guard reportedDistance >= 1_000,
-                  let route = try? await fetchRoute(for: workout),
-                  route.count >= 2
-            else {
-                continue
-            }
+        func bestRecord(
+            distanceMeters: Double,
+            duration: (RunningRoutePerformanceEntry) -> TimeInterval?
+        ) -> TimedDistancePerformanceRecord? {
+            runningPerformance
+                .compactMap { entry -> TimedDistancePerformanceRecord? in
+                    guard let value = duration(entry) else {
+                        return nil
+                    }
 
-            if let duration = fastestSegmentDuration(
-                in: route,
-                targetDistance: 1_000
-            ),
-               fastestOneK.map { duration < $0.duration } ?? true {
-                fastestOneK = TimedDistancePerformanceRecord(
-                    distanceMeters: 1_000,
-                    duration: duration,
-                    date: workout.startDate,
-                    workoutID: workout.uuid
-                )
-            }
-
-            if reportedDistance >= 5_000,
-               let duration = fastestSegmentDuration(
-                    in: route,
-                    targetDistance: 5_000
-               ),
-               fastestFiveK.map { duration < $0.duration } ?? true {
-                fastestFiveK = TimedDistancePerformanceRecord(
-                    distanceMeters: 5_000,
-                    duration: duration,
-                    date: workout.startDate,
-                    workoutID: workout.uuid
-                )
-            }
-
-            if reportedDistance >= 42_195,
-               let duration = fastestSegmentDuration(
-                    in: route,
-                    targetDistance: 42_195
-               ),
-               fastestMarathon.map { duration < $0.duration } ?? true {
-                fastestMarathon = TimedDistancePerformanceRecord(
-                    distanceMeters: 42_195,
-                    duration: duration,
-                    date: workout.startDate,
-                    workoutID: workout.uuid
-                )
-            }
+                    return TimedDistancePerformanceRecord(
+                        distanceMeters: distanceMeters,
+                        duration: value,
+                        date: entry.startDate,
+                        workoutID: entry.workoutID
+                    )
+                }
+                .min { $0.duration < $1.duration }
         }
+
+        let fastestOneK = bestRecord(
+            distanceMeters: 1_000,
+            duration: { $0.fastestOneK }
+        )
+        let fastestFiveK = bestRecord(
+            distanceMeters: 5_000,
+            duration: { $0.fastestFiveK }
+        )
+        let fastestMarathon = bestRecord(
+            distanceMeters: 42_195,
+            duration: { $0.fastestMarathon }
+        )
 
         let stats = ProfilePerformanceStats(
             fastestOneKilometer: fastestOneK,
@@ -1831,36 +1819,39 @@ final class HealthKitManager: ObservableObject {
         var fastestRunningRecords:
             [HealthPersonalRecordKind: (duration: TimeInterval, date: Date)] = [:]
 
-        for workout in workouts where workout.workoutActivityType == .running {
-            guard let reportedDistance =
-                    Self.safeDoubleValue(workout.totalDistance, unit: .meter()),
-                  reportedDistance >= 1_000,
-                  let route = try? await fetchRoute(for: workout),
-                  route.count >= 2
-            else {
-                continue
-            }
+        let runningWorkouts = workouts.filter {
+            $0.workoutActivityType == .running &&
+            (Self.safeDoubleValue(
+                $0.totalDistance,
+                unit: .meter()
+            ) ?? 0) >= 1_000
+        }
 
-            for (kind, targetDistance) in timedRunningTargets
-            where reportedDistance >= targetDistance {
-                guard let duration = fastestSegmentDuration(
-                    in: route,
-                    targetDistance: targetDistance
-                ) else {
+        let runningPerformance =
+            await runningRoutePerformanceEntries(
+                for: runningWorkouts
+            )
+
+        for entry in runningPerformance {
+            for (kind, _) in timedRunningTargets {
+                guard let duration =
+                        entry.duration(for: kind)
+                else {
                     continue
                 }
 
-                if let existing = fastestRunningRecords[kind] {
+                if let existing =
+                        fastestRunningRecords[kind] {
                     if duration < existing.duration {
                         fastestRunningRecords[kind] = (
                             duration,
-                            workout.startDate
+                            entry.startDate
                         )
                     }
                 } else {
                     fastestRunningRecords[kind] = (
                         duration,
-                        workout.startDate
+                        entry.startDate
                     )
                 }
             }
@@ -2773,6 +2764,199 @@ final class HealthKitManager: ObservableObject {
         UserDefaults.standard.removeObject(
             forKey: trophySnapshotDiskKey
         )
+    }
+
+    private struct RunningRoutePerformanceEntry: Codable {
+        let workoutID: UUID
+        let startDate: Date
+        let endDate: Date
+        let reportedDistanceMeters: Double
+        let analyzedAt: Date
+        let routeAvailable: Bool
+        let fastestOneK: TimeInterval?
+        let fastestMile: TimeInterval?
+        let fastestFiveK: TimeInterval?
+        let fastestTenK: TimeInterval?
+        let fastestHalfMarathon: TimeInterval?
+        let fastestMarathon: TimeInterval?
+
+        func duration(
+            for kind: HealthPersonalRecordKind
+        ) -> TimeInterval? {
+            switch kind {
+            case .fastest1K:
+                return fastestOneK
+            case .fastestMile:
+                return fastestMile
+            case .fastest5K:
+                return fastestFiveK
+            case .fastest10K:
+                return fastestTenK
+            case .fastestHalfMarathon:
+                return fastestHalfMarathon
+            case .fastestMarathon:
+                return fastestMarathon
+            default:
+                return nil
+            }
+        }
+    }
+
+    private struct RunningRoutePerformanceDiskCache: Codable {
+        let entries: [RunningRoutePerformanceEntry]
+    }
+
+    private func loadRunningRoutePerformanceCacheIfNeeded() {
+        guard !runningRoutePerformanceCacheLoaded else {
+            return
+        }
+
+        runningRoutePerformanceCacheLoaded = true
+
+        guard let data = UserDefaults.standard.data(
+                  forKey: runningRoutePerformanceDiskKey
+              ),
+              let cache = try? JSONDecoder().decode(
+                  RunningRoutePerformanceDiskCache.self,
+                  from: data
+              )
+        else {
+            return
+        }
+
+        runningRoutePerformanceCache =
+            Dictionary(
+                uniqueKeysWithValues:
+                    cache.entries.map {
+                        ($0.workoutID, $0)
+                    }
+            )
+    }
+
+    private func persistRunningRoutePerformanceCache() {
+        let diskCache =
+            RunningRoutePerformanceDiskCache(
+                entries:
+                    runningRoutePerformanceCache
+                    .values
+                    .sorted {
+                        $0.endDate > $1.endDate
+                    }
+            )
+
+        guard let data =
+                try? JSONEncoder().encode(diskCache)
+        else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey: runningRoutePerformanceDiskKey
+        )
+    }
+
+    private func runningRoutePerformanceEntries(
+        for runningWorkouts: [HKWorkout]
+    ) async -> [RunningRoutePerformanceEntry] {
+        loadRunningRoutePerformanceCacheIfNeeded()
+
+        let currentIDs =
+            Set(runningWorkouts.map(\.uuid))
+        let staleIDs =
+            runningRoutePerformanceCache.keys
+            .filter { !currentIDs.contains($0) }
+
+        var cacheChanged = !staleIDs.isEmpty
+        for id in staleIDs {
+            runningRoutePerformanceCache[id] = nil
+        }
+
+        for workout in runningWorkouts {
+            let distance =
+                Self.safeDoubleValue(
+                    workout.totalDistance,
+                    unit: .meter()
+                ) ?? 0
+
+            guard distance >= 1_000 else {
+                continue
+            }
+
+            if let cached =
+                    runningRoutePerformanceCache[
+                        workout.uuid
+                    ],
+               abs(
+                   cached.endDate.timeIntervalSince(
+                       workout.endDate
+                   )
+               ) < 1,
+               abs(
+                   cached.reportedDistanceMeters -
+                   distance
+               ) < 1 {
+                let shouldRetryUnavailableRoute =
+                    !cached.routeAvailable &&
+                    Date().timeIntervalSince(
+                        cached.analyzedAt
+                    ) > 600 &&
+                    Date().timeIntervalSince(
+                        workout.endDate
+                    ) < 86_400
+
+                if !shouldRetryUnavailableRoute {
+                    continue
+                }
+            }
+
+            let route =
+                (try? await fetchRoute(
+                    for: workout
+                )) ?? []
+            let hasRoute = route.count >= 2
+
+            func segment(
+                _ target: Double
+            ) -> TimeInterval? {
+                guard hasRoute,
+                      distance >= target
+                else {
+                    return nil
+                }
+
+                return fastestSegmentDuration(
+                    in: route,
+                    targetDistance: target
+                )
+            }
+
+            runningRoutePerformanceCache[
+                workout.uuid
+            ] = RunningRoutePerformanceEntry(
+                workoutID: workout.uuid,
+                startDate: workout.startDate,
+                endDate: workout.endDate,
+                reportedDistanceMeters: distance,
+                analyzedAt: Date(),
+                routeAvailable: hasRoute,
+                fastestOneK: segment(1_000),
+                fastestMile: segment(1_609.344),
+                fastestFiveK: segment(5_000),
+                fastestTenK: segment(10_000),
+                fastestHalfMarathon: segment(21_097.5),
+                fastestMarathon: segment(42_195)
+            )
+            cacheChanged = true
+        }
+
+        if cacheChanged {
+            persistRunningRoutePerformanceCache()
+        }
+
+        return runningWorkouts.compactMap {
+            runningRoutePerformanceCache[$0.uuid]
+        }
     }
 
     private func fetchAllWorkoutsCached(
