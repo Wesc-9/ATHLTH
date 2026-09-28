@@ -209,4 +209,61 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
         )
     }
 
+
+    func testAudioCoachDuckingDefaultsOnForLegacyPayloads() throws {
+        let legacyJSON = """
+        {
+          "enabled": true,
+          "language": "system",
+          "distanceIntervalMeters": 1000,
+          "timeIntervalSeconds": null,
+          "announceDistance": true,
+          "announceElapsedTime": true,
+          "announceAveragePace": true,
+          "announceClockTime": false,
+          "announceHeartRate": false,
+          "announceRemainingRouteDistance": false,
+          "announceEstimatedRemainingRouteTime": false,
+          "routeDistanceMeters": null,
+          "announceCurrentWorkoutStep": false,
+          "announceRemainingStepTime": false,
+          "announceRemainingStepDistance": false
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self,
+            from: Data(legacyJSON.utf8)
+        )
+
+        XCTAssertNil(decoded.duckOtherAudio)
+        XCTAssertTrue(decoded.shouldDuckOtherAudio)
+    }
+
+    func testAudioCoachDuckingSurvivesWatchTransferEncoding() throws {
+        var configuration =
+            WatchAudioCoachConfiguration.disabled
+        configuration.enabled = true
+        configuration.duckOtherAudio = false
+
+        let data =
+            try JSONEncoder().encode(
+                configuration
+            )
+        let decoded =
+            try JSONDecoder().decode(
+                WatchAudioCoachConfiguration.self,
+                from: data
+            )
+
+        XCTAssertTrue(decoded.enabled)
+        XCTAssertEqual(
+            decoded.duckOtherAudio,
+            false
+        )
+        XCTAssertFalse(
+            decoded.shouldDuckOtherAudio
+        )
+    }
+
 }
