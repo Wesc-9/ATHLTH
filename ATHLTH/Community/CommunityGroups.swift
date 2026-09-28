@@ -1900,8 +1900,10 @@ final class CommunityGroupStore: ObservableObject {
                 )
                 .execute()
 
+            // The announcement only changes detail-scoped group content.
+            // Avoid a full Community reload (groups, memberships, activity,
+            // invites and profiles) for a local timeline mutation.
             await loadGroupContent(groupID)
-            await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
