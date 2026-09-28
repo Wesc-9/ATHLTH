@@ -677,7 +677,12 @@ struct GoalCreationView: View {
     @State private var imageData: Data?
 
     var body: some View {
-        NavigationStack {
+        let goalImageButtonTitle =
+            imageData == nil
+                ? "Choose from Photos"
+                : "Change photo"
+
+        return NavigationStack {
             VStack(spacing: 0) {
                 progressHeader
 
@@ -857,7 +862,7 @@ struct GoalCreationView: View {
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 HStack {
                     Image(systemName: "photo.on.rectangle.angled")
-                    Text(imageData == nil ? "Choose from Photos" : "Change photo")
+                    Text(goalImageButtonTitle)
                     Spacer()
                     Image(systemName: "chevron.right")
                 }
@@ -1399,7 +1404,12 @@ struct GoalEditView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        let photoButtonTitle =
+            imageData == nil
+                ? "Choose or change photo"
+                : "New photo selected"
+
+        return NavigationStack {
             Form {
                 Section("Goal") {
                     TextField("Title", text: $title)
@@ -1420,7 +1430,7 @@ struct GoalEditView: View {
                 Section("Identity") {
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         Label(
-                            imageData == nil ? "Choose or change photo" : "New photo selected",
+                            photoButtonTitle,
                             systemImage: "photo.on.rectangle.angled"
                         )
                     }
