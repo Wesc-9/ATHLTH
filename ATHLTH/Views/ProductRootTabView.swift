@@ -1871,6 +1871,7 @@ struct ATHLTHHomeView: View {
                 homeWatchTransferMessage =
                     "\(watchKind.title) started on Apple Watch."
             } catch {
+                await social.cancelActiveWorkout()
                 homeWatchTransferError = error.localizedDescription
             }
         }
@@ -3395,6 +3396,9 @@ struct ATHLTHTrainView: View {
                 watchConnection.sendWorkoutRouteSelection(nil)
             }
         } catch {
+            Task { @MainActor in
+                await social.cancelActiveWorkout()
+            }
             watchTransferError = error.localizedDescription
             return
         }
@@ -3438,6 +3442,7 @@ struct ATHLTHTrainView: View {
                 watchTransferMessage =
                     "\(configuration.title) started on Apple Watch."
             } catch {
+                await social.cancelActiveWorkout()
                 watchTransferError = error.localizedDescription
             }
         }
@@ -3481,6 +3486,7 @@ struct ATHLTHTrainView: View {
                 watchTransferMessage =
                     "Walk started on Apple Watch."
             } catch {
+                await social.cancelActiveWorkout()
                 watchTransferError = error.localizedDescription
             }
         }
@@ -3528,6 +3534,9 @@ struct ATHLTHTrainView: View {
                 watchConnection.sendWorkoutRouteSelection(nil)
             }
         } catch {
+            Task { @MainActor in
+                await social.cancelActiveWorkout()
+            }
             watchTransferError = error.localizedDescription
             return
         }
@@ -3551,6 +3560,7 @@ struct ATHLTHTrainView: View {
                 watchTransferMessage =
                     "\(workout.title) started on Apple Watch."
             } catch {
+                await social.cancelActiveWorkout()
                 watchTransferError = error.localizedDescription
             }
         }
