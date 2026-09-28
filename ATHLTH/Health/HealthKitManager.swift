@@ -108,7 +108,9 @@ final class HealthKitManager: ObservableObject {
     private let trophySnapshotDiskKey = "athlth.health.trophySnapshotCache.v1"
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
-    private let currentAuthorizationVersion = 2
+    // Version 3 adds write access for walking/running distance so
+    // HKWorkoutBuilder can persist distance as an associated Health sample.
+    private let currentAuthorizationVersion = 3
     private let refreshInProgressKey = "athlth.healthRefreshInProgress"
     private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
     private let currentSafeRefreshVersion = 2
@@ -224,7 +226,20 @@ final class HealthKitManager: ObservableObject {
     }
 
     private var shareTypes: Set<HKSampleType> {
-        [HKObjectType.workoutType(), HKSeriesType.workoutRoute()]
+        var types: Set<HKSampleType> = [
+            HKObjectType.workoutType(),
+            HKSeriesType.workoutRoute()
+        ]
+
+        if let distance =
+                HKObjectType.quantityType(
+                    forIdentifier:
+                        .distanceWalkingRunning
+                ) {
+            types.insert(distance)
+        }
+
+        return types
     }
 
     var canWriteWorkouts: Bool {
@@ -1957,19 +1972,44 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
-        if let workout = workouts
-            .filter({ $0.totalEnergyBurned != nil })
-            .max(by: {
-                (Self.safeDoubleValue($0.totalEnergyBurned, unit: .kilocalorie()) ?? 0) <
-                (Self.safeDoubleValue($1.totalEnergyBurned, unit: .kilocalorie()) ?? 0)
-            }),
-           let calories = Self.safeDoubleValue(workout.totalEnergyBurned, unit: .kilocalorie()),
-           calories > 0 {
+        if let activeEnergyType =
+                HKObjectType.quantityType(
+                    forIdentifier:
+                        .activeEnergyBurned
+                ),
+           let record = workouts.compactMap({
+                workout ->
+                    (
+                        workout: HKWorkout,
+                        calories: Double
+                    )? in
+
+                guard let quantity =
+                        workout.statistics(
+                            for: activeEnergyType
+                        )?.sumQuantity(),
+                      let calories =
+                        Self.safeDoubleValue(
+                            quantity,
+                            unit: .kilocalorie()
+                        )
+                else {
+                    return nil
+                }
+
+                return (
+                    workout: workout,
+                    calories: calories
+                )
+           }).max(by: {
+                $0.calories < $1.calories
+           }),
+           record.calories > 0 {
             records.append(
                 HealthPersonalRecord(
                     kind: .mostActiveCalories,
-                    value: calories,
-                    date: workout.startDate
+                    value: record.calories,
+                    date: record.workout.startDate
                 )
             )
         }
