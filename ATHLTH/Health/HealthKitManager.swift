@@ -108,9 +108,11 @@ final class HealthKitManager: ObservableObject {
     private let trophySnapshotDiskKey = "athlth.health.trophySnapshotCache.v1"
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
-    // Version 3 adds write access for walking/running distance so
-    // HKWorkoutBuilder can persist distance as an associated Health sample.
-    private let currentAuthorizationVersion = 3
+    // Keep the existing authorization version stable so users upgrading
+    // from earlier TestFlight builds retain their current Health connection.
+    // The expanded write set is requested the next time Health permissions
+    // are explicitly reviewed.
+    private let currentAuthorizationVersion = 2
     private let refreshInProgressKey = "athlth.healthRefreshInProgress"
     private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
     private let currentSafeRefreshVersion = 2
