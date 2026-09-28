@@ -1974,6 +1974,403 @@ struct TrainingPlanCatalogDetailView: View {
     }
 }
 
+
+struct PersonalizeTrainingPlanView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+
+    let entry: TrainingPlanCatalogEntry
+
+    @State private var startDate = Date()
+    @State private var selectedDays: Set<Int> = []
+    @State private var configured = false
+    @State private var scheduleError: String?
+
+    private let dayLabels = [
+        "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+    ]
+
+    private var hasValidDays: Bool {
+        selectedDays.count == entry.sessionsPerWeek
+    }
+
+    private var endDate: Date {
+        Calendar.current.date(
+            byAdding: .day,
+            value: max(entry.durationWeeks * 7 - 1, 0),
+            to: Calendar.current.startOfDay(for: startDate)
+        ) ?? startDate
+    }
+
+    private var conflictingPlan: TrainingPlan? {
+        session.trainingPlanConflict(
+            startDate: startDate,
+            weekCount: entry.durationWeeks
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    LibraryPremiumIntro(
+                        eyebrow: "MAKE IT MINE",
+                        title: entry.title,
+                        subtitle:
+                            "Choose when this plan fits your life. ATHLTH keeps the training structure, but places the sessions on the days you prefer.",
+                        icon: "slider.horizontal.3",
+                        accent: ATHLTHTheme.accent
+                    ) {
+                        HStack(spacing: 8) {
+                            LibraryStatPill(
+                                value: "\(entry.durationWeeks)",
+                                label: "weeks",
+                                icon: "calendar",
+                                tint: ATHLTHTheme.accent
+                            )
+
+                            LibraryStatPill(
+                                value: "\(entry.sessionsPerWeek)",
+                                label: "days / week",
+                                icon: "repeat",
+                                tint: ATHLTHTheme.vitality
+                            )
+                        }
+                    }
+
+                    ATHLTHCard {
+                        VStack(alignment: .leading, spacing: 13) {
+                            Text("START")
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1.6)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+
+                            DatePicker(
+                                "Start date",
+                                selection: $startDate,
+                                in: Calendar.current.startOfDay(
+                                    for: Date()
+                                )...,
+                                displayedComponents: .date
+                            )
+
+                            Divider()
+
+                            HStack {
+                                Text("Estimated finish")
+                                    .font(.subheadline)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.mutedText
+                                    )
+
+                                Spacer()
+
+                                Text(
+                                    endDate.formatted(
+                                        date: .abbreviated,
+                                        time: .omitted
+                                    )
+                                )
+                                .font(.subheadline.weight(.semibold))
+                            }
+                        }
+                    }
+
+                    ATHLTHCard {
+                        VStack(alignment: .leading, spacing: 13) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("TRAINING DAYS")
+                                        .font(
+                                            .system(
+                                                size: 9,
+                                                weight: .bold
+                                            )
+                                        )
+                                        .tracking(1.6)
+                                        .foregroundStyle(
+                                            ATHLTHTheme.mutedText
+                                        )
+
+                                    Text(
+                                        "Choose \(entry.sessionsPerWeek) days"
+                                    )
+                                    .font(.headline)
+                                }
+
+                                Spacer()
+
+                                Text(
+                                    "\(selectedDays.count)/\(entry.sessionsPerWeek)"
+                                )
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(
+                                    hasValidDays
+                                        ? ATHLTHTheme.vitality
+                                        : ATHLTHTheme.accent
+                                )
+                            }
+
+                            HStack(spacing: 7) {
+                                ForEach(1...7, id: \.self) { day in
+                                    let selected =
+                                        selectedDays.contains(day)
+
+                                    Button {
+                                        toggleDay(day)
+                                    } label: {
+                                        Text(dayLabels[day - 1])
+                                            .font(
+                                                .system(
+                                                    size: 11,
+                                                    weight: .bold
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                selected
+                                                    ? Color.white
+                                                    : ATHLTHTheme
+                                                        .primaryText
+                                                        .opacity(0.72)
+                                            )
+                                            .frame(
+                                                maxWidth: .infinity
+                                            )
+                                            .frame(height: 42)
+                                            .background(
+                                                selected
+                                                    ? ATHLTHTheme.accent
+                                                    : Color.white
+                                                        .opacity(0.70),
+                                                in: RoundedRectangle(
+                                                    cornerRadius: 12,
+                                                    style: .continuous
+                                                )
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+
+                            Text(
+                                "The plan keeps its workout order. ATHLTH maps session 1, 2, 3 and so on to your selected days each week."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    ATHLTHCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("PLAN FIT")
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1.6)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+
+                            Label(
+                                entry.level,
+                                systemImage: "speedometer"
+                            )
+                            .font(.subheadline.weight(.semibold))
+
+                            Label(
+                                entry.goal,
+                                systemImage: "scope"
+                            )
+                            .font(.subheadline.weight(.semibold))
+
+                            Text(
+                                "You can still edit individual workouts, exercises, routes and targets after the plan is created."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let conflict = conflictingPlan {
+                        HStack(alignment: .top, spacing: 11) {
+                            Image(
+                                systemName:
+                                    "calendar.badge.exclamationmark"
+                            )
+                            .foregroundStyle(Color.orange)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("This overlaps another plan")
+                                    .font(.subheadline.weight(.semibold))
+
+                                Text(
+                                    "\(conflict.title) already covers part of these dates. Choose another start date."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(14)
+                        .background(
+                            Color.orange.opacity(0.08),
+                            in: RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                        )
+                    }
+
+                    Button {
+                        createScheduledPlan()
+                    } label: {
+                        HStack {
+                            Label(
+                                "Create My Plan",
+                                systemImage: "calendar.badge.plus"
+                            )
+                            .font(.headline)
+
+                            Spacer()
+
+                            Image(systemName: "arrow.right")
+                                .font(.caption.bold())
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 17)
+                        .frame(height: 54)
+                        .background(
+                            ATHLTHTheme.accentDeep,
+                            in: RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        !hasValidDays ||
+                        conflictingPlan != nil
+                    )
+                    .opacity(
+                        !hasValidDays ||
+                        conflictingPlan != nil
+                            ? 0.45
+                            : 1
+                    )
+
+                    Button {
+                        _ = session.saveCatalogPlanTemplate(
+                            entry,
+                            preferredDayIndexes:
+                                selectedDays.sorted()
+                        )
+                        dismiss()
+                    } label: {
+                        Label(
+                            "Save for later",
+                            systemImage: "bookmark"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTheme.accent)
+                    .disabled(!hasValidDays)
+                }
+                .padding(18)
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
+            }
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: ATHLTHTheme.accent.opacity(0.24)
+                )
+            )
+            .navigationTitle("Make it mine")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                guard !configured else { return }
+                configured = true
+                startDate =
+                    session.suggestedTrainingPlanStartDate
+                selectedDays = Set(
+                    defaultDays(
+                        for: entry.sessionsPerWeek
+                    )
+                )
+            }
+            .alert(
+                "Could not create plan",
+                isPresented: Binding(
+                    get: { scheduleError != nil },
+                    set: { shown in
+                        if !shown {
+                            scheduleError = nil
+                        }
+                    }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(scheduleError ?? "")
+            }
+        }
+    }
+
+    private func toggleDay(
+        _ day: Int
+    ) {
+        if selectedDays.contains(day) {
+            selectedDays.remove(day)
+            return
+        }
+
+        guard selectedDays.count < entry.sessionsPerWeek
+        else {
+            return
+        }
+
+        selectedDays.insert(day)
+    }
+
+    private func defaultDays(
+        for count: Int
+    ) -> [Int] {
+        switch count {
+        case 2: return [2, 5]
+        case 3: return [2, 4, 6]
+        case 4: return [1, 3, 5, 7]
+        case 5: return [1, 2, 4, 5, 7]
+        default: return [1, 2, 3, 4, 5, 6]
+        }
+    }
+
+    private func createScheduledPlan() {
+        guard hasValidDays else { return }
+
+        guard session.scheduleCatalogPlan(
+            entry,
+            startDate: startDate,
+            preferredDayIndexes:
+                selectedDays.sorted()
+        ) != nil else {
+            scheduleError =
+                "The plan could not be scheduled. Check that its dates do not overlap another active or upcoming plan."
+            return
+        }
+
+        dismiss()
+    }
+}
+
 struct MyTrainingPlansLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
     @State private var showingCreatePlan = false
