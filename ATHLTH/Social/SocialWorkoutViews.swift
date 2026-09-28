@@ -540,10 +540,12 @@ struct HomeActivitySection: View {
             )
         }
         .task(id: detailLoadKey) {
-            await social.refreshHomeFeed()
+            // Keep Home responsive: render the workout visual first,
+            // then enrich the card with social state and Coach data.
             await loadFeaturedWorkoutDetails()
-            await loadWorkoutAIInsights()
+            await social.refreshHomeFeed()
             await loadPublishedActivityRecords()
+            await loadWorkoutAIInsights()
         }
     }
 
@@ -591,10 +593,30 @@ struct HomeActivitySection: View {
         var refreshed: [UUID: SocialActivityRecord] = [:]
 
         for workout in featuredWorkouts {
-            if let activity = await social.workoutActivity(
-                for: workout.id
-            ) {
-                refreshed[workout.id] = activity
+            if let feedItem =
+                social.feed.first(
+                    where: {
+                        $0.actor.userID ==
+                            social.currentUserID &&
+                        $0.activity.kind ==
+                            "workout" &&
+                        $0.activity.metadata?[
+                            "workout_id"
+                        ] ==
+                            workout.id.uuidString
+                    }
+                ) {
+                refreshed[workout.id] =
+                    feedItem.activity
+                continue
+            }
+
+            if let activity =
+                await social.workoutActivity(
+                    for: workout.id
+                ) {
+                refreshed[workout.id] =
+                    activity
             }
         }
 
@@ -668,6 +690,10 @@ struct HomeActivitySection: View {
                 await health
                     .workoutAIInsightContext(
                         for: summary,
+                        detail:
+                            workoutDetails[
+                                workout.id
+                            ],
                         maximumHeartRateBPM:
                             session
                                 .onboardingProfile?
@@ -692,6 +718,160 @@ struct HomeActivitySection: View {
     }
 }
 
+private struct HomeActivityVisualRecipe: Equatable {
+    let palette: String
+    let scene: String
+    let light: String
+    let motif: String
+    let energy: String
+    let variant: Int
+
+    static func local(
+        for workout: SocialPublishableWorkout,
+        hasRoute: Bool
+    ) -> HomeActivityVisualRecipe {
+        let hour =
+            Calendar.current.component(
+                .hour,
+                from: workout.startDate
+            )
+
+        let palette: String
+        let light: String
+
+        switch hour {
+        case 5..<11:
+            palette = "sage"
+            light = "sunrise"
+        case 11..<17:
+            palette = "ocean"
+            light = "daylight"
+        case 17..<22:
+            palette = "amber"
+            light = "golden_hour"
+        default:
+            palette = "slate"
+            light = "dusk"
+        }
+
+        let scene: String
+        switch workout.activity {
+        case .hiking:
+            scene = "mountain"
+        case .cycling:
+            scene = "coast"
+        case .walking:
+            scene =
+                hour >= 17 || hour < 6
+                    ? "city"
+                    : "forest"
+        default:
+            scene =
+                hasRoute
+                    ? "mountain"
+                    : "track"
+        }
+
+        let distance =
+            workout.distanceMeters ?? 0
+        let energy: String =
+            distance >= 10_000
+                ? "energetic"
+                : "steady"
+
+        let scalarSum =
+            workout.id.uuidString
+                .unicodeScalars
+                .reduce(0) {
+                    $0 + Int($1.value)
+                }
+
+        return HomeActivityVisualRecipe(
+            palette: palette,
+            scene: scene,
+            light: light,
+            motif: hasRoute ? "route" : "pulse",
+            energy: energy,
+            variant: (scalarSum % 4) + 1
+        )
+    }
+}
+
+private struct HomeActivityScenicWash: View {
+    let recipe: HomeActivityVisualRecipe
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            LinearGradient(
+                colors: paletteColors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .opacity(
+                recipe.energy == "energetic"
+                    ? 0.38
+                    : 0.30
+            )
+
+            Image(systemName: sceneSymbol)
+                .font(.system(size: 86, weight: .light))
+                .foregroundStyle(
+                    Color.white.opacity(0.14)
+                )
+                .padding(.trailing, 28)
+                .padding(.bottom, 22)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var paletteColors: [Color] {
+        switch recipe.palette {
+        case "ocean":
+            return [
+                Color.cyan.opacity(0.22),
+                Color.blue.opacity(0.07),
+                .clear
+            ]
+        case "amber":
+            return [
+                Color.orange.opacity(0.20),
+                Color.yellow.opacity(0.07),
+                .clear
+            ]
+        case "slate":
+            return [
+                Color.indigo.opacity(0.18),
+                Color.black.opacity(0.10),
+                .clear
+            ]
+        default:
+            return [
+                ATHLTHTheme.vitality.opacity(0.18),
+                Color.green.opacity(0.05),
+                .clear
+            ]
+        }
+    }
+
+    private var sceneSymbol: String {
+        switch recipe.scene {
+        case "forest":
+            return "tree.fill"
+        case "city":
+            return "building.2.fill"
+        case "coast":
+            return "water.waves"
+        case "track":
+            return "figure.run"
+        case "studio":
+            return "dumbbell.fill"
+        default:
+            return "mountain.2.fill"
+        }
+    }
+}
+
 private struct HomeActivityOutdoorCard: View {
     let workout: SocialPublishableWorkout
     let detail: WorkoutDetail?
@@ -703,7 +883,38 @@ private struct HomeActivityOutdoorCard: View {
     let onPost: () -> Void
 
     private var routeCoordinates: [CLLocationCoordinate2D] {
-        detail?.route.map(\.coordinate) ?? []
+        guard let route = detail?.route,
+              !route.isEmpty
+        else {
+            return []
+        }
+
+        let maximumCount = 180
+        guard route.count > maximumCount else {
+            return route.map(\.coordinate)
+        }
+
+        let lastIndex = route.count - 1
+        let step =
+            Double(lastIndex) /
+            Double(maximumCount - 1)
+
+        return (0..<maximumCount).map {
+            index in
+            route[
+                min(
+                    Int(
+                        (
+                            Double(index) *
+                            step
+                        )
+                        .rounded()
+                    ),
+                    lastIndex
+                )
+            ]
+            .coordinate
+        }
     }
 
     private var singleLocation: CLLocation? {
@@ -718,57 +929,24 @@ private struct HomeActivityOutdoorCard: View {
         return nil
     }
 
-    private var mapRegion: MKCoordinateRegion {
-        let coordinates: [CLLocationCoordinate2D]
-
-        if routeCoordinates.count >= 2 {
-            coordinates = routeCoordinates
-        } else if let singleLocation {
-            coordinates = [singleLocation.coordinate]
-        } else {
-            coordinates = []
-        }
-
-        guard let first = coordinates.first else {
-            return MKCoordinateRegion(
-                center: CLLocationCoordinate2D(
-                    latitude: 63.4305,
-                    longitude: 10.3951
-                ),
-                span: MKCoordinateSpan(
-                    latitudeDelta: 0.08,
-                    longitudeDelta: 0.08
-                )
+    private var visualRecipe:
+        HomeActivityVisualRecipe {
+        if let recipe =
+            aiInsight?.visualRecipe {
+            return HomeActivityVisualRecipe(
+                palette: recipe.palette,
+                scene: recipe.scene,
+                light: recipe.light,
+                motif: recipe.motif,
+                energy: recipe.energy,
+                variant: recipe.variant
             )
         }
 
-        var minLatitude = first.latitude
-        var maxLatitude = first.latitude
-        var minLongitude = first.longitude
-        var maxLongitude = first.longitude
-
-        for coordinate in coordinates.dropFirst() {
-            minLatitude = min(minLatitude, coordinate.latitude)
-            maxLatitude = max(maxLatitude, coordinate.latitude)
-            minLongitude = min(minLongitude, coordinate.longitude)
-            maxLongitude = max(maxLongitude, coordinate.longitude)
-        }
-
-        return MKCoordinateRegion(
-            center: CLLocationCoordinate2D(
-                latitude: (minLatitude + maxLatitude) / 2,
-                longitude: (minLongitude + maxLongitude) / 2
-            ),
-            span: MKCoordinateSpan(
-                latitudeDelta: max(
-                    (maxLatitude - minLatitude) * 1.55,
-                    0.008
-                ),
-                longitudeDelta: max(
-                    (maxLongitude - minLongitude) * 1.55,
-                    0.008
-                )
-            )
+        return HomeActivityVisualRecipe.local(
+            for: workout,
+            hasRoute:
+                routeCoordinates.count >= 2
         )
     }
 
@@ -777,11 +955,15 @@ private struct HomeActivityOutdoorCard: View {
             ZStack(alignment: .topLeading) {
                 mapBackground
 
+                HomeActivityScenicWash(
+                    recipe: visualRecipe
+                )
+
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.90),
-                        Color.white.opacity(0.52),
-                        Color.clear
+                        Color.white.opacity(0.96),
+                        Color.white.opacity(0.72),
+                        Color.white.opacity(0.08)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -789,9 +971,9 @@ private struct HomeActivityOutdoorCard: View {
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.04),
+                        Color.white.opacity(0.02),
                         Color.clear,
-                        Color.black.opacity(0.34)
+                        Color.black.opacity(0.42)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -807,7 +989,10 @@ private struct HomeActivityOutdoorCard: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(ATHLTHTheme.primaryText)
                                     .frame(width: 40, height: 40)
-                                    .background(.ultraThinMaterial, in: Circle())
+                                    .background(
+                                        Color.white.opacity(0.88),
+                                        in: Circle()
+                                    )
                                     .overlay {
                                         Circle()
                                             .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
@@ -848,7 +1033,10 @@ private struct HomeActivityOutdoorCard: View {
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                                 .frame(width: 36, height: 36)
-                                .background(.ultraThinMaterial, in: Circle())
+                                .background(
+                                    Color.white.opacity(0.88),
+                                    in: Circle()
+                                )
                                 .overlay {
                                     Circle()
                                         .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
@@ -858,7 +1046,7 @@ private struct HomeActivityOutdoorCard: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(workout.title)
+                        Text(displayTitle)
                             .font(.system(size: 25, weight: .bold, design: .rounded))
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .lineLimit(2)
@@ -905,7 +1093,7 @@ private struct HomeActivityOutdoorCard: View {
                     .allowsHitTesting(false)
                 }
             }
-            .frame(height: 252)
+            .frame(height: 240)
             .clipped()
 
             VStack(spacing: 10) {
@@ -1085,10 +1273,10 @@ private struct HomeActivityOutdoorCard: View {
             .stroke(Color.white.opacity(0.84), lineWidth: 0.8)
         }
         .shadow(
-            color: Color.black.opacity(0.10),
-            radius: 18,
+            color: Color.black.opacity(0.075),
+            radius: 12,
             x: 0,
-            y: 9
+            y: 6
         )
     }
 
@@ -1169,6 +1357,53 @@ private struct HomeActivityOutdoorCard: View {
         case .hiking: return "Hike"
         default: return workout.activity.rawValue
         }
+    }
+
+    private var displayTitle: String {
+        let trimmed =
+            workout.title
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        let genericTitles =
+            Set([
+                workout.activity.rawValue.lowercased(),
+                activityTitle.lowercased(),
+                "running",
+                "walking",
+                "cycling",
+                "hiking",
+                "workout"
+            ])
+
+        guard trimmed.isEmpty ||
+              genericTitles.contains(
+                trimmed.lowercased()
+              )
+        else {
+            return trimmed
+        }
+
+        let hour =
+            Calendar.current.component(
+                .hour,
+                from: workout.startDate
+            )
+        let daypart: String
+
+        switch hour {
+        case 5..<12:
+            daypart = "Morning"
+        case 12..<17:
+            daypart = "Afternoon"
+        case 17..<22:
+            daypart = "Evening"
+        default:
+            daypart = "Night"
+        }
+
+        return "\(daypart) \(activityTitle)"
     }
 
     private var outdoorDescription: String {
@@ -1461,10 +1696,6 @@ private struct HomeActivityRouteArtwork: View {
                         )
                     )
                     .padding(30)
-
-                ProgressView()
-                    .tint(ATHLTHTheme.accentDeep)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .clipped()
@@ -1489,9 +1720,9 @@ private final class HomeActivityRouteSnapshotRenderer {
         NSCache<NSString, UIImage>()
 
     private init() {
-        cache.countLimit = 12
+        cache.countLimit = 8
         cache.totalCostLimit =
-            32 * 1_024 * 1_024
+            20 * 1_024 * 1_024
     }
 
     static func cacheKey(
@@ -1541,7 +1772,7 @@ private final class HomeActivityRouteSnapshotRenderer {
         if coordinates.count >= 2 {
             points = Self.sampled(
                 coordinates,
-                maximumCount: 220
+                maximumCount: 180
             )
         } else if let singleLocation {
             points = [singleLocation]
@@ -1554,9 +1785,9 @@ private final class HomeActivityRouteSnapshotRenderer {
         options.region =
             Self.region(for: points)
         options.size =
-            CGSize(width: 520, height: 320)
+            CGSize(width: 460, height: 285)
         options.scale = 2
-        options.mapType = .satellite
+        options.mapType = .mutedStandard
         options.pointOfInterestFilter =
             .excludingAll
         options.traitCollection =
@@ -1854,6 +2085,23 @@ private final class HomeActivityRouteSnapshotRenderer {
                 )
         }
 
+        let latitudeDelta =
+            max(
+                (
+                    maxLatitude -
+                    minLatitude
+                ) * 1.58,
+                0.009
+            )
+        let longitudeDelta =
+            max(
+                (
+                    maxLongitude -
+                    minLongitude
+                ) * 1.62,
+                0.009
+            )
+
         return MKCoordinateRegion(
             center:
                 CLLocationCoordinate2D(
@@ -1866,23 +2114,14 @@ private final class HomeActivityRouteSnapshotRenderer {
                         (
                             minLongitude +
                             maxLongitude
-                        ) / 2
+                        ) / 2 -
+                        longitudeDelta * 0.075
                 ),
             span: MKCoordinateSpan(
-                latitudeDelta: max(
-                    (
-                        maxLatitude -
-                        minLatitude
-                    ) * 1.48,
-                    0.009
-                ),
-                longitudeDelta: max(
-                    (
-                        maxLongitude -
-                        minLongitude
-                    ) * 1.48,
-                    0.009
-                )
+                latitudeDelta:
+                    latitudeDelta,
+                longitudeDelta:
+                    longitudeDelta
             )
         )
     }
@@ -2610,7 +2849,7 @@ private struct HomeActivityStrengthCard: View {
 
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(workout.title)
+                    Text(displayTitle)
                         .font(.system(size: 23, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .lineLimit(2)
@@ -2623,38 +2862,32 @@ private struct HomeActivityStrengthCard: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                HomeActivityMuscleArtwork(
-                    muscleGroups: focusAreas
-                )
-                .frame(width: 126, height: 150)
-            }
+                HStack(alignment: .center, spacing: 8) {
+                    HomeActivityMuscleArtwork(
+                        muscleGroups: focusAreas
+                    )
+                    .frame(width: 92, height: 128)
 
-            if !focusAreas.isEmpty {
-                HStack(spacing: 7) {
-                    Text("Focus Areas")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    if !focusAreas.isEmpty {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Focus Areas")
+                                .font(.system(size: 9.5, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(focusAreas, id: \.self) { group in
+                            ForEach(focusAreas.prefix(4), id: \.self) { group in
                                 HStack(spacing: 5) {
                                     Circle()
                                         .fill(Color.indigo.opacity(0.72))
                                         .frame(width: 6, height: 6)
 
                                     Text(group)
-                                        .font(.caption2.weight(.semibold))
+                                        .font(.system(size: 9.5, weight: .medium))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .lineLimit(1)
                                 }
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 5)
-                                .background(
-                                    Color.indigo.opacity(0.06),
-                                    in: Capsule()
-                                )
                             }
                         }
+                        .frame(width: 72, alignment: .leading)
                     }
                 }
             }
@@ -2739,10 +2972,10 @@ private struct HomeActivityStrengthCard: View {
             .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
         }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.055),
-            radius: 13,
+            color: ATHLTHTheme.accentDeep.opacity(0.045),
+            radius: 9,
             x: 0,
-            y: 6
+            y: 4
         )
     }
 
@@ -2752,6 +2985,82 @@ private struct HomeActivityStrengthCard: View {
                 .map { $0.capitalized }
                 .prefix(4)
         )
+    }
+
+    private var displayTitle: String {
+        let trimmed =
+            workout.title
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+        let normalizedTitle =
+            trimmed.lowercased()
+        let generic =
+            trimmed.isEmpty ||
+            normalizedTitle == "strength" ||
+            normalizedTitle == "strength training" ||
+            normalizedTitle == "functional strength training" ||
+            normalizedTitle == "traditional strength training" ||
+            normalizedTitle == "workout"
+
+        guard generic else {
+            return trimmed
+        }
+
+        let normalizedAreas =
+            Set(
+                focusAreas.map {
+                    $0.lowercased()
+                }
+            )
+        let upperKeywords: Set<String> = [
+            "chest",
+            "shoulders",
+            "back",
+            "arms",
+            "biceps",
+            "triceps"
+        ]
+        let lowerKeywords: Set<String> = [
+            "legs",
+            "quads",
+            "quadriceps",
+            "hamstrings",
+            "glutes",
+            "calves"
+        ]
+
+        let hasUpper =
+            !normalizedAreas
+                .intersection(
+                    upperKeywords
+                )
+                .isEmpty
+        let hasLower =
+            !normalizedAreas
+                .intersection(
+                    lowerKeywords
+                )
+                .isEmpty
+
+        if hasUpper && hasLower {
+            return "Full Body Strength"
+        }
+
+        if hasUpper {
+            return "Upper Body Strength"
+        }
+
+        if hasLower {
+            return "Lower Body Strength"
+        }
+
+        if normalizedAreas.contains("core") ||
+            normalizedAreas.contains("abs") {
+            return "Core Strength"
+        }
+
+        return "Strength Session"
     }
 
     private var strengthDescription: String {
