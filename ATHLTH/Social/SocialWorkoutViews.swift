@@ -98,14 +98,21 @@ struct QuickWorkoutStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     let kind: WorkoutKind
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
-    let onStart: ([SocialProfileCard], Set<UUID>) -> Void
+    let onStart: (
+        [SocialProfileCard],
+        Set<UUID>,
+        WatchAudioCoachConfiguration
+    ) -> Void
 
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
+    @State private var audioCoachDraft = AudioCoachDraft()
+    @State private var audioCoachLoaded = false
 
     private var canStart: Bool {
         trainingDeviceProvider == .appleWatch && watchConnected
@@ -207,6 +214,14 @@ struct QuickWorkoutStartSheet: View {
                         }
                     }
 
+                    AudioCoachSetupCard(
+                        draft: $audioCoachDraft,
+                        showRouteOptions:
+                            kind == .running ||
+                            kind == .walking,
+                        showStructuredOptions: false
+                    )
+
                     WorkoutGearSelectionCard(
                         selectedGearIDs: $selectedGearIDs,
                         activity: workoutActivity
@@ -225,7 +240,8 @@ struct QuickWorkoutStartSheet: View {
 
                         onStart(
                             selected,
-                            selectedGearIDs
+                            selectedGearIDs,
+                            audioCoachDraft.configuration()
                         )
                         dismiss()
                     } label: {
@@ -255,6 +271,11 @@ struct QuickWorkoutStartSheet: View {
                 }
             }
             .task {
+                if !audioCoachLoaded {
+                    audioCoachDraft.load(from: settings)
+                    audioCoachLoaded = true
+                }
+
                 if social.friends.isEmpty {
                     await social.refresh()
                 }
