@@ -1,3 +1,4 @@
+import Foundation
 import Supabase
 import SwiftUI
 
@@ -5,6 +6,8 @@ struct TrainingLibraryHomeView: View {
     @EnvironmentObject private var favorites: LibraryFavoritesStore
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
+
+    @State private var showingCreatePlan = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -77,8 +80,8 @@ struct TrainingLibraryHomeView: View {
                     )
                 }
 
-                NavigationLink {
-                    TrainingPlanCreationView()
+                Button {
+                    showingCreatePlan = true
                 } label: {
                     LibraryDestinationTile(
                         title: "Create Plan",
@@ -177,6 +180,9 @@ struct TrainingLibraryHomeView: View {
             }
         }
         .buttonStyle(.plain)
+        .sheet(isPresented: $showingCreatePlan) {
+            TrainingPlanCreationView()
+        }
         .task {
             await favorites.refresh()
         }
