@@ -68,9 +68,29 @@ struct WorkoutAIInsightContext: Codable, Hashable {
     let segments: [WorkoutRouteHealthSegment]
 }
 
+struct WorkoutVisualRecipe: Codable, Hashable {
+    let palette: String
+    let scene: String
+    let light: String
+    let motif: String
+    let energy: String
+    let variant: Int
+}
+
 struct WorkoutAIInsight: Codable, Hashable {
     let headline: String
     let summary: String
+    let visualRecipe: WorkoutVisualRecipe?
+
+    init(
+        headline: String,
+        summary: String,
+        visualRecipe: WorkoutVisualRecipe? = nil
+    ) {
+        self.headline = headline
+        self.summary = summary
+        self.visualRecipe = visualRecipe
+    }
 }
 
 struct TrainingHealthSummary: Equatable {
