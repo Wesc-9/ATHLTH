@@ -527,7 +527,7 @@ struct ATHLTHHomeView: View {
                     watchConnected:
                         settings.trainingDeviceProvider == .appleWatch &&
                         watchConnection.isReady
-                ) { selectedFriends, gearIDs in
+                ) { selectedFriends, gearIDs, audioCoach in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
                             title: kind.title,
@@ -539,7 +539,8 @@ struct ATHLTHHomeView: View {
 
                         startHomeQuickWorkoutOnWatch(
                             kind,
-                            gearIDs: gearIDs
+                            gearIDs: gearIDs,
+                            audioCoach: audioCoach
                         )
                     }
                 }
@@ -1879,7 +1880,8 @@ struct ATHLTHHomeView: View {
 
     private func startHomeQuickWorkoutOnWatch(
         _ kind: WorkoutKind,
-        gearIDs: Set<UUID>
+        gearIDs: Set<UUID>,
+        audioCoach: WatchAudioCoachConfiguration
     ) {
         guard settings.trainingDeviceProvider == .appleWatch,
               watchConnection.isReady,
@@ -1894,6 +1896,9 @@ struct ATHLTHHomeView: View {
             do {
                 try await watchConnection.startWorkoutOnWatch(watchKind)
                 gear.prepareNextWorkoutGear(gearIDs)
+                watchConnection.sendAudioCoachConfiguration(
+                    audioCoach
+                )
                 homeWatchTransferMessage =
                     "\(watchKind.title) started on Apple Watch."
             } catch {
@@ -3151,7 +3156,7 @@ struct ATHLTHTrainView: View {
                     watchConnected:
                         settings.trainingDeviceProvider == .appleWatch &&
                         watchConnection.isReady
-                ) { selectedFriends, gearIDs in
+                ) { selectedFriends, gearIDs, audioCoach in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
                             title: workout.title,
@@ -3162,7 +3167,8 @@ struct ATHLTHTrainView: View {
                         )
                         startRunningTemplate(
                             workout,
-                            gearIDs: gearIDs
+                            gearIDs: gearIDs,
+                            audioCoach: audioCoach
                         )
                     }
                 }
@@ -3791,7 +3797,8 @@ struct ATHLTHTrainView: View {
 
     private func startRunningTemplate(
         _ workout: RunningWorkoutTemplate,
-        gearIDs: Set<UUID>
+        gearIDs: Set<UUID>,
+        audioCoach: WatchAudioCoachConfiguration
     ) {
         guard settings.trainingDeviceProvider == .appleWatch,
               watchConnection.isReady
@@ -3820,7 +3827,9 @@ struct ATHLTHTrainView: View {
             do {
                 try await watchConnection.startWorkoutOnWatch(.running)
                 gear.prepareNextWorkoutGear(gearIDs)
-                watchConnection.sendAudioCoachConfiguration(.disabled)
+                watchConnection.sendAudioCoachConfiguration(
+                    audioCoach
+                )
                 var watchTransfer =
                     watchRunningWorkoutTransfer(
                         from: workout
