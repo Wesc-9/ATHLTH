@@ -2276,6 +2276,173 @@ final class AppSessionStore: ObservableObject {
         persistPlanTemplates()
     }
 
+    @discardableResult
+    func saveCatalogPlanTemplate(
+        _ entry: TrainingPlanCatalogEntry
+    ) -> TrainingPlan? {
+        let catalogTag = "catalog:\(entry.slug)"
+
+        if let existing = planTemplates.first(
+            where: { $0.tags.contains(catalogTag) }
+        ) {
+            return existing
+        }
+
+        let weekCount = min(max(entry.durationWeeks, 1), 52)
+        let sessionsPerWeek = min(
+            max(entry.sessionsPerWeek, 2),
+            6
+        )
+        let pattern =
+            entry.workoutKinds.isEmpty
+                ? [WorkoutKind.running, .strength]
+                : entry.workoutKinds
+
+        let targetDayIndexes: [Int]
+        switch sessionsPerWeek {
+        case 2:
+            targetDayIndexes = [1, 4]
+        case 3:
+            targetDayIndexes = [1, 3, 5]
+        case 4:
+            targetDayIndexes = [1, 2, 4, 6]
+        case 5:
+            targetDayIndexes = [1, 2, 3, 5, 6]
+        default:
+            targetDayIndexes = [1, 2, 3, 4, 5, 6]
+        }
+
+        func makeCatalogSession(
+            _ kind: WorkoutKind,
+            weekNumber: Int,
+            slot: Int
+        ) -> PlannedSession {
+            let title: String
+            let duration: Int
+            let distance: Double?
+
+            switch kind {
+            case .running:
+                title =
+                    slot == sessionsPerWeek - 1
+                        ? "Long Run"
+                        : "Run"
+                duration =
+                    min(
+                        40 + max(weekNumber - 1, 0) * 2,
+                        90
+                    )
+                distance = nil
+
+            case .walking:
+                title = "Walk"
+                duration = 45
+                distance = nil
+
+            case .strength:
+                title = "Strength"
+                duration = 50
+                distance = nil
+
+            case .mobility:
+                title = "Mobility"
+                duration = 25
+                distance = nil
+
+            case .recovery:
+                title = "Recovery"
+                duration = 30
+                distance = nil
+
+            case .custom:
+                title = "Workout"
+                duration = 45
+                distance = nil
+            }
+
+            return PlannedSession(
+                id: UUID(),
+                title: title,
+                kind: kind,
+                scheduledStart: nil,
+                durationMinutes: duration,
+                targetDistanceKilometers: distance,
+                targetPaceSecondsPerKilometer: nil,
+                routeID: nil,
+                exercises: [],
+                notes:
+                    "From ATHLTH Plan Library · \(entry.title)",
+                runningWorkout: nil
+            )
+        }
+
+        var weeks = (1...weekCount).map(makeEmptyWeek)
+
+        for weekIndex in weeks.indices {
+            for (slot, dayIndex) in
+                targetDayIndexes.enumerated() {
+                guard let actualDayIndex =
+                        weeks[weekIndex]
+                            .days
+                            .firstIndex(
+                                where: {
+                                    $0.dayIndex == dayIndex
+                                }
+                            )
+                else {
+                    continue
+                }
+
+                let patternIndex =
+                    (
+                        weekIndex *
+                        sessionsPerWeek +
+                        slot
+                    ) %
+                    pattern.count
+
+                weeks[weekIndex]
+                    .days[actualDayIndex]
+                    .sessions = [
+                        makeCatalogSession(
+                            pattern[patternIndex],
+                            weekNumber: weekIndex + 1,
+                            slot: slot
+                        )
+                    ]
+            }
+        }
+
+        let template = TrainingPlan(
+            id: UUID(),
+            ownerID: profile.userID,
+            title: entry.title,
+            summary: entry.summary,
+            visibility: .privateOnly,
+            version: 1,
+            weeks: weeks,
+            tags:
+                Array(
+                    Set(
+                        entry.tags +
+                        [
+                            catalogTag,
+                            entry.category,
+                            entry.level.lowercased()
+                        ]
+                    )
+                ),
+            createdAt: Date(),
+            updatedAt: Date(),
+            startDate: nil,
+            endDate: nil
+        )
+
+        planTemplates.insert(template, at: 0)
+        persistPlanTemplates()
+        return template
+    }
+
     func saveSharedPlan(
         _ source: TrainingPlan,
         sourceOwnerID: UUID? = nil,
