@@ -178,7 +178,8 @@ struct ATHLTHHomeView: View {
             ATHLTHPinnedHeroLayout(
                 accent: ATHLTHTheme.premiumGold.opacity(0.70),
                 softTransition: true,
-                immersiveTransition: useImmersiveHomeHero
+                immersiveTransition: useImmersiveHomeHero,
+                scrollFadeTransition: true
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
@@ -2692,7 +2693,8 @@ struct ATHLTHTrainView: View {
             ATHLTHPinnedHeroLayout(
                 accent: Color.green.opacity(0.55),
                 softTransition: true,
-                immersiveTransition: useImmersiveTrainHero
+                immersiveTransition: useImmersiveTrainHero,
+                scrollFadeTransition: true
             ) {
                 ATHLTHTabHero(
                     imageName: "TrainHero",
@@ -3955,7 +3957,8 @@ struct ATHLTHRecoveryView: View {
             ATHLTHPinnedHeroLayout(
                 accent: Color.blue.opacity(0.70),
                 softTransition: true,
-                immersiveTransition: useImmersiveRecoveryHero
+                immersiveTransition: useImmersiveRecoveryHero,
+                scrollFadeTransition: true
             ) {
                 ATHLTHTabHero(
                     imageName: "RecoveryHero",
@@ -4987,7 +4990,8 @@ struct ATHLTHProgressView: View {
             ATHLTHPinnedHeroLayout(
                 accent: green.opacity(0.60),
                 softTransition: true,
-                immersiveTransition: useImmersiveProgressHero
+                immersiveTransition: useImmersiveProgressHero,
+                scrollFadeTransition: true
             ) {
                 ATHLTHTabHero(
                     imageName: "ProgressHero",
