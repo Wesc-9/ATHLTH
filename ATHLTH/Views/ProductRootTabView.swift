@@ -691,7 +691,8 @@ struct ATHLTHHomeView: View {
     }
 
     private var homeNotificationCount: Int {
-        notifications.unreadCount + health.pendingWorkoutImportCount
+        notifications.notificationCenterUnreadCount +
+            health.pendingWorkoutImportCount
     }
 
     private var homeNotificationBadgeText: String {
