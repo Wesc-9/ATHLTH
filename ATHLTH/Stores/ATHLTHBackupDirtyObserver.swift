@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Bridges persisted training-data changes into the event-driven backup store.
