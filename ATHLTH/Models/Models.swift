@@ -353,6 +353,100 @@ struct ProfilePerformanceStats: Equatable, Hashable {
     )
 }
 
+extension HKWorkout {
+    var athlthDistanceMeters: Double? {
+        let identifiers:
+            [HKQuantityTypeIdentifier]
+
+        switch workoutActivityType {
+        case .running,
+             .walking,
+             .hiking,
+             .elliptical,
+             .stairClimbing:
+            identifiers = [
+                .distanceWalkingRunning
+            ]
+
+        case .cycling:
+            identifiers = [
+                .distanceCycling
+            ]
+
+        case .swimming:
+            identifiers = [
+                .distanceSwimming
+            ]
+
+        default:
+            // Imported workouts can come from many apps and devices.
+            // Fall back across the distance types ATHLTH currently reads.
+            identifiers = [
+                .distanceWalkingRunning,
+                .distanceCycling,
+                .distanceSwimming
+            ]
+        }
+
+        for identifier in identifiers {
+            guard let type =
+                    HKObjectType.quantityType(
+                        forIdentifier: identifier
+                    ),
+                  let quantity =
+                    statistics(
+                        for: type
+                    )?.sumQuantity(),
+                  quantity.is(
+                    compatibleWith: .meter()
+                  )
+            else {
+                continue
+            }
+
+            let value =
+                quantity.doubleValue(
+                    for: .meter()
+                )
+
+            if value.isFinite {
+                return value
+            }
+        }
+
+        return nil
+    }
+
+    var athlthActiveEnergyKilocalories:
+        Double? {
+        guard let type =
+                HKObjectType.quantityType(
+                    forIdentifier:
+                        .activeEnergyBurned
+                ),
+              let quantity =
+                statistics(
+                    for: type
+                )?.sumQuantity(),
+              quantity.is(
+                compatibleWith:
+                    .kilocalorie()
+              )
+        else {
+            return nil
+        }
+
+        let value =
+            quantity.doubleValue(
+                for: .kilocalorie()
+            )
+
+        return value.isFinite
+            ? value
+            : nil
+    }
+}
+
 struct WorkoutSummary: Identifiable, Hashable {
     let id: UUID
     let activity: WorkoutActivity
@@ -368,35 +462,12 @@ struct WorkoutSummary: Identifiable, Hashable {
         startDate = workout.startDate
         endDate = workout.endDate
         duration = workout.duration
-        if let distance = workout.totalDistance,
-           distance.is(compatibleWith: .meter()) {
-            let value = distance.doubleValue(for: .meter())
-            distanceMeters = value.isFinite ? value : nil
-        } else {
-            distanceMeters = nil
-        }
+        distanceMeters =
+            workout.athlthDistanceMeters
 
-        if let activeEnergyType =
-                HKObjectType.quantityType(
-                    forIdentifier:
-                        .activeEnergyBurned
-                ),
-           let energy =
-                workout.statistics(
-                    for: activeEnergyType
-                )?.sumQuantity(),
-           energy.is(
-                compatibleWith: .kilocalorie()
-           ) {
-            let value =
-                energy.doubleValue(
-                    for: .kilocalorie()
-                )
-            activeEnergyKilocalories =
-                value.isFinite ? value : nil
-        } else {
-            activeEnergyKilocalories = nil
-        }
+        activeEnergyKilocalories =
+            workout
+                .athlthActiveEnergyKilocalories
     }
 
     var distanceKilometers: Double? {
