@@ -1603,6 +1603,40 @@ struct MyTrainingPlansLibraryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                LibraryPremiumIntro(
+                    eyebrow: "MY PLANS",
+                    title: "Your training, organised",
+                    subtitle:
+                        "Keep reusable plans close, schedule what comes next and jump back into your active program.",
+                    icon: "calendar.badge.clock",
+                    accent: ATHLTHTheme.accent
+                ) {
+                    HStack(spacing: 8) {
+                        LibraryStatPill(
+                            value: "\(session.planTemplates.count)",
+                            label: "saved",
+                            icon: "bookmark.fill",
+                            tint: ATHLTHTheme.premiumGold
+                        )
+
+                        LibraryStatPill(
+                            value: "\(session.trainingPlans.count)",
+                            label: "scheduled",
+                            icon: "calendar",
+                            tint: ATHLTHTheme.accent
+                        )
+
+                        if activePlanCount > 0 {
+                            LibraryStatPill(
+                                value: "\(activePlanCount)",
+                                label: "active",
+                                icon: "play.fill",
+                                tint: ATHLTHTheme.vitality
+                            )
+                        }
+                    }
+                }
+
                 if !session.planTemplates.isEmpty {
                     planSectionHeader(
                         "Saved Plans",
@@ -1707,57 +1741,36 @@ struct MyTrainingPlansLibraryView: View {
     private func templateCard(
         _ template: TrainingPlan
     ) -> some View {
-        ATHLTHCard {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 13) {
                 Image(systemName: "square.stack.3d.up.fill")
-                    .font(.title3)
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 48, height: 48)
                     .background(
                         ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 13)
+                        in: RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
                     )
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("SAVED PLAN")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(ATHLTHTheme.accent)
+
                     Text(template.title)
                         .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
                     Text(
-                        "\(template.weeks.count) weeks · saved plan"
+                        "\(template.weeks.count) weeks · ready to schedule"
                     )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                    if !template.summary.isEmpty {
-                        Text(template.summary)
-                            .font(.caption)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
-                            .lineLimit(2)
-                    }
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
-
-                Spacer()
-            }
-
-            HStack {
-                Button {
-                    if session.usePlanTemplate(
-                        template.id,
-                        startDate:
-                            session.suggestedTrainingPlanStartDate
-                    ) == nil {
-                        scheduleError =
-                            "Another plan overlaps the suggested start date. Choose a different date when creating or scheduling the plan."
-                    }
-                } label: {
-                    Label(
-                        "Schedule Plan",
-                        systemImage: "calendar.badge.plus"
-                    )
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
-                .controlSize(.small)
 
                 Spacer()
 
@@ -1765,62 +1778,253 @@ struct MyTrainingPlansLibraryView: View {
                     session.deletePlanTemplate(template.id)
                 } label: {
                     Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText.opacity(0.72)
+                        )
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Color.white.opacity(0.68),
+                            in: Circle()
+                        )
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.top, 8)
+
+            if !template.summary.isEmpty {
+                Text(template.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
+            }
+
+            Button {
+                if session.usePlanTemplate(
+                    template.id,
+                    startDate:
+                        session.suggestedTrainingPlanStartDate
+                ) == nil {
+                    scheduleError =
+                        "Another plan overlaps the suggested start date. Choose a different date when creating or scheduling the plan."
+                }
+            } label: {
+                HStack {
+                    Label(
+                        "Schedule Plan",
+                        systemImage: "calendar.badge.plus"
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .font(.caption.bold())
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.accent,
+                            ATHLTHTheme.accentDeep
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                )
+            }
+            .buttonStyle(.plain)
         }
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    ATHLTHTheme.accent.opacity(0.035)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.035),
+            radius: 13,
+            y: 6
+        )
     }
 
     private func scheduledPlanCard(
         _ plan: TrainingPlan
     ) -> some View {
-        HStack(spacing: 13) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.title3)
-                .foregroundStyle(ATHLTHTheme.accent)
-                .frame(width: 44, height: 44)
+        let status = session.trainingPlanStatus(plan)
+
+        return HStack(spacing: 13) {
+            Image(systemName: statusIcon(status))
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(statusTint(status))
+                .frame(width: 48, height: 48)
                 .background(
-                    ATHLTHTheme.accentSoft,
-                    in: RoundedRectangle(cornerRadius: 13)
+                    statusTint(status).opacity(0.10),
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
                 )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(plan.title)
-                    .font(.headline)
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 7) {
+                    Text(plan.title)
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+
+                    Text(statusTitle(status))
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(statusTint(status))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            statusTint(status).opacity(0.10),
+                            in: Capsule()
+                        )
+                }
 
                 Text(
-                    "\(plan.weeks.count) weeks · \(session.trainingPlanStatus(plan).rawValue.capitalized)"
+                    "\(plan.weeks.count) weeks · \(scheduledDateText(plan))"
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            Image(systemName: "chevron.right")
+            Image(systemName: "arrow.right")
                 .font(.caption.bold())
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(statusTint(status))
+                .frame(width: 30, height: 30)
+                .background(
+                    statusTint(status).opacity(0.08),
+                    in: Circle()
+                )
         }
         .padding(15)
         .background(
-            Color.white.opacity(0.84),
-            in: RoundedRectangle(cornerRadius: 20)
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.95),
+                    statusTint(status).opacity(0.025)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 0.8
+            )
+        }
     }
 
     private func planSectionHeader(
         _ title: String,
         detail: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.title3.weight(.bold))
-            Text(detail)
-                .font(.caption)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.8)
                 .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Text(detail)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText.opacity(0.72)
+                )
         }
+        .padding(.top, 2)
+    }
+
+    private var activePlanCount: Int {
+        session.trainingPlans.filter {
+            session.trainingPlanStatus($0) == .active
+        }.count
+    }
+
+    private func statusTitle(
+        _ status: TrainingPlanTimingStatus
+    ) -> String {
+        switch status {
+        case .active: return "ACTIVE"
+        case .upcoming: return "UPCOMING"
+        case .completed: return "COMPLETED"
+        case .unscheduled: return "UNSCHEDULED"
+        }
+    }
+
+    private func statusIcon(
+        _ status: TrainingPlanTimingStatus
+    ) -> String {
+        switch status {
+        case .active: return "play.fill"
+        case .upcoming: return "calendar.badge.clock"
+        case .completed: return "checkmark"
+        case .unscheduled: return "calendar"
+        }
+    }
+
+    private func statusTint(
+        _ status: TrainingPlanTimingStatus
+    ) -> Color {
+        switch status {
+        case .active: return ATHLTHTheme.vitality
+        case .upcoming: return ATHLTHTheme.accent
+        case .completed: return ATHLTHTheme.mutedText
+        case .unscheduled: return Color.orange
+        }
+    }
+
+    private func scheduledDateText(
+        _ plan: TrainingPlan
+    ) -> String {
+        guard let start = plan.startDate else {
+            return "Not dated"
+        }
+
+        return start.formatted(
+            date: .abbreviated,
+            time: .omitted
+        )
     }
 }
 
