@@ -254,6 +254,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
             name: "phoneHistory",
             userID: accountID
         )
+        ATHLTHTrainingDataChangeSignal.post(userID: accountID)
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
