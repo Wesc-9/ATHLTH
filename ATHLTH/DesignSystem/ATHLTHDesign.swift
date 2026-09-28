@@ -245,7 +245,7 @@ struct ATHLTHTabHero: View {
     // participate in layout, so the hero/content boundary stays exactly where
     // it is. The bleed only becomes visible while the ScrollView is pulled
     // downward, preventing the light app canvas from flashing through.
-    private let scrollRevealBleed: CGFloat = 240
+    private let scrollRevealBleed: CGFloat = 104
 
     var body: some View {
         GeometryReader { proxy in
@@ -830,9 +830,13 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                     )
                     .padding(
                         .horizontal,
-                        immersiveTransition
-                            ? 8
-                            : (softTransition ? 10 : 0)
+                        scrollFadeTransition
+                            ? 0
+                            : (
+                                immersiveTransition
+                                    ? 8
+                                    : (softTransition ? 10 : 0)
+                            )
                     )
                 }
                 .scrollIndicators(.hidden)
