@@ -541,6 +541,7 @@ struct ATHLTHTabHero: View {
                         : (isNarrowPhone ? 44 : 48)
                 )
                 .padding(.bottom, bottomInset)
+                .offset(y: -16)
                 .frame(
                     maxWidth:
                         min(
@@ -655,10 +656,6 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         70 + (94 * scrollFadeProgress)
     }
 
-    private var scrollFadeTopOpacity: CGFloat {
-        max(0.015, 0.16 - (0.145 * scrollFadeProgress))
-    }
-
     private var usesTabletContentWidth: Bool {
         UIDevice.current.userInterfaceIdiom == .pad &&
         horizontalSizeClass == .regular
@@ -700,7 +697,8 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                             : (softTransition ? 40 : 16)
                     )
                     .overlay(alignment: .bottom) {
-                        if softTransition || immersiveTransition {
+                        if !scrollFadeTransition &&
+                            (softTransition || immersiveTransition) {
                             LinearGradient(
                                 stops: immersiveTransition
                                     ? [
@@ -846,16 +844,18 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                             LinearGradient(
                                 stops: [
                                     .init(
-                                        color: Color.black.opacity(
-                                            scrollFadeTopOpacity
-                                        ),
+                                        color: Color.clear,
                                         location: 0
                                     ),
                                     .init(
+                                        color: Color.clear,
+                                        location: 0.10
+                                    ),
+                                    .init(
                                         color: Color.black.opacity(
-                                            0.44 + (0.04 * scrollFadeProgress)
+                                            0.42 + (0.05 * scrollFadeProgress)
                                         ),
-                                        location: 0.24
+                                        location: 0.30
                                     ),
                                     .init(
                                         color: Color.black.opacity(0.84),
