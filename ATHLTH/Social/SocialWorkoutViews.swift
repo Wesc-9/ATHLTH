@@ -670,6 +670,10 @@ struct HomeActivitySection: View {
                 await health
                     .workoutAIInsightContext(
                         for: summary,
+                        detail:
+                            workoutDetails[
+                                workout.id
+                            ],
                         maximumHeartRateBPM:
                             session
                                 .onboardingProfile?
