@@ -39,17 +39,10 @@ struct WorkoutStartOptionsView: View {
         self.watchConnected = watchConnected
         self.onStart = onStart
 
-        let initialDevice: WorkoutCaptureDevice
-        switch defaultCapture {
-        case .appleWatch
-            where trainingDeviceProvider == .appleWatch && watchConnected:
-            initialDevice = .appleWatch
-        case .automatic
-            where trainingDeviceProvider == .appleWatch && watchConnected:
-            initialDevice = .appleWatch
-        default:
-            initialDevice = .iPhone
-        }
+        // Workout capture is chosen for this workout only.
+        // Legacy Settings preferences must not silently decide the device.
+        let initialDevice: WorkoutCaptureDevice =
+            watchConnected ? .appleWatch : .iPhone
 
         _captureDevice = State(initialValue: initialDevice)
         _trackingMode = State(
@@ -70,44 +63,32 @@ struct WorkoutStartOptionsView: View {
                             .padding(.top, 4)
                     }
 
-                    if trainingDeviceProvider != .none {
-                        ATHLTHCard {
-                            ATHLTHSectionHeader(title: "Workout device")
+                    ATHLTHCard {
+                        ATHLTHSectionHeader(title: "Workout device")
 
-                            VStack(spacing: 10) {
-                                optionRow(
-                                    title: "iPhone",
-                                    subtitle: "Record and finish the workout directly in ATHLTH.",
-                                    icon: "iphone",
-                                    selected: captureDevice == .iPhone
-                                ) {
-                                    captureDevice = .iPhone
-                                }
-
-                                if trainingDeviceProvider == .appleWatch {
-                                    optionRow(
-                                        title: "Apple Watch",
-                                        subtitle: watchConnected
-                                            ? "Record the continuous workout on Apple Watch."
-                                            : "Finish Apple Watch setup in Settings to use this option.",
-                                        icon: "applewatch",
-                                        selected: captureDevice == .appleWatch,
-                                        disabled: !watchConnected
-                                    ) {
-                                        captureDevice = .appleWatch
-                                    }
-                                } else if trainingDeviceProvider == .garmin {
-                                    optionRow(
-                                        title: "Garmin",
-                                        subtitle: "Garmin setup will appear here when the integration is enabled.",
-                                        icon: "watch.analog",
-                                        selected: false,
-                                        disabled: true
-                                    ) {}
-                                }
+                        VStack(spacing: 10) {
+                            optionRow(
+                                title: "iPhone",
+                                subtitle: "Record and finish this workout directly in ATHLTH. Keep your iPhone with you.",
+                                icon: "iphone",
+                                selected: captureDevice == .iPhone
+                            ) {
+                                captureDevice = .iPhone
                             }
-                            .padding(.top, 12)
+
+                            optionRow(
+                                title: "Apple Watch",
+                                subtitle: watchConnected
+                                    ? "Record the continuous workout on Apple Watch."
+                                    : "Finish Apple Watch setup in Settings to use this option.",
+                                icon: "applewatch",
+                                selected: captureDevice == .appleWatch,
+                                disabled: !watchConnected
+                            ) {
+                                captureDevice = .appleWatch
+                            }
                         }
+                        .padding(.top, 12)
                     }
 
                     ATHLTHCard {
@@ -149,17 +130,15 @@ struct WorkoutStartOptionsView: View {
                         )
                     }
 
-                    if trainingDeviceProvider != .none {
-                        ATHLTHCard {
-                            Label(deviceInfoTitle, systemImage: "checkmark.shield.fill")
-                                .font(.headline)
-                                .foregroundStyle(ATHLTHTheme.accent)
+                    ATHLTHCard {
+                        Label("Choose for each workout", systemImage: "checkmark.shield.fill")
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.accent)
 
-                            Text(deviceInfoDetail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.top, 6)
-                        }
+                        Text("This device choice applies only to the workout you are about to start. You can choose differently next time.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 6)
                     }
 
                     Button {
@@ -206,28 +185,6 @@ struct WorkoutStartOptionsView: View {
                     }
                 }
             }
-        }
-    }
-
-    private var deviceInfoTitle: String {
-        switch trainingDeviceProvider {
-        case .appleWatch:
-            return "Apple Watch is optional"
-        case .garmin:
-            return "Garmin sync is pending"
-        case .none:
-            return "No watch required"
-        }
-    }
-
-    private var deviceInfoDetail: String {
-        switch trainingDeviceProvider {
-        case .appleWatch:
-            return "You can still record this strength workout on iPhone if Apple Watch is unavailable."
-        case .garmin:
-            return "Until Garmin authorization is available, ATHLTH keeps the full strength log on iPhone. Garmin-derived metrics will plug into the same data model later."
-        case .none:
-            return "Strength workouts are recorded safely on iPhone. Missing wearable metrics stay empty instead of blocking or crashing the workout."
         }
     }
 
