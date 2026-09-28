@@ -1337,15 +1337,49 @@ struct OfficialWeeklyChallengeCard: View {
         ZStack(alignment: .bottomLeading) {
             challengeArtwork
 
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.88),
-                    Color.white.opacity(0.22),
-                    Color.black.opacity(0.44)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            ZStack {
+                LinearGradient(
+                    stops: [
+                        .init(
+                            color: Color.white.opacity(0.94),
+                            location: 0
+                        ),
+                        .init(
+                            color: Color.white.opacity(0.70),
+                            location: 0.36
+                        ),
+                        .init(
+                            color: Color.white.opacity(0.18),
+                            location: 0.64
+                        ),
+                        .init(
+                            color: Color.clear,
+                            location: 1
+                        )
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                LinearGradient(
+                    stops: [
+                        .init(
+                            color: Color.clear,
+                            location: 0.46
+                        ),
+                        .init(
+                            color: Color.black.opacity(0.10),
+                            location: 0.70
+                        ),
+                        .init(
+                            color: Color.black.opacity(0.54),
+                            location: 1
+                        )
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
@@ -1367,7 +1401,22 @@ struct OfficialWeeklyChallengeCard: View {
 
                     Text(timeRemaining)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.72))
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText.opacity(0.78)
+                        )
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(
+                            Color.white.opacity(0.78),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.white.opacity(0.90),
+                                    lineWidth: 0.7
+                                )
+                        }
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -1405,12 +1454,12 @@ struct OfficialWeeklyChallengeCard: View {
                         Text("\(store.participantCount(for: challenge.id)) participating")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
+                            .padding(.leading, 14)
                             .shadow(
-                                color: .black.opacity(0.28),
-                                radius: 3,
+                                color: .black.opacity(0.42),
+                                radius: 4,
                                 y: 1
                             )
-                            .padding(.leading, 14)
                     }
 
                     Spacer(minLength: 8)
@@ -1442,7 +1491,7 @@ struct OfficialWeeklyChallengeCard: View {
                                     .padding(.horizontal, 14)
                                     .frame(height: 42)
                                     .background(
-                                        Color.black.opacity(0.28),
+                                        Color.black.opacity(0.42),
                                         in: Capsule()
                                     )
                                     .overlay {
