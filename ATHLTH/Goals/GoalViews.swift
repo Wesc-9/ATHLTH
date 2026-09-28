@@ -677,12 +677,7 @@ struct GoalCreationView: View {
     @State private var imageData: Data?
 
     var body: some View {
-        let goalImageButtonTitle =
-            imageData == nil
-                ? "Choose from Photos"
-                : "Change photo"
-
-        return NavigationStack {
+        NavigationStack {
             VStack(spacing: 0) {
                 progressHeader
 
@@ -718,6 +713,12 @@ struct GoalCreationView: View {
                 }
             }
         }
+    }
+
+    private var goalImageButtonTitle: String {
+        imageData == nil
+            ? "Choose from Photos"
+            : "Change photo"
     }
 
     private var progressHeader: some View {
