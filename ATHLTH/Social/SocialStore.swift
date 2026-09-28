@@ -75,6 +75,25 @@ final class SocialStore: ObservableObject {
         followingIDs.contains(userID)
     }
 
+    func isFollowedBy(_ userID: UUID) -> Bool {
+        followerIDs.contains(userID)
+    }
+
+    func isMutualFollow(_ userID: UUID) -> Bool {
+        followingIDs.contains(userID) &&
+            followerIDs.contains(userID)
+    }
+
+    var mutualFollows: [SocialProfileCard] {
+        visibleProfiles
+            .filter { isMutualFollow($0.userID) }
+            .sorted {
+                $0.resolvedName.localizedCaseInsensitiveCompare(
+                    $1.resolvedName
+                ) == .orderedAscending
+            }
+    }
+
     func acceptedTrainingPartnerNames(for workoutID: UUID) -> [String] {
         guard let session = workoutSessions.first(where: {
             $0.creatorID == currentUserID &&
@@ -1320,13 +1339,13 @@ final class SocialStore: ObservableObject {
 
         self.friendships = friendships
 
-        let friendIDs = Set(
-            friendships.compactMap {
-                $0.otherUserID(for: currentUserID)
-            }
-        )
+        // Keep the legacy friendship rows loaded for old challenge records,
+        // but the product relationship is now follow-only. Two athletes are
+        // treated as a direct connection only when they follow each other.
+        let mutualFollowIDs =
+            followerIDs.intersection(followingIDs)
 
-        friends = friendIDs
+        friends = mutualFollowIDs
             .compactMap { cardByID[$0] }
             .sorted {
                 $0.resolvedName.localizedCaseInsensitiveCompare($1.resolvedName) == .orderedAscending
