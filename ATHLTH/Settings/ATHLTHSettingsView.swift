@@ -15,6 +15,7 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     @State private var showingMembership = false
     @State private var healthRequestInProgress = false
@@ -337,17 +338,25 @@ struct ATHLTHSettingsView: View {
 
                             SettingsDivider()
 
-                            PremiumSettingsRow(
-                                icon: "music.note",
-                                iconTint: spotifyGreen,
-                                iconBackground: spotifyGreen.opacity(0.12),
-                                title: "Spotify",
-                                subtitle: "Spotify integration is planned"
-                            ) {
-                                Text("Planned")
-                                    .font(.subheadline)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            NavigationLink {
+                                SpotifySettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "music.note",
+                                    iconTint: spotifyGreen,
+                                    iconBackground: spotifyGreen.opacity(0.12),
+                                    title: "Spotify",
+                                    subtitle: spotifyConnectionSubtitle
+                                ) {
+                                    connectionTrailing(
+                                        spotify.connectionState.title,
+                                        showChevron: true,
+                                        loading:
+                                            spotify.connectionState == .connecting
+                                    )
+                                }
                             }
+                            .buttonStyle(.plain)
 
                             SettingsDivider()
 
@@ -865,6 +874,27 @@ struct ATHLTHSettingsView: View {
             return "Checking"
         case .appNotInstalled, .notPaired, .unsupported:
             return "Setup"
+        }
+    }
+
+    private var spotifyConnectionSubtitle: String {
+        if spotify.isConnected {
+            return spotify.playlists.isEmpty
+                ? "Spotify connected"
+                : "Connected · \(spotify.playlists.count) playlists available"
+        }
+
+        switch spotify.connectionState {
+        case .unavailable:
+            return "Spotify setup is unavailable in this build"
+        case .connecting:
+            return "Connecting to Spotify…"
+        case .error:
+            return "Connection needs attention"
+        case .disconnected:
+            return "Connect Spotify for workout playlists"
+        case .connected:
+            return "Spotify connected"
         }
     }
 
