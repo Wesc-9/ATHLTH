@@ -2359,6 +2359,7 @@ final class AppSessionStore: ObservableObject {
             coachPlanAdaptationHistory: coachPlanAdaptationHistory
         )
         AccountLocalStorage.write(content, name: "training", userID: userID, defaults: defaults)
+        ATHLTHTrainingDataChangeSignal.post(userID: userID)
     }
 
     func reloadTrainingContent() {
