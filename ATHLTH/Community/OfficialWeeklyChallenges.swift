@@ -485,10 +485,12 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
 
         let now = Date()
         let challengeID = existing?.id ?? UUID()
-        let previousHeroAsset =
-            existing?.heroAsset == "CommunityHero"
+        let previousHeroAsset = {
+            let asset = existing?.heroAsset ?? ""
+            return ["CommunityHero", "TrainHero"].contains(asset)
                 ? ""
-                : (existing?.heroAsset ?? "")
+                : asset
+        }()
         let coverNeedsRefresh =
             existing == nil ||
             previousHeroAsset.isEmpty ||
@@ -843,6 +845,13 @@ private struct OfficialWeeklyChallengeArtwork: View {
         OfficialWeeklyCoverRecipe(asset: challenge.heroAsset)
     }
 
+    private var legacyGenericAssets: Set<String> {
+        [
+            "CommunityHero",
+            "TrainHero"
+        ]
+    }
+
     var body: some View {
         Group {
             if let recipe {
@@ -861,7 +870,9 @@ private struct OfficialWeeklyChallengeArtwork: View {
                         fallbackArtwork
                     }
                 }
-            } else if challenge.heroAsset != "CommunityHero",
+            } else if !legacyGenericAssets.contains(
+                        challenge.heroAsset
+                      ),
                       !challenge.heroAsset.isEmpty,
                       UIImage(named: challenge.heroAsset) != nil {
                 Image(challenge.heroAsset)
