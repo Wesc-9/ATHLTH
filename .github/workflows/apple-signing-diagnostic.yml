@@ -124,7 +124,7 @@ jobs:
               print(f"BUNDLE[{ident}].PLATFORM={a.get('platform')}")
               print(f"BUNDLE[{ident}].SEED_ID={a.get('seedId')}")
 
-              cs, cb = get(f"/v1/bundleIds/{bid}/bundleIdCapabilities", {"limit": "200"})
+              cs, cb = get(f"/v1/bundleIds/{bid}/bundleIdCapabilities")
               print(f"BUNDLE[{ident}].CAPABILITIES_HTTP={cs}")
               if cs == 200:
                   caps = cb.get("data", [])
