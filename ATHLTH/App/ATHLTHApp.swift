@@ -172,9 +172,9 @@ struct AppRootView: View {
         .task {
             await resolveStartupAuthentication()
 
-            if settings.trainingDeviceProvider == .appleWatch {
-                watchConnection.connect()
-            }
+            // Watch availability is discovered independently of workout capture.
+            // The user chooses iPhone vs Apple Watch for each workout.
+            watchConnection.connect()
 
             await subscriptionStore.start()
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
@@ -289,11 +289,9 @@ struct AppRootView: View {
 
             guard phase == .active else { return }
 
-            // Only touch WatchConnectivity when Apple Watch is the selected
-            // provider. Garmin/no-watch users should not depend on Watch state.
-            if settings.trainingDeviceProvider == .appleWatch {
-                watchConnection.connect()
-            }
+            // Refresh Watch availability whenever the app becomes active.
+            // This is connection state, not a global workout-device choice.
+            watchConnection.connect()
 
             let now = Date()
             if let lastFullLifecycleRefreshAt,
@@ -405,13 +403,6 @@ struct AppRootView: View {
             }
         }
         )
-        .onChange(of: settings.trainingDeviceProvider) { _, provider in
-            if provider == .appleWatch {
-                watchConnection.connect()
-            } else if settings.preferredWorkoutCapture == .appleWatch {
-                settings.preferredWorkoutCapture = .iPhone
-            }
-        }
         .onChange(of: health.personalDetails) { _, details in
             guard let source = appSession.onboardingProfile?.personalDetailsSource,
                   source == .appleHealth || source == .mixed,
@@ -461,12 +452,7 @@ struct AppRootView: View {
             }
         }
         .onChange(of: watchConnection.lastCompletedWorkout) { _, result in
-            guard settings.trainingDeviceProvider == .appleWatch,
-                  let result
-            else {
-                if settings.trainingDeviceProvider != .appleWatch {
-                    watchConnection.clearCompletedWorkout()
-                }
+            guard let result else {
                 return
             }
 
