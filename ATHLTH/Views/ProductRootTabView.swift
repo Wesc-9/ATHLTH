@@ -472,9 +472,10 @@ struct ATHLTHHomeView: View {
             .sheet(item: $selectedHomeStrengthSession) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
-                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    trainingDeviceProvider:
+                        watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady,
-                    defaultCapture: settings.preferredWorkoutCapture,
+                    defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
                 ) { captureDevice, trackingMode, selectedFriends, audioCoach in
                     Task { @MainActor in
@@ -503,7 +504,8 @@ struct ATHLTHHomeView: View {
             .sheet(item: $pendingHomeQuickStartKind) { kind in
                 QuickWorkoutStartSheet(
                     kind: kind,
-                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    trainingDeviceProvider:
+                        watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady
                 ) { selectedFriends, gearIDs, audioCoach in
                     Task { @MainActor in
@@ -1600,10 +1602,7 @@ struct ATHLTHHomeView: View {
                     homeQuickStartButton(
                         title: "Run",
                         icon: "figure.run",
-                        tint: .green,
-                        enabled:
-                            settings.trainingDeviceProvider == .appleWatch &&
-                            watchConnection.isReady
+                        tint: .green
                     ) {
                         pendingHomeQuickStartKind = .running
                     }
@@ -1963,10 +1962,7 @@ struct ATHLTHHomeView: View {
                 ? .advanced
                 : .simple
 
-        let useAppleWatch =
-            settings.trainingDeviceProvider == .appleWatch &&
-            watchConnection.isReady &&
-            settings.preferredWorkoutCapture != .iPhone
+        let useAppleWatch = watchConnection.isReady
 
         homeDirectStartInProgress = true
         homeWatchTransferError = nil
@@ -2757,9 +2753,10 @@ struct ATHLTHTrainView: View {
             .sheet(item: $selectedStrengthSession) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
-                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    trainingDeviceProvider:
+                        watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady,
-                    defaultCapture: settings.preferredWorkoutCapture,
+                    defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
                 ) { captureDevice, trackingMode, selectedFriends, audioCoach in
                     Task { @MainActor in
@@ -2788,7 +2785,7 @@ struct ATHLTHTrainView: View {
             .sheet(isPresented: $showingRunQuickStart) {
                 RunQuickStartSheet(
                     trainingDeviceProvider:
-                        settings.trainingDeviceProvider,
+                        watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady
                 ) { configuration in
                     Task { @MainActor in
@@ -2806,7 +2803,7 @@ struct ATHLTHTrainView: View {
             .sheet(isPresented: $showingWalkQuickStart) {
                 WalkQuickStartSheet(
                     trainingDeviceProvider:
-                        settings.trainingDeviceProvider,
+                        watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady
                 ) { configuration in
                     Task { @MainActor in
@@ -2838,7 +2835,8 @@ struct ATHLTHTrainView: View {
             .sheet(item: $pendingRunningTemplate) { workout in
                 QuickWorkoutStartSheet(
                     kind: .running,
-                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    trainingDeviceProvider:
+                        watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady
                 ) { selectedFriends, gearIDs, audioCoach in
                     Task { @MainActor in
@@ -2859,7 +2857,8 @@ struct ATHLTHTrainView: View {
             }
             .sheet(isPresented: $showingCustomQuickStart) {
                 CustomQuickStartSheet(
-                    trainingDeviceProvider: settings.trainingDeviceProvider,
+                    trainingDeviceProvider:
+                        watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady
                 ) { configuration in
                     startCustomWorkoutOnWatch(configuration)
