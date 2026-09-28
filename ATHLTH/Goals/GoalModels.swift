@@ -65,7 +65,7 @@ enum GoalPrivacy: String, CaseIterable, Identifiable, Codable, Hashable {
     var title: String {
         switch self {
         case .privateOnly: return "Private"
-        case .friends: return "Friends"
+        case .friends: return "Followers"
         case .publicVisible: return "Public"
         }
     }
