@@ -1114,27 +1114,9 @@ struct TrainingPlanLibraryView: View {
         .padding(.horizontal, 13)
         .frame(height: 38)
         .background(
-            Group {
-                if selected {
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.accent,
-                            ATHLTHTheme.accentDeep
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                } else {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.94),
-                            Color.white.opacity(0.74)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
-            },
+            selected
+                ? ATHLTHTheme.accentDeep
+                : Color.white.opacity(0.86),
             in: Capsule()
         )
         .overlay {
@@ -1316,24 +1298,87 @@ struct TrainingPlanCatalogDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(entry.categoryTitle.uppercased())
-                        .font(.caption2.weight(.bold))
-                        .tracking(2)
-                        .foregroundStyle(ATHLTHTheme.accent)
-
-                    Text(entry.title)
-                        .font(
-                            .system(
-                                size: 34,
-                                weight: .bold,
-                                design: .serif
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 13) {
+                        Image(systemName: detailIcon)
+                            .font(.system(size: 23, weight: .semibold))
+                            .foregroundStyle(detailAccent)
+                            .frame(width: 54, height: 54)
+                            .background(
+                                detailAccent.opacity(0.10),
+                                in: RoundedRectangle(
+                                    cornerRadius: 17,
+                                    style: .continuous
+                                )
                             )
-                        )
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(entry.categoryTitle.uppercased())
+                                .font(.system(size: 10, weight: .bold))
+                                .tracking(2.1)
+                                .foregroundStyle(detailAccent)
+
+                            Text(entry.title)
+                                .font(
+                                    .system(
+                                        size: 34,
+                                        weight: .semibold,
+                                        design: .serif
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                        }
+
+                        Spacer(minLength: 0)
+                    }
 
                     Text(entry.summary)
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineSpacing(2)
+
+                    HStack(spacing: 7) {
+                        Label(
+                            entry.level,
+                            systemImage: "speedometer"
+                        )
+                        Label(
+                            entry.goal,
+                            systemImage: "scope"
+                        )
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText.opacity(0.68)
+                    )
+                    .lineLimit(1)
+                }
+                .padding(18)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.96),
+                            detailAccent.opacity(0.055)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 28,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 28,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white.opacity(0.95),
+                        lineWidth: 1
+                    )
                 }
 
                 HStack(spacing: 10) {
@@ -1499,12 +1544,54 @@ struct TrainingPlanCatalogDetailView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .padding(12)
+        .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            Color.white.opacity(0.82),
-            in: RoundedRectangle(cornerRadius: 16)
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.94),
+                    detailAccent.opacity(0.025)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.035),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private var detailAccent: Color {
+        switch entry.category {
+        case "strength":
+            return Color.indigo
+        case "hybrid":
+            return ATHLTHTheme.premiumGold
+        default:
+            return ATHLTHTheme.vitality
+        }
+    }
+
+    private var detailIcon: String {
+        switch entry.category {
+        case "strength":
+            return "dumbbell.fill"
+        case "hybrid":
+            return "figure.run.square.stack.fill"
+        default:
+            return "figure.run"
+        }
     }
 }
 
