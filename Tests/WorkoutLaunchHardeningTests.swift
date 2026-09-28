@@ -47,6 +47,14 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
         XCTAssertTrue(
             store.aiHealthDataSharingEnabled
         )
+
+        store.clearAfterAccountDeletion()
+        store.applyBackendBootstrap(
+            bootstrap(first)
+        )
+        XCTAssertFalse(
+            store.aiHealthDataSharingEnabled
+        )
     }
 
     func testWorkoutKindMappingIsCentralized() {
