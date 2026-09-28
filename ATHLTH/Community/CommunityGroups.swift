@@ -1125,7 +1125,7 @@ final class CommunityGroupStore: ObservableObject {
                     .execute()
                     .value
 
-            let loadedGroups = try await groupsQuery
+            let discoveryGroups = try await groupsQuery
             let loadedMemberships =
                 try await membershipsQuery
             let loadedActivity =
@@ -1136,6 +1136,51 @@ final class CommunityGroupStore: ObservableObject {
                 try await joinRequestsQuery
             let notificationPreferences =
                 try await notificationPreferencesQuery
+
+            // The paged discovery list must never hide a club the user
+            // belongs to or has been invited to just because that club is
+            // older than the first page.
+            var requiredGroupIDs =
+                Set(loadedMemberships.map(\.groupID))
+            requiredGroupIDs.formUnion(
+                loadedInvites.map(\.groupID)
+            )
+            requiredGroupIDs.formUnion(
+                loadedJoinRequests.map(\.groupID)
+            )
+
+            let discoveryGroupIDs =
+                Set(discoveryGroups.map(\.id))
+            let missingGroupIDs =
+                requiredGroupIDs.subtracting(
+                    discoveryGroupIDs
+                )
+
+            let requiredGroups: [CommunityGroupRecord]
+            if missingGroupIDs.isEmpty {
+                requiredGroups = []
+            } else {
+                requiredGroups = try await client
+                    .from("community_groups")
+                    .select()
+                    .in(
+                        "id",
+                        values:
+                            missingGroupIDs.map(
+                                \.uuidString
+                            )
+                    )
+                    .execute()
+                    .value
+            }
+
+            let loadedGroups =
+                discoveryGroups + requiredGroups
+                .filter {
+                    !discoveryGroupIDs.contains(
+                        $0.id
+                    )
+                }
 
             var neededProfileIDs: Set<UUID> = [
                 userID
@@ -1170,7 +1215,7 @@ final class CommunityGroupStore: ObservableObject {
 
             groups = loadedGroups
             canLoadMoreGroups =
-                loadedGroups.count >= groupFetchLimit
+                discoveryGroups.count >= groupFetchLimit
             lastRefreshAt = Date()
             ownMemberships = loadedMemberships
             communityActivity = loadedActivity
