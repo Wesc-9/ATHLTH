@@ -29,8 +29,11 @@ final class WorkoutInsightAIService {
     ) async throws -> WorkoutAIInsight {
         let signature =
             Self.signature(for: context)
+        let userScope =
+            client.auth.currentUser?.id.uuidString ??
+            "signed-out"
         let key =
-            "athlth.workoutInsight.\(workoutID.uuidString)"
+            "athlth.workoutInsight.\(userScope).\(workoutID.uuidString)"
 
         if let data = defaults.data(
             forKey: key
