@@ -778,6 +778,7 @@ struct AroundYouExploreView: View {
     @State private var routeActionMessage: String?
     @State private var routeActionError: String?
     @State private var startingRoute = false
+    @State private var showingDiscoveryHub = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -981,6 +982,19 @@ struct AroundYouExploreView: View {
             for: .tabBar
         )
         .toolbar {
+            if embeddedInTab {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingDiscoveryHub = true
+                    } label: {
+                        Image(systemName: "sparkles")
+                    }
+                    .accessibilityLabel(
+                        "Discover clubs, challenges and public activity"
+                    )
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     hasCenteredOnUser = false
@@ -993,6 +1007,9 @@ struct AroundYouExploreView: View {
                     "Center on my location"
                 )
             }
+        }
+        .sheet(isPresented: $showingDiscoveryHub) {
+            ExploreDiscoveryHubView()
         }
         .task {
             async let routesRefresh: Void =
