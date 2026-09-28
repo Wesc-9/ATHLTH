@@ -687,6 +687,7 @@ private struct SocialActivityCard: View {
 }
 
 struct FriendProfileView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
 
@@ -697,24 +698,35 @@ struct FriendProfileView: View {
     @State private var loading = true
     @State private var showingChallenge = false
     @State private var showingReport = false
-    @State private var confirmRemove = false
     @State private var confirmBlock = false
     @State private var followOverview = SocialFollowOverview.empty
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
+        ATHLTHPinnedHeroLayout(
+            accent: ATHLTHTheme.premiumGold.opacity(0.62)
+        ) {
+            if let profile {
+                remoteProfileHero(profile)
+            } else {
+                Color.clear
+                    .frame(height: 236)
+            }
+        } content: {
+            LazyVStack(spacing: 16) {
                 if loading && profile == nil {
                     ProgressView("Loading profile…")
                         .padding(.top, 70)
                 } else if let profile {
-                    profileHeader(profile)
+                    followStats(profile)
                     actionBar(profile)
 
                     if profile.card.isPrivateProfile &&
-                        social.relationshipState(with: userID) != .friends &&
                         !social.isFollowing(userID) {
                         privateProfileNotice
+                    }
+
+                    if !profile.recentActivities.isEmpty {
+                        recentActivityCard(profile.recentActivities)
                     }
 
                     if let performance = profile.performance {
@@ -724,38 +736,57 @@ struct FriendProfileView: View {
                     if !profile.trophies.isEmpty {
                         trophyCard(profile.trophies)
                     }
-
-                    if !profile.recentActivities.isEmpty {
-                        recentActivityCard(profile.recentActivities)
-                    }
                 } else {
                     ContentUnavailableView(
                         "Profile unavailable",
                         systemImage: "person.crop.circle.badge.questionmark",
-                        description: Text("This profile may be private or unavailable.")
+                        description: Text(
+                            "This profile may be private or unavailable."
+                        )
                     )
                     .padding(.top, 70)
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 120)
+            .frame(maxWidth: 900)
+            .frame(maxWidth: .infinity)
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent: ATHLTHTheme.accent.opacity(0.18)
-            )
-        )
-        .navigationTitle(profile?.card.usernameLabel ?? "Profile")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep.opacity(0.74)
+                        )
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Color.white.opacity(0.46),
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white.opacity(0.58),
+                                    lineWidth: 0.8
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+            }
+
             if profile != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        if social.relationshipState(with: userID) == .friends {
-                            Button("Remove Friend", role: .destructive) {
-                                confirmRemove = true
-                            }
-                        }
-
                         Button("Report") {
                             showingReport = true
                         }
@@ -765,6 +796,13 @@ struct FriendProfileView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                ATHLTHTheme.cardWarm.opacity(0.82),
+                                in: Circle()
+                            )
                     }
                 }
             }
@@ -777,23 +815,14 @@ struct FriendProfileView: View {
         }
         .sheet(isPresented: $showingChallenge) {
             if let profile {
-                ChallengeCreationView(preselectedFriends: [profile.card])
+                ChallengeCreationView(
+                    preselectedFriends: [profile.card]
+                )
             }
         }
         .sheet(isPresented: $showingReport) {
             if let profile {
                 ReportUserView(profile: profile.card)
-            }
-        }
-        .confirmationDialog(
-            "Remove this friend?",
-            isPresented: $confirmRemove,
-            titleVisibility: .visible
-        ) {
-            Button("Remove Friend", role: .destructive) {
-                Task {
-                    await social.removeFriend(userID)
-                }
             }
         }
         .confirmationDialog(
@@ -809,124 +838,123 @@ struct FriendProfileView: View {
         }
     }
 
-    private func profileHeader(_ profile: SocialFriendProfile) -> some View {
-        VStack(spacing: 18) {
+    private func remoteProfileHero(
+        _ profile: SocialFriendProfile
+    ) -> some View {
+        GeometryReader { proxy in
             ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                ATHLTHTheme.accent.opacity(0.18),
-                                ATHLTHTheme.vitality.opacity(0.10),
-                                Color.white.opacity(0.92)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                Image("ProfileHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height,
+                        alignment: .leading
                     )
-                    .frame(width: 126, height: 126)
+                    .clipped()
 
-                SocialAvatar(profile: profile.card, size: 112)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.92),
+                        ATHLTHTheme.cardWarm.opacity(0.74),
+                        ATHLTHTheme.cardWarm.opacity(0.28)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        ATHLTHTheme.canvasBottom.opacity(0.38)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                HStack(alignment: .center, spacing: 16) {
+                    SocialAvatar(
+                        profile: profile.card,
+                        size: 96
+                    )
                     .overlay {
                         Circle()
-                            .stroke(Color.white.opacity(0.92), lineWidth: 3)
+                            .stroke(
+                                Color.white.opacity(0.95),
+                                lineWidth: 3
+                            )
                     }
-            }
-
-            VStack(spacing: 5) {
-                Text(profile.card.resolvedName)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .multilineTextAlignment(.center)
-
-                if !profile.card.usernameLabel.isEmpty {
-                    Text(profile.card.usernameLabel)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                }
-
-                Label(
-                    profile.card.isPrivateProfile
-                        ? "Private profile"
-                        : "Public profile",
-                    systemImage:
-                        profile.card.isPrivateProfile
-                            ? "lock.fill"
-                            : "globe.europe.africa.fill"
-                )
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(
-                    profile.card.isPrivateProfile
-                        ? ATHLTHTheme.mutedText
-                        : ATHLTHTheme.vitality
-                )
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    Color.white.opacity(0.72),
-                    in: Capsule()
-                )
-            }
-
-            if let bio = profile.card.bio?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-               !bio.isEmpty {
-                Text(bio)
-                    .font(.subheadline)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.78))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 12)
-            }
-
-            followStats(profile)
-
-            HStack(spacing: 8) {
-                if let focus = profile.trainingFocus {
-                    Label(focus.title, systemImage: focus.systemImage)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(ATHLTHTheme.accentSoft, in: Capsule())
-                }
-
-                if let presence = profile.presence {
-                    Label(
-                        presence.state == "training"
-                            ? "Training now"
-                            : "Available",
-                        systemImage: presence.state == "training"
-                            ? "figure.run"
-                            : "circle.fill"
+                    .shadow(
+                        color: .black.opacity(0.08),
+                        radius: 10,
+                        x: 0,
+                        y: 5
                     )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.vitality)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        ATHLTHTheme.vitalitySoft,
-                        in: Capsule()
-                    )
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("PROFILE")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.6)
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep.opacity(0.62)
+                            )
+
+                        Text(profile.card.resolvedName)
+                            .font(.system(size: 27, weight: .bold))
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.76)
+
+                        if !profile.card.usernameLabel.isEmpty {
+                            Text(profile.card.usernameLabel)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                        }
+
+                        if let focus = profile.trainingFocus {
+                            Label(
+                                focus.title,
+                                systemImage: focus.systemImage
+                            )
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                Color.white.opacity(0.66),
+                                in: Capsule()
+                            )
+                            .padding(.top, 2)
+                        }
+
+                        if let bio = profile.card.bio?
+                            .trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            ),
+                           !bio.isEmpty {
+                            Text(bio)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText.opacity(0.72)
+                                )
+                                .lineLimit(2)
+                                .padding(.top, 1)
+                        }
+                    }
+
+                    Spacer(minLength: 6)
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 72)
+                .padding(.bottom, 24)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 24)
-        .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 30,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 30,
-                style: .continuous
-            )
-            .stroke(Color.white.opacity(0.72), lineWidth: 1)
-        }
+        .frame(height: 236)
+        .clipped()
     }
 
     @ViewBuilder
