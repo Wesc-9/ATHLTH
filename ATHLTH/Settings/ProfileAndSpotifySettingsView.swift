@@ -1571,7 +1571,7 @@ struct SpotifySettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                    Text("Redirect URI: athlth://spotify-callback")
+                    Text("Redirect URI: athlth-spotify-login://callback")
                         .font(.caption.monospaced())
                         .textSelection(.enabled)
                 }
