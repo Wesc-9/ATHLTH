@@ -2050,43 +2050,107 @@ struct LibraryFavoritesView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    favoriteFilter(
-                        "All",
-                        selected: selectedKind == nil
-                    ) {
-                        selectedKind = nil
-                    }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                LibraryPremiumIntro(
+                    eyebrow: "FAVORITES",
+                    title: "Your fastest way back",
+                    subtitle:
+                        "Keep the plans, workouts, exercises and routes you return to most in one place.",
+                    icon: "star.fill",
+                    accent: ATHLTHTheme.premiumGold
+                ) {
+                    HStack(spacing: 8) {
+                        LibraryStatPill(
+                            value: "\(favorites.favorites.count)",
+                            label: "saved",
+                            icon: "star.fill",
+                            tint: ATHLTHTheme.premiumGold
+                        )
 
-                    ForEach(LibraryFavoriteKind.allCases) { kind in
-                        favoriteFilter(
-                            kind.title,
-                            selected: selectedKind == kind
-                        ) {
-                            selectedKind = kind
+                        if let selectedKind {
+                            LibraryStatPill(
+                                value: "\(favorites.count(for: selectedKind))",
+                                label: selectedKind.title.lowercased(),
+                                icon: selectedKind.systemImage,
+                                tint: favoriteTint(selectedKind)
+                            )
+                        } else {
+                            LibraryStatPill(
+                                value: "\(favoriteKindsInUse)",
+                                label: "types",
+                                icon: "square.grid.2x2.fill",
+                                tint: ATHLTHTheme.accent
+                            )
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
 
-            if displayedFavorites.isEmpty {
-                ContentUnavailableView {
-                    Label(
-                        "No favorites yet",
-                        systemImage: "star"
-                    )
-                } description: {
-                    Text(
-                        "Tap the star on a plan, workout, exercise or route to keep it here."
-                    )
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        favoriteFilter(
+                            "All",
+                            icon: "sparkles",
+                            selected: selectedKind == nil
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                selectedKind = nil
+                            }
+                        }
+
+                        ForEach(LibraryFavoriteKind.allCases) { kind in
+                            favoriteFilter(
+                                kind.title,
+                                icon: kind.systemImage,
+                                selected: selectedKind == kind
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    selectedKind = kind
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
+
+                if displayedFavorites.isEmpty {
+                    VStack(spacing: 15) {
+                        Image(systemName: "star")
+                            .font(.system(size: 27, weight: .medium))
+                            .foregroundStyle(
+                                ATHLTHTheme.premiumGold
+                            )
+                            .frame(width: 66, height: 66)
+                            .background(
+                                ATHLTHTheme.premiumGold.opacity(0.10),
+                                in: Circle()
+                            )
+
+                        VStack(spacing: 5) {
+                            Text("Nothing saved here yet")
+                                .font(.title3.weight(.semibold))
+
+                            Text(
+                                "Tap the star on a plan, workout, exercise or route and it will appear here."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .multilineTextAlignment(.center)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 34)
+                    .padding(.horizontal, 22)
+                    .background(
+                        Color.white.opacity(0.78),
+                        in: RoundedRectangle(
+                            cornerRadius: 25,
+                            style: .continuous
+                        )
+                    )
+                } else {
                     LazyVStack(spacing: 10) {
                         ForEach(displayedFavorites) { item in
                             HStack(spacing: 8) {
@@ -2107,12 +2171,16 @@ struct LibraryFavoritesView: View {
                             }
                         }
                     }
-                    .padding(16)
                 }
             }
+            .padding(18)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
         .background(
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.premiumGold.opacity(0.20)
+            )
         )
         .navigationTitle("Favorites")
         .navigationBarTitleDisplayMode(.inline)
@@ -2194,25 +2262,40 @@ struct LibraryFavoritesView: View {
 
     private func favoriteFilter(
         _ title: String,
+        icon: String,
         selected: Bool,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(
-                    selected
-                        ? Color.white
-                        : ATHLTHTheme.primaryText
-                )
-                .padding(.horizontal, 13)
-                .frame(height: 35)
-                .background(
-                    selected
-                        ? ATHLTHTheme.accent
-                        : Color(.secondarySystemGroupedBackground),
-                    in: Capsule()
-                )
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+
+                Text(title)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(
+                selected
+                    ? Color.white
+                    : ATHLTHTheme.primaryText.opacity(0.80)
+            )
+            .padding(.horizontal, 13)
+            .frame(height: 38)
+            .background(
+                selected
+                    ? ATHLTHTheme.accentDeep
+                    : Color.white.opacity(0.84),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        selected
+                            ? Color.white.opacity(0.16)
+                            : Color.black.opacity(0.035),
+                        lineWidth: 0.8
+                    )
+            }
         }
         .buttonStyle(.plain)
     }
@@ -2220,21 +2303,31 @@ struct LibraryFavoritesView: View {
     private func favoriteRow(
         _ item: LibraryFavoriteRecord
     ) -> some View {
-        HStack(spacing: 12) {
+        let tint = favoriteTint(item.itemType)
+
+        return HStack(spacing: 13) {
             Image(
                 systemName:
                     item.icon ??
                     item.itemType.systemImage
             )
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(ATHLTHTheme.accent)
-            .frame(width: 42, height: 42)
+            .foregroundStyle(tint)
+            .frame(width: 46, height: 46)
             .background(
-                ATHLTHTheme.accentSoft,
-                in: RoundedRectangle(cornerRadius: 13)
+                tint.opacity(0.10),
+                in: RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
             )
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.itemType.title.uppercased())
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(tint)
+
                 Text(item.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
@@ -2245,20 +2338,64 @@ struct LibraryFavoritesView: View {
                     item.itemType.title
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ATHLTHTheme.mutedText)
                 .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            Image(systemName: "chevron.right")
+            Image(systemName: "arrow.right")
                 .font(.caption.bold())
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(tint)
+                .frame(width: 29, height: 29)
+                .background(
+                    tint.opacity(0.08),
+                    in: Circle()
+                )
         }
-        .padding(13)
+        .padding(14)
         .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 18)
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    tint.opacity(0.025)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var favoriteKindsInUse: Int {
+        Set(favorites.favorites.map(\.itemType)).count
+    }
+
+    private func favoriteTint(
+        _ kind: LibraryFavoriteKind
+    ) -> Color {
+        switch kind {
+        case .plan:
+            return Color.orange
+        case .workout:
+            return ATHLTHTheme.vitality
+        case .exercise:
+            return Color.indigo
+        case .route:
+            return Color.green
+        }
     }
 }
