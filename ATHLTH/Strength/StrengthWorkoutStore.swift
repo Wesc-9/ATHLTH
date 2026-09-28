@@ -793,6 +793,7 @@ final class StrengthWorkoutStore: ObservableObject {
     private func persistWorkoutHistory() {
         guard let accountID else { return }
         AccountLocalStorage.write(workoutHistory, name: "strengthHistory", userID: accountID)
+        ATHLTHTrainingDataChangeSignal.post(userID: accountID)
     }
 
     private static func loadWorkoutHistory() -> [StrengthWorkoutLog] {
