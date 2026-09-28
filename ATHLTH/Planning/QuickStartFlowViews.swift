@@ -19,6 +19,7 @@ struct AudioCoachDraft {
     var announceCurrentWorkoutStep = true
     var announceRemainingStepTime = true
     var announceRemainingStepDistance = true
+    var duckOtherAudio = true
 
     var language: WatchAudioCoachLanguage = .system
 
@@ -53,6 +54,8 @@ struct AudioCoachDraft {
             settings.audioCoachAnnounceRemainingStepTime
         announceRemainingStepDistance =
             settings.audioCoachAnnounceRemainingStepDistance
+        duckOtherAudio =
+            settings.audioCoachDuckOtherAudio
         language = settings.audioCoachLanguage
     }
 
@@ -90,7 +93,9 @@ struct AudioCoachDraft {
             announceRemainingStepTime:
                 enabled && announceRemainingStepTime,
             announceRemainingStepDistance:
-                enabled && announceRemainingStepDistance
+                enabled && announceRemainingStepDistance,
+            duckOtherAudio:
+                duckOtherAudio
         )
     }
 }
@@ -1263,6 +1268,26 @@ struct AudioCoachSetupCard: View {
                                     .announceRemainingStepDistance
                         )
                     }
+
+                    Divider()
+
+                    Text("MUSIC & OTHER AUDIO")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.0)
+                        .foregroundStyle(.secondary)
+
+                    Toggle(
+                        "Lower music while coach speaks",
+                        isOn: $draft.duckOtherAudio
+                    )
+
+                    Text(
+                        draft.duckOtherAudio
+                            ? "Spotify and other audio are reduced only while the coach is speaking."
+                            : "Coach speech mixes with music at its current level."
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
 
                     Divider()
 
