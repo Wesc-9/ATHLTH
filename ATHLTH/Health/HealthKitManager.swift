@@ -3496,99 +3496,12 @@ final class HealthKitManager: ObservableObject {
         let hrvDays = (try? await hrvDaysTask) ?? [:]
         let restingDays = (try? await restingDaysTask) ?? [:]
 
-        let commonDays = Set(sleepDays.keys)
-            .intersection(hrvDays.keys)
-            .intersection(restingDays.keys)
-        let qualifyingBaselineDays = commonDays.count
-
-        let averageSleep = Self.average(
-            commonDays.compactMap { sleepDays[$0] }
-        )
-        let averageHRV = Self.average(
-            commonDays.compactMap { hrvDays[$0] }
-        )
-        let averageRestingHR = Self.average(
-            commonDays.compactMap { restingDays[$0] }
-        )
-
-        let now = Date()
-        let recentWindow: TimeInterval = 48 * 3_600
-
-        guard qualifyingBaselineDays >= 5,
-              currentSleep.totalAsleep > 0,
-              let currentHRV = currentHeart.hrvMilliseconds,
-              currentHRV > 0,
-              let hrvDate = currentHeart.hrvDate,
-              abs(now.timeIntervalSince(hrvDate)) <= recentWindow,
-              let currentRestingHR = currentHeart.restingHeartRate,
-              currentRestingHR > 0,
-              let restingDate = currentHeart.restingHeartRateDate,
-              abs(now.timeIntervalSince(restingDate)) <= recentWindow,
-              let averageSleep,
-              averageSleep > 0,
-              let averageHRV,
-              averageHRV > 0,
-              let averageRestingHR,
-              averageRestingHR > 0
-        else {
-            return RecoveryReadinessSummary(
-                score: nil,
-                state: .buildingBaseline,
-                detail: qualifyingBaselineDays > 0
-                    ? "ATHLTH has \(qualifyingBaselineDays) usable baseline day\(qualifyingBaselineDays == 1 ? "" : "s"). At least 5 days with sleep, HRV and resting heart rate are needed."
-                    : "ATHLTH is learning your recent sleep, HRV and resting heart-rate baseline.",
-                baselineDays: qualifyingBaselineDays,
-                averageSleepDuration: averageSleep,
-                baselineHRVMilliseconds: averageHRV,
-                baselineRestingHeartRate: averageRestingHR
-            )
-        }
-
-        let sleepReference = max(averageSleep, 7.5 * 3_600)
-        let sleepScore = Self.clamp(
-            currentSleep.totalAsleep / sleepReference,
-            lower: 0.45,
-            upper: 1.0
-        ) * 100
-
-        let hrvScore = Self.clamp(
-            currentHRV / averageHRV,
-            lower: 0.55,
-            upper: 1.0
-        ) * 100
-
-        let restingScore = Self.clamp(
-            averageRestingHR / currentRestingHR,
-            lower: 0.60,
-            upper: 1.0
-        ) * 100
-
-        let rawScore =
-            sleepScore * 0.45 +
-            hrvScore * 0.35 +
-            restingScore * 0.20
-        let score = Int(Self.clamp(rawScore, lower: 0, upper: 100).rounded())
-
-        let state: RecoveryReadinessState
-        switch score {
-        case 80...:
-            state = .ready
-        case 65..<80:
-            state = .balanced
-        case 50..<65:
-            state = .takeItEasy
-        default:
-            state = .recover
-        }
-
-        return RecoveryReadinessSummary(
-            score: score,
-            state: state,
-            detail: "Based on last night's sleep and today's HRV/resting heart rate compared with your recent baseline.",
-            baselineDays: qualifyingBaselineDays,
-            averageSleepDuration: averageSleep,
-            baselineHRVMilliseconds: averageHRV,
-            baselineRestingHeartRate: averageRestingHR
+        return RecoveryReadinessEngine.evaluate(
+            currentSleep: currentSleep,
+            currentHeart: currentHeart,
+            sleepDays: sleepDays,
+            hrvDays: hrvDays,
+            restingHeartRateDays: restingDays
         )
     }
 
@@ -3655,21 +3568,6 @@ final class HealthKitManager: ObservableObject {
 
             healthStore.execute(query)
         }
-    }
-
-    private static func average(
-        _ values: [Double]
-    ) -> Double? {
-        guard !values.isEmpty else { return nil }
-        return values.reduce(0, +) / Double(values.count)
-    }
-
-    private static func clamp(
-        _ value: Double,
-        lower: Double,
-        upper: Double
-    ) -> Double {
-        min(max(value, lower), upper)
     }
 
     private func dailyCumulativeQuantities(
