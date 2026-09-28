@@ -103,7 +103,7 @@ struct ATHLTHNotificationCenterView: View {
                 }
             }
 
-            if notifications.items.isEmpty &&
+            if notifications.notificationCenterItems.isEmpty &&
                 health.pendingWorkoutImports.isEmpty {
                 Section {
                     ContentUnavailableView(
@@ -112,9 +112,9 @@ struct ATHLTHNotificationCenterView: View {
                         description: Text("Completed workouts, reached milestones and goal updates will appear here.")
                     )
                 }
-            } else if !notifications.items.isEmpty {
+            } else if !notifications.notificationCenterItems.isEmpty {
                 Section {
-                    ForEach(notifications.items) { item in
+                    ForEach(notifications.notificationCenterItems) { item in
                         notificationRow(item)
                             .swipeActions {
                                 Button(role: .destructive) {
@@ -131,7 +131,7 @@ struct ATHLTHNotificationCenterView: View {
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if notifications.unreadCount > 0 {
+            if notifications.notificationCenterUnreadCount > 0 {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Mark All Read") {
                         notifications.markAllRead()
@@ -333,7 +333,11 @@ struct ATHLTHNotificationCenterView: View {
         }
 
         switch item.socialEventKind {
-        case "friend_request", "friend_accepted", "reaction":
+        case "friend_request",
+             "friend_accepted",
+             "follow_request",
+             "follow_accepted",
+             "reaction":
             return true
         default:
             return false
@@ -350,9 +354,9 @@ struct ATHLTHNotificationCenterView: View {
             TrophyCollectionView()
         } else {
             switch item.socialEventKind {
-            case "friend_request":
+            case "friend_request", "follow_request":
                 SocialHubView(initialTab: .requests)
-            case "friend_accepted":
+            case "friend_accepted", "follow_accepted":
                 SocialHubView(initialTab: .friends)
             case "reaction":
                 SocialHubView(initialTab: .feed)
