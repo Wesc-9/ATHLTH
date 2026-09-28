@@ -156,6 +156,10 @@ struct AppRootView: View {
     @State private var queuedWorkoutReviewIDs: Set<UUID> = []
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
     @State private var lastFullLifecycleRefreshAt: Date?
+    @State private var showingNotificationPermissionPrimer = false
+
+    @AppStorage("athlth.notifications.permissionPrimerShown")
+    private var notificationPermissionPrimerShown = false
 
     private let minimumLifecycleRefreshInterval:
         TimeInterval = 90
@@ -175,6 +179,7 @@ struct AppRootView: View {
         }
         .task {
             await resolveStartupAuthentication()
+            scheduleNotificationPermissionPrimerIfNeeded()
 
             // Watch availability is discovered independently of workout capture.
             // The user chooses iPhone vs Apple Watch for each workout.
@@ -758,6 +763,8 @@ struct AppRootView: View {
             guard signedIn else { return }
 
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
+            scheduleNotificationPermissionPrimerIfNeeded()
+
             Task {
                 await APNsPushManager.shared.syncCurrentToken()
                 await syncPushPreferences()
@@ -770,6 +777,10 @@ struct AppRootView: View {
                     await syncSocialOwnedData()
                 }
             }
+        }
+        .onChange(of: appSession.onboardingCompleted) { _, completed in
+            guard completed else { return }
+            scheduleNotificationPermissionPrimerIfNeeded()
         }
         .background {
             ZStack {
@@ -826,6 +837,26 @@ struct AppRootView: View {
         } message: {
             Text(
                 "Completed workouts are private by default. You can share this workout, automatically share future workouts, or keep them private. You can change this later in Settings."
+            )
+        }
+        .sheet(isPresented: $showingNotificationPermissionPrimer) {
+            ATHLTHNotificationPermissionPrimerView(
+                onAllow: {
+                    notificationPermissionPrimerShown = true
+                    showingNotificationPermissionPrimer = false
+
+                    Task {
+                        _ = await notifications
+                            .requestSystemNotificationPermissionIfNeeded()
+                        await APNsPushManager.shared
+                            .syncCurrentToken()
+                        await syncPushPreferences()
+                    }
+                },
+                onNotNow: {
+                    notificationPermissionPrimerShown = true
+                    showingNotificationPermissionPrimer = false
+                }
             )
         }
         .sheet(item: $pendingWorkoutReview) { workout in
@@ -1178,6 +1209,45 @@ struct AppRootView: View {
         }
 
         await social.syncChallenges(challengeStore)
+    }
+
+    @MainActor
+    private func scheduleNotificationPermissionPrimerIfNeeded() {
+        guard !notificationPermissionPrimerShown,
+              !showingNotificationPermissionPrimer,
+              !appSession.previewModeEnabled,
+              appSession.signedIn,
+              appSession.onboardingCompleted
+        else {
+            return
+        }
+
+        Task { @MainActor in
+            await notifications.refreshAuthorizationStatus()
+
+            guard !notificationPermissionPrimerShown,
+                  !showingNotificationPermissionPrimer,
+                  appSession.signedIn,
+                  appSession.onboardingCompleted,
+                  notifications.authorizationStatus == .notDetermined
+            else {
+                return
+            }
+
+            try? await Task.sleep(
+                for: .milliseconds(650)
+            )
+
+            guard !notificationPermissionPrimerShown,
+                  appSession.signedIn,
+                  appSession.onboardingCompleted,
+                  notifications.authorizationStatus == .notDetermined
+            else {
+                return
+            }
+
+            showingNotificationPermissionPrimer = true
+        }
     }
 
     private func refreshTrophiesAndNotifications() async {
