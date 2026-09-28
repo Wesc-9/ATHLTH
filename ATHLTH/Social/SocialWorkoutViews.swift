@@ -694,6 +694,342 @@ struct HomeActivitySection: View {
     }
 }
 
+private struct HomeActivityVisualRecipe: Equatable {
+    let palette: String
+    let scene: String
+    let light: String
+    let motif: String
+    let energy: String
+    let variant: Int
+
+    static func local(
+        for workout: SocialPublishableWorkout,
+        hasRoute: Bool
+    ) -> HomeActivityVisualRecipe {
+        let hour =
+            Calendar.current.component(
+                .hour,
+                from: workout.startDate
+            )
+
+        let palette: String
+        let light: String
+
+        switch hour {
+        case 5..<11:
+            palette = "sage"
+            light = "sunrise"
+        case 11..<17:
+            palette = "ocean"
+            light = "daylight"
+        case 17..<22:
+            palette = "amber"
+            light = "golden_hour"
+        default:
+            palette = "slate"
+            light = "dusk"
+        }
+
+        let scene: String
+        switch workout.activity {
+        case .hiking:
+            scene = "mountain"
+        case .cycling:
+            scene = "coast"
+        case .walking:
+            scene =
+                hour >= 17 || hour < 6
+                    ? "city"
+                    : "forest"
+        default:
+            scene =
+                hasRoute
+                    ? "mountain"
+                    : "track"
+        }
+
+        let distance =
+            workout.distanceMeters ?? 0
+        let energy: String =
+            distance >= 10_000
+                ? "energetic"
+                : "steady"
+
+        let scalarSum =
+            workout.id.uuidString
+                .unicodeScalars
+                .reduce(0) {
+                    $0 + Int($1.value)
+                }
+
+        return HomeActivityVisualRecipe(
+            palette: palette,
+            scene: scene,
+            light: light,
+            motif: hasRoute ? "route" : "pulse",
+            energy: energy,
+            variant: (scalarSum % 4) + 1
+        )
+    }
+}
+
+private struct HomeActivityScenicWash: View {
+    let recipe: HomeActivityVisualRecipe
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: paletteColors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .opacity(0.34)
+
+            lightOverlay
+
+            sceneOverlay
+                .opacity(0.16)
+
+            if recipe.energy == "energetic" {
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.white.opacity(0.10),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var paletteColors: [Color] {
+        switch recipe.palette {
+        case "ocean":
+            return [
+                Color.cyan.opacity(0.22),
+                Color.blue.opacity(0.08),
+                Color.clear
+            ]
+        case "amber":
+            return [
+                Color.orange.opacity(0.18),
+                Color.yellow.opacity(0.08),
+                Color.clear
+            ]
+        case "slate":
+            return [
+                Color.indigo.opacity(0.18),
+                Color.black.opacity(0.10),
+                Color.clear
+            ]
+        default:
+            return [
+                ATHLTHTheme.vitality.opacity(0.18),
+                Color.green.opacity(0.06),
+                Color.clear
+            ]
+        }
+    }
+
+    @ViewBuilder
+    private var lightOverlay: some View {
+        switch recipe.light {
+        case "sunrise":
+            RadialGradient(
+                colors: [
+                    Color.yellow.opacity(0.22),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 6,
+                endRadius: 180
+            )
+        case "golden_hour":
+            RadialGradient(
+                colors: [
+                    Color.orange.opacity(0.24),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 8,
+                endRadius: 190
+            )
+        case "dusk":
+            LinearGradient(
+                colors: [
+                    Color.indigo.opacity(0.16),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        default:
+            Color.white.opacity(0.035)
+        }
+    }
+
+    @ViewBuilder
+    private var sceneOverlay: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+
+            switch recipe.scene {
+            case "forest":
+                HStack(alignment: .bottom, spacing: -10) {
+                    ForEach(0..<4, id: \.self) { index in
+                        Image(systemName: "tree.fill")
+                            .font(
+                                .system(
+                                    size:
+                                        44 +
+                                        CGFloat(
+                                            (index + recipe.variant) % 3
+                                        ) * 12
+                                )
+                            )
+                    }
+                }
+                .foregroundStyle(.white)
+                .position(
+                    x: size.width * 0.80,
+                    y: size.height * 0.72
+                )
+
+            case "city":
+                HStack(alignment: .bottom, spacing: 5) {
+                    Image(systemName: "building.fill")
+                    Image(systemName: "building.2.fill")
+                    Image(systemName: "building.fill")
+                }
+                .font(
+                    .system(
+                        size:
+                            max(
+                                size.width * 0.10,
+                                34
+                            )
+                    )
+                )
+                .foregroundStyle(.white)
+                .position(
+                    x: size.width * 0.78,
+                    y: size.height * 0.70
+                )
+
+            case "coast":
+                Image(systemName: "water.waves")
+                    .font(
+                        .system(
+                            size:
+                                max(
+                                    size.width * 0.24,
+                                    72
+                                )
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .position(
+                        x: size.width * 0.80,
+                        y: size.height * 0.70
+                    )
+
+            case "track":
+                RoundedRectangle(
+                    cornerRadius: 80,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white,
+                    lineWidth: 4
+                )
+                .frame(
+                    width: size.width * 0.42,
+                    height: size.height * 0.42
+                )
+                .rotationEffect(
+                    .degrees(
+                        recipe.variant.isMultiple(of: 2)
+                            ? -8
+                            : 8
+                    )
+                )
+                .position(
+                    x: size.width * 0.80,
+                    y: size.height * 0.64
+                )
+
+            default:
+                HomeActivityMountainSilhouette()
+                    .fill(Color.white)
+                    .frame(
+                        width: size.width * 0.58,
+                        height: size.height * 0.52
+                    )
+                    .position(
+                        x: size.width * 0.78,
+                        y: size.height * 0.70
+                    )
+            }
+        }
+    }
+}
+
+private struct HomeActivityMountainSilhouette: Shape {
+    func path(
+        in rect: CGRect
+    ) -> Path {
+        var path = Path()
+        path.move(
+            to: CGPoint(
+                x: rect.minX,
+                y: rect.maxY
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.width * 0.22,
+                y: rect.height * 0.52
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.width * 0.40,
+                y: rect.height * 0.73
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.width * 0.62,
+                y: rect.height * 0.30
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.width * 0.78,
+                y: rect.height * 0.58
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.maxX,
+                y: rect.height * 0.42
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.maxX,
+                y: rect.maxY
+            )
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
 private struct HomeActivityOutdoorCard: View {
     let workout: SocialPublishableWorkout
     let detail: WorkoutDetail?
@@ -718,6 +1054,15 @@ private struct HomeActivityOutdoorCard: View {
         }
 
         return nil
+    }
+
+    private var visualRecipe:
+        HomeActivityVisualRecipe {
+        HomeActivityVisualRecipe.local(
+            for: workout,
+            hasRoute:
+                routeCoordinates.count >= 2
+        )
     }
 
     private var mapRegion: MKCoordinateRegion {
@@ -778,6 +1123,10 @@ private struct HomeActivityOutdoorCard: View {
         VStack(spacing: 0) {
             ZStack(alignment: .topLeading) {
                 mapBackground
+
+                HomeActivityScenicWash(
+                    recipe: visualRecipe
+                )
 
                 LinearGradient(
                     colors: [
