@@ -125,6 +125,7 @@ final class RunningWorkoutLibraryStore: ObservableObject {
     private func persist() {
         guard let accountID else { return }
         AccountLocalStorage.write(customTemplates, name: "runningLibrary", userID: accountID)
+        ATHLTHTrainingDataChangeSignal.post(userID: accountID)
     }
 
     private static func loadCustomTemplates() -> [RunningWorkoutTemplate] {
