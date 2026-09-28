@@ -520,7 +520,7 @@ struct SocialHubView: View {
                 Button("Follow") {
                     Task {
                         if profile.isPrivateProfile {
-                            await social.sendFriendRequest(
+                            await social.sendFollowRequest(
                                 to: profile
                             )
                         } else {
@@ -1117,7 +1117,7 @@ struct FriendProfileView: View {
         } else if profile.card.isPrivateProfile {
             Button {
                 Task {
-                    await social.sendFriendRequest(to: profile.card)
+                    await social.sendFollowRequest(to: profile.card)
                 }
             } label: {
                 Label(
@@ -1447,6 +1447,7 @@ struct ProfileConnectionsView: View {
 struct SocialPrivacySettingsView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var goalStore: GoalStore
 
     @State private var draft: SocialPrivacySettings?
     @State private var saving = false
@@ -1483,7 +1484,8 @@ struct SocialPrivacySettingsView: View {
                     Toggle("Recent activity", isOn: binding.shareRecentActivity)
                     Toggle("Running PRs", isOn: binding.shareRunningPRs)
                     Toggle("Strength PRs", isOn: binding.shareStrengthPRs)
-                    Toggle("Completed goals", isOn: binding.shareGoals)
+                    Toggle("Goals", isOn: binding.shareGoals)
+                    Toggle("Gear", isOn: binding.shareGear)
                     Toggle("Workout totals", isOn: binding.shareWorkoutTotals)
 
                     Text("Strength PRs use manually entered reps and weight and are labeled Manual in Activity. Running PRs use qualifying Apple Health workout data.")
@@ -1542,7 +1544,14 @@ struct SocialPrivacySettingsView: View {
         guard let draft else { return }
 
         saving = true
-        await social.updatePrivacy(draft)
+        let result = await social.updatePrivacy(draft)
+
+        if case .success = result {
+            await social.syncOwnGoals(
+                goalStore.goals,
+                enabled: draft.shareGoals
+            )
+        }
 
         if let visibility = ProfileVisibility(rawValue: draft.profileVisibility) {
             settings.profileVisibility = visibility
