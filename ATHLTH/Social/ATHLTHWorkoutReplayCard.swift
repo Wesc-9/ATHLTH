@@ -362,3 +362,39 @@ private struct ReplayMoment {
     let icon: String
     let tint: Color
 }
+
+
+extension HealthKitManager {
+    func athlthReplayContext(
+        for workout: SocialPublishableWorkout,
+        maximumHeartRateBPM: Int?
+    ) async -> WorkoutAIInsightContext? {
+        guard workout.activity != .strength else {
+            return nil
+        }
+
+        let summary: WorkoutSummary?
+
+        if let current = workouts.first(
+            where: { $0.id == workout.id }
+        ) {
+            summary = current
+        } else {
+            summary =
+                (try? await workoutHistory())?
+                    .first {
+                        $0.id == workout.id
+                    }
+        }
+
+        guard let summary else {
+            return nil
+        }
+
+        return await workoutAIInsightContext(
+            for: summary,
+            maximumHeartRateBPM:
+                maximumHeartRateBPM
+        )
+    }
+}
