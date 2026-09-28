@@ -528,85 +528,6 @@ struct HomeAroundYouSection: View {
             .map(\.0)
     }
 
-    private var nearbyChallenges: [ATHLTHChallenge] {
-        let currentUserID = session.profile.userID
-
-        let candidates = challenges.visibleChallenges.filter { challenge in
-            challenge.status != .cancelled &&
-            (
-                challenge.visibility == .publicProfile ||
-                challenge.creatorID == currentUserID ||
-                challenge.participants.contains {
-                    $0.userID == currentUserID
-                }
-            )
-        }
-
-        guard let location = locationStore.location else {
-            return candidates.filter {
-                challengeCoordinate($0) != nil
-            }
-        }
-
-        return candidates
-            .compactMap {
-                challenge ->
-                    (ATHLTHChallenge, CLLocationDistance)?
-                in
-                guard let coordinate =
-                        challengeCoordinate(challenge)
-                else {
-                    return nil
-                }
-
-                let distance = CLLocation(
-                    latitude: coordinate.latitude,
-                    longitude: coordinate.longitude
-                )
-                .distance(from: location)
-
-                guard distance <= 50_000 else {
-                    return nil
-                }
-
-                return (challenge, distance)
-            }
-            .sorted { $0.1 < $1.1 }
-            .map(\.0)
-    }
-
-    private func challengeCoordinate(
-        _ challenge: ATHLTHChallenge
-    ) -> CLLocationCoordinate2D? {
-        if let meetup = challenge.rules.meetup {
-            return CLLocationCoordinate2D(
-                latitude: meetup.latitude,
-                longitude: meetup.longitude
-            )
-        }
-
-        guard let coordinates =
-                challenge.rules.route?.coordinates,
-              !coordinates.isEmpty
-        else {
-            return nil
-        }
-
-        let latitude =
-            coordinates.reduce(0) {
-                $0 + $1.latitude
-            } / Double(coordinates.count)
-        let longitude =
-            coordinates.reduce(0) {
-                $0 + $1.longitude
-            } / Double(coordinates.count)
-
-        return CLLocationCoordinate2D(
-            latitude: latitude,
-            longitude: longitude
-        )
-    }
-
     private func eventCoordinate(
         _ item: CommunityEventItem
     ) -> CLLocationCoordinate2D? {
@@ -1836,6 +1757,85 @@ struct AroundYouExploreView: View {
             }
             .sorted { $0.1 < $1.1 }
             .map(\.0)
+    }
+
+    private var nearbyChallenges: [ATHLTHChallenge] {
+        let currentUserID = session.profile.userID
+
+        let candidates = challenges.visibleChallenges.filter { challenge in
+            challenge.status != .cancelled &&
+            (
+                challenge.visibility == .publicProfile ||
+                challenge.creatorID == currentUserID ||
+                challenge.participants.contains {
+                    $0.userID == currentUserID
+                }
+            )
+        }
+
+        guard let location = locationStore.location else {
+            return candidates.filter {
+                challengeCoordinate($0) != nil
+            }
+        }
+
+        return candidates
+            .compactMap {
+                challenge ->
+                    (ATHLTHChallenge, CLLocationDistance)?
+                in
+                guard let coordinate =
+                        challengeCoordinate(challenge)
+                else {
+                    return nil
+                }
+
+                let distance = CLLocation(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                .distance(from: location)
+
+                guard distance <= 50_000 else {
+                    return nil
+                }
+
+                return (challenge, distance)
+            }
+            .sorted { $0.1 < $1.1 }
+            .map(\.0)
+    }
+
+    private func challengeCoordinate(
+        _ challenge: ATHLTHChallenge
+    ) -> CLLocationCoordinate2D? {
+        if let meetup = challenge.rules.meetup {
+            return CLLocationCoordinate2D(
+                latitude: meetup.latitude,
+                longitude: meetup.longitude
+            )
+        }
+
+        guard let coordinates =
+                challenge.rules.route?.coordinates,
+              !coordinates.isEmpty
+        else {
+            return nil
+        }
+
+        let latitude =
+            coordinates.reduce(0) {
+                $0 + $1.latitude
+            } / Double(coordinates.count)
+        let longitude =
+            coordinates.reduce(0) {
+                $0 + $1.longitude
+            } / Double(coordinates.count)
+
+        return CLLocationCoordinate2D(
+            latitude: latitude,
+            longitude: longitude
+        )
     }
 
     private func eventCoordinate(
