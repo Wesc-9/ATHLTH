@@ -32,7 +32,10 @@ PY
     fi
   done
 
-  if [ -n "${TEMP_CERT_ID:-}" ]; then
+  # Never revoke a distribution certificate implicitly after a successful
+  # TestFlight/App Store upload. Apple may still be processing or validating
+  # builds signed with it. Revocation is now an explicit maintenance action.
+  if [ "${ATHLTH_REVOKE_TEMP_CERT:-0}" = "1" ] && [ -n "${TEMP_CERT_ID:-}" ]; then
     curl --silent --show-error --request DELETE \
       --header "Authorization: Bearer $TOKEN" \
       "https://api.appstoreconnect.apple.com/v1/certificates/$TEMP_CERT_ID" >/dev/null
