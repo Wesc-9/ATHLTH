@@ -28,16 +28,6 @@ struct ATHLTHSettingsView: View {
                     header
                         .padding(.bottom, 24)
 
-                    settingsSection("Training data") {
-                        PremiumSettingsCard {
-                            NavigationLink { TrainingDataSettingsView() } label: {
-                                PremiumSettingsRow(icon: "icloud", title: "Training data & Coach", subtitle: "Cloud backup, restore and history sharing") {
-                                    Image(systemName: "chevron.right")
-                                }
-                            }
-                        }
-                    }
-
                     settingsSection("App") {
                         PremiumSettingsCard {
                             Menu {
@@ -163,8 +153,26 @@ struct ATHLTHSettingsView: View {
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "shield.lefthalf.filled",
-                                    title: "Privacy & Data",
+                                    title: "Privacy & AI",
                                     subtitle: privacySummary
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(
+                                            ATHLTHTheme.mutedText.opacity(0.72)
+                                        )
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                TrainingDataSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "icloud",
+                                    title: "Training data & Coach",
+                                    subtitle: "Cloud backup, restore and training-history sharing"
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(
