@@ -408,15 +408,20 @@ final class SocialStore: ObservableObject {
         }
     }
 
-    func block(_ userID: UUID) async {
+    @discardableResult
+    func block(_ userID: UUID) async -> Bool {
         errorMessage = nil
 
         do {
             try await service.blockUser(userID)
             profileCache[userID] = nil
+            followerIDs.remove(userID)
+            followingIDs.remove(userID)
             await refresh()
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
