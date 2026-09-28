@@ -19,7 +19,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
       BUNDLE_ID: com.wesc9.athlth
-      BUILD_NUMBER: "47"
+      BUILD_NUMBER: "46"
     steps:
       - uses: actions/checkout@v4
 
@@ -142,7 +142,7 @@ jobs:
           all_inc = {(x.get("type"), x.get("id")): x for x in all_builds.get("included", [])}
           for build in all_builds.get("data", []):
               ba = build.get("attributes", {})
-              if str(ba.get("version")) not in {"42", "43", "45", "47"}:
+              if str(ba.get("version")) not in {"42", "43", "45", "46", "47", "48"}:
                   continue
               bid = build.get("id")
               print(f"COMPARE_BUILD[{ba.get('version')}].ID={bid}")
