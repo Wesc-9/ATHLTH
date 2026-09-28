@@ -1,0 +1,124 @@
+name: Diagnose App Store Connect API access
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.4.3
+    paths:
+      - .github/asc-key-diagnostic-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      BUNDLE_ID: com.wesc9.athlth
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify App Store Connect key across services
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyjwt cryptography
+          python3 - <<'PY'
+          import json, os, time, urllib.parse, urllib.request, urllib.error
+          import jwt
+
+          key = os.environ["ASC_API_KEY_P8"].strip()
+          if len(key) >= 2 and key[0] == key[-1] and key[0] in {"'", '"'}:
+              if key[0] == '"':
+                  try:
+                      key = json.loads(key)
+                  except json.JSONDecodeError:
+                      key = key[1:-1]
+              else:
+                  key = key[1:-1]
+          key = key.replace("\\r\\n", "\n").replace("\\n", "\n")
+
+          now = int(time.time())
+          token = jwt.encode(
+              {
+                  "iss": os.environ["ASC_ISSUER_ID"],
+                  "iat": now - 30,
+                  "exp": now + 600,
+                  "aud": "appstoreconnect-v1",
+              },
+              key,
+              algorithm="ES256",
+              headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"},
+          )
+
+          def request(path, params=None):
+              url = "https://api.appstoreconnect.apple.com" + path
+              if params:
+                  url += "?" + urllib.parse.urlencode(params, doseq=True)
+              req = urllib.request.Request(url, headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/json",
+              })
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      data = resp.read().decode("utf-8")
+                      return resp.status, json.loads(data) if data else {}
+              except urllib.error.HTTPError as exc:
+                  raw = exc.read().decode("utf-8", "replace")
+                  try:
+                      body = json.loads(raw)
+                  except Exception:
+                      body = {"raw": raw}
+                  return exc.code, body
+
+          def check(label, path, params=None):
+              status, body = request(path, params)
+              print(f"{label}_HTTP={status}")
+              if status >= 400:
+                  errs = body.get("errors", []) if isinstance(body, dict) else []
+                  for i, err in enumerate(errs[:3]):
+                      print(f"{label}_ERROR[{i}].CODE={err.get('code')}")
+                      print(f"{label}_ERROR[{i}].TITLE={err.get('title')}")
+                      print(f"{label}_ERROR[{i}].DETAIL={err.get('detail')}")
+              return status, body
+
+          print(f"KEY_ID_SUFFIX={os.environ['ASC_KEY_ID'][-4:]}")
+          print(f"ISSUER_ID_PRESENT={bool(os.environ.get('ASC_ISSUER_ID'))}")
+          print("JWT_GENERATED=true")
+
+          apps_status, apps = check("APPS", "/v1/apps", {
+              "filter[bundleId]": os.environ["BUNDLE_ID"],
+              "limit": "5",
+          })
+          app_id = ""
+          if apps_status == 200 and apps.get("data"):
+              app_id = apps["data"][0]["id"]
+              print(f"APP_FOUND=true")
+              print(f"APP_ID={app_id}")
+          else:
+              print("APP_FOUND=false")
+
+          check("USERS", "/v1/users", {"limit": "1"})
+          check("BUNDLE_IDS", "/v1/bundleIds", {
+              "filter[identifier]": os.environ["BUNDLE_ID"],
+              "limit": "5",
+          })
+          check("CERTIFICATES", "/v1/certificates", {"limit": "1"})
+          check("PROFILES", "/v1/profiles", {"limit": "1"})
+
+          if app_id:
+              check("BETA_GROUPS", "/v1/betaGroups", {
+                  "filter[app]": app_id,
+                  "limit": "1",
+              })
+              check("BETA_LICENSE", f"/v1/apps/{app_id}/betaLicenseAgreement")
+              check("BUILDS", "/v1/builds", {
+                  "filter[app]": app_id,
+                  "sort": "-uploadedDate",
+                  "limit": "1",
+              })
+          PY
