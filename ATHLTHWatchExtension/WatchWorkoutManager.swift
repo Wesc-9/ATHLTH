@@ -111,6 +111,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var mirroringRetryPending = false
     private var lastMirrorSnapshotSentAt: Date?
     private let speechSynthesizer = AVSpeechSynthesizer()
+    private var coachAudioSessionIsActive = false
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var structuredStepStartElapsedTime: TimeInterval = 0
@@ -138,6 +139,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private override init() {
         super.init()
         locationManager.delegate = self
+        speechSynthesizer.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 3
     }
@@ -174,6 +176,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
            configuration.enabled,
            currentStructuredRunningStep != nil {
             announceCurrentStructuredStep(prefix: "Current")
+        }
+    }
+
+    func updateAudioCoachDuringWorkout(
+        _ configuration: WatchAudioCoachConfiguration
+    ) {
+        publish {
+            self.audioCoachConfiguration = configuration
+        }
+
+        resetAudioCoachThresholds()
+
+        if !configuration.enabled {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+            deactivateAudioCoachAudioSession()
         }
     }
 
@@ -328,6 +345,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     prefix: "Current"
                 )
             }
+        } else {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+            deactivateAudioCoachAudioSession()
         }
     }
 
@@ -625,6 +645,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastLapElapsedTime = 0
         lastLapDistanceMeters = 0
         speechSynthesizer.stopSpeaking(at: .immediate)
+        deactivateAudioCoachAudioSession()
         publish {
             self.state = .idle
             self.elapsedTime = 0
@@ -2221,6 +2242,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
         }
 
+        activateAudioCoachAudioSession()
+
         let utterance = AVSpeechUtterance(
             string: text
         )
@@ -2233,6 +2256,50 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         utterance.rate = 0.48
         utterance.volume = 1.0
         speechSynthesizer.speak(utterance)
+    }
+
+    private func activateAudioCoachAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        let options: AVAudioSession.CategoryOptions =
+            audioCoachConfiguration.shouldDuckOtherAudio
+                ? [
+                    .duckOthers,
+                    .interruptSpokenAudioAndMixWithOthers
+                ]
+                : [.mixWithOthers]
+
+        do {
+            try session.setCategory(
+                .playback,
+                mode: .spokenAudio,
+                options: options
+            )
+            try session.setActive(true)
+            coachAudioSessionIsActive = true
+        } catch {
+            // Speech should still be attempted. A temporary audio-session
+            // failure must never interrupt or end an active workout.
+            errorMessage =
+                "Audio Coach: \(error.localizedDescription)"
+        }
+    }
+
+    private func deactivateAudioCoachAudioSession() {
+        guard coachAudioSessionIsActive else {
+            return
+        }
+
+        do {
+            try AVAudioSession.sharedInstance().setActive(
+                false,
+                options: .notifyOthersOnDeactivation
+            )
+            coachAudioSessionIsActive = false
+        } catch {
+            // Do not surface this as a workout failure. The next coach cue
+            // gets another chance to establish a clean temporary session.
+            coachAudioSessionIsActive = false
+        }
     }
 
     private func stopTimer() {
@@ -2724,6 +2791,40 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         _ changes: () -> Void
     ) {
         changes()
+    }
+}
+
+extension WatchWorkoutManager:
+    AVSpeechSynthesizerDelegate {
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  !self.speechSynthesizer.isSpeaking
+            else {
+                return
+            }
+
+            self.deactivateAudioCoachAudioSession()
+        }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didCancel utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  !self.speechSynthesizer.isSpeaking
+            else {
+                return
+            }
+
+            self.deactivateAudioCoachAudioSession()
+        }
     }
 }
 
