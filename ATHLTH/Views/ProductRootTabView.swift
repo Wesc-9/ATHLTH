@@ -6528,5 +6528,11 @@ struct ATHLTHProfileView: View {
         if social.privacy?.shareTrophyCabinet == true {
             await social.syncOwnTrophies(trophyStore.showcaseTrophies)
         }
+        if let privacy = social.privacy {
+            await social.syncOwnGoals(
+                goalStore.goals,
+                enabled: privacy.shareGoals
+            )
+        }
     }
 }
