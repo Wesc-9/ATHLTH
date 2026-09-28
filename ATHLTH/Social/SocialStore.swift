@@ -656,6 +656,31 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func cancelActiveWorkout() async {
+        guard let activeWorkoutSession,
+              activeWorkoutSession.creatorID == currentUserID,
+              activeWorkoutSession.status == .active
+        else {
+            return
+        }
+
+        do {
+            try await service.cancelWorkoutSession(
+                activeWorkoutSession.id
+            )
+            self.activeWorkoutSession = nil
+            activeWorkoutParticipants = []
+            workoutSessions.removeAll {
+                $0.id == activeWorkoutSession.id
+            }
+            workoutParticipants.removeAll {
+                $0.sessionID == activeWorkoutSession.id
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func finishActiveWorkout(
         sourceWorkoutID: UUID,
         endedAt: Date
