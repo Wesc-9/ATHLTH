@@ -4068,7 +4068,8 @@ struct ATHLTHRecoveryView: View {
             } content: {
                 LazyVStack(spacing: 16) {
                     if shouldShowWearableRecoveryContent {
-                        if session.hasPaidAccess {
+                        if session.hasPaidAccess &&
+                            settings.aiHealthDataSharingEnabled {
                             RecoveryAIInsightCard(
                                 insight: recoveryAIInsight ?? fallbackRecoveryAIInsight,
                                 context: recoveryAIContext,
@@ -4099,6 +4100,28 @@ struct ATHLTHRecoveryView: View {
                                 sleep: health.sleep,
                                 heart: health.heart
                             )
+
+                            if session.hasPaidAccess {
+                                ATHLTHCard {
+                                    Label(
+                                        "ATHLTH Coach health insights are off",
+                                        systemImage: "lock.shield.fill"
+                                    )
+                                    .font(.headline)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                                    Text(
+                                        "Enable health-data use in Settings → Privacy & Data only if you want Coach to use sleep, HRV, heart-rate and workout context. Recovery scoring continues locally either way."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
+                                    .padding(.top, 5)
+                                }
+                            }
                         }
 
                         MuscleRecoveryCard(
@@ -4178,10 +4201,20 @@ struct ATHLTHRecoveryView: View {
                 RecoveryGuidedToolView(tool: tool)
             }
             .sheet(isPresented: $showingRecoveryCoach) {
-                RecoveryCoachView(
-                    context: recoveryAIContext,
-                    insight: recoveryAIInsight ?? fallbackRecoveryAIInsight
-                )
+                if settings.aiHealthDataSharingEnabled {
+                    RecoveryCoachView(
+                        context: recoveryAIContext,
+                        insight: recoveryAIInsight ?? fallbackRecoveryAIInsight
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Coach health access is off",
+                        systemImage: "lock.shield.fill",
+                        description: Text(
+                            "Enable it in Settings → Privacy & Data before sharing recovery health context with ATHLTH Coach."
+                        )
+                    )
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
         }
