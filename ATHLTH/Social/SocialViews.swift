@@ -689,12 +689,11 @@ private struct SocialActivityCard: View {
 struct FriendProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
-    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var messaging: MessagingStore
 
     let userID: UUID
 
     @State private var profile: SocialFriendProfile?
-    @State private var ownStats: ProfilePerformanceStats?
     @State private var loading = true
     @State private var showingChallenge = false
     @State private var showingReport = false
@@ -725,12 +724,25 @@ struct FriendProfileView: View {
                         privateProfileNotice
                     }
 
-                    if !profile.recentActivities.isEmpty {
-                        recentActivityCard(profile.recentActivities)
+                    // Match the owner's profile order. RLS simply returns no
+                    // rows for sections the athlete has not shared.
+                    if !profile.gear.isEmpty {
+                        remoteGearCard(profile.gear)
+                    }
+
+                    let workouts = profile.recentActivities.filter {
+                        $0.activity.kind == "workout"
+                    }
+                    if !workouts.isEmpty {
+                        workoutHistoryCard(workouts)
+                    }
+
+                    if !profile.goals.isEmpty {
+                        remoteGoalsCard(profile.goals)
                     }
 
                     if let performance = profile.performance {
-                        compareCard(friend: performance)
+                        performanceCard(performance)
                     }
 
                     if !profile.trophies.isEmpty {
@@ -832,7 +844,10 @@ struct FriendProfileView: View {
         ) {
             Button("Block", role: .destructive) {
                 Task {
-                    await social.block(userID)
+                    if await social.block(userID) {
+                        await messaging.refresh()
+                        dismiss()
+                    }
                 }
             }
         }
@@ -915,20 +930,25 @@ struct FriendProfileView: View {
                                 )
                         }
 
-                        if let focus = profile.trainingFocus {
-                            Label(
-                                focus.title,
-                                systemImage: focus.systemImage
-                            )
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(
-                                Color.white.opacity(0.66),
-                                in: Capsule()
-                            )
-                            .padding(.top, 2)
+                        HStack(spacing: 6) {
+                            if social.isMutualFollow(userID) {
+                                relationshipPill(
+                                    "Mutual follow",
+                                    systemImage: "person.2.fill"
+                                )
+                            } else if social.isFollowedBy(userID) {
+                                relationshipPill(
+                                    "Follows you",
+                                    systemImage: "person.fill.checkmark"
+                                )
+                            }
+
+                            if let focus = profile.trainingFocus {
+                                relationshipPill(
+                                    focus.title,
+                                    systemImage: focus.systemImage
+                                )
+                            }
                         }
 
                         if let bio = profile.card.bio?
@@ -957,17 +977,32 @@ struct FriendProfileView: View {
         .clipped()
     }
 
+    private func relationshipPill(
+        _ title: String,
+        systemImage: String
+    ) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(
+                Color.white.opacity(0.66),
+                in: Capsule()
+            )
+            .lineLimit(1)
+    }
+
     @ViewBuilder
     private func followStats(
         _ profile: SocialFriendProfile
     ) -> some View {
+        let canBrowseConnections =
+            !profile.card.isPrivateProfile ||
+            social.isFollowing(userID)
+
         HStack(spacing: 0) {
-            if profile.card.isPrivateProfile {
-                followStat(
-                    value: followOverview.followerCount,
-                    title: "Followers"
-                )
-            } else {
+            if canBrowseConnections {
                 NavigationLink {
                     ProfileConnectionsView(
                         title: "Followers",
@@ -981,17 +1016,17 @@ struct FriendProfileView: View {
                     )
                 }
                 .buttonStyle(.plain)
+            } else {
+                followStat(
+                    value: followOverview.followerCount,
+                    title: "Followers"
+                )
             }
 
             Divider()
                 .frame(height: 34)
 
-            if profile.card.isPrivateProfile {
-                followStat(
-                    value: followOverview.followingCount,
-                    title: "Following"
-                )
-            } else {
+            if canBrowseConnections {
                 NavigationLink {
                     ProfileConnectionsView(
                         title: "Following",
@@ -1005,6 +1040,11 @@ struct FriendProfileView: View {
                     )
                 }
                 .buttonStyle(.plain)
+            } else {
+                followStat(
+                    value: followOverview.followingCount,
+                    title: "Following"
+                )
             }
         }
         .padding(.vertical, 12)
@@ -1035,7 +1075,7 @@ struct FriendProfileView: View {
     }
 
     private func actionBar(_ profile: SocialFriendProfile) -> some View {
-        let relationship = social.relationshipState(with: userID)
+        let isMutual = social.isMutualFollow(userID)
 
         return VStack(spacing: 10) {
             HStack(spacing: 10) {
@@ -1045,9 +1085,7 @@ struct FriendProfileView: View {
                     DirectMessageThreadView(friend: profile.card)
                 } label: {
                     Label(
-                        relationship == .friends
-                            ? "Message"
-                            : "Message request",
+                        isMutual ? "Message" : "Message request",
                         systemImage: "message.fill"
                     )
                     .font(.subheadline.weight(.semibold))
@@ -1058,7 +1096,7 @@ struct FriendProfileView: View {
                 .tint(ATHLTHTheme.accentDeep)
             }
 
-            if relationship == .friends {
+            if isMutual {
                 Button {
                     showingChallenge = true
                 } label: {
@@ -1162,7 +1200,7 @@ struct FriendProfileView: View {
                 .font(.headline)
 
             Text(
-                "Send a follow request to unlock the profile sections this athlete shares with approved connections."
+                "Send a follow request to unlock the profile sections this athlete shares with approved followers."
             )
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1186,167 +1224,253 @@ struct FriendProfileView: View {
         }
     }
 
-    private func compareCard(friend: SocialPerformanceStats) -> some View {
-        VStack(alignment: .leading, spacing: 13) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Compare")
-                    .font(.title3.bold())
-                Text("You vs \(profile?.card.resolvedName ?? "Athlete")")
+    private func remoteGearCard(
+        _ items: [ProfileGearItem]
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Gear")
+                        .font(.headline)
+                    Spacer()
+                    Text("\(items.count)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                ForEach(Array(items.prefix(4))) { item in
+                    HStack(spacing: 12) {
+                        Image(systemName: item.category.systemImage)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 42, height: 42)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 13,
+                                    style: .continuous
+                                )
+                            )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                            Text(item.category.shortTitle)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                        }
+
+                        Spacer()
+
+                        if item.isFeatured {
+                            Image(systemName: "star.fill")
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme.premiumGold
+                                )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func workoutHistoryCard(
+        _ items: [SocialFeedItem]
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Workout History")
+                    .font(.headline)
+
+                ForEach(Array(items.prefix(5))) { item in
+                    HStack(spacing: 10) {
+                        Image(systemName: socialIcon(item.activity.kind))
+                            .foregroundStyle(ATHLTHTheme.accent)
+                            .frame(width: 36, height: 36)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 11,
+                                    style: .continuous
+                                )
+                            )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.activity.title)
+                                .font(.subheadline.weight(.semibold))
+                            if let subtitle = item.activity.subtitle {
+                                Text(subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        Text(item.activity.createdAt, style: .relative)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func remoteGoalsCard(
+        _ goals: [SocialProfileGoalRecord]
+    ) -> some View {
+        let sorted = goals.sorted {
+            if $0.isPrimary != $1.isPrimary {
+                return $0.isPrimary && !$1.isPrimary
+            }
+            return $0.progress > $1.progress
+        }
+
+        return ATHLTHCard {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack {
+                    Text("Goals")
+                        .font(.headline)
+                    Spacer()
+                    Text("\(goals.count)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.green)
+                }
+
+                if let goal = sorted.first {
+                    Text(goal.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(2)
+
+                    Text(
+                        "\(Int((goal.progress * 100).rounded()))% complete"
+                    )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                    ProgressView(value: goal.progress)
+                        .tint(.green)
+
+                    if let deadline = goal.deadline {
+                        Label(
+                            deadline.formatted(date: .abbreviated, time: .omitted),
+                            systemImage: "calendar"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
             }
-
-            comparisonHeader
-
-            compareRow(
-                "Fastest 1K",
-                own: formatTime(ownStats?.fastestOneKilometer?.duration),
-                friend: formatTime(friend.fastest1KSeconds)
-            )
-            compareRow(
-                "Fastest 5K",
-                own: formatTime(ownStats?.fastestFiveKilometers?.duration),
-                friend: formatTime(friend.fastest5KSeconds)
-            )
-            compareRow(
-                "Marathon",
-                own: formatTime(ownStats?.fastestMarathon?.duration),
-                friend: formatTime(friend.fastestMarathonSeconds)
-            )
-            compareRow(
-                "Longest Run",
-                own: formatDistance(ownStats?.longestRunMeters),
-                friend: formatDistance(friend.longestRunMeters)
-            )
-            compareRow(
-                "Workouts",
-                own: ownStats.map { "\($0.totalWorkoutCount)" } ?? "—",
-                friend: "\(friend.totalWorkoutCount)"
-            )
-            compareRow(
-                "Running",
-                own: formatDistance(ownStats?.totalRunningDistanceMeters),
-                friend: formatDistance(friend.totalRunningDistanceMeters)
-            )
         }
-        .padding()
-        .socialCard()
     }
 
-    private var comparisonHeader: some View {
-        HStack {
-            Text("STAT")
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text("YOU")
-                .frame(width: 90, alignment: .trailing)
-            Text("ATHLETE")
-                .frame(width: 90, alignment: .trailing)
+    private func performanceCard(
+        _ performance: SocialPerformanceStats
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Performance")
+                    .font(.headline)
+
+                remoteStatRow(
+                    "Fastest 1K",
+                    value: formatTime(performance.fastest1KSeconds)
+                )
+                remoteStatRow(
+                    "Fastest 5K",
+                    value: formatTime(performance.fastest5KSeconds)
+                )
+                remoteStatRow(
+                    "Marathon",
+                    value: formatTime(performance.fastestMarathonSeconds)
+                )
+                remoteStatRow(
+                    "Longest Run",
+                    value: formatDistance(performance.longestRunMeters)
+                )
+                remoteStatRow(
+                    "Workouts",
+                    value: "\(performance.totalWorkoutCount)"
+                )
+                remoteStatRow(
+                    "Running",
+                    value: formatDistance(
+                        performance.totalRunningDistanceMeters
+                    )
+                )
+            }
         }
-        .font(.system(size: 9, weight: .bold))
-        .tracking(1)
-        .foregroundStyle(.secondary)
     }
 
-    private func compareRow(
+    private func remoteStatRow(
         _ title: String,
-        own: String,
-        friend: String
+        value: String
     ) -> some View {
         HStack {
             Text(title)
                 .font(.subheadline)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text(own)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            Spacer()
+            Text(value)
                 .font(.subheadline.monospacedDigit().weight(.semibold))
-                .frame(width: 90, alignment: .trailing)
-
-            Text(friend)
-                .font(.subheadline.monospacedDigit().weight(.semibold))
-                .frame(width: 90, alignment: .trailing)
+                .foregroundStyle(ATHLTHTheme.primaryText)
         }
-        .padding(.vertical, 3)
     }
 
-    private func trophyCard(_ items: [SocialTrophyShowcaseItem]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Trophy Cabinet")
-                .font(.title3.bold())
+    private func trophyCard(
+        _ items: [SocialTrophyShowcaseItem]
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Trophies")
+                    .font(.headline)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(items) { item in
-                        VStack(spacing: 8) {
-                            ZStack {
-                                ATHLTHTrophyPlateShape()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.black, ATHLTHTheme.accent.opacity(0.62)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(items) { item in
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    ATHLTHTrophyPlateShape()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    .black,
+                                                    ATHLTHTheme.accent
+                                                        .opacity(0.62)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
                                         )
-                                    )
 
-                                ATHLTHMarkShape()
-                                    .fill(.white)
-                                    .frame(width: 30, height: 22)
+                                    ATHLTHMarkShape()
+                                        .fill(.white)
+                                        .frame(width: 30, height: 22)
+                                }
+                                .frame(width: 72, height: 82)
+
+                                Text(item.title)
+                                    .font(.caption2.bold())
+                                    .lineLimit(1)
+
+                                Text(item.stageLabel)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
                             }
-                            .frame(width: 72, height: 82)
-
-                            Text(item.title)
-                                .font(.caption2.bold())
-                                .lineLimit(1)
-
-                            Text(item.stageLabel)
-                                .font(.system(size: 9))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            .frame(width: 105)
                         }
-                        .frame(width: 105)
                     }
                 }
             }
         }
-        .padding()
-        .socialCard()
-    }
-
-    private func recentActivityCard(_ items: [SocialFeedItem]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Activity")
-                .font(.title3.bold())
-
-            ForEach(items.prefix(5)) { item in
-                HStack(spacing: 10) {
-                    Image(systemName: socialIcon(item.activity.kind))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 30, height: 30)
-                        .background(ATHLTHTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.activity.title)
-                            .font(.subheadline.weight(.semibold))
-                        if let subtitle = item.activity.subtitle {
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
-
-                    Text(item.activity.createdAt, style: .relative)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                if item.id != items.prefix(5).last?.id {
-                    Divider().opacity(0.4)
-                }
-            }
-        }
-        .padding()
-        .socialCard()
     }
 
     private func load(force: Bool = false) async {
@@ -1355,13 +1479,9 @@ struct FriendProfileView: View {
             userID,
             forceRefresh: force
         )
-        async let ownTask = try? health.profilePerformanceStats(
-            forceRefresh: force
-        )
         async let followTask = social.loadFollowOverview(for: userID)
 
         profile = await profileTask
-        ownStats = await ownTask
         followOverview = await followTask
         loading = false
     }
@@ -1374,10 +1494,19 @@ struct FriendProfileView: View {
         let remainder = total % 60
 
         if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, remainder)
+            return String(
+                format: "%d:%02d:%02d",
+                hours,
+                minutes,
+                remainder
+            )
         }
 
-        return String(format: "%d:%02d", minutes, remainder)
+        return String(
+            format: "%d:%02d",
+            minutes,
+            remainder
+        )
     }
 
     private func formatDistance(_ meters: Double?) -> String {
@@ -1395,7 +1524,6 @@ struct FriendProfileView: View {
         }
     }
 }
-
 
 struct ProfileConnectionsView: View {
     let title: String
