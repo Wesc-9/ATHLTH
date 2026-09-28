@@ -201,6 +201,61 @@ struct ATHLTHSettingsView: View {
 
                             SettingsDivider()
 
+                            Menu {
+                                ForEach(
+                                    ExternalWorkoutImportMode.allCases
+                                ) { mode in
+                                    Button {
+                                        settings.externalWorkoutImportMode = mode
+                                        Task {
+                                            await health
+                                                .applyExternalWorkoutImportMode(
+                                                    mode
+                                                )
+                                        }
+                                    } label: {
+                                        if settings.externalWorkoutImportMode ==
+                                            mode {
+                                            Label(
+                                                mode.title,
+                                                systemImage: "checkmark"
+                                            )
+                                        } else {
+                                            Text(mode.title)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "square.and.arrow.down",
+                                    title: "External workouts",
+                                    subtitle:
+                                        "Control workouts found in Apple Health"
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text(
+                                            settings
+                                                .externalWorkoutImportMode
+                                                .shortTitle
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme.mutedText
+                                        )
+
+                                        Image(
+                                            systemName: "chevron.right"
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme.mutedText
+                                                .opacity(0.72)
+                                        )
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
                             Button {
                                 runHealthSync()
                             } label: {
