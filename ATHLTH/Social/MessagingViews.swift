@@ -943,64 +943,371 @@ private struct MessageConversationRow: View {
 
     var body: some View {
         HStack(spacing: 13) {
-            SocialAvatar(profile: friend, size: 52)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(friend.resolvedName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-
-                Text(previewText)
-                    .font(.caption)
-                    .foregroundStyle(unreadCount > 0 ? .primary : .secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 7) {
-                if let date = lastMessage?.createdAt {
-                    Text(date.formatted(date: .omitted, time: .shortened))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+            ZStack(alignment: .bottomTrailing) {
+                SocialAvatar(
+                    profile: friend,
+                    size: 56
+                )
 
                 if unreadCount > 0 {
-                    Text("\(unreadCount)")
-                        .font(.caption2.bold())
+                    Circle()
+                        .fill(ATHLTHTheme.accent)
+                        .frame(width: 11, height: 11)
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                        .offset(x: 1, y: 1)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 7) {
+                    if unreadCount > 0 {
+                        Image(systemName: "star.fill")
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.premiumGold
+                            )
+                    }
+
+                    Text(friend.resolvedName)
+                        .font(
+                            .system(
+                                size: 16,
+                                weight:
+                                    unreadCount > 0
+                                        ? .bold
+                                        : .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+
+                    if let label = attachmentLabel {
+                        Text(label)
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: Capsule()
+                            )
+                    }
+                }
+
+                previewContent
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 8) {
+                if let date = lastMessage?.createdAt {
+                    Text(
+                        inboxTimestamp(date)
+                    )
+                    .font(
+                        .system(
+                            size: 12,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .lineLimit(1)
+                }
+
+                HStack(spacing: 8) {
+                    if unreadCount > 0 {
+                        Text(
+                            unreadCount > 99
+                                ? "99+"
+                                : "\(unreadCount)"
+                        )
+                        .font(
+                            .caption2.weight(.bold)
+                                .monospacedDigit()
+                        )
                         .foregroundStyle(.white)
-                        .frame(minWidth: 20, minHeight: 20)
-                        .background(ATHLTHTheme.accent, in: Circle())
-                } else {
+                        .frame(
+                            minWidth: 24,
+                            minHeight: 24
+                        )
+                        .padding(
+                            .horizontal,
+                            unreadCount > 9 ? 3 : 0
+                        )
+                        .background(
+                            ATHLTHTheme.accentDeep,
+                            in: Capsule()
+                        )
+                    }
+
                     Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText.opacity(0.66)
+                        )
                 }
             }
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .background(
-            Color.white.opacity(0.96),
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            LinearGradient(
+                colors:
+                    unreadCount > 0
+                        ? [
+                            Color.white.opacity(0.98),
+                            ATHLTHTheme.cardWarm.opacity(0.90)
+                        ]
+                        : [
+                            Color.white.opacity(0.92),
+                            Color.white.opacity(0.82)
+                        ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(ATHLTHTheme.border, lineWidth: 1)
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                unreadCount > 0
+                    ? ATHLTHTheme.premiumGold.opacity(0.14)
+                    : Color.white.opacity(0.86),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(
+                unreadCount > 0
+                    ? 0.045
+                    : 0.025
+            ),
+            radius: 10,
+            y: 4
+        )
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var previewContent: some View {
+        if isVoiceMessage {
+            HStack(spacing: 8) {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 25, height: 25)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: Circle()
+                    )
+
+                HStack(alignment: .center, spacing: 2) {
+                    ForEach(0..<13, id: \.self) { index in
+                        Capsule()
+                            .fill(
+                                ATHLTHTheme.accentDeep.opacity(
+                                    0.34 + Double(index % 4) * 0.11
+                                )
+                            )
+                            .frame(
+                                width: 2,
+                                height:
+                                    CGFloat(
+                                        5 + ((index * 7) % 13)
+                                    )
+                            )
+                    }
+                }
+
+                Text("Voice note")
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+            }
+            .lineLimit(1)
+        } else if let kind = lastMessage?.attachmentKind {
+            HStack(spacing: 8) {
+                Image(systemName: kind.systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 27, height: 27)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 8,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 1) {
+                    if let title = lastMessage?.attachmentTitle,
+                       !title.isEmpty {
+                        Text(title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText.opacity(0.86)
+                            )
+                            .lineLimit(1)
+                    }
+
+                    Text(
+                        previewText
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .lineLimit(1)
+                }
+            }
+        } else {
+            Text(previewText)
+                .font(
+                    .system(
+                        size: 14,
+                        weight:
+                            unreadCount > 0
+                                ? .medium
+                                : .regular
+                    )
+                )
+                .foregroundStyle(
+                    unreadCount > 0
+                        ? ATHLTHTheme.primaryText.opacity(0.82)
+                        : ATHLTHTheme.mutedText
+                )
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
         }
     }
 
-    private var previewText: String {
-        guard let lastMessage else { return "Start a conversation" }
+    private var attachmentLabel: String? {
+        guard let raw =
+                lastMessage?
+                    .attachmentKindRaw?
+                    .lowercased()
+        else {
+            return nil
+        }
 
-        if let body = lastMessage.body, !body.isEmpty {
+        if raw.contains("voice") ||
+            raw.contains("audio") {
+            return "VOICE"
+        }
+
+        return lastMessage?
+            .attachmentKind?
+            .title
+            .uppercased()
+    }
+
+    private var isVoiceMessage: Bool {
+        guard let raw =
+                lastMessage?
+                    .attachmentKindRaw?
+                    .lowercased()
+        else {
+            return false
+        }
+
+        return raw.contains("voice") ||
+            raw.contains("audio")
+    }
+
+    private var previewText: String {
+        guard let lastMessage else {
+            return "Start a conversation"
+        }
+
+        if let body = lastMessage.body,
+           !body.isEmpty {
             return body
         }
 
         if let kind = lastMessage.attachmentKind {
-            return "Shared \(kind.title.lowercased()) · \(lastMessage.attachmentTitle ?? "")"
+            let title =
+                lastMessage.attachmentTitle?
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ) ?? ""
+
+            return title.isEmpty
+                ? "Shared \(kind.title.lowercased())"
+                : "Shared \(kind.title.lowercased())"
         }
 
         return "Message"
+    }
+
+    private func inboxTimestamp(
+        _ date: Date
+    ) -> String {
+        let calendar = Calendar.current
+
+        if calendar.isDateInToday(date) {
+            return date.formatted(
+                date: .omitted,
+                time: .shortened
+            )
+        }
+
+        if calendar.isDateInYesterday(date) {
+            return "Yesterday"
+        }
+
+        if let days =
+                calendar.dateComponents(
+                    [.day],
+                    from:
+                        calendar.startOfDay(for: date),
+                    to:
+                        calendar.startOfDay(for: Date())
+                )
+                .day,
+           days < 7 {
+            return date.formatted(
+                .dateTime.weekday(.abbreviated)
+            )
+        }
+
+        return date.formatted(
+            date: .abbreviated,
+            time: .omitted
+        )
     }
 }
 
