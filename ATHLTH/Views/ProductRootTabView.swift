@@ -106,9 +106,7 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
             .sheet(
                 isPresented: Binding(
                     get: {
-                        guard settings.trainingDeviceProvider == .appleWatch,
-                              workoutMirroring.isPresentationRequested
-                        else {
+                        guard workoutMirroring.isPresentationRequested else {
                             return false
                         }
 
@@ -771,41 +769,20 @@ struct ATHLTHHomeView: View {
 
     private var homeHealthSourceText: String {
         if !health.hasRequestedAuthorization {
-            switch settings.trainingDeviceProvider {
-            case .garmin:
-                return "Garmin sync pending · Apple Health not connected"
-            case .appleWatch:
-                return watchConnection.isReady
-                    ? "Apple Watch connected · Apple Health not connected"
-                    : "Apple Watch setup incomplete"
-            case .none:
-                return "No health source connected"
-            }
+            return watchConnection.isReady
+                ? "Apple Watch connected · Apple Health not connected"
+                : "No health source connected"
         }
 
         if !health.hasTrainingHealthData {
-            switch settings.trainingDeviceProvider {
-            case .appleWatch:
-                return watchConnection.isReady
-                    ? "Apple Health configured · no training data yet"
-                    : "Apple Health configured · Watch setup incomplete"
-            case .garmin:
-                return "Apple Health configured · Garmin sync pending"
-            case .none:
-                return "Apple Health configured · no training data yet"
-            }
+            return watchConnection.isReady
+                ? "Apple Health configured · no training data yet"
+                : "Apple Health configured · no training data yet"
         }
 
-        switch settings.trainingDeviceProvider {
-        case .appleWatch:
-            return watchConnection.isReady
-                ? "Apple Health + Apple Watch"
-                : "Apple Health · Apple Watch setup incomplete"
-        case .garmin:
-            return "Apple Health · Garmin sync pending"
-        case .none:
-            return "Apple Health / iPhone"
-        }
+        return watchConnection.isReady
+            ? "Apple Health + Apple Watch"
+            : "Apple Health"
     }
 
     private var greetingTitle: String {
@@ -849,17 +826,11 @@ struct ATHLTHHomeView: View {
 
     private var homeNoHealthDetail: String {
         if !health.hasRequestedAuthorization {
-            switch settings.trainingDeviceProvider {
-            case .appleWatch:
-                if watchConnection.isReady {
-                    return "Your Apple Watch is connected, but ATHLTH still needs Apple Health access before health metrics appear. Training plans, strength logging and social features remain available."
-                }
-                return "Apple Watch setup is incomplete and Apple Health is not connected. ATHLTH hides unavailable health cards while training plans, strength logging and social features remain available."
-            case .garmin:
-                return "Garmin sync is not active yet and Apple Health is not connected. ATHLTH keeps unavailable health cards out of the way."
-            case .none:
-                return "No watch or Apple Health is connected. ATHLTH stays focused on training plans, strength logging, routes, challenges and social features you can use without wearable data."
+            if watchConnection.isReady {
+                return "Your Apple Watch is connected, but ATHLTH still needs Apple Health access before health metrics appear. Training plans, strength logging and social features remain available."
             }
+
+            return "No Apple Watch or Apple Health source is connected. ATHLTH stays focused on training plans, strength logging, routes, challenges and social features you can use without wearable data."
         }
 
         return "Apple Health is configured. Health cards appear automatically when compatible readable data becomes available, so ATHLTH does not fill your dashboard with empty metrics."
@@ -1874,7 +1845,6 @@ struct ATHLTHHomeView: View {
         _ workout: PlannedSession
     ) {
         guard let watchKind = PlannedWorkoutWatchBuilder.watchKind(for: workout.kind),
-              settings.trainingDeviceProvider == .appleWatch,
               watchConnection.isReady
         else {
             homeWatchTransferError =
@@ -3202,7 +3172,6 @@ struct ATHLTHTrainView: View {
     }
 
     private var customQuickStartAvailable: Bool {
-        settings.trainingDeviceProvider == .appleWatch &&
         watchConnection.isReady
     }
 
@@ -3215,24 +3184,17 @@ struct ATHLTHTrainView: View {
     private func quickStartSubtitle(
         _ kind: WorkoutKind
     ) -> String {
-        if kind == .running || kind == .walking {
-            if settings.trainingDeviceProvider == .none { return "Record with iPhone" }
-            if settings.trainingDeviceProvider != .appleWatch {
-                return "Apple Watch required"
-            }
-
-            if !watchConnection.isReady {
-                return "Connect Watch"
-            }
-        }
-
         switch kind {
         case .running:
-            return "Free / Route / Workout"
+            return watchConnection.isReady
+                ? "iPhone / Watch · Free / Route / Workout"
+                : "iPhone · Free Run"
         case .walking:
-            return "Free Walk"
+            return watchConnection.isReady
+                ? "iPhone / Watch · Free Walk"
+                : "iPhone · Free Walk"
         case .strength:
-            return "Empty / Build"
+            return "Choose device at start"
         case .mobility, .recovery, .custom:
             return kind.title
         }
@@ -3240,21 +3202,13 @@ struct ATHLTHTrainView: View {
 
     private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
         guard phoneWorkout.active == nil else { return false }
-        if kind == .strength {
+
+        switch kind {
+        case .running, .walking:
+            return true
+        case .strength:
             return strengthWorkout.activeWorkout == nil
-        }
-
-        guard watchWorkoutKind(for: kind) != nil else {
-            return false
-        }
-
-        switch settings.trainingDeviceProvider {
-        case .appleWatch:
-            return watchConnection.isReady &&
-                !watchConnection.workoutLaunchInProgress
-        case .none:
-            return (kind == .running || kind == .walking) && strengthWorkout.activeWorkout == nil
-        case .garmin:
+        case .mobility, .recovery, .custom:
             return false
         }
     }
@@ -3273,53 +3227,31 @@ struct ATHLTHTrainView: View {
     }
 
     private var quickStartDeviceTitle: String {
-        switch settings.trainingDeviceProvider {
-        case .appleWatch:
-            return watchConnection.isReady ? "Apple Watch" : "Apple Watch setup"
-        case .garmin:
-            return "Garmin · sync pending"
-        case .none:
-            return "iPhone"
-        }
+        watchConnection.isReady
+            ? "Choose iPhone or Apple Watch at start"
+            : "iPhone · Apple Watch not connected"
     }
 
     @ViewBuilder
     private func routeDeviceActions(
         _ route: TrainingRoute
     ) -> some View {
-        switch settings.trainingDeviceProvider {
-        case .appleWatch:
-            HStack(spacing: 10) {
-                Button {
-                    sendRouteToWatch(route)
-                } label: {
-                    Label("Send to Apple Watch", systemImage: "applewatch")
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
-                .disabled(!watchConnection.isReady)
-
-                if !watchConnection.isReady {
-                    Text(watchConnection.state.subtitle)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+        HStack(spacing: 10) {
+            Button {
+                sendRouteToWatch(route)
+            } label: {
+                Label("Send to Apple Watch", systemImage: "applewatch")
             }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accent)
+            .disabled(!watchConnection.isReady)
 
-        case .garmin:
-            HStack(spacing: 10) {
-                Label("Garmin route sync", systemImage: "watch.analog")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
-
-                Text("Planned · authorization pending")
+            if !watchConnection.isReady {
+                Text("Connect Apple Watch to send this route.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-
-        case .none:
-            EmptyView()
         }
     }
 
@@ -3547,9 +3479,7 @@ struct ATHLTHTrainView: View {
     }
 
     private func sendRouteToWatch(_ route: TrainingRoute) {
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady
-        else {
+        guard watchConnection.isReady else {
             return
         }
 
@@ -4641,24 +4571,16 @@ struct ATHLTHRecoveryView: View {
 
     private var recoveryUnavailableDetail: String {
         if !health.hasRequestedAuthorization {
-            switch settings.trainingDeviceProvider {
-            case .appleWatch:
-                return "Apple Watch health metrics stay hidden until setup is complete and Apple Health data is available. You can still use training plans, log strength sessions and use the rest of ATHLTH."
-            case .garmin:
-                return "Garmin health sync is not active yet and Apple Health is not connected, so ATHLTH hides unavailable recovery metrics."
-            case .none:
-                return "You selected No watch and Apple Health is not connected. ATHLTH keeps this page clean instead of showing empty wearable metrics. You can connect Apple Health or a wearable later in Settings."
+            if watchConnection.isReady {
+                return "Apple Watch is connected, but recovery metrics stay hidden until Apple Health data is available. You can still use training plans, log strength sessions and use the rest of ATHLTH."
             }
+
+            return "Apple Health is not connected, so ATHLTH hides unavailable recovery metrics. You can connect Apple Health or Apple Watch later in Settings."
         }
 
-        switch settings.trainingDeviceProvider {
-        case .none:
-            return "Apple Health is configured. ATHLTH will show recovery here when compatible readable sleep, HRV or resting heart-rate data becomes available; until then, empty wearable cards stay hidden."
-        case .appleWatch:
-            return "ATHLTH will show recovery as soon as compatible Apple Health data from your Watch or another source is available. Empty metrics stay hidden in the meantime."
-        case .garmin:
-            return "ATHLTH will show recovery when compatible Apple Health or future Garmin data becomes available."
-        }
+        return watchConnection.isReady
+            ? "ATHLTH will show recovery as soon as compatible Apple Health data from your Watch or another source is available. Empty metrics stay hidden in the meantime."
+            : "Apple Health is configured. ATHLTH will show recovery when compatible readable sleep, HRV or resting heart-rate data becomes available."
     }
 
     private var recoveryHeadline: String {
@@ -4724,14 +4646,9 @@ struct ATHLTHRecoveryView: View {
         case .recover:
             return "Prioritize recovery today"
         case .buildingBaseline:
-            switch settings.trainingDeviceProvider {
-            case .appleWatch:
-                return "Keep wearing your Apple Watch"
-            case .garmin:
-                return "Garmin sync is waiting for authorization"
-            case .none:
-                return "More health data is needed"
-            }
+            return watchConnection.isReady
+                ? "Keep wearing your Apple Watch"
+                : "More health data is needed"
         }
     }
 
@@ -4783,14 +4700,9 @@ struct ATHLTHRecoveryView: View {
         case .recover:
             return "Your combined recovery signals are well below baseline. Rest, mobility, breathing or very easy activity may be more appropriate."
         case .buildingBaseline:
-            switch settings.trainingDeviceProvider {
-            case .appleWatch:
-                return "ATHLTH needs at least five usable days with sleep, HRV and resting heart-rate data before showing a recovery score."
-            case .garmin:
-                return "The recovery model is ready for Garmin sleep, HRV and resting heart-rate data. Until Garmin authorization is approved, ATHLTH uses any compatible data already available through Apple Health."
-            case .none:
-                return "Recovery scoring needs sleep, HRV and resting heart-rate data. Without a wearable, ATHLTH leaves the score unavailable instead of estimating or failing."
-            }
+            return watchConnection.isReady
+                ? "ATHLTH needs at least five usable days with sleep, HRV and resting heart-rate data before showing a recovery score."
+                : "Recovery scoring needs sleep, HRV and resting heart-rate data. Without compatible data, ATHLTH leaves the score unavailable instead of estimating it."
         }
     }
 
