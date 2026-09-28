@@ -111,6 +111,14 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announceRemainingStepTime: Bool
     var announceRemainingStepDistance: Bool
 
+    // Optional for backwards compatibility with configurations already
+    // persisted or queued before music ducking was introduced.
+    var duckOtherAudio: Bool? = nil
+
+    var shouldDuckOtherAudio: Bool {
+        duckOtherAudio ?? true
+    }
+
     static let disabled = WatchAudioCoachConfiguration(
         enabled: false,
         language: .system,
