@@ -81,6 +81,16 @@ struct WorkoutAIInsight: Codable, Hashable {
     let headline: String
     let summary: String
     let visualRecipe: WorkoutVisualRecipe?
+
+    init(
+        headline: String,
+        summary: String,
+        visualRecipe: WorkoutVisualRecipe? = nil
+    ) {
+        self.headline = headline
+        self.summary = summary
+        self.visualRecipe = visualRecipe
+    }
 }
 
 struct TrainingHealthSummary: Equatable {
