@@ -156,14 +156,14 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
-                    settingsSection("Privacy & Visibility") {
+                    settingsSection("Privacy & Data") {
                         PremiumSettingsCard {
                             NavigationLink {
                                 ATHLTHPrivacyCenterView()
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "shield.lefthalf.filled",
-                                    title: "Privacy & Visibility",
+                                    title: "Privacy & Data",
                                     subtitle: privacySummary
                                 ) {
                                     Image(systemName: "chevron.right")
