@@ -234,6 +234,7 @@ private enum AroundYouFilter: String, CaseIterable, Identifiable {
     case all = "All"
     case routes = "Routes"
     case events = "Events"
+    case challenges = "Challenges"
 
     var id: String { rawValue }
 }
@@ -527,6 +528,85 @@ struct HomeAroundYouSection: View {
             .map(\.0)
     }
 
+    private var nearbyChallenges: [ATHLTHChallenge] {
+        let currentUserID = session.profile.userID
+
+        let candidates = challenges.visibleChallenges.filter { challenge in
+            challenge.status != .cancelled &&
+            (
+                challenge.visibility == .publicProfile ||
+                challenge.creatorID == currentUserID ||
+                challenge.participants.contains {
+                    $0.userID == currentUserID
+                }
+            )
+        }
+
+        guard let location = locationStore.location else {
+            return candidates.filter {
+                challengeCoordinate($0) != nil
+            }
+        }
+
+        return candidates
+            .compactMap {
+                challenge ->
+                    (ATHLTHChallenge, CLLocationDistance)?
+                in
+                guard let coordinate =
+                        challengeCoordinate(challenge)
+                else {
+                    return nil
+                }
+
+                let distance = CLLocation(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                .distance(from: location)
+
+                guard distance <= 50_000 else {
+                    return nil
+                }
+
+                return (challenge, distance)
+            }
+            .sorted { $0.1 < $1.1 }
+            .map(\.0)
+    }
+
+    private func challengeCoordinate(
+        _ challenge: ATHLTHChallenge
+    ) -> CLLocationCoordinate2D? {
+        if let meetup = challenge.rules.meetup {
+            return CLLocationCoordinate2D(
+                latitude: meetup.latitude,
+                longitude: meetup.longitude
+            )
+        }
+
+        guard let coordinates =
+                challenge.rules.route?.coordinates,
+              !coordinates.isEmpty
+        else {
+            return nil
+        }
+
+        let latitude =
+            coordinates.reduce(0) {
+                $0 + $1.latitude
+            } / Double(coordinates.count)
+        let longitude =
+            coordinates.reduce(0) {
+                $0 + $1.longitude
+            } / Double(coordinates.count)
+
+        return CLLocationCoordinate2D(
+            latitude: latitude,
+            longitude: longitude
+        )
+    }
+
     private func eventCoordinate(
         _ item: CommunityEventItem
     ) -> CLLocationCoordinate2D? {
@@ -684,8 +764,10 @@ struct AroundYouExploreView: View {
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var challenges: ChallengeStore
 
     @ObservedObject var locationStore: HomeLocationStore
+    var embeddedInTab: Bool = false
 
     @StateObject private var routeAttempts = RouteAttemptStore()
 
@@ -696,6 +778,7 @@ struct AroundYouExploreView: View {
     @State private var routeActionMessage: String?
     @State private var routeActionError: String?
     @State private var startingRoute = false
+    @State private var showingDiscoveryHub = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -714,7 +797,7 @@ struct AroundYouExploreView: View {
                         UserAnnotation()
                     }
 
-                    if filter != .events {
+                    if filter == .all || filter == .routes {
                         ForEach(nearbyRoutes.prefix(25)) { route in
                             let isSelected =
                                 selectedRoute?.id == route.id
@@ -782,7 +865,7 @@ struct AroundYouExploreView: View {
                         }
                     }
 
-                    if filter != .routes {
+                    if filter == .all || filter == .events {
                         ForEach(nearbyEvents.prefix(30)) { item in
                             if let coordinate =
                                 eventCoordinate(item) {
@@ -795,6 +878,57 @@ struct AroundYouExploreView: View {
                                     coordinate: coordinate
                                 )
                                 .tint(.purple)
+                            }
+                        }
+                    }
+
+                    if filter == .all || filter == .challenges {
+                        ForEach(nearbyChallenges.prefix(30)) { challenge in
+                            if let coordinate =
+                                challengeCoordinate(challenge) {
+                                Annotation(
+                                    challenge.title,
+                                    coordinate: coordinate
+                                ) {
+                                    NavigationLink {
+                                        ChallengeDetailView(
+                                            challengeID: challenge.id
+                                        )
+                                    } label: {
+                                        Image(
+                                            systemName:
+                                                challenge.sport.systemImage
+                                        )
+                                        .font(
+                                            .system(
+                                                size: 16,
+                                                weight: .bold
+                                            )
+                                        )
+                                        .foregroundStyle(.white)
+                                        .frame(width: 34, height: 34)
+                                        .background(
+                                            ATHLTHTheme.vitality,
+                                            in: Circle()
+                                        )
+                                        .overlay {
+                                            Circle()
+                                                .stroke(
+                                                    .white,
+                                                    lineWidth: 2
+                                                )
+                                        }
+                                        .shadow(
+                                            color: .black.opacity(0.14),
+                                            radius: 5,
+                                            y: 2
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(
+                                        "Open challenge \(challenge.title)"
+                                    )
+                                }
                             }
                         }
                     }
@@ -841,10 +975,26 @@ struct AroundYouExploreView: View {
             }
         }
         .background(ATHLTHPremiumCanvas())
-        .navigationTitle("Around You")
+        .navigationTitle(embeddedInTab ? "Explore" : "Around You")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
+        .toolbar(
+            embeddedInTab ? .visible : .hidden,
+            for: .tabBar
+        )
         .toolbar {
+            if embeddedInTab {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingDiscoveryHub = true
+                    } label: {
+                        Image(systemName: "sparkles")
+                    }
+                    .accessibilityLabel(
+                        "Discover clubs, challenges and public activity"
+                    )
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     hasCenteredOnUser = false
@@ -857,6 +1007,9 @@ struct AroundYouExploreView: View {
                     "Center on my location"
                 )
             }
+        }
+        .sheet(isPresented: $showingDiscoveryHub) {
+            ExploreDiscoveryHubView()
         }
         .task {
             async let routesRefresh: Void =
@@ -935,7 +1088,7 @@ struct AroundYouExploreView: View {
     private func selectRoute(
         nearestTo coordinate: CLLocationCoordinate2D
     ) {
-        guard filter != .events else {
+        guard filter == .all || filter == .routes else {
             withAnimation(.easeInOut(duration: 0.16)) {
                 selectedRoute = nil
             }
