@@ -5529,19 +5529,19 @@ struct ATHLTHProgressView: View {
 
     private var comparisonLabel: String {
         switch period {
-        case .week: return "vs. last week"
-        case .month: return "vs. last month"
+        case .week: return "vs. prior 7 days"
+        case .month: return "vs. prior month"
         case .threeMonths: return "vs. prior 3 mo."
-        case .year: return "vs. last year"
+        case .year: return "vs. prior year"
         }
     }
 
     private var periodSummaryLabel: String {
         switch period {
-        case .week: return "this week"
-        case .month: return "this month"
-        case .threeMonths: return "3 months"
-        case .year: return "this year"
+        case .week: return "last 7 days"
+        case .month: return "last month"
+        case .threeMonths: return "last 3 months"
+        case .year: return "last year"
         }
     }
 
@@ -5602,61 +5602,84 @@ struct ATHLTHProgressView: View {
         let calendar = Calendar.current
         let now = Date()
 
+        // Progress periods are rolling windows anchored to the current
+        // moment. They must not reset at the start of a calendar
+        // week/month/year; otherwise Monday would contain only Monday
+        // and the first day of a month would contain only that day.
         let start: Date
         let previousStart: Date
 
         switch period {
         case .week:
-            start = calendar.dateInterval(of: .weekOfYear, for: now)?.start
-                ?? calendar.startOfDay(for: now)
-            previousStart = calendar.date(byAdding: .weekOfYear, value: -1, to: start)
-                ?? start.addingTimeInterval(-604_800)
+            start =
+                calendar.date(
+                    byAdding: .day,
+                    value: -7,
+                    to: now
+                ) ??
+                now.addingTimeInterval(-604_800)
+            previousStart =
+                calendar.date(
+                    byAdding: .day,
+                    value: -7,
+                    to: start
+                ) ??
+                start.addingTimeInterval(-604_800)
 
         case .month:
-            start = calendar.dateInterval(of: .month, for: now)?.start
-                ?? calendar.startOfDay(for: now)
-            previousStart = calendar.date(byAdding: .month, value: -1, to: start)
-                ?? start.addingTimeInterval(-2_592_000)
+            start =
+                calendar.date(
+                    byAdding: .month,
+                    value: -1,
+                    to: now
+                ) ??
+                now.addingTimeInterval(-2_592_000)
+            previousStart =
+                calendar.date(
+                    byAdding: .month,
+                    value: -1,
+                    to: start
+                ) ??
+                start.addingTimeInterval(-2_592_000)
 
         case .threeMonths:
-            let currentMonth = calendar.dateInterval(of: .month, for: now)?.start
-                ?? calendar.startOfDay(for: now)
-            start = calendar.date(byAdding: .month, value: -2, to: currentMonth)
-                ?? currentMonth
-            previousStart = calendar.date(byAdding: .month, value: -3, to: start)
-                ?? start.addingTimeInterval(-7_776_000)
+            start =
+                calendar.date(
+                    byAdding: .month,
+                    value: -3,
+                    to: now
+                ) ??
+                now.addingTimeInterval(-7_776_000)
+            previousStart =
+                calendar.date(
+                    byAdding: .month,
+                    value: -3,
+                    to: start
+                ) ??
+                start.addingTimeInterval(-7_776_000)
 
         case .year:
-            start = calendar.dateInterval(of: .year, for: now)?.start
-                ?? calendar.startOfDay(for: now)
-            previousStart = calendar.date(byAdding: .year, value: -1, to: start)
-                ?? start.addingTimeInterval(-31_536_000)
+            start =
+                calendar.date(
+                    byAdding: .year,
+                    value: -1,
+                    to: now
+                ) ??
+                now.addingTimeInterval(-31_536_000)
+            previousStart =
+                calendar.date(
+                    byAdding: .year,
+                    value: -1,
+                    to: start
+                ) ??
+                start.addingTimeInterval(-31_536_000)
         }
-
-        let elapsed = now.timeIntervalSince(start)
-        let previousBoundary: Date
-
-        switch period {
-        case .week:
-            previousBoundary = calendar.date(byAdding: .weekOfYear, value: 1, to: previousStart) ?? start
-        case .month:
-            previousBoundary = calendar.date(byAdding: .month, value: 1, to: previousStart) ?? start
-        case .threeMonths:
-            previousBoundary = calendar.date(byAdding: .month, value: 3, to: previousStart) ?? start
-        case .year:
-            previousBoundary = calendar.date(byAdding: .year, value: 1, to: previousStart) ?? start
-        }
-
-        let previousEnd = min(
-            previousStart.addingTimeInterval(elapsed),
-            previousBoundary
-        )
 
         return (
             start: start,
             end: now,
             previousStart: previousStart,
-            previousEnd: previousEnd
+            previousEnd: start
         )
     }
 
