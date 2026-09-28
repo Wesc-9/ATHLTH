@@ -5941,7 +5941,12 @@ struct CommunityGroupCreateView: View {
     @State private var saving = false
 
     var body: some View {
-        NavigationStack {
+        let photoButtonTitle =
+            selectedImageData == nil
+                ? "Choose Club Photo"
+                : "Change Club Photo"
+
+        return NavigationStack {
             Form {
                 Section {
                     VStack(spacing: 14) {
@@ -5952,9 +5957,7 @@ struct CommunityGroupCreateView: View {
                             matching: .images
                         ) {
                             Label(
-                                selectedImageData == nil
-                                    ? "Choose Club Photo"
-                                    : "Change Club Photo",
+                                photoButtonTitle,
                                 systemImage: "photo.on.rectangle.angled"
                             )
                             .frame(maxWidth: .infinity)
@@ -6326,7 +6329,12 @@ struct CommunityGroupSettingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        let photoButtonTitle =
+            selectedImageData == nil
+                ? "Choose Photo"
+                : "Change Photo"
+
+        return NavigationStack {
             Form {
                 Section {
                     VStack(spacing: 14) {
@@ -6338,9 +6346,7 @@ struct CommunityGroupSettingsView: View {
                                 matching: .images
                             ) {
                                 Label(
-                                    selectedImageData == nil
-                                        ? "Choose Photo"
-                                        : "Change Photo",
+                                    photoButtonTitle,
                                     systemImage: "photo"
                                 )
                             }
@@ -7529,7 +7535,12 @@ private struct CommunityContentCoverPicker: View {
     @State private var imageError: String?
 
     var body: some View {
-        VStack(spacing: 12) {
+        let photoButtonTitle =
+            imageData == nil
+                ? "Choose Photo"
+                : "Change Photo"
+
+        return VStack(spacing: 12) {
             Group {
                 if let imageData,
                    let image = UIImage(data: imageData) {
@@ -7586,9 +7597,7 @@ private struct CommunityContentCoverPicker: View {
                     matching: .images
                 ) {
                     Label(
-                        imageData == nil
-                            ? "Choose Photo"
-                            : "Change Photo",
+                        photoButtonTitle,
                         systemImage: "photo"
                     )
                 }
