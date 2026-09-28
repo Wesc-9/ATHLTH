@@ -9,6 +9,38 @@ enum TrainingPlanTimingStatus: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+struct TrainingPlanSessionOccurrence: Identifiable {
+    let planID: UUID
+    let session: PlannedSession
+    let date: Date
+    let weekNumber: Int
+
+    var id: String {
+        "\(planID.uuidString)|\(session.id.uuidString)"
+    }
+}
+
+struct TrainingPlanProgressSnapshot {
+    let totalSessions: Int
+    let completedSessions: Int
+    let skippedSessions: Int
+    let currentWeek: Int
+    let totalWeeks: Int
+    let missed: [TrainingPlanSessionOccurrence]
+
+    var completionFraction: Double {
+        guard totalSessions > 0 else { return 0 }
+        return min(
+            max(
+                Double(completedSessions) /
+                Double(totalSessions),
+                0
+            ),
+            1
+        )
+    }
+}
+
 
 struct AccountTrainingContent: Codable {
     var activePlan: TrainingPlan?
@@ -1054,6 +1086,172 @@ final class AppSessionStore: ObservableObject {
         }
 
         return .active
+    }
+
+    func trainingPlanProgress(
+        _ plan: TrainingPlan,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog],
+        referenceDate: Date = Date()
+    ) -> TrainingPlanProgressSnapshot {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: referenceDate)
+        let start = plan.startDate.map {
+            calendar.startOfDay(for: $0)
+        }
+
+        var occurrences: [TrainingPlanSessionOccurrence] = []
+
+        for (weekIndex, week) in plan.weeks.enumerated() {
+            for day in week.days {
+                for plannedSession in day.sessions {
+                    let fallbackDate: Date
+                    if let start {
+                        fallbackDate =
+                            calendar.date(
+                                byAdding: .day,
+                                value:
+                                    weekIndex * 7 +
+                                    max(day.dayIndex - 1, 0),
+                                to: start
+                            ) ?? start
+                    } else {
+                        fallbackDate = plannedSession.scheduledStart
+                            ?? plan.createdAt
+                    }
+
+                    occurrences.append(
+                        TrainingPlanSessionOccurrence(
+                            planID: plan.id,
+                            session: plannedSession,
+                            date:
+                                plannedSession.scheduledStart
+                                    .map {
+                                        calendar.startOfDay(for: $0)
+                                    }
+                                    ?? fallbackDate,
+                            weekNumber: weekIndex + 1
+                        )
+                    )
+                }
+            }
+        }
+
+        var unusedHealth = healthWorkouts.sorted {
+            $0.startDate < $1.startDate
+        }
+        var completedIDs = Set<UUID>()
+        var skippedIDs = Set<UUID>()
+
+        for occurrence in occurrences {
+            let planned = occurrence.session
+
+            if isPlanSessionSkipped(
+                planID: plan.id,
+                sessionID: planned.id
+            ) {
+                skippedIDs.insert(planned.id)
+                continue
+            }
+
+            if isPlanSessionManuallyCompleted(
+                planID: plan.id,
+                sessionID: planned.id
+            ) {
+                completedIDs.insert(planned.id)
+                continue
+            }
+
+            if strengthHistory.contains(
+                where: {
+                    $0.isFinished &&
+                    $0.plannedSessionID == planned.id
+                }
+            ) {
+                completedIDs.insert(planned.id)
+                continue
+            }
+
+            if let matchIndex = unusedHealth.firstIndex(
+                where: { workout in
+                    calendar.isDate(
+                        workout.startDate,
+                        inSameDayAs: occurrence.date
+                    ) &&
+                    Self.healthWorkout(
+                        workout,
+                        matches: planned
+                    )
+                }
+            ) {
+                completedIDs.insert(planned.id)
+                unusedHealth.remove(at: matchIndex)
+            }
+        }
+
+        let missed = occurrences
+            .filter {
+                calendar.startOfDay(for: $0.date) < today &&
+                !completedIDs.contains($0.session.id) &&
+                !skippedIDs.contains($0.session.id)
+            }
+            .sorted { $0.date < $1.date }
+
+        let currentWeek: Int
+        if let start {
+            let dayOffset =
+                calendar.dateComponents(
+                    [.day],
+                    from: start,
+                    to: today
+                ).day ?? 0
+
+            if dayOffset < 0 {
+                currentWeek = 0
+            } else {
+                currentWeek = min(
+                    max(dayOffset / 7 + 1, 1),
+                    max(plan.weeks.count, 1)
+                )
+            }
+        } else {
+            currentWeek = 0
+        }
+
+        return TrainingPlanProgressSnapshot(
+            totalSessions: occurrences.count,
+            completedSessions: completedIDs.count,
+            skippedSessions: skippedIDs.count,
+            currentWeek: currentWeek,
+            totalWeeks: plan.weeks.count,
+            missed: missed
+        )
+    }
+
+    private static func healthWorkout(
+        _ workout: WorkoutSummary,
+        matches session: PlannedSession
+    ) -> Bool {
+        switch session.kind {
+        case .running:
+            return workout.activity == .running
+        case .walking:
+            return workout.activity == .walking ||
+                workout.activity == .hiking
+        case .strength:
+            return workout.activity == .strength
+        case .mobility:
+            return workout.activity == .yoga ||
+                workout.activity == .coreTraining
+        case .recovery:
+            return false
+        case .custom:
+            return workout.activity == .hiit ||
+                workout.activity == .rowing ||
+                workout.activity == .cycling ||
+                workout.activity == .stairClimbing ||
+                workout.activity == .other
+        }
     }
 
     func trainingPlanConflict(
