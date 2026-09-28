@@ -243,6 +243,7 @@ struct HomeAroundYouSection: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
+    @EnvironmentObject private var challenges: ChallengeStore
 
     @StateObject private var locationStore = HomeLocationStore()
     @State private var mapSnapshot: UIImage?
