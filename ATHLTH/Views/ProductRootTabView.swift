@@ -3955,7 +3955,6 @@ struct ATHLTHRecoveryView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
-    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     @StateObject private var sorenessStore = RecoverySorenessStore()
     @State private var recoverySnapshot = RecoveryTrendSnapshot.empty
