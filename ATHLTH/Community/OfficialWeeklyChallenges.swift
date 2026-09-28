@@ -881,8 +881,30 @@ private struct OfficialWeeklyChallengeArtwork: View {
             let size = proxy.size
 
             ZStack {
+                // Keep covers visually tied to what the challenge actually
+                // asks the athlete to do. The AI recipe art-directs the
+                // treatment, while a local run/walk photo provides the
+                // semantic base. This is fast, cached with the app and avoids
+                // generating or downloading large images at runtime.
+                Image(
+                    semanticBaseImageName(
+                        variant: recipe.variant
+                    )
+                )
+                .resizable()
+                .interpolation(.high)
+                .antialiased(true)
+                .scaledToFill()
+                .frame(
+                    width: size.width,
+                    height: size.height
+                )
+                .clipped()
+
                 LinearGradient(
-                    colors: paletteColors(recipe.palette),
+                    colors:
+                        paletteColors(recipe.palette)
+                        .map { $0.opacity(0.26) },
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -894,6 +916,7 @@ private struct OfficialWeeklyChallengeArtwork: View {
                     size: size,
                     variant: recipe.variant
                 )
+                .opacity(0.62)
 
                 routeLayer(
                     size: size,
@@ -903,25 +926,46 @@ private struct OfficialWeeklyChallengeArtwork: View {
 
                 motifLayer(recipe.motif)
                     .frame(
-                        width: min(size.width * 0.36, 150),
-                        height: min(size.width * 0.36, 150)
+                        width: min(size.width * 0.30, 124),
+                        height: min(size.width * 0.30, 124)
                     )
                     .offset(
-                        x: size.width * 0.28,
-                        y: size.height * 0.15
+                        x: size.width * 0.30,
+                        y: size.height * 0.16
                     )
+                    .opacity(0.72)
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.12),
+                        Color.white.opacity(0.06),
                         Color.clear,
-                        Color.black.opacity(0.16)
+                        Color.black.opacity(0.20)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             }
             .clipped()
+        }
+    }
+
+    private func semanticBaseImageName(
+        variant: Int
+    ) -> String {
+        switch challenge.kind {
+        case .distance:
+            return variant.isMultiple(of: 2)
+                ? "HomeHero"
+                : "StrengthPostWorkoutHero"
+
+        case .sessions:
+            return "HomeHero"
+
+        case .minutes:
+            return "StrengthPostWorkoutHero"
+
+        case .streak:
+            return "ProfileHero"
         }
     }
 
@@ -1170,29 +1214,52 @@ private struct OfficialWeeklyChallengeArtwork: View {
     }
 
     private var fallbackArtwork: some View {
-        ZStack {
-            LinearGradient(
-                colors: fallbackColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+        GeometryReader { proxy in
+            ZStack {
+                Image(
+                    semanticBaseImageName(
+                        variant: 1
+                    )
+                )
+                .resizable()
+                .interpolation(.high)
+                .antialiased(true)
+                .scaledToFill()
+                .frame(
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                )
+                .clipped()
 
-            Circle()
-                .fill(Color.white.opacity(0.16))
-                .frame(width: 220, height: 220)
-                .blur(radius: 2)
-                .offset(x: 118, y: -72)
+                LinearGradient(
+                    colors:
+                        fallbackColors
+                        .map { $0.opacity(0.22) },
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
-            Circle()
-                .fill(Color.white.opacity(0.10))
-                .frame(width: 150, height: 150)
-                .offset(x: -126, y: 92)
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.20)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
 
-            Image(systemName: challenge.kind.icon)
-                .font(.system(size: 78, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.20))
-                .rotationEffect(.degrees(-8))
-                .offset(x: 118, y: 44)
+                Image(systemName: challenge.kind.icon)
+                    .font(.system(size: 70, weight: .semibold))
+                    .foregroundStyle(
+                        Color.white.opacity(0.16)
+                    )
+                    .rotationEffect(.degrees(-8))
+                    .offset(
+                        x: proxy.size.width * 0.30,
+                        y: proxy.size.height * 0.18
+                    )
+            }
+            .clipped()
         }
     }
 
