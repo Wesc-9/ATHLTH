@@ -321,13 +321,20 @@ enum WorkoutLaunchCoordinator {
         let watchSessionID: UUID?
 
         if captureDevice == .appleWatch {
-            try await watchConnection
-                .startWorkoutOnWatch(.strength)
-            watchConnection
-                .sendAudioCoachConfiguration(
-                    audioCoach
-                )
-            watchSessionID = UUID()
+            do {
+                try await watchConnection
+                    .startWorkoutOnWatch(.strength)
+                watchConnection
+                    .sendAudioCoachConfiguration(
+                        audioCoach
+                    )
+                watchSessionID = UUID()
+            } catch {
+                if !selectedFriends.isEmpty {
+                    await social.cancelActiveWorkout()
+                }
+                throw error
+            }
         } else {
             watchSessionID = nil
         }
