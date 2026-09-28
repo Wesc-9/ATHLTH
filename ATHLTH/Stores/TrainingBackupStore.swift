@@ -83,6 +83,10 @@ final class TrainingBackupStore: ObservableObject {
     @Published private(set) var available: [TrainingBackupRow] = []
     private var lastPayload: TrainingBackupPayload?
     private var accountID: UUID?
+    private var isDirty = false
+    private var scheduledBackupTask: Task<Void, Never>?
+    private var lastSuccessfulBackupAt: Date?
+    private let automaticBackupDelay: Duration = .seconds(20)
     private let client = SupabaseEnvironment.client
     let deviceID: UUID
 
@@ -98,11 +102,32 @@ final class TrainingBackupStore: ObservableObject {
     }
 
     func switchAccount(_ id: UUID?) {
+        scheduledBackupTask?.cancel()
+        scheduledBackupTask = nil
         accountID = id
         lastPayload = nil
+        isDirty = false
         available = []
-        enabled = id.flatMap { AccountLocalStorage.read(Bool.self, name: "cloudBackupConsent", userID: $0) } ?? false
-        status = id == nil ? "Sign in to manage cloud backups." : enabled ? "Automatic backup pending." : "Automatic training backup is off."
+        enabled = id.flatMap {
+            AccountLocalStorage.read(
+                Bool.self,
+                name: "cloudBackupConsent",
+                userID: $0
+            )
+        } ?? false
+        lastSuccessfulBackupAt = id.flatMap {
+            AccountLocalStorage.read(
+                Date.self,
+                name: "cloudBackupLastSuccessfulAt",
+                userID: $0
+            )
+        }
+        status =
+            id == nil
+                ? "Sign in to manage cloud backups."
+                : enabled
+                    ? "Automatic backup is ready."
+                    : "Automatic training backup is off."
     }
 
     private struct ConsentChange: Encodable {
@@ -113,9 +138,25 @@ final class TrainingBackupStore: ObservableObject {
 
     private func rememberConsent(_ value: Bool, userID: UUID) {
         enabled = value
-        AccountLocalStorage.write(value, name: "cloudBackupConsent", userID: userID)
-        AccountLocalStorage.write(Date(), name: "cloudBackupConsentChangedAt", userID: userID)
+        AccountLocalStorage.write(
+            value,
+            name: "cloudBackupConsent",
+            userID: userID
+        )
+        AccountLocalStorage.write(
+            Date(),
+            name: "cloudBackupConsentChangedAt",
+            userID: userID
+        )
         lastPayload = nil
+
+        if value {
+            markDirty(userID: userID)
+        } else {
+            scheduledBackupTask?.cancel()
+            scheduledBackupTask = nil
+            isDirty = false
+        }
     }
 
     func setEnabled(_ value: Bool) async {
@@ -157,24 +198,125 @@ final class TrainingBackupStore: ObservableObject {
         } catch { if accountID == userID { status = "Backup is off, but deletion failed: \(error.localizedDescription). Try again." } }
     }
 
+    func beginChangeTracking(userID: UUID) {
+        guard accountID == userID else { return }
+        isDirty = false
+    }
+
+    func markDirty(userID: UUID) {
+        guard accountID == userID else { return }
+
+        isDirty = true
+        guard enabled else { return }
+        scheduleAutomaticBackup(userID: userID)
+    }
+
+    private func scheduleAutomaticBackup(userID: UUID) {
+        guard scheduledBackupTask == nil,
+              enabled,
+              accountID == userID
+        else {
+            return
+        }
+
+        scheduledBackupTask = Task { @MainActor in
+            try? await Task.sleep(
+                for: automaticBackupDelay
+            )
+
+            guard !Task.isCancelled else { return }
+            scheduledBackupTask = nil
+
+            await backUp(userID: userID)
+
+            if isDirty,
+               enabled,
+               accountID == userID {
+                scheduleAutomaticBackup(
+                    userID: userID
+                )
+            }
+        }
+    }
+
+    func performFailsafeBackup(
+        userID: UUID,
+        maximumAge: TimeInterval = 30 * 60
+    ) async {
+        guard enabled,
+              accountID == userID
+        else {
+            return
+        }
+
+        if isDirty {
+            await backUp(userID: userID)
+            return
+        }
+
+        guard lastSuccessfulBackupAt == nil ||
+              Date().timeIntervalSince(
+                lastSuccessfulBackupAt ?? .distantPast
+              ) >= maximumAge
+        else {
+            return
+        }
+
+        // The failsafe intentionally captures once even when no dirty event
+        // was observed. It protects against a future persistence path that
+        // forgets to emit a dirty signal without returning to frequent polling.
+        await backUp(
+            userID: userID,
+            force: true
+        )
+    }
+
     private func checkAccount(_ id: UUID) throws {
         guard accountID == id, client.auth.currentUser?.id == id else { throw BackupError.accountChanged }
     }
 
     func backUp(userID: UUID, force: Bool = false) async {
         guard enabled, !isBusy else { return }
+        guard force || isDirty else { return }
+
         isBusy = true
         defer { isBusy = false }
+
         do {
             try checkAccount(userID)
-            let payload = try TrainingBackupPayload.capture(userID: userID)
-            guard force || payload != lastPayload else { return }
-            try await upload(payload, deviceID: deviceID)
+            let payload = try TrainingBackupPayload.capture(
+                userID: userID
+            )
+
+            if !force,
+               let lastPayload,
+               payload == lastPayload {
+                isDirty = false
+                return
+            }
+
+            try await upload(
+                payload,
+                deviceID: deviceID
+            )
             try checkAccount(userID)
+
+            let completedAt = Date()
             lastPayload = payload
-            status = "Backed up \(Date().formatted(date: .abbreviated, time: .shortened))."
+            isDirty = false
+            lastSuccessfulBackupAt = completedAt
+            AccountLocalStorage.write(
+                completedAt,
+                name: "cloudBackupLastSuccessfulAt",
+                userID: userID
+            )
+            status =
+                "Backed up \(completedAt.formatted(date: .abbreviated, time: .shortened))."
         } catch {
-            if accountID == userID { status = "Backup pending: \(error.localizedDescription) Your data remains on this phone." }
+            if accountID == userID {
+                status =
+                    "Backup pending: \(error.localizedDescription) Your data remains on this phone."
+            }
         }
     }
 
@@ -229,6 +371,7 @@ final class TrainingBackupStore: ObservableObject {
                 else { UserDefaults.standard.removeObject(forKey: key) }
             }
             lastPayload = nil
+            markDirty(userID: userID)
             status = "Training data restored. Your previous data is also backed up."
             return true
         } catch {
