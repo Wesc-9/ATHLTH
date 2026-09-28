@@ -15,6 +15,44 @@ private final class HealthObserverCompletion: @unchecked Sendable {
     }
 }
 
+private final class HealthRouteQueryAccumulator:
+    @unchecked Sendable {
+
+    private let lock = NSLock()
+    private var locations: [CLLocation] = []
+    private var completed = false
+
+    func consume(
+        batch: [CLLocation]?,
+        done: Bool,
+        error: Error?
+    ) -> Result<[CLLocation], Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard !completed else {
+            return nil
+        }
+
+        if let error {
+            completed = true
+            return .failure(error)
+        }
+
+        locations.append(
+            contentsOf: batch ?? []
+        )
+
+        guard done else {
+            return nil
+        }
+
+        completed = true
+        return .success(locations)
+    }
+}
+
+
 @MainActor
 final class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
@@ -4350,29 +4388,43 @@ final class HealthKitManager: ObservableObject {
         return allLocations.sorted { $0.timestamp < $1.timestamp }
     }
 
-    private func locations(for route: HKWorkoutRoute) async throws -> [CLLocation] {
+    private func locations(
+        for route: HKWorkoutRoute
+    ) async throws -> [CLLocation] {
         try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<[CLLocation], Error>) in
+            (
+                continuation:
+                    CheckedContinuation<
+                        [CLLocation],
+                        Error
+                    >
+            ) in
+            let accumulator =
+                HealthRouteQueryAccumulator()
 
-            var result: [CLLocation] = []
-            var finished = false
+            let query =
+                HKWorkoutRouteQuery(
+                    route: route
+                ) {
+                    _,
+                    batch,
+                    done,
+                    error in
 
-            let query = HKWorkoutRouteQuery(route: route) { _, batch, done, error in
-                guard !finished else { return }
+                    guard let result =
+                            accumulator.consume(
+                                batch: batch,
+                                done: done,
+                                error: error
+                            )
+                    else {
+                        return
+                    }
 
-                if let error {
-                    finished = true
-                    continuation.resume(throwing: error)
-                    return
+                    continuation.resume(
+                        with: result
+                    )
                 }
-
-                result.append(contentsOf: batch ?? [])
-
-                if done {
-                    finished = true
-                    continuation.resume(returning: result)
-                }
-            }
 
             healthStore.execute(query)
         }
