@@ -24,3 +24,10 @@ enum AccountLocalStorage {
         defaults.set(data, forKey: key(name, userID: userID))
     }
 }
+
+// Consent is account-scoped and independent of cloud backup and HealthKit access.
+enum CoachHistoryPermission {
+    static func isEnabled(userID: UUID, defaults: UserDefaults = .standard) -> Bool {
+        AccountLocalStorage.read(Bool.self, name: "coachHistoryConsent", userID: userID, defaults: defaults) == true
+    }
+}

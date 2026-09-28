@@ -594,7 +594,9 @@ final class HealthKitManager: ObservableObject {
         do {
             try await builder.beginCollection(at: startDate)
             try await builder.addMetadata([
-                HKMetadataKeyExternalUUID: externalID.uuidString
+                HKMetadataKeyExternalUUID: externalID.uuidString,
+                HKMetadataKeySyncIdentifier: "athlth-strength-" + externalID.uuidString,
+                HKMetadataKeySyncVersion: 1
             ])
             try await builder.endCollection(at: endDate)
             let workout = try await builder.finishWorkout()

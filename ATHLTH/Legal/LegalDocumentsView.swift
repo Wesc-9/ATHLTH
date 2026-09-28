@@ -23,7 +23,7 @@ private struct LegalSectionData: Identifiable {
 struct LegalDocumentView: View {
     let kind: LegalDocumentKind
 
-    private let effectiveDate = "23 September 2026"
+    private let effectiveDate = "28 September 2026"
 
     var body: some View {
         ScrollView {
@@ -206,6 +206,14 @@ struct LegalDocumentView: View {
             LegalSectionData(
                 title: "16. Privacy contact",
                 body: "\(ATHLTHLegalIdentity.privacyContactStatement) Account deletion is available directly in Settings."
+            ),
+            LegalSectionData(
+                title: "17. Optional cloud training backup",
+                body: "Cloud training backup is off until you explicitly enable it in Settings > Training data & Coach. With your consent, ATHLTH stores plans, planned saved routes, goals, exercise libraries, Coach preferences, completed strength logs and iPhone workout summaries with Supabase for backup and restoration. Goals, notes and workout records may reveal health information. Planned routes contain location data. Imported pulse/calorie readings, recorded GPS traces, the Apple Health library, health-profile details and local photos are excluded from these backups. Backup does not make your data public. The current database region is EU North (Stockholm); provider access, support, logs and subprocessors can involve other locations and require separate contractual safeguards. The latest copy from each device and pre-restore recovery copies remain until you delete cloud backups or your account. Turning backup off stops new uploads but does not delete existing copies. Delete cloud backups stops uploads for the account and removes its active backup records; provider disaster-recovery copies expire according to the provider’s retention arrangements. Local app data and Apple Health data are not deleted by this action."
+            ),
+            LegalSectionData(
+                title: "18. Optional Coach history sharing",
+                body: "History sharing with Coach is a separate opt-in, off by default. When enabled, requesting a new or adapted plan sends Groq a limited summary of up to the preceding 28 days of available workouts, such as activity type, dates, duration, distance and workout counts. Raw GPS traces, pulse, sleep and HRV readings are excluded from this history summary. Goals, plan information and notes you supply for the requested Coach function are processed separately as part of that request. Cloud backup permission does not authorize Coach history sharing. Turn history sharing off in Settings > Training data & Coach to prevent future history summaries being sent. Withdrawal cannot undo a request already processed."
             )
         ]
     }

@@ -168,7 +168,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
             let saved: HKWorkout
             if let existing { saved = existing }
             else {
-                saved = HKWorkout(activityType: workout.walking ? .walking : .running, start: workout.start, end: end, duration: workout.accumulatedSeconds, totalEnergyBurned: nil, totalDistance: HKQuantity(unit: .meter(), doubleValue: workout.distanceMeters), metadata: [HKMetadataKeyExternalUUID: workout.id.uuidString, HKMetadataKeyIndoorWorkout: false])
+                saved = HKWorkout(activityType: workout.walking ? .walking : .running, start: workout.start, end: end, duration: workout.accumulatedSeconds, totalEnergyBurned: nil, totalDistance: HKQuantity(unit: .meter(), doubleValue: workout.distanceMeters), metadata: [HKMetadataKeyExternalUUID: workout.id.uuidString, HKMetadataKeySyncIdentifier: "athlth-phone-" + workout.id.uuidString, HKMetadataKeySyncVersion: 1, HKMetadataKeyIndoorWorkout: false])
                 try await healthStore.save(saved)
                 // Route failure must not create a duplicate workout on retry.
                 if !workout.points.isEmpty, healthStore.authorizationStatus(for: HKSeriesType.workoutRoute()) == .sharingAuthorized {

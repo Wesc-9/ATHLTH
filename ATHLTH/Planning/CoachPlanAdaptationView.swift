@@ -30,6 +30,7 @@ struct CoachPlanAdaptationView: View {
     }
 
     private var recentTraining: [String] {
+        guard session.signedIn, CoachHistoryPermission.isEnabled(userID: session.profile.userID) else { return [] }
         let cutoff = Date().addingTimeInterval(-14 * 86_400)
 
         return health.workouts
@@ -531,6 +532,7 @@ struct CoachPlanAdaptationView: View {
             resolvedGoals = Array(goalStore.activeGoals.prefix(3))
         }
 
+        let requestOwner = session.profile.userID
         let request = CoachPlanAdaptationService.makeRequest(
             plan: plan,
             goals: resolvedGoals,
@@ -540,6 +542,7 @@ struct CoachPlanAdaptationView: View {
 
         do {
             let generated = try await service.generate(request: request)
+            guard session.signedIn, session.profile.userID == requestOwner else { return }
 
             guard !generated.changes.isEmpty else {
                 infoMessage =

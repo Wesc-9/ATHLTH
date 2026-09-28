@@ -445,7 +445,7 @@ final class AppSessionStore: ObservableObject {
         if let deletedID {
             defaults.removeObject(forKey: AccountLocalStorage.key("training", userID: deletedID))
             defaults.removeObject(forKey: AccountLocalStorage.key("coach", userID: deletedID))
-            for name in ["goals", "strengthHistory", "strengthActive", "phoneHistory", "phoneActive", "coachHistoryConsent"] {
+            for name in ["goals", "strengthHistory", "strengthActive", "phoneHistory", "phoneActive", "coachHistoryConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt"] {
                 defaults.removeObject(forKey: AccountLocalStorage.key(name, userID: deletedID))
             }
             AccountLocalStorage.write([RunningWorkoutTemplate](), name: "runningLibrary", userID: deletedID, defaults: defaults)

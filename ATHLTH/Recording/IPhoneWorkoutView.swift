@@ -4,6 +4,7 @@ import MapKit
 struct IPhoneWorkoutView: View {
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
     @State private var confirmFinish = false
 
@@ -18,9 +19,9 @@ struct IPhoneWorkoutView: View {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             let elapsed = workout.elapsed(at: context.date)
                             LabeledContent("Active time", value: Duration.seconds(elapsed).formatted(.time(pattern: .hourMinuteSecond)))
-                            LabeledContent("Distance", value: String(format: "%.2f km", workout.distanceMeters / 1000))
+                            LabeledContent("Distance", value: settings.measurementPreference.distance(fromKilometers: workout.distanceMeters / 1000))
                             if workout.distanceMeters >= 50 {
-                                LabeledContent("Average pace", value: String(format: "%.1f min/km", elapsed / 60 / (workout.distanceMeters / 1000)))
+                                LabeledContent("Average pace", value: String(format: "%.1f min/%@", elapsed / 60 / (workout.distanceMeters / (settings.measurementPreference == .metric ? 1000 : 1609.344)), settings.measurementPreference.distanceUnit))
                             }
                         }
                         if workout.resumedAt == nil { Button("Resume workout") { recorder.resume() } }

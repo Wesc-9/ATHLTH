@@ -207,12 +207,12 @@ struct RunQuickStartSheet: View {
                     modeCard
                     selectionCard
 
+                    if trainingDeviceProvider == .appleWatch {
                     WorkoutGearSelectionCard(
                         selectedGearIDs: $selectedGearIDs,
                         activity: .running
                     )
 
-                    if trainingDeviceProvider == .appleWatch {
                     ATHLTHPlusFeatureGate(
                         feature: .audioCoach,
                         title: "Audio Coach · ATHLTH+",
@@ -674,12 +674,12 @@ struct WalkQuickStartSheet: View {
                         }
                     }
 
+                    if trainingDeviceProvider == .appleWatch {
                     WorkoutGearSelectionCard(
                         selectedGearIDs: $selectedGearIDs,
                         activity: .walking
                     )
 
-                    if trainingDeviceProvider == .appleWatch {
                     ATHLTHPlusFeatureGate(
                         feature: .audioCoach,
                         title: "Audio Coach · ATHLTH+",

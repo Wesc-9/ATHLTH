@@ -126,6 +126,7 @@ struct ActiveStrengthWorkoutView: View {
         defer { finishInProgress = false }
 
         let endDate = Date()
+        let ownerID = appSession.profile.userID
 
         switch workout.captureDevice {
         case .appleWatch:
@@ -144,6 +145,8 @@ struct ActiveStrengthWorkoutView: View {
                 externalID: workout.id
             )
 
+            guard appSession.signedIn, appSession.profile.userID == ownerID,
+                  strength.activeWorkout?.id == workout.id else { return }
             strength.finish(
                 healthKitWorkoutUUID: healthWorkoutUUID,
                 duration: endDate.timeIntervalSince(workout.startedAt)

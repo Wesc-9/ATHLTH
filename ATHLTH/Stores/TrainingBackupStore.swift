@@ -8,10 +8,32 @@ struct TrainingBackupPayload: Codable, Equatable {
 
     static let names = ["training", "goals", "strengthHistory", "runningLibrary", "exerciseLibrary", "coach", "phoneHistory"]
 
-    static func capture(userID: UUID) -> Self {
+    static func capture(userID: UUID) throws -> Self {
         var records: [String: Data] = [:]
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
         for name in names {
-            if let data = UserDefaults.standard.data(forKey: AccountLocalStorage.key(name, userID: userID)) { records[name] = data }
+            if let data = UserDefaults.standard.data(forKey: AccountLocalStorage.key(name, userID: userID)) {
+                // Keep imported health readings and recorded GPS traces out of cloud backup.
+                if name == "strengthHistory" {
+                    var logs = try JSONDecoder().decode([StrengthWorkoutLog].self, from: data)
+                    for index in logs.indices {
+                        logs[index].healthMetrics = LinkedHealthWorkoutMetrics(healthKitWorkoutUUID: logs[index].healthMetrics.healthKitWorkoutUUID, duration: nil, activeCalories: nil, averageHeartRate: nil, maxHeartRate: nil)
+                    }
+                    records[name] = try encoder.encode(logs)
+                } else if name == "phoneHistory" {
+                    var logs = try JSONDecoder().decode([PhoneWorkout].self, from: data)
+                    for index in logs.indices { logs[index].points = [] }
+                    records[name] = try encoder.encode(logs)
+                } else if name == "training" {
+                    _ = try JSONDecoder().decode(AccountTrainingContent.self, from: data)
+                    guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw BackupError.invalidBackup }
+                    object.removeValue(forKey: "onboardingProfile")
+                    records[name] = try JSONSerialization.data(withJSONObject: object, options: .sortedKeys)
+                } else {
+                    records[name] = data
+                }
+            }
         }
         return Self(version: 1, ownerID: userID, records: records)
     }
@@ -23,7 +45,9 @@ struct TrainingBackupPayload: Codable, Equatable {
         // Decode each public model before replacing anything on this device.
         let decoder = JSONDecoder()
         if let data = records["phoneHistory"] { _ = try decoder.decode([PhoneWorkout].self, from: data) }
-        if let data = records["training"] { _ = try decoder.decode(AccountTrainingContent.self, from: data) }
+        if let data = records["training"] {
+            _ = try decoder.decode(AccountTrainingContent.self, from: data)
+        }
         if let data = records["goals"] { _ = try decoder.decode([ATHLTHGoal].self, from: data) }
         if let data = records["strengthHistory"] { _ = try decoder.decode([StrengthWorkoutLog].self, from: data) }
         if let data = records["runningLibrary"] { _ = try decoder.decode([RunningWorkoutTemplate].self, from: data) }
@@ -32,12 +56,13 @@ struct TrainingBackupPayload: Codable, Equatable {
 }
 
 enum BackupError: LocalizedError {
-    case invalidBackup, tooLarge, accountChanged
+    case invalidBackup, tooLarge, accountChanged, consentRequired
     var errorDescription: String? {
         switch self {
         case .invalidBackup: return "This backup is incompatible or belongs to another account. Nothing was restored."
         case .tooLarge: return "This backup is too large. Your local data is safe; contact support."
         case .accountChanged: return "Your account changed. Please try again."
+        case .consentRequired: return "Enable cloud backup before uploading training data."
         }
     }
 }
@@ -52,7 +77,8 @@ struct TrainingBackupRow: Codable, Identifiable {
 
 @MainActor
 final class TrainingBackupStore: ObservableObject {
-    @Published private(set) var status = "Automatic backup is ready when you sign in."
+    @Published private(set) var status = "Cloud backup is off until you choose to enable it."
+    @Published private(set) var enabled = false
     @Published private(set) var isBusy = false
     @Published private(set) var available: [TrainingBackupRow] = []
     private var lastPayload: TrainingBackupPayload?
@@ -75,7 +101,55 @@ final class TrainingBackupStore: ObservableObject {
         accountID = id
         lastPayload = nil
         available = []
-        status = id == nil ? "Sign in to back up your training data." : "Automatic backup pending."
+        enabled = id.flatMap { AccountLocalStorage.read(Bool.self, name: "cloudBackupConsent", userID: $0) } ?? false
+        status = id == nil ? "Sign in to manage cloud backups." : enabled ? "Automatic backup pending." : "Automatic training backup is off."
+    }
+
+    private struct ConsentChange: Encodable {
+        let p_enabled: Bool
+        let p_delete: Bool
+    }
+    private struct RemoteConsent: Decodable { let enabled: Bool }
+
+    private func rememberConsent(_ value: Bool, userID: UUID) {
+        enabled = value
+        AccountLocalStorage.write(value, name: "cloudBackupConsent", userID: userID)
+        AccountLocalStorage.write(Date(), name: "cloudBackupConsentChangedAt", userID: userID)
+        lastPayload = nil
+    }
+
+    func setEnabled(_ value: Bool) async {
+        guard let userID = accountID, !isBusy else { return }
+        isBusy = true
+        defer { isBusy = false }
+        // Stop this device immediately, even if server revocation needs a retry.
+        if !value { rememberConsent(false, userID: userID) }
+        do {
+            try checkAccount(userID)
+            try await client.rpc("set_training_backup_consent", params: ConsentChange(p_enabled: value, p_delete: false)).execute()
+            try checkAccount(userID)
+            rememberConsent(value, userID: userID)
+            status = value ? "Cloud backup enabled. Waiting for the next backup." : "Backup stopped for this account. Existing copies remain until you delete them."
+        } catch {
+            if accountID == userID {
+                status = value ? "Could not enable backup: \(error.localizedDescription)" : "Stopped on this phone. Could not stop other devices; reconnect and turn backup off again: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func deleteCloudBackups(userID: UUID) async {
+        guard !isBusy else { return }
+        guard accountID == userID else { return }
+        rememberConsent(false, userID: userID)
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            try checkAccount(userID)
+            try await client.rpc("set_training_backup_consent", params: ConsentChange(p_enabled: false, p_delete: true)).execute()
+            try checkAccount(userID)
+            available = []
+            status = "Cloud backup records deleted. Local data is unchanged. Provider disaster-recovery copies follow its retention policy."
+        } catch { if accountID == userID { status = "Backup is off, but deletion failed: \(error.localizedDescription). Try again." } }
     }
 
     private func checkAccount(_ id: UUID) throws {
@@ -83,12 +157,12 @@ final class TrainingBackupStore: ObservableObject {
     }
 
     func backUp(userID: UUID, force: Bool = false) async {
-        guard !isBusy else { return }
+        guard enabled, !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
         do {
             try checkAccount(userID)
-            let payload = TrainingBackupPayload.capture(userID: userID)
+            let payload = try TrainingBackupPayload.capture(userID: userID)
             guard force || payload != lastPayload else { return }
             try await upload(payload, deviceID: deviceID)
             try checkAccount(userID)
@@ -101,6 +175,14 @@ final class TrainingBackupStore: ObservableObject {
 
     private func upload(_ payload: TrainingBackupPayload, deviceID: UUID) async throws {
         try checkAccount(payload.ownerID)
+        guard enabled else { throw BackupError.consentRequired }
+        let consents: [RemoteConsent] = try await client.from("training_backup_consent").select("enabled").eq("user_id", value: payload.ownerID).execute().value
+        try checkAccount(payload.ownerID)
+        guard consents.first?.enabled == true else {
+            rememberConsent(false, userID: payload.ownerID)
+            throw BackupError.consentRequired
+        }
+        try payload.validate(for: payload.ownerID)
         guard try JSONEncoder().encode(payload).count <= 20_000_000 else { throw BackupError.tooLarge }
         let row = TrainingBackupRow(user_id: payload.ownerID, device_id: deviceID, payload: payload, updated_at: Date())
         try await client.from("account_training_backups").upsert(row, onConflict: "user_id,device_id").execute()
@@ -120,7 +202,7 @@ final class TrainingBackupStore: ObservableObject {
     }
 
     func restore(_ row: TrainingBackupRow, userID: UUID) async -> Bool {
-        guard !isBusy else { return false }
+        guard enabled, !isBusy else { return false }
         isBusy = true
         defer { isBusy = false }
         do {
@@ -130,9 +212,15 @@ final class TrainingBackupStore: ObservableObject {
             // A separate recovery slot keeps the pre-restore state available.
             try await upload(.capture(userID: userID), deviceID: UUID())
             try checkAccount(userID)
+            var restoredRecords = row.payload.records
+            if let data = restoredRecords["training"] {
+                var training = try JSONDecoder().decode(AccountTrainingContent.self, from: data)
+                training.onboardingProfile = AccountLocalStorage.read(AccountTrainingContent.self, name: "training", userID: userID)?.onboardingProfile
+                restoredRecords["training"] = try JSONEncoder().encode(training)
+            }
             for name in TrainingBackupPayload.names {
                 let key = AccountLocalStorage.key(name, userID: userID)
-                if let data = row.payload.records[name] { UserDefaults.standard.set(data, forKey: key) }
+                if let data = restoredRecords[name] { UserDefaults.standard.set(data, forKey: key) }
                 else { UserDefaults.standard.removeObject(forKey: key) }
             }
             lastPayload = nil

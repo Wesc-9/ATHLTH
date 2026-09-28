@@ -998,7 +998,7 @@ struct AIProgramBuilderView: View {
 
     private var historyContext: String {
         guard session.signedIn,
-              AccountLocalStorage.read(Bool.self, name: "coachHistoryConsent", userID: session.profile.userID) == true else { return "" }
+              CoachHistoryPermission.isEnabled(userID: session.profile.userID) else { return "" }
         let cutoff = Date().addingTimeInterval(-28 * 86400)
         let workouts = health.workouts.filter { $0.startDate >= cutoff }
         let local = strength.workoutHistory.filter { $0.isFinished && $0.startedAt >= cutoff }

@@ -1297,10 +1297,10 @@ struct OnboardingFlowView: View {
                 deviceChoiceCard(
                     provider: .none,
                     title: "iPhone",
-                    subtitle: "Use ATHLTH with your iPhone and Apple Health when available.",
+                    subtitle: "Carry your iPhone throughout the workout to record outdoor runs and walks.",
                     icon: "iphone",
                     status: settings.trainingDeviceProvider == .none
-                        ? "iPhone / manual mode"
+                        ? "iPhone recording"
                         : nil,
                     statusTint: OnboardingTheme.accent
                 )
