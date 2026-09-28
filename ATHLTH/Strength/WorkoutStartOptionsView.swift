@@ -149,7 +149,9 @@ struct WorkoutStartOptionsView: View {
                             captureDevice,
                             trackingMode,
                             selectedFriends,
-                            audioCoachDraft.configuration()
+                            captureDevice == .appleWatch
+                                ? audioCoachDraft.configuration()
+                                : .disabled
                         )
                         dismiss()
                     } label: {
