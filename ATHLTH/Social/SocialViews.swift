@@ -318,7 +318,7 @@ struct SocialHubView: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(
                                         invite.creator?.resolvedName
-                                            ?? "A friend"
+                                            ?? "An athlete"
                                     )
                                     .font(.subheadline.weight(.semibold))
 
@@ -556,7 +556,7 @@ struct SocialFeedView: View {
                     ContentUnavailableView(
                         "Your social feed is quiet",
                         systemImage: "bolt.heart.fill",
-                        description: Text("Friend workouts, trophies, goals and challenges can appear here when they choose to share them.")
+                        description: Text("Workouts, trophies, goals and challenges can appear here when athletes you follow choose to share them.")
                     )
                     .padding(.vertical, 50)
                 } else {
@@ -1229,7 +1229,7 @@ struct FriendProfileView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Compare")
                     .font(.title3.bold())
-                Text("You vs \(profile?.card.resolvedName ?? "Friend")")
+                Text("You vs \(profile?.card.resolvedName ?? "Athlete")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1277,7 +1277,7 @@ struct FriendProfileView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text("YOU")
                 .frame(width: 90, alignment: .trailing)
-            Text("FRIEND")
+            Text("ATHLETE")
                 .frame(width: 90, alignment: .trailing)
         }
         .font(.system(size: 9, weight: .bold))
@@ -1499,17 +1499,17 @@ struct SocialPrivacySettingsView: View {
                         Text("Public").tag("public")
                     }
 
-                    Toggle("Allow friend requests", isOn: binding.allowFriendRequests)
+                    Toggle("Allow follow requests", isOn: binding.allowFriendRequests)
                 }
 
                 Section("Messages") {
                     Picker("Who can message me", selection: binding.allowDirectMessages) {
-                        Text("Friends + requests").tag("requests")
-                        Text("Friends only").tag("friends")
+                        Text("Mutual follows + requests").tag("requests")
+                        Text("Mutual follows only").tag("friends")
                         Text("Nobody").tag("nobody")
                     }
 
-                    Text("Message requests let people who are not your friends send one text message. They cannot send another message or share workouts, plans, routes or challenges until you accept. Blocking always stops messaging.")
+                    Text("Message requests let people you do not mutually follow send one text message. They cannot send another message or share workouts, plans, routes or challenges until you accept. Blocking always stops messaging.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1531,7 +1531,7 @@ struct SocialPrivacySettingsView: View {
 
                 Section("Challenges") {
                     Picker("Challenge invites", selection: binding.allowChallengeInvites) {
-                        Text("Friends").tag("friends")
+                        Text("Mutual follows").tag("friends")
                         Text("Everyone").tag("everyone")
                         Text("Nobody").tag("nobody")
                     }
