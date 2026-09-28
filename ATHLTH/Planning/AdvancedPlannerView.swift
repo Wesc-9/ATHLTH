@@ -5000,6 +5000,28 @@ private struct PlannedAudioCoachEditorView: View {
                                         .announceRemainingStepDistance
                             )
                         }
+
+                        Section("Music & other audio") {
+                            Toggle(
+                                "Lower music while coach speaks",
+                                isOn: Binding(
+                                    get: {
+                                        draft.shouldDuckOtherAudio
+                                    },
+                                    set: { enabled in
+                                        draft.duckOtherAudio = enabled
+                                    }
+                                )
+                            )
+
+                            Text(
+                                draft.shouldDuckOtherAudio
+                                    ? "Spotify and other audio are reduced only while the coach is speaking."
+                                    : "Coach speech mixes with other audio at its current level."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
