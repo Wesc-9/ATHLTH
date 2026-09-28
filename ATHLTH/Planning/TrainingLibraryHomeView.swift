@@ -1721,6 +1721,7 @@ struct TrainingPlanLibraryView: View {
 struct TrainingPlanCatalogDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var recents: LibraryRecentsStore
 
     let entry: TrainingPlanCatalogEntry
 
@@ -1967,6 +1968,16 @@ struct TrainingPlanCatalogDetailView: View {
         )
         .navigationTitle(entry.title)
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            recents.markUsed(
+                .plan,
+                itemID: entry.id.uuidString,
+                title: entry.title,
+                subtitle:
+                    "\(entry.durationWeeks) weeks · \(entry.level)",
+                icon: "calendar.badge.clock"
+            )
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 LibraryFavoriteButton(
