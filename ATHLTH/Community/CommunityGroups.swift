@@ -784,6 +784,9 @@ final class CommunityGroupStore: ObservableObject {
 
     private let client: SupabaseClient
     private var lastRefreshAt: Date?
+    private var groupFetchLimit = 40
+    @Published private(set) var canLoadMoreGroups = true
+    @Published private(set) var isLoadingMoreGroups = false
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -1079,7 +1082,7 @@ final class CommunityGroupStore: ObservableObject {
                 .from("community_groups")
                 .select()
                 .order("created_at", ascending: false)
-                .limit(150)
+                .limit(groupFetchLimit)
                 .execute()
                 .value
 
@@ -1094,7 +1097,7 @@ final class CommunityGroupStore: ObservableObject {
                 .from("community_group_activity")
                 .select()
                 .order("created_at", ascending: false)
-                .limit(100)
+                .limit(50)
                 .execute()
                 .value
 
@@ -1102,7 +1105,7 @@ final class CommunityGroupStore: ObservableObject {
                 .from("social_profile_cards")
                 .select()
                 .order("updated_at", ascending: false)
-                .limit(500)
+                .limit(120)
                 .execute()
                 .value
 
@@ -1131,6 +1134,8 @@ final class CommunityGroupStore: ObservableObject {
                     .value
 
             groups = try await groupsQuery
+            canLoadMoreGroups =
+                groups.count >= groupFetchLimit
             lastRefreshAt = Date()
             ownMemberships = try await membershipsQuery
             communityActivity = try await activityQuery
@@ -1162,6 +1167,20 @@ final class CommunityGroupStore: ObservableObject {
             guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    func loadMoreGroups() async {
+        guard canLoadMoreGroups,
+              !isLoading,
+              !isLoadingMoreGroups
+        else {
+            return
+        }
+
+        isLoadingMoreGroups = true
+        groupFetchLimit += 40
+        await refresh(force: true)
+        isLoadingMoreGroups = false
     }
 
     var calendarEvents: [CommunityGroupEventRecord] {
@@ -2958,6 +2977,33 @@ struct CommunityGroupsView: View {
                     } else {
                         ForEach(matchingGroups) { group in
                             groupLink(group, joined: false)
+                        }
+
+                        if groups.canLoadMoreGroups {
+                            Button {
+                                Task {
+                                    await groups.loadMoreGroups()
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if groups.isLoadingMoreGroups {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    }
+
+                                    Text(
+                                        groups.isLoadingMoreGroups
+                                            ? "Loading more clubs…"
+                                            : "Load more clubs"
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 11)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(groups.isLoadingMoreGroups)
+                            .padding(.top, 6)
                         }
                     }
                 }
