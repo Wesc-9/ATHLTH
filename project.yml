@@ -65,10 +65,13 @@ targets:
           - CFBundleURLName: com.wesc9.athlth.auth
             CFBundleURLSchemes:
               - athlth
+          - CFBundleURLName: com.wesc9.athlth.spotify
+            CFBundleURLSchemes:
+              - athlth-spotify-login
         LSApplicationQueriesSchemes:
           - spotify
         ATHLTHSpotifyClientID: "$(ATHLTH_SPOTIFY_CLIENT_ID)"
-        ATHLTHSpotifyRedirectURI: "athlth://spotify-callback"
+        ATHLTHSpotifyRedirectURI: "athlth-spotify-login://callback"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth
