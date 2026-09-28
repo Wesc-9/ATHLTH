@@ -21,6 +21,7 @@ struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var recents: LibraryRecentsStore
 
     let source: ExerciseLibrarySection?
     let selectionTitle: String?
@@ -132,6 +133,23 @@ struct ExerciseLibraryView: View {
                                     exerciseRow(entry)
                                 }
                                 .buttonStyle(.plain)
+                                .simultaneousGesture(
+                                    TapGesture().onEnded {
+                                        recents.markUsed(
+                                            .exercise,
+                                            itemID: entry.id.uuidString,
+                                            title: entry.name,
+                                            subtitle:
+                                                [
+                                                    entry.bodyPart,
+                                                    entry.exercise.equipment.first
+                                                ]
+                                                .compactMap { $0 }
+                                                .joined(separator: " · "),
+                                            icon: "dumbbell.fill"
+                                        )
+                                    }
+                                )
 
                                 LibraryFavoriteButton(
                                     kind: .exercise,
@@ -175,6 +193,7 @@ struct ExerciseLibraryView: View {
                 .environmentObject(session)
         }
         .task {
+            recents.refresh()
             async let exerciseRefresh: Void = library.refresh()
             async let favoriteRefresh: Void = favorites.refresh()
             _ = await (exerciseRefresh, favoriteRefresh)
