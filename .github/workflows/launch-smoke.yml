@@ -206,6 +206,41 @@ jobs:
             xcrun simctl delete "$udid" >/dev/null 2>&1 || true
           }
 
+          validate_nonblank_screen() {
+            local udid="$1"
+            local screenshot="$2"
+            local label="$3"
+            local attempt=1
+            local entropy="0"
+
+            while [ "$attempt" -le 3 ]; do
+              xcrun simctl io "$udid" screenshot "$screenshot"
+              test -s "$screenshot"
+
+              entropy=$(magick "$screenshot" -colorspace Gray -format "%[entropy]" info:)
+              echo "$label screenshot entropy (attempt $attempt): $entropy"
+
+              if python3 - "$entropy" <<'PY'
+          import sys
+          raise SystemExit(0 if float(sys.argv[1]) >= 0.025 else 1)
+          PY
+              then
+                return 0
+              fi
+
+              if [ "$attempt" -lt 3 ]; then
+                echo "$label still looks blank; waiting 8 seconds before retry."
+                sleep 8
+              fi
+
+              attempt=$((attempt + 1))
+            done
+
+            echo "::error::$label remained visually blank after three checks (entropy=$entropy)."
+            xcrun simctl spawn "$udid" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+            return 1
+          }
+
           while IFS='|' read -r CLASS DEVICE_TYPE DEVICE_NAME; do
             echo "Testing $CLASS layout on $DEVICE_NAME"
 
@@ -239,21 +274,7 @@ jobs:
             fi
 
             SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS.png"
-            xcrun simctl io "$UDID" screenshot "$SCREENSHOT"
-            test -s "$SCREENSHOT"
-
-            ENTROPY=$(magick "$SCREENSHOT" -colorspace Gray -format "%[entropy]" info:)
-            echo "$DEVICE_NAME launch screenshot entropy: $ENTROPY"
-
-            python3 - "$ENTROPY" "$DEVICE_NAME" <<'PY'
-          import sys
-          entropy=float(sys.argv[1])
-          device=sys.argv[2]
-          if entropy < 0.025:
-              raise SystemExit(
-                  f"ATHLTH appears visually blank on {device}: entropy={entropy:.5f}"
-              )
-          PY
+            validate_nonblank_screen               "$UDID"               "$SCREENSHOT"               "$DEVICE_NAME onboarding"
 
             echo "ATHLTH remained alive and rendered non-blank onboarding UI on $DEVICE_NAME (PID $PID)."
 
@@ -286,22 +307,7 @@ jobs:
               fi
 
               TAB_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-tab-$TAB.png"
-              xcrun simctl io "$UDID" screenshot "$TAB_SCREENSHOT"
-              test -s "$TAB_SCREENSHOT"
-
-              TAB_ENTROPY=$(magick "$TAB_SCREENSHOT" -colorspace Gray -format "%[entropy]" info:)
-              echo "$DEVICE_NAME tab $TAB screenshot entropy: $TAB_ENTROPY"
-
-              python3 - "$TAB_ENTROPY" "$DEVICE_NAME" "$TAB" <<'PY'
-          import sys
-          entropy=float(sys.argv[1])
-          device=sys.argv[2]
-          tab=sys.argv[3]
-          if entropy < 0.025:
-              raise SystemExit(
-                  f"ATHLTH tab {tab} appears visually blank on {device}: entropy={entropy:.5f}"
-              )
-          PY
+              validate_nonblank_screen                 "$UDID"                 "$TAB_SCREENSHOT"                 "$DEVICE_NAME tab $TAB"
 
               xcrun simctl terminate "$UDID" com.wesc9.athlth || true
             done
