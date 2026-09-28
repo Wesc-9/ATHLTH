@@ -492,7 +492,12 @@ struct CustomExerciseEditorView: View {
     @State private var videoURLText = ""
 
     var body: some View {
-        NavigationStack {
+        let photoButtonTitle =
+            selectedImageData == nil
+                ? "Add Exercise Image"
+                : "Change Exercise Image"
+
+        return NavigationStack {
             Form {
                 Section("Exercise") {
                     TextField("Name", text: $name)
@@ -535,9 +540,7 @@ struct CustomExerciseEditorView: View {
                         matching: .images
                     ) {
                         Label(
-                            selectedImageData == nil
-                                ? "Add Exercise Image"
-                                : "Change Exercise Image",
+                            photoButtonTitle,
                             systemImage: "photo.badge.plus"
                         )
                     }
