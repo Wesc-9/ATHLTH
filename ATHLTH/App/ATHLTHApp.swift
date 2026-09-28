@@ -751,9 +751,17 @@ struct AppRootView: View {
             guard appSession.signedIn else { return }
             let userID = appSession.profile.userID
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(300))
-                guard !Task.isCancelled, appSession.signedIn, appSession.profile.userID == userID else { return }
-                await trainingBackups.backUp(userID: userID)
+                try? await Task.sleep(for: .seconds(1_800))
+                guard !Task.isCancelled,
+                      appSession.signedIn,
+                      appSession.profile.userID == userID
+                else {
+                    return
+                }
+
+                await trainingBackups.performFailsafeBackup(
+                    userID: userID
+                )
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
@@ -777,6 +785,7 @@ struct AppRootView: View {
             ZStack {
                 ATHLTHSurfaceRuntimeObserver()
                 ATHLTHStrengthWatchSyncObserver()
+                ATHLTHBackupDirtyObserver()
             }
         }
     }
