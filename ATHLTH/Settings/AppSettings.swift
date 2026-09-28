@@ -202,6 +202,30 @@ enum StrengthTrackingPreference: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum ExternalWorkoutImportMode: String, CaseIterable, Identifiable, Codable {
+    case ask
+    case automatic
+    case never
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .ask: return "Ask before importing"
+        case .automatic: return "Automatically import"
+        case .never: return "Don't import"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .ask: return "Ask"
+        case .automatic: return "Automatic"
+        case .never: return "Off"
+        }
+    }
+}
+
 enum IntegrationKind: String, CaseIterable, Identifiable {
     case appleHealth
     case appleWatch
@@ -255,6 +279,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
     @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
+    @Published var externalWorkoutImportMode: ExternalWorkoutImportMode { didSet { persist() } }
     @Published var autoPublishCompletedWorkouts: Bool { didSet { persist() } }
     @Published var workoutSharingChoiceCompleted: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
@@ -400,6 +425,9 @@ final class AppSettingsStore: ObservableObject {
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
         backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
+        externalWorkoutImportMode = ExternalWorkoutImportMode(
+            rawValue: defaults.string(forKey: "settings.externalWorkoutImportMode") ?? ""
+        ) ?? .ask
         autoPublishCompletedWorkouts = defaults.object(forKey: "settings.autoPublishCompletedWorkouts") as? Bool ?? false
         workoutSharingChoiceCompleted = defaults.object(
             forKey: "settings.workoutSharingChoiceCompleted"
@@ -587,6 +615,7 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
         defaults.set(backgroundHealthSyncEnabled, forKey: "settings.backgroundHealthSyncEnabled")
+        defaults.set(externalWorkoutImportMode.rawValue, forKey: "settings.externalWorkoutImportMode")
         defaults.set(autoPublishCompletedWorkouts, forKey: "settings.autoPublishCompletedWorkouts")
         defaults.set(
             workoutSharingChoiceCompleted,
