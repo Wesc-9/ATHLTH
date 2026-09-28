@@ -3,7 +3,7 @@ import XCTest
 
 final class WorkoutLaunchHardeningTests: XCTestCase {
     @MainActor
-    func testAIHealthConsentIsExplicitAndPersists() {
+    func testAIHealthConsentIsAccountScopedAndPersists() {
         let suite =
             "ATHLTHTests.\(UUID().uuidString)"
         let defaults =
@@ -15,18 +15,37 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
             )
         }
 
-        let initial =
-            AppSettingsStore(defaults: defaults)
+        let first = UUID()
+        let second = UUID()
+        let store =
+            AppSessionStore(defaults: defaults)
+
+        store.applyBackendBootstrap(
+            bootstrap(first)
+        )
         XCTAssertFalse(
-            initial.aiHealthDataSharingEnabled
+            store.aiHealthDataSharingEnabled
         )
 
-        initial.aiHealthDataSharingEnabled = true
-
-        let reopened =
-            AppSettingsStore(defaults: defaults)
+        store.setAIHealthDataSharingEnabled(true)
         XCTAssertTrue(
-            reopened.aiHealthDataSharingEnabled
+            store.aiHealthDataSharingEnabled
+        )
+
+        store.clearAfterSignOut()
+        store.applyBackendBootstrap(
+            bootstrap(second)
+        )
+        XCTAssertFalse(
+            store.aiHealthDataSharingEnabled
+        )
+
+        store.clearAfterSignOut()
+        store.applyBackendBootstrap(
+            bootstrap(first)
+        )
+        XCTAssertTrue(
+            store.aiHealthDataSharingEnabled
         )
     }
 
@@ -153,4 +172,33 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
             300
         )
     }
+
+    private func bootstrap(
+        _ id: UUID
+    ) -> BackendUserBootstrap {
+        BackendUserBootstrap(
+            profile: BackendProfile(
+                id: id,
+                onboardingCompleted: true,
+                createdAt: Date(),
+                updatedAt: Date()
+            ),
+            role: BackendAccountRole(
+                userID: id,
+                role: "user"
+            ),
+            entitlement:
+                BackendSubscriptionEntitlement(
+                    userID: id,
+                    tier: "free",
+                    status: "inactive",
+                    source: "none",
+                    trialStartedAt: nil,
+                    trialEndsAt: nil,
+                    appStoreProductID: nil,
+                    currentPeriodEndsAt: nil
+                )
+        )
+    }
+
 }
