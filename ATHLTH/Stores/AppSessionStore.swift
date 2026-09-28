@@ -16,6 +16,7 @@ struct AccountTrainingContent: Codable {
     var planTemplates: [TrainingPlan]
     var savedWorkoutTemplates: [PlannedSession]
     var manuallyCompletedPlanSessions: Set<String>
+    var skippedPlanSessions: Set<String>? = nil
     var savedRoutes: [TrainingRoute]
     var onboardingProfile: OnboardingProfileData?
     var pendingCoachPlanProposal: CoachPlanChangeProposal? = nil
@@ -34,6 +35,7 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var planTemplates: [TrainingPlan]
     @Published private(set) var savedWorkoutTemplates: [PlannedSession]
     @Published private(set) var manuallyCompletedPlanSessions: Set<String>
+    @Published private(set) var skippedPlanSessions: Set<String>
     @Published private(set) var pendingCoachPlanProposal: CoachPlanChangeProposal?
     @Published private(set) var coachPlanAdaptationHistory: [CoachPlanAdaptationRecord]
     @Published var savedRoutes: [TrainingRoute] {
@@ -73,6 +75,7 @@ final class AppSessionStore: ObservableObject {
         self.planTemplates = []
         self.savedWorkoutTemplates = []
         self.manuallyCompletedPlanSessions = []
+        self.skippedPlanSessions = []
         self.pendingCoachPlanProposal = nil
         self.coachPlanAdaptationHistory = []
         self.savedRoutes = savedRoutes
@@ -491,6 +494,7 @@ final class AppSessionStore: ObservableObject {
         planTemplates = []
         savedWorkoutTemplates = []
         manuallyCompletedPlanSessions = []
+        skippedPlanSessions = []
         pendingCoachPlanProposal = nil
         coachPlanAdaptationHistory = []
         loadingAccountContent = false
@@ -539,11 +543,44 @@ final class AppSessionStore: ObservableObject {
 
         if completed {
             manuallyCompletedPlanSessions.insert(key)
+            skippedPlanSessions.remove(key)
         } else {
             manuallyCompletedPlanSessions.remove(key)
         }
 
         persistManuallyCompletedPlanSessions()
+    }
+
+    func isPlanSessionSkipped(
+        planID: UUID,
+        sessionID: UUID
+    ) -> Bool {
+        skippedPlanSessions.contains(
+            Self.manualCompletionKey(
+                planID: planID,
+                sessionID: sessionID
+            )
+        )
+    }
+
+    func setPlanSessionSkipped(
+        planID: UUID,
+        sessionID: UUID,
+        skipped: Bool
+    ) {
+        let key = Self.manualCompletionKey(
+            planID: planID,
+            sessionID: sessionID
+        )
+
+        if skipped {
+            skippedPlanSessions.insert(key)
+            manuallyCompletedPlanSessions.remove(key)
+        } else {
+            skippedPlanSessions.remove(key)
+        }
+
+        persistAccountContent()
     }
 
     func togglePlanSessionManualCompletion(
@@ -1209,6 +1246,113 @@ final class AppSessionStore: ObservableObject {
         }
 
         return duplicate
+    }
+
+    @discardableResult
+    func movePlanSession(
+        planID: UUID,
+        sessionID: UUID,
+        to targetDate: Date
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              let startDate = plan.startDate
+        else {
+            return false
+        }
+
+        var movedSession: PlannedSession?
+        var sourceWeekIndex: Int?
+        var sourceDayIndex: Int?
+
+        outerLoop:
+        for weekIndex in plan.weeks.indices {
+            for dayIndex in plan.weeks[weekIndex].days.indices {
+                if let sessionIndex =
+                    plan.weeks[weekIndex]
+                        .days[dayIndex]
+                        .sessions
+                        .firstIndex(
+                            where: { $0.id == sessionID }
+                        ) {
+                    movedSession =
+                        plan.weeks[weekIndex]
+                            .days[dayIndex]
+                            .sessions[sessionIndex]
+                    sourceWeekIndex = weekIndex
+                    sourceDayIndex = dayIndex
+                    break outerLoop
+                }
+            }
+        }
+
+        guard var movedSession,
+              let sourceWeekIndex,
+              let sourceDayIndex
+        else {
+            return false
+        }
+
+        let calendar = Calendar.current
+        let start =
+            calendar.startOfDay(for: startDate)
+        let target =
+            calendar.startOfDay(for: targetDate)
+        let dayOffset =
+            calendar.dateComponents(
+                [.day],
+                from: start,
+                to: target
+            ).day ?? -1
+
+        guard dayOffset >= 0 else {
+            return false
+        }
+
+        let targetWeekIndex = dayOffset / 7
+        guard plan.weeks.indices.contains(targetWeekIndex)
+        else {
+            return false
+        }
+
+        let weekday = calendar.component(
+            .weekday,
+            from: target
+        )
+        let targetDayNumber =
+            ((weekday + 5) % 7) + 1
+        guard let targetDayIndex =
+                plan.weeks[targetWeekIndex]
+                    .days
+                    .firstIndex(
+                        where: {
+                            $0.dayIndex == targetDayNumber
+                        }
+                    )
+        else {
+            return false
+        }
+
+        plan.weeks[sourceWeekIndex]
+            .days[sourceDayIndex]
+            .sessions
+            .removeAll { $0.id == sessionID }
+
+        movedSession.scheduledStart = target
+        plan.weeks[targetWeekIndex]
+            .days[targetDayIndex]
+            .sessions
+            .append(movedSession)
+
+        setPlanSessionSkipped(
+            planID: planID,
+            sessionID: sessionID,
+            skipped: false
+        )
+
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
     }
 
     @discardableResult
@@ -2591,6 +2735,7 @@ final class AppSessionStore: ObservableObject {
             activePlan: activePlan, scheduledPlans: scheduledPlans,
             planTemplates: planTemplates, savedWorkoutTemplates: savedWorkoutTemplates,
             manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
+            skippedPlanSessions: skippedPlanSessions,
             savedRoutes: savedRoutes,
             onboardingProfile: onboardingProfile,
             pendingCoachPlanProposal: pendingCoachPlanProposal,
@@ -2628,6 +2773,7 @@ final class AppSessionStore: ObservableObject {
         savedRoutes = stored?.savedRoutes ?? (mayMigrate ? Self.loadSavedRoutes(from: defaults).filter { $0.ownerID == userID } : [])
         savedWorkoutTemplates = stored?.savedWorkoutTemplates ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadSavedWorkoutTemplates(from: defaults) : [])
         manuallyCompletedPlanSessions = stored?.manuallyCompletedPlanSessions ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadManuallyCompletedPlanSessions(from: defaults) : [])
+        skippedPlanSessions = stored?.skippedPlanSessions ?? []
         pendingCoachPlanProposal = stored?.pendingCoachPlanProposal
         coachPlanAdaptationHistory = stored?.coachPlanAdaptationHistory ?? []
         onboardingProfile = stored?.onboardingProfile
