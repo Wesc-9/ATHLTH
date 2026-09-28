@@ -63,7 +63,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         let configured =
             (Bundle.main.object(forInfoDictionaryKey: "ATHLTHSpotifyRedirectURI") as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return configured.isEmpty ? "athlth://spotify-callback" : configured
+        return configured.isEmpty ? "athlth-spotify-login://callback" : configured
     }
 
     var isConfigured: Bool {
