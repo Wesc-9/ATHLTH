@@ -2924,6 +2924,373 @@ struct MyTrainingPlansLibraryView: View {
     }
 }
 
+
+struct MissedWorkoutsReviewView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var subscriptionStore: SubscriptionStore
+
+    let planID: UUID
+
+    @State private var actionError: String?
+    @State private var showingCoach = false
+    @State private var showingSubscriptionOffer = false
+
+    private var plan: TrainingPlan? {
+        session.trainingPlan(withID: planID)
+    }
+
+    private var progress: TrainingPlanProgressSnapshot? {
+        guard let plan else { return nil }
+
+        return session.trainingPlanProgress(
+            plan,
+            healthWorkouts: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let plan, let progress {
+                        LibraryPremiumIntro(
+                            eyebrow: "PLAN REVIEW",
+                            title:
+                                progress.missed.isEmpty
+                                    ? "You’re caught up"
+                                    : "Missed workouts",
+                            subtitle:
+                                progress.missed.isEmpty
+                                    ? "There are no unresolved workouts in \(plan.title)."
+                                    : "Decide what happens next. ATHLTH will never move or mark a missed workout without you choosing.",
+                            icon: "clock.arrow.circlepath",
+                            accent:
+                                progress.missed.isEmpty
+                                    ? ATHLTHTheme.vitality
+                                    : Color.orange
+                        ) {
+                            HStack(spacing: 8) {
+                                LibraryStatPill(
+                                    value:
+                                        "\(progress.completedSessions)",
+                                    label: "completed",
+                                    icon: "checkmark",
+                                    tint: ATHLTHTheme.vitality
+                                )
+
+                                LibraryStatPill(
+                                    value:
+                                        "\(progress.missed.count)",
+                                    label: "to review",
+                                    icon: "clock",
+                                    tint: Color.orange
+                                )
+                            }
+                        }
+
+                        if progress.missed.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "checkmark.circle.fill"
+                                )
+                                .font(.system(size: 34))
+                                .foregroundStyle(
+                                    ATHLTHTheme.vitality
+                                )
+
+                                Text("Nothing needs your attention")
+                                    .font(.headline)
+
+                                Text(
+                                    "Your plan can continue exactly as scheduled."
+                                )
+                                .font(.subheadline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 34)
+                            .background(
+                                Color.white.opacity(0.78),
+                                in: RoundedRectangle(
+                                    cornerRadius: 24,
+                                    style: .continuous
+                                )
+                            )
+                        } else {
+                            ForEach(progress.missed) { occurrence in
+                                missedCard(occurrence)
+                            }
+
+                            if session.activePlan?.id == planID {
+                                Button {
+                                    openCoach()
+                                } label: {
+                                    HStack {
+                                        Label(
+                                            "Ask ATHLTH Coach",
+                                            systemImage: "sparkles"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+
+                                        Spacer()
+
+                                        Image(systemName: "arrow.right")
+                                            .font(.caption.bold())
+                                    }
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 15)
+                                    .frame(height: 48)
+                                    .background(
+                                        ATHLTHTheme.accentDeep,
+                                        in: RoundedRectangle(
+                                            cornerRadius: 15,
+                                            style: .continuous
+                                        )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+
+                                Text(
+                                    "Coach can review the active plan and suggest broader changes. Nothing changes until you accept the proposal."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                            }
+                        }
+                    } else {
+                        ContentUnavailableView(
+                            "Plan unavailable",
+                            systemImage: "calendar.badge.exclamationmark",
+                            description: Text(
+                                "This plan is no longer available."
+                            )
+                        )
+                    }
+                }
+                .padding(18)
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
+            }
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: Color.orange.opacity(0.18)
+                )
+            )
+            .navigationTitle("Missed Workouts")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingCoach) {
+                CoachPlanAdaptationView()
+            }
+            .sheet(isPresented: $showingSubscriptionOffer) {
+                SubscriptionOfferView {
+                    session.applyStoreKitEntitlement(
+                        subscriptionStore.activeEntitlement
+                    )
+
+                    if session.canAccess(.aiTrainingPrograms) {
+                        showingSubscriptionOffer = false
+                        showingCoach = true
+                    }
+                }
+                .environmentObject(subscriptionStore)
+            }
+            .alert(
+                "Could not update workout",
+                isPresented: Binding(
+                    get: { actionError != nil },
+                    set: { shown in
+                        if !shown {
+                            actionError = nil
+                        }
+                    }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(actionError ?? "")
+            }
+        }
+    }
+
+    private func missedCard(
+        _ occurrence: TrainingPlanSessionOccurrence
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(
+                    systemName:
+                        occurrence.session.kind.systemImage
+                )
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color.orange)
+                .frame(width: 44, height: 44)
+                .background(
+                    Color.orange.opacity(0.09),
+                    in: RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        occurrence.date.formatted(
+                            date: .abbreviated,
+                            time: .omitted
+                        )
+                    )
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.orange)
+
+                    Text(occurrence.session.title)
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+
+                    Text(
+                        "Week \(occurrence.weekNumber) · \(sessionSummary(occurrence.session))"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 9) {
+                Button {
+                    moveToTomorrow(occurrence)
+                } label: {
+                    Label(
+                        "Tomorrow",
+                        systemImage: "arrow.right.circle"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.accent)
+
+                Button {
+                    session.setPlanSessionSkipped(
+                        planID: planID,
+                        sessionID: occurrence.session.id,
+                        skipped: true
+                    )
+                } label: {
+                    Label(
+                        "Skip",
+                        systemImage: "forward.end"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.mutedText)
+            }
+        }
+        .padding(15)
+        .background(
+            Color.white.opacity(0.86),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.orange.opacity(0.09),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func moveToTomorrow(
+        _ occurrence: TrainingPlanSessionOccurrence
+    ) {
+        let tomorrow =
+            Calendar.current.date(
+                byAdding: .day,
+                value: 1,
+                to: Date()
+            ) ?? Date()
+
+        guard session.movePlanSession(
+            planID: planID,
+            sessionID: occurrence.session.id,
+            to: tomorrow
+        ) else {
+            actionError =
+                "This workout cannot be moved to tomorrow because that date is outside the plan window."
+            return
+        }
+    }
+
+    private func openCoach() {
+        guard session.canAccess(.aiTrainingPrograms) else {
+            showingSubscriptionOffer = true
+            return
+        }
+
+        showingCoach = true
+    }
+
+    private func sessionSummary(
+        _ planned: PlannedSession
+    ) -> String {
+        var parts: [String] = []
+
+        if let duration = planned.durationMinutes {
+            parts.append("\(duration) min")
+        }
+
+        if !planned.exercises.isEmpty {
+            parts.append(
+                "\(planned.exercises.count) exercises"
+            )
+        }
+
+        if let distance =
+                planned.targetDistanceKilometers {
+            parts.append(
+                String(
+                    format: "%.1f km",
+                    distance
+                )
+            )
+        }
+
+        return parts.isEmpty
+            ? planned.kind.title
+            : parts.joined(separator: " · ")
+    }
+}
+
 struct LibraryFavoritesView: View {
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
