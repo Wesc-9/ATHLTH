@@ -75,22 +75,24 @@ jobs:
                   return exc.code, body
 
           print("=== CERTIFICATES ===")
-          status, body = get("/v1/certificates", {
-              "filter[certificateType]": "DISTRIBUTION",
-              "limit": "200",
-          })
+          status, body = get("/v1/certificates", {"limit": "200"})
           print(f"CERT_HTTP={status}")
           if status == 200:
               certs = body.get("data", [])
-              print(f"DISTRIBUTION_CERT_COUNT={len(certs)}")
+              print(f"ACTIVE_CERT_COUNT={len(certs)}")
+              counts = {}
               for i, item in enumerate(certs):
                   a = item.get("attributes", {})
+                  ctype = str(a.get("certificateType"))
+                  counts[ctype] = counts.get(ctype, 0) + 1
                   print(f"CERT[{i}].ID={item.get('id')}")
                   print(f"CERT[{i}].DISPLAY_NAME={a.get('displayName')}")
                   print(f"CERT[{i}].SERIAL={a.get('serialNumber')}")
                   print(f"CERT[{i}].PLATFORM={a.get('platform')}")
                   print(f"CERT[{i}].EXPIRATION={a.get('expirationDate')}")
-                  print(f"CERT[{i}].TYPE={a.get('certificateType')}")
+                  print(f"CERT[{i}].TYPE={ctype}")
+              for ctype, count in sorted(counts.items()):
+                  print(f"CERT_TYPE_COUNT[{ctype}]={count}")
           else:
               print(json.dumps(body, sort_keys=True))
 
