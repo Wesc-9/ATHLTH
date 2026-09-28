@@ -300,7 +300,6 @@ struct HomeActivitySection: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var showingPublish = false
     @State private var selectedPublishWorkoutID: UUID?
@@ -638,7 +637,7 @@ struct HomeActivitySection: View {
     @MainActor
     private func loadWorkoutAIInsights() async {
         guard session.hasPaidAccess,
-              settings.aiHealthDataSharingEnabled
+              session.aiHealthDataSharingEnabled
         else {
             workoutAIInsights.removeAll()
             loadingAIInsightIDs.removeAll()
