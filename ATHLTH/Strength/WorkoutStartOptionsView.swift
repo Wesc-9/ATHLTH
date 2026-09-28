@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkoutStartOptionsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     let session: PlannedSession
     let trainingDeviceProvider: TrainingDeviceProvider
@@ -10,12 +11,15 @@ struct WorkoutStartOptionsView: View {
     let onStart: (
         WorkoutCaptureDevice,
         StrengthTrackingMode,
-        [SocialProfileCard]
+        [SocialProfileCard],
+        WatchAudioCoachConfiguration
     ) -> Void
 
     @State private var captureDevice: WorkoutCaptureDevice
     @State private var trackingMode: StrengthTrackingMode
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var audioCoachDraft = AudioCoachDraft()
+    @State private var audioCoachLoaded = false
 
     init(
         session: PlannedSession,
@@ -26,7 +30,8 @@ struct WorkoutStartOptionsView: View {
         onStart: @escaping (
             WorkoutCaptureDevice,
             StrengthTrackingMode,
-            [SocialProfileCard]
+            [SocialProfileCard],
+            WatchAudioCoachConfiguration
         ) -> Void
     ) {
         self.session = session
@@ -130,6 +135,14 @@ struct WorkoutStartOptionsView: View {
                         .padding(.top, 12)
                     }
 
+                    if captureDevice == .appleWatch {
+                        AudioCoachSetupCard(
+                            draft: $audioCoachDraft,
+                            showRouteOptions: false,
+                            showStructuredOptions: false
+                        )
+                    }
+
                     ATHLTHCard {
                         WorkoutFriendPicker(
                             selectedFriendIDs: $selectedFriendIDs
@@ -156,7 +169,8 @@ struct WorkoutStartOptionsView: View {
                         onStart(
                             captureDevice,
                             trackingMode,
-                            selectedFriends
+                            selectedFriends,
+                            audioCoachDraft.configuration()
                         )
                         dismiss()
                     } label: {
@@ -176,6 +190,11 @@ struct WorkoutStartOptionsView: View {
             .navigationTitle("Start Workout")
             .navigationBarTitleDisplayMode(.inline)
             .task {
+                if !audioCoachLoaded {
+                    audioCoachDraft.load(from: settings)
+                    audioCoachLoaded = true
+                }
+
                 if social.friends.isEmpty {
                     await social.refresh()
                 }
