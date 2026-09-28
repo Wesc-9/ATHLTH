@@ -1245,6 +1245,27 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    private func mergeGroupActivityIntoCommunityFeed(
+        _ groupID: UUID
+    ) {
+        let refreshedGroupActivity =
+            activityByGroup[groupID] ?? []
+
+        let unaffected =
+            communityActivity.filter {
+                $0.groupID != groupID
+            }
+
+        communityActivity =
+            Array(
+                (unaffected + refreshedGroupActivity)
+                    .sorted {
+                        $0.createdAt > $1.createdAt
+                    }
+                    .prefix(50)
+            )
+    }
+
     func loadMoreGroups() async {
         guard canLoadMoreGroups,
               !isLoading,
@@ -2601,7 +2622,9 @@ final class CommunityGroupStore: ObservableObject {
 
             errorMessage = nil
             await loadGroupContent(groupID)
-            await refresh(force: true)
+            mergeGroupActivityIntoCommunityFeed(
+                groupID
+            )
             return true
         } catch {
             if uploadedImage {
@@ -2704,7 +2727,9 @@ final class CommunityGroupStore: ObservableObject {
 
             errorMessage = nil
             await loadGroupContent(groupID)
-            await refresh(force: true)
+            mergeGroupActivityIntoCommunityFeed(
+                groupID
+            )
             return true
         } catch {
             if uploadedImage {
