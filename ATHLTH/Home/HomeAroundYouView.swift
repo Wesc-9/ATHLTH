@@ -246,6 +246,8 @@ struct HomeAroundYouSection: View {
     @StateObject private var locationStore = HomeLocationStore()
     @State private var mapSnapshot: UIImage?
     @State private var snapshotLoading = false
+    @State private var lastSnapshotLocation: CLLocation?
+    private let snapshotMovementThreshold: CLLocationDistance = 150
 
     var body: some View {
         ATHLTHCard {
@@ -419,10 +421,10 @@ struct HomeAroundYouSection: View {
             Task { await refreshSnapshot() }
         }
         .onChange(of: routeDiscovery.routes.count) { _, _ in
-            Task { await refreshSnapshot() }
+            Task { await refreshSnapshot(force: true) }
         }
         .onChange(of: community.events.count) { _, _ in
-            Task { await refreshSnapshot() }
+            Task { await refreshSnapshot(force: true) }
         }
     }
 
@@ -541,9 +543,19 @@ struct HomeAroundYouSection: View {
     }
 
     @MainActor
-    private func refreshSnapshot() async {
+    private func refreshSnapshot(
+        force: Bool = false
+    ) async {
         guard let location = locationStore.location else { return }
         guard !snapshotLoading else { return }
+
+        if !force,
+           mapSnapshot != nil,
+           let lastSnapshotLocation,
+           location.distance(from: lastSnapshotLocation) <
+                snapshotMovementThreshold {
+            return
+        }
 
         snapshotLoading = true
         defer { snapshotLoading = false }
@@ -574,16 +586,10 @@ struct HomeAroundYouSection: View {
                 cg.setLineJoin(.round)
 
                 for route in nearbyRoutes.prefix(4) {
-                    let points = route.coordinates
-                        .enumerated()
-                        .compactMap { index, coordinate -> CGPoint? in
-                            let stride = max(route.coordinates.count / 90, 1)
-                            guard index % stride == 0 ||
-                                  index == route.coordinates.count - 1
-                            else { return nil }
-
+                    let points = route.renderCoordinates
+                        .compactMap { coordinate -> CGPoint? in
                             let point = snapshot.point(
-                                for: coordinate.coordinate
+                                for: coordinate
                             )
                             return bounds.insetBy(dx: -20, dy: -20)
                                 .contains(point) ? point : nil
@@ -644,6 +650,7 @@ struct HomeAroundYouSection: View {
                     )
                 )
             }
+            lastSnapshotLocation = location
         } catch {
             // Keep the lightweight fallback instead of turning map rendering
             // into a Home-level error.
