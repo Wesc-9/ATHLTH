@@ -170,10 +170,10 @@ function fallbackRecipe(kind: string) {
     default:
       return {
         palette: "sage",
-        scene: "mountain",
+        scene: "coast",
         light: "daylight",
         motif: "route",
-        energy: "steady",
+        energy: "energetic",
         variant: 1,
       };
   }
@@ -275,10 +275,14 @@ Choose a structured visual recipe for one premium weekly fitness challenge cover
 The app itself renders the artwork from your recipe. You are not generating pixels.
 
 Goals:
-- Match the challenge concept, type and target.
+- Match the challenge concept, type, title, subtitle and target very clearly.
+- The visual direction must immediately feel related to run/walk activity, not generic wellness, spa, architecture or product photography.
+- Distance challenges should feel like continuous outdoor movement, a route or a destination.
+- Session challenges should feel social, repeatable and active; prefer track/group cues.
+- Minutes challenges should communicate sustained movement and time-on-feet.
+- Streak challenges should communicate consistency, repeated days and momentum.
 - Keep the result bright, premium, modern and Scandinavian.
-- Vary the look from generic Community branding.
-- Prefer tasteful fitness/outdoor visual language.
+- Vary the look from generic Community branding while staying unmistakably fitness-focused.
 - Do not include text, logos, typography or medical imagery.
 - Pick only values from the provided JSON schema.
 `.trim();
