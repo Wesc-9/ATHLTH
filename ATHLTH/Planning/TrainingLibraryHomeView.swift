@@ -232,6 +232,17 @@ struct TrainingLibraryHomeView: View {
                             recentCard(item)
                         }
                         .buttonStyle(.plain)
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                recents.markUsed(
+                                    item.itemType,
+                                    itemID: item.itemID,
+                                    title: item.title,
+                                    subtitle: item.subtitle,
+                                    icon: item.icon
+                                )
+                            }
+                        )
                     }
                 }
                 .padding(.vertical, 2)
@@ -3624,6 +3635,7 @@ struct MissedWorkoutsReviewView: View {
 
 struct LibraryFavoritesView: View {
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var recents: LibraryRecentsStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
@@ -3754,6 +3766,17 @@ struct LibraryFavoritesView: View {
                                     favoriteRow(item)
                                 }
                                 .buttonStyle(.plain)
+                                .simultaneousGesture(
+                                    TapGesture().onEnded {
+                                        recents.markUsed(
+                                            item.itemType,
+                                            itemID: item.itemID,
+                                            title: item.title,
+                                            subtitle: item.subtitle,
+                                            icon: item.icon
+                                        )
+                                    }
+                                )
 
                                 LibraryFavoriteButton(
                                     kind: item.itemType,
@@ -3779,6 +3802,7 @@ struct LibraryFavoritesView: View {
         .navigationTitle("Favorites")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            recents.refresh()
             async let saved: Void = favorites.refresh()
             async let plans: Void = planLibrary.refresh()
             async let exercises: Void = exerciseLibrary.refresh()
