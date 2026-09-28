@@ -11,26 +11,29 @@ struct TrainingLibraryHomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("TRAINING LIBRARY")
-                    .font(.caption2.weight(.bold))
-                    .tracking(2.4)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-
-                Text("Find your next session")
-                    .font(
-                        .system(
-                            size: 30,
-                            weight: .bold,
-                            design: .serif
-                        )
+            LibraryPremiumIntro(
+                eyebrow: "TRAINING LIBRARY",
+                title: "Everything you train with",
+                subtitle:
+                    "Plans, workouts, exercises and routes — curated, saved and ready when you are.",
+                icon: "square.grid.2x2.fill",
+                accent: ATHLTHTheme.accent
+            ) {
+                HStack(spacing: 8) {
+                    LibraryStatPill(
+                        value: "\(favorites.favorites.count)",
+                        label: "favorites",
+                        icon: "star.fill",
+                        tint: ATHLTHTheme.premiumGold
                     )
 
-                Text(
-                    "Plans, workouts, exercises and routes — ready when you are."
-                )
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                    LibraryStatPill(
+                        value: "4",
+                        label: "collections",
+                        icon: "square.stack.3d.up.fill",
+                        tint: ATHLTHTheme.accent
+                    )
+                }
             }
 
             librarySection(
@@ -214,47 +217,245 @@ private struct LibraryDestinationTile: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(tint)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 46, height: 46)
                     .background(
-                        tint.opacity(0.09),
+                        LinearGradient(
+                            colors: [
+                                tint.opacity(0.16),
+                                tint.opacity(0.07)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
                         in: RoundedRectangle(
-                            cornerRadius: 14,
+                            cornerRadius: 15,
                             style: .continuous
                         )
                     )
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption.bold()).foregroundStyle(.tertiary)
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
+                        .stroke(
+                            Color.white.opacity(0.82),
+                            lineWidth: 0.8
+                        )
+                    }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText.opacity(0.76)
+                    )
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Color.white.opacity(0.66),
+                        in: Circle()
+                    )
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.headline).foregroundStyle(.primary)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                    .lineLimit(2)
             }
+
             Spacer(minLength: 0)
+
+            Capsule()
+                .fill(tint.opacity(0.26))
+                .frame(width: 34, height: 3)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 148,
+            alignment: .topLeading
+        )
         .background(
-            Color.white.opacity(0.82),
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    tint.opacity(0.035)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 24,
                 style: .continuous
             )
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(ATHLTHTheme.accent.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.96),
+                lineWidth: 1
+            )
         }
-        .contentShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.035),
+            radius: 14,
+            y: 7
+        )
+        .contentShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
     }
 }
 
+private struct LibraryPremiumIntro<Accessory: View>: View {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let icon: String
+    let accent: Color
+    @ViewBuilder let accessory: () -> Accessory
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 48, height: 48)
+                    .background(
+                        accent.opacity(0.10),
+                        in: RoundedRectangle(
+                            cornerRadius: 16,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(eyebrow)
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(2.6)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text(title)
+                        .font(
+                            .system(
+                                size: 30,
+                                weight: .semibold,
+                                design: .serif
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+            accessory()
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    accent.opacity(0.055)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.035),
+            radius: 18,
+            y: 8
+        )
+    }
+}
+
+private struct LibraryStatPill: View {
+    let value: String
+    let label: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(tint)
+
+            Text(value)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 31)
+        .background(
+            Color.white.opacity(0.72),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    Color.black.opacity(0.035),
+                    lineWidth: 0.7
+                )
+        }
+    }
+}
 
 enum LibraryFavoriteKind: String, Codable, CaseIterable, Identifiable {
     case plan
