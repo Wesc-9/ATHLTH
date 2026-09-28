@@ -2038,7 +2038,7 @@ struct MessageSharePicker: View {
                 }
                 .listStyle(.insetGrouped)
             }
-            .navigationTitle("Share with Friend")
+            .navigationTitle("Share with Athlete")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
