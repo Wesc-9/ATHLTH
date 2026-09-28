@@ -908,7 +908,7 @@ final class HealthKitManager: ObservableObject {
         var firstMarathonDate: Date?
 
         for workout in workouts where workout.workoutActivityType == .running {
-            let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()) ?? 0
+            let distance = workout.athlthDistanceMeters ?? 0
             guard distance > 0 else { continue }
 
             longestRunMeters = max(longestRunMeters, distance)
@@ -1743,24 +1743,24 @@ final class HealthKitManager: ObservableObject {
         }
 
         let longestDistanceWorkout = allWorkouts
-            .filter { (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) > 0 }
+            .filter { ($0.athlthDistanceMeters ?? 0) > 0 }
             .max { lhs, rhs in
-                (Self.safeDoubleValue(lhs.totalDistance, unit: .meter()) ?? 0) <
-                (Self.safeDoubleValue(rhs.totalDistance, unit: .meter()) ?? 0)
+                (lhs.athlthDistanceMeters ?? 0) <
+                (rhs.athlthDistanceMeters ?? 0)
             }
 
         let runningWorkouts = workoutsByDate.filter {
             $0.workoutActivityType == .running &&
-            (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) > 0
+            ($0.athlthDistanceMeters ?? 0) > 0
         }
 
         let longestRun = runningWorkouts.max { lhs, rhs in
-            (Self.safeDoubleValue(lhs.totalDistance, unit: .meter()) ?? 0) <
-            (Self.safeDoubleValue(rhs.totalDistance, unit: .meter()) ?? 0)
+            (lhs.athlthDistanceMeters ?? 0) <
+            (rhs.athlthDistanceMeters ?? 0)
         }
 
         let totalRunningDistance = runningWorkouts.reduce(0.0) { partial, workout in
-            partial + (Self.safeDoubleValue(workout.totalDistance, unit: .meter()) ?? 0)
+            partial + (workout.athlthDistanceMeters ?? 0)
         }
 
         let runningPerformance =
@@ -1810,15 +1810,12 @@ final class HealthKitManager: ObservableObject {
             longestWorkoutActivity: longestWorkout.map {
                 WorkoutActivity(healthKitType: $0.workoutActivityType)
             },
-            longestWorkoutDistanceMeters: Self.safeDoubleValue(
-                longestDistanceWorkout?.totalDistance,
-                unit: .meter()
-            ),
+            longestWorkoutDistanceMeters: longestDistanceWorkout?.athlthDistanceMeters,
             longestWorkoutDistanceDate: longestDistanceWorkout?.startDate,
             longestWorkoutDistanceActivity: longestDistanceWorkout.map {
                 WorkoutActivity(healthKitType: $0.workoutActivityType)
             },
-            longestRunMeters: Self.safeDoubleValue(longestRun?.totalDistance, unit: .meter()),
+            longestRunMeters: longestRun?.athlthDistanceMeters,
             longestRunDate: longestRun?.startDate,
             totalWorkoutCount: allWorkouts.count,
             totalTrainingDuration: allWorkouts.reduce(0) { $0 + $1.duration },
@@ -1844,12 +1841,12 @@ final class HealthKitManager: ObservableObject {
         var records: [HealthPersonalRecord] = []
 
         if let workout = workouts
-            .filter({ $0.workoutActivityType == .running && $0.totalDistance != nil })
+            .filter({ $0.workoutActivityType == .running && $0.athlthDistanceMeters != nil })
             .max(by: {
-                (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) <
-                (Self.safeDoubleValue($1.totalDistance, unit: .meter()) ?? 0)
+                ($0.athlthDistanceMeters ?? 0) <
+                ($1.athlthDistanceMeters ?? 0)
             }),
-           let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()),
+           let distance = workout.athlthDistanceMeters,
            distance > 0 {
             records.append(
                 HealthPersonalRecord(
@@ -1874,10 +1871,7 @@ final class HealthKitManager: ObservableObject {
 
         let runningWorkouts = workouts.filter {
             $0.workoutActivityType == .running &&
-            (Self.safeDoubleValue(
-                $0.totalDistance,
-                unit: .meter()
-            ) ?? 0) >= 1_000
+            ($0.athlthDistanceMeters ?? 0) >= 1_000
         }
 
         let runningPerformance =
@@ -1925,12 +1919,12 @@ final class HealthKitManager: ObservableObject {
         }
 
         if let workout = workouts
-            .filter({ $0.workoutActivityType == .cycling && $0.totalDistance != nil })
+            .filter({ $0.workoutActivityType == .cycling && $0.athlthDistanceMeters != nil })
             .max(by: {
-                (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) <
-                (Self.safeDoubleValue($1.totalDistance, unit: .meter()) ?? 0)
+                ($0.athlthDistanceMeters ?? 0) <
+                ($1.athlthDistanceMeters ?? 0)
             }),
-           let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()),
+           let distance = workout.athlthDistanceMeters,
            distance > 0 {
             records.append(
                 HealthPersonalRecord(
@@ -1944,13 +1938,13 @@ final class HealthKitManager: ObservableObject {
         if let workout = workouts
             .filter({
                 ($0.workoutActivityType == .walking || $0.workoutActivityType == .hiking) &&
-                $0.totalDistance != nil
+                $0.athlthDistanceMeters != nil
             })
             .max(by: {
-                (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) <
-                (Self.safeDoubleValue($1.totalDistance, unit: .meter()) ?? 0)
+                ($0.athlthDistanceMeters ?? 0) <
+                ($1.athlthDistanceMeters ?? 0)
             }),
-           let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter()),
+           let distance = workout.athlthDistanceMeters,
            distance > 0 {
             records.append(
                 HealthPersonalRecord(
@@ -2048,12 +2042,12 @@ final class HealthKitManager: ObservableObject {
             let candidates = workouts.filter { workoutMatchesGoalActivity($0, filter: rule.activity) }
 
             guard let workout = candidates
-                .filter({ $0.totalDistance != nil })
+                .filter({ $0.athlthDistanceMeters != nil })
                 .max(by: {
-                    (Self.safeDoubleValue($0.totalDistance, unit: .meter()) ?? 0) <
-                    (Self.safeDoubleValue($1.totalDistance, unit: .meter()) ?? 0)
+                    ($0.athlthDistanceMeters ?? 0) <
+                    ($1.athlthDistanceMeters ?? 0)
                 }),
-                let distance = Self.safeDoubleValue(workout.totalDistance, unit: .meter())
+                let distance = workout.athlthDistanceMeters
             else {
                 return nil
             }
@@ -2952,10 +2946,7 @@ final class HealthKitManager: ObservableObject {
 
         for workout in runningWorkouts {
             let distance =
-                Self.safeDoubleValue(
-                    workout.totalDistance,
-                    unit: .meter()
-                ) ?? 0
+                workout.athlthDistanceMeters ?? 0
 
             guard distance >= 1_000 else {
                 continue
@@ -3463,10 +3454,7 @@ final class HealthKitManager: ObservableObject {
         let totalTrainingDuration = workouts.reduce(0) { $0 + $1.duration }
         let totalWorkoutDistance = workouts.reduce(0) { partial, workout in
             partial +
-                (Self.safeDoubleValue(
-                    workout.totalDistance,
-                    unit: .meter()
-                ) ?? 0)
+                (workout.athlthDistanceMeters ?? 0)
         }
         let totalSteps = stepsByDay.isEmpty ? nil : stepsByDay.values.reduce(0, +)
         let averageSteps = average(Array(stepsByDay.values))
@@ -3871,10 +3859,7 @@ final class HealthKitManager: ObservableObject {
                     workoutDistanceMeters:
                         bucketWorkouts.reduce(0) { partial, workout in
                             partial +
-                                (Self.safeDoubleValue(
-                                    workout.totalDistance,
-                                    unit: .meter()
-                                ) ?? 0)
+                                (workout.athlthDistanceMeters ?? 0)
                         }
                 )
             )
