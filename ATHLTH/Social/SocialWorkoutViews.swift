@@ -1878,13 +1878,19 @@ private struct HomeActivityRouteArtwork: View {
         }
         .clipped()
         .task(id: cacheKey) {
-            image =
+            let rendered =
                 await HomeActivityRouteSnapshotRenderer
                     .shared
                     .image(
                         coordinates: coordinates,
                         singleLocation: singleLocation
                     )
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            image = rendered
         }
     }
 }
@@ -1934,6 +1940,10 @@ private final class HomeActivityRouteSnapshotRenderer {
         coordinates: [CLLocationCoordinate2D],
         singleLocation: CLLocationCoordinate2D?
     ) async -> UIImage? {
+        guard !Task.isCancelled else {
+            return nil
+        }
+
         let key = Self.cacheKey(
             coordinates: coordinates,
             singleLocation: singleLocation
@@ -1979,6 +1989,10 @@ private final class HomeActivityRouteSnapshotRenderer {
                     options: options
                 )
                 .start()
+
+            guard !Task.isCancelled else {
+                return nil
+            }
 
             let format =
                 UIGraphicsImageRendererFormat
@@ -2138,6 +2152,10 @@ private final class HomeActivityRouteSnapshotRenderer {
                         )
                     }
                 }
+
+            guard !Task.isCancelled else {
+                return nil
+            }
 
             cache.setObject(
                 rendered,
