@@ -58,6 +58,7 @@ final class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
 
     @Published private(set) var workouts: [WorkoutSummary] = []
+    @Published private(set) var pendingWorkoutImports: [PendingWorkoutImport] = []
     @Published private(set) var sleep: SleepSummary = .empty
     @Published private(set) var heart: HeartSummary = .empty
     @Published private(set) var training: TrainingHealthSummary = .empty
@@ -117,9 +118,51 @@ final class HealthKitManager: ObservableObject {
     private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
     private let currentSafeRefreshVersion = 2
     private let lastSuccessfulRefreshKey = "athlth.healthLastSuccessfulRefreshAt"
+    private let workoutImportCutoverKey = "athlth.health.workoutImport.cutover.v1"
+    private let workoutImportAnchorKey = "athlth.health.workoutImport.anchor.v1"
+    private let workoutImportPendingIDsKey = "athlth.health.workoutImport.pendingIDs.v1"
+    private let workoutImportImportedIDsKey = "athlth.health.workoutImport.importedIDs.v1"
+    private let workoutImportIgnoredIDsKey = "athlth.health.workoutImport.ignoredIDs.v1"
+    private var workoutImportCutoverDate = Date()
+    private var workoutImportAnchor: HKQueryAnchor?
+    private var pendingExternalWorkoutIDs: Set<UUID> = []
+    private var importedExternalWorkoutIDs: Set<UUID> = []
+    private var ignoredExternalWorkoutIDs: Set<UUID> = []
 
     init() {
         let defaults = UserDefaults.standard
+
+        if let storedCutover = defaults.object(
+            forKey: workoutImportCutoverKey
+        ) as? Date {
+            workoutImportCutoverDate = storedCutover
+        } else {
+            // Grandfather existing Health history while still catching a
+            // workout that may have triggered the first post-update launch.
+            let cutover = Date().addingTimeInterval(-15 * 60)
+            workoutImportCutoverDate = cutover
+            defaults.set(cutover, forKey: workoutImportCutoverKey)
+        }
+
+        pendingExternalWorkoutIDs = Self.loadWorkoutImportUUIDSet(
+            key: workoutImportPendingIDsKey,
+            defaults: defaults
+        )
+        importedExternalWorkoutIDs = Self.loadWorkoutImportUUIDSet(
+            key: workoutImportImportedIDsKey,
+            defaults: defaults
+        )
+        ignoredExternalWorkoutIDs = Self.loadWorkoutImportUUIDSet(
+            key: workoutImportIgnoredIDsKey,
+            defaults: defaults
+        )
+
+        if let anchorData = defaults.data(forKey: workoutImportAnchorKey) {
+            workoutImportAnchor = try? NSKeyedUnarchiver.unarchivedObject(
+                ofClass: HKQueryAnchor.self,
+                from: anchorData
+            )
+        }
 
         if let data = defaults.data(forKey: trophySnapshotDiskKey),
            let cached = try? JSONDecoder().decode(
@@ -170,6 +213,197 @@ final class HealthKitManager: ObservableObject {
 
     var hasRequestedAuthorization: Bool {
         UserDefaults.standard.integer(forKey: authorizationVersionKey) >= currentAuthorizationVersion
+    }
+
+    var pendingWorkoutImportCount: Int {
+        pendingExternalWorkoutIDs.count
+    }
+
+    @discardableResult
+    func refreshWorkoutImportInbox() async -> Bool {
+        guard healthDataAvailable,
+              hasRequestedAuthorization,
+              !shouldDeferAutomaticHealthWork
+        else {
+            return false
+        }
+
+        var acceptedWorkoutChanged = false
+
+        do {
+            if pendingWorkoutImports.isEmpty,
+               !pendingExternalWorkoutIDs.isEmpty {
+                await rehydratePendingWorkoutImports()
+            }
+
+            let changes = try await fetchWorkoutImportChanges()
+
+            if let newAnchor = changes.anchor {
+                workoutImportAnchor = newAnchor
+                persistWorkoutImportAnchor(newAnchor)
+            }
+
+            let deletedIDs = Set(changes.deleted.map(\.uuid))
+            if !deletedIDs.isEmpty {
+                if workouts.contains(where: { deletedIDs.contains($0.id) }) {
+                    acceptedWorkoutChanged = true
+                }
+
+                pendingExternalWorkoutIDs.subtract(deletedIDs)
+                importedExternalWorkoutIDs.subtract(deletedIDs)
+                ignoredExternalWorkoutIDs.subtract(deletedIDs)
+                pendingWorkoutImports.removeAll {
+                    deletedIDs.contains($0.id)
+                }
+                workouts.removeAll {
+                    deletedIDs.contains($0.id)
+                }
+
+                for id in deletedIDs {
+                    workoutObjects[id] = nil
+                }
+            }
+
+            let mode = externalWorkoutImportMode
+
+            for workout in changes.workouts {
+                workoutObjects[workout.uuid] = workout
+
+                if isATHLTHWorkout(workout) {
+                    if !workouts.contains(where: { $0.id == workout.uuid }) {
+                        acceptedWorkoutChanged = true
+                    }
+                    continue
+                }
+
+                if workout.endDate < workoutImportCutoverDate {
+                    continue
+                }
+
+                if importedExternalWorkoutIDs.contains(workout.uuid) ||
+                    ignoredExternalWorkoutIDs.contains(workout.uuid) {
+                    continue
+                }
+
+                switch mode {
+                case .ask:
+                    pendingExternalWorkoutIDs.insert(workout.uuid)
+
+                    if !pendingWorkoutImports.contains(
+                        where: { $0.id == workout.uuid }
+                    ) {
+                        pendingWorkoutImports.append(
+                            makePendingWorkoutImport(workout)
+                        )
+                    }
+
+                case .automatic:
+                    importedExternalWorkoutIDs.insert(workout.uuid)
+                    pendingExternalWorkoutIDs.remove(workout.uuid)
+                    pendingWorkoutImports.removeAll {
+                        $0.id == workout.uuid
+                    }
+                    acceptedWorkoutChanged = true
+
+                case .never:
+                    ignoredExternalWorkoutIDs.insert(workout.uuid)
+                    pendingExternalWorkoutIDs.remove(workout.uuid)
+                    pendingWorkoutImports.removeAll {
+                        $0.id == workout.uuid
+                    }
+                }
+            }
+
+            pendingWorkoutImports.sort {
+                $0.summary.endDate > $1.summary.endDate
+            }
+            persistWorkoutImportState()
+
+            if acceptedWorkoutChanged {
+                invalidateWorkoutDerivedCaches()
+            }
+
+            return acceptedWorkoutChanged
+        } catch {
+            // Import discovery is deliberately non-blocking. A failed
+            // incremental read must never make the rest of ATHLTH unusable;
+            // the next foreground/background Health refresh retries it.
+            return false
+        }
+    }
+
+    func importPendingWorkout(_ id: UUID) {
+        importPendingWorkouts([id])
+    }
+
+    func importPendingWorkouts(_ ids: Set<UUID>) {
+        let resolved = ids.intersection(pendingExternalWorkoutIDs)
+        guard !resolved.isEmpty else { return }
+
+        let importedSummaries = pendingWorkoutImports
+            .filter { resolved.contains($0.id) }
+            .map(\.summary)
+
+        pendingExternalWorkoutIDs.subtract(resolved)
+        ignoredExternalWorkoutIDs.subtract(resolved)
+        importedExternalWorkoutIDs.formUnion(resolved)
+        pendingWorkoutImports.removeAll {
+            resolved.contains($0.id)
+        }
+
+        for summary in importedSummaries
+        where !workouts.contains(where: { $0.id == summary.id }) {
+            workouts.append(summary)
+        }
+
+        workouts.sort { $0.startDate > $1.startDate }
+        persistWorkoutImportState()
+        invalidateWorkoutDerivedCaches()
+    }
+
+    func importAllPendingWorkouts() {
+        importPendingWorkouts(pendingExternalWorkoutIDs)
+    }
+
+    func ignorePendingWorkout(_ id: UUID) {
+        ignorePendingWorkouts([id])
+    }
+
+    func ignorePendingWorkouts(_ ids: Set<UUID>) {
+        let resolved = ids.intersection(pendingExternalWorkoutIDs)
+        guard !resolved.isEmpty else { return }
+
+        pendingExternalWorkoutIDs.subtract(resolved)
+        importedExternalWorkoutIDs.subtract(resolved)
+        ignoredExternalWorkoutIDs.formUnion(resolved)
+        pendingWorkoutImports.removeAll {
+            resolved.contains($0.id)
+        }
+        workouts.removeAll {
+            resolved.contains($0.id)
+        }
+
+        persistWorkoutImportState()
+        invalidateWorkoutDerivedCaches()
+    }
+
+    func ignoreAllPendingWorkouts() {
+        ignorePendingWorkouts(pendingExternalWorkoutIDs)
+    }
+
+    func applyExternalWorkoutImportMode(
+        _ mode: ExternalWorkoutImportMode
+    ) async {
+        switch mode {
+        case .ask:
+            break
+        case .automatic:
+            importAllPendingWorkouts()
+        case .never:
+            ignoreAllPendingWorkouts()
+        }
+
+        _ = await refreshWorkoutImportInbox()
     }
 
     func prepareBackgroundObserversAtLaunch() {
@@ -428,7 +662,18 @@ final class HealthKitManager: ObservableObject {
                         return
                     }
 
-                    await self.refreshAll()
+                    if type.identifier ==
+                        HKObjectType.workoutType().identifier {
+                        let acceptedWorkoutChanged =
+                            await self.refreshWorkoutImportInbox()
+
+                        if acceptedWorkoutChanged {
+                            await self.refreshAll()
+                        }
+                    } else {
+                        await self.refreshAll()
+                    }
+
                     completion.call()
                 }
             }
@@ -2823,6 +3068,184 @@ final class HealthKitManager: ObservableObject {
         let latestSleepDuration: TimeInterval
     }
 
+    private var externalWorkoutImportMode: ExternalWorkoutImportMode {
+        ExternalWorkoutImportMode(
+            rawValue: UserDefaults.standard.string(
+                forKey: "settings.externalWorkoutImportMode"
+            ) ?? ""
+        ) ?? .ask
+    }
+
+    private func isATHLTHWorkout(_ workout: HKWorkout) -> Bool {
+        let bundleIdentifier =
+            workout.sourceRevision.source.bundleIdentifier.lowercased()
+
+        if bundleIdentifier.hasPrefix("com.wesc9.athlth") {
+            return true
+        }
+
+        if let syncIdentifier =
+                workout.metadata?[HKMetadataKeySyncIdentifier] as? String,
+           syncIdentifier.lowercased().hasPrefix("athlth-") {
+            return true
+        }
+
+        return false
+    }
+
+    private func isWorkoutAcceptedForATHLTH(
+        _ workout: HKWorkout
+    ) -> Bool {
+        if ignoredExternalWorkoutIDs.contains(workout.uuid) {
+            return false
+        }
+
+        if isATHLTHWorkout(workout) {
+            return true
+        }
+
+        if workout.endDate < workoutImportCutoverDate {
+            return true
+        }
+
+        return importedExternalWorkoutIDs.contains(workout.uuid)
+    }
+
+    private func makePendingWorkoutImport(
+        _ workout: HKWorkout
+    ) -> PendingWorkoutImport {
+        PendingWorkoutImport(
+            summary: WorkoutSummary(workout: workout),
+            sourceName: workout.sourceRevision.source.name,
+            deviceName: workout.device?.name
+        )
+    }
+
+    private func fetchWorkoutImportChanges() async throws -> (
+        workouts: [HKWorkout],
+        deleted: [HKDeletedObject],
+        anchor: HKQueryAnchor?
+    ) {
+        let predicate = HKQuery.predicateForSamples(
+            withStart: workoutImportCutoverDate,
+            end: nil,
+            options: []
+        )
+        let anchor = workoutImportAnchor
+
+        return try await withCheckedThrowingContinuation {
+            continuation in
+
+            let query = HKAnchoredObjectQuery(
+                type: HKObjectType.workoutType(),
+                predicate: predicate,
+                anchor: anchor,
+                limit: HKObjectQueryNoLimit
+            ) { _, samples, deleted, newAnchor, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                continuation.resume(
+                    returning: (
+                        (samples as? [HKWorkout]) ?? [],
+                        deleted ?? [],
+                        newAnchor
+                    )
+                )
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
+    private func rehydratePendingWorkoutImports() async {
+        guard !pendingExternalWorkoutIDs.isEmpty else {
+            pendingWorkoutImports = []
+            return
+        }
+
+        let start = min(
+            workoutImportCutoverDate,
+            Date().addingTimeInterval(-90 * 24 * 60 * 60)
+        )
+
+        guard let fetched = try? await fetchRawWorkouts(
+            startDate: start,
+            endDate: Date(),
+            limit: 250
+        ) else {
+            return
+        }
+
+        let matching = fetched.filter {
+            pendingExternalWorkoutIDs.contains($0.uuid) &&
+                !importedExternalWorkoutIDs.contains($0.uuid) &&
+                !ignoredExternalWorkoutIDs.contains($0.uuid)
+        }
+
+        for workout in matching {
+            workoutObjects[workout.uuid] = workout
+        }
+
+        pendingWorkoutImports = matching
+            .map(makePendingWorkoutImport)
+            .sorted {
+                $0.summary.endDate > $1.summary.endDate
+            }
+
+        let foundIDs = Set(matching.map(\.uuid))
+        let missingIDs = pendingExternalWorkoutIDs.subtracting(foundIDs)
+
+        if !missingIDs.isEmpty {
+            pendingExternalWorkoutIDs.subtract(missingIDs)
+            persistWorkoutImportState()
+        }
+    }
+
+    private static func loadWorkoutImportUUIDSet(
+        key: String,
+        defaults: UserDefaults
+    ) -> Set<UUID> {
+        Set(
+            (defaults.stringArray(forKey: key) ?? [])
+                .compactMap(UUID.init(uuidString:))
+        )
+    }
+
+    private func persistWorkoutImportState() {
+        let defaults = UserDefaults.standard
+        defaults.set(
+            pendingExternalWorkoutIDs.map(\.uuidString),
+            forKey: workoutImportPendingIDsKey
+        )
+        defaults.set(
+            importedExternalWorkoutIDs.map(\.uuidString),
+            forKey: workoutImportImportedIDsKey
+        )
+        defaults.set(
+            ignoredExternalWorkoutIDs.map(\.uuidString),
+            forKey: workoutImportIgnoredIDsKey
+        )
+    }
+
+    private func persistWorkoutImportAnchor(
+        _ anchor: HKQueryAnchor
+    ) {
+        guard let data = try? NSKeyedArchiver.archivedData(
+            withRootObject: anchor,
+            requiringSecureCoding: true
+        ) else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey: workoutImportAnchorKey
+        )
+    }
+
     private func invalidateWorkoutDerivedCaches() {
         allWorkoutsCache = nil
         profilePerformanceCache = nil
@@ -3050,6 +3473,11 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func fetchAllWorkouts() async throws -> [HKWorkout] {
+        let fetched = try await fetchRawAllWorkouts()
+        return fetched.filter(isWorkoutAcceptedForATHLTH)
+    }
+
+    private func fetchRawAllWorkouts() async throws -> [HKWorkout] {
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
 
         return try await withCheckedThrowingContinuation {
@@ -3073,6 +3501,19 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func fetchWorkouts(
+        startDate: Date,
+        endDate: Date,
+        limit: Int = HKObjectQueryNoLimit
+    ) async throws -> [HKWorkout] {
+        let fetched = try await fetchRawWorkouts(
+            startDate: startDate,
+            endDate: endDate,
+            limit: limit
+        )
+        return fetched.filter(isWorkoutAcceptedForATHLTH)
+    }
+
+    private func fetchRawWorkouts(
         startDate: Date,
         endDate: Date,
         limit: Int = HKObjectQueryNoLimit
