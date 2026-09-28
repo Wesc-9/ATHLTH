@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ATHLTHInsightsView: View {
     var onSelectTab: (Int) -> Void = { _ in }
@@ -232,8 +233,10 @@ struct ATHLTHInsightsView: View {
                 }
                 .padding(.top, 12)
             } else {
+                let items = Array(whatChangedItems.prefix(3))
+
                 VStack(spacing: 0) {
-                    ForEach(Array(whatChangedItems.prefix(3).enumerated()), id: \.element.id) { index, item in
+                    ForEach(items) { item in
                         HStack(alignment: .top, spacing: 11) {
                             Image(systemName: item.icon)
                                 .font(.system(size: 15, weight: .semibold))
@@ -262,7 +265,7 @@ struct ATHLTHInsightsView: View {
                         }
                         .padding(.vertical, 10)
 
-                        if index < min(whatChangedItems.count, 3) - 1 {
+                        if item.id != items.last?.id {
                             Divider()
                         }
                     }
