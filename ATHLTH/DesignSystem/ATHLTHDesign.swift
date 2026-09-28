@@ -407,29 +407,6 @@ struct ATHLTHTabHero: View {
                     endPoint: .bottom
                 )
 
-                // Reserve visual breathing room for every status-bar shape:
-                // classic status bar, notch and Dynamic Island.
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.22),
-                        Color.black.opacity(0.07),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(
-                    height:
-                        isNarrowPhone
-                            ? 56
-                            : 62
-                )
-                .frame(
-                    maxHeight: .infinity,
-                    alignment: .top
-                )
-                .allowsHitTesting(false)
-
                 RadialGradient(
                     colors: [
                         ATHLTHTheme.champagne
