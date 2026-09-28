@@ -11,26 +11,29 @@ struct TrainingLibraryHomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("TRAINING LIBRARY")
-                    .font(.caption2.weight(.bold))
-                    .tracking(2.4)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-
-                Text("Find your next session")
-                    .font(
-                        .system(
-                            size: 30,
-                            weight: .bold,
-                            design: .serif
-                        )
+            LibraryPremiumIntro(
+                eyebrow: "TRAINING LIBRARY",
+                title: "Everything you train with",
+                subtitle:
+                    "Plans, workouts, exercises and routes — curated, saved and ready when you are.",
+                icon: "square.grid.2x2.fill",
+                accent: ATHLTHTheme.accent
+            ) {
+                HStack(spacing: 8) {
+                    LibraryStatPill(
+                        value: "\(favorites.favorites.count)",
+                        label: "favorites",
+                        icon: "star.fill",
+                        tint: ATHLTHTheme.premiumGold
                     )
 
-                Text(
-                    "Plans, workouts, exercises and routes — ready when you are."
-                )
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                    LibraryStatPill(
+                        value: "4",
+                        label: "collections",
+                        icon: "square.stack.3d.up.fill",
+                        tint: ATHLTHTheme.accent
+                    )
+                }
             }
 
             librarySection(
@@ -214,49 +217,263 @@ private struct LibraryDestinationTile: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(tint)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 46, height: 46)
                     .background(
-                        tint.opacity(0.09),
+                        LinearGradient(
+                            colors: [
+                                tint.opacity(0.16),
+                                tint.opacity(0.07)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
                         in: RoundedRectangle(
-                            cornerRadius: 14,
+                            cornerRadius: 15,
                             style: .continuous
                         )
                     )
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption.bold()).foregroundStyle(.tertiary)
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
+                        .stroke(
+                            Color.white.opacity(0.82),
+                            lineWidth: 0.8
+                        )
+                    }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText.opacity(0.76)
+                    )
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Color.white.opacity(0.66),
+                        in: Circle()
+                    )
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.headline).foregroundStyle(.primary)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                    .lineLimit(2)
             }
+
             Spacer(minLength: 0)
+
+            Capsule()
+                .fill(tint.opacity(0.26))
+                .frame(width: 34, height: 3)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 148,
+            alignment: .topLeading
+        )
         .background(
-            Color.white.opacity(0.82),
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    tint.opacity(0.035)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 24,
                 style: .continuous
             )
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(ATHLTHTheme.accent.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.96),
+                lineWidth: 1
+            )
         }
-        .contentShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.035),
+            radius: 14,
+            y: 7
+        )
+        .contentShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
     }
 }
 
+private struct LibraryPremiumIntro<Accessory: View>: View {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let icon: String
+    let accent: Color
+    private let accessory: Accessory
 
-enum LibraryFavoriteKind: String, Codable, CaseIterable, Identifiable {
+    init(
+        eyebrow: String,
+        title: String,
+        subtitle: String,
+        icon: String,
+        accent: Color,
+        @ViewBuilder accessory: () -> Accessory
+    ) {
+        self.eyebrow = eyebrow
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.accent = accent
+        self.accessory = accessory()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 48, height: 48)
+                    .background(
+                        accent.opacity(0.10),
+                        in: RoundedRectangle(
+                            cornerRadius: 16,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(eyebrow)
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(2.6)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text(title)
+                        .font(
+                            .system(
+                                size: 30,
+                                weight: .semibold,
+                                design: .serif
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+            accessory
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    accent.opacity(0.055)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.035),
+            radius: 18,
+            y: 8
+        )
+    }
+}
+
+private struct LibraryStatPill: View {
+    let value: String
+    let label: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(tint)
+
+            Text(value)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 31)
+        .background(
+            Color.white.opacity(0.72),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    Color.black.opacity(0.035),
+                    lineWidth: 0.7
+                )
+        }
+    }
+}
+
+enum LibraryFavoriteKind: String, Codable, CaseIterable, Identifiable, Hashable {
     case plan
     case workout
     case exercise
@@ -755,28 +972,30 @@ struct TrainingPlanLibraryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("PLAN LIBRARY")
-                        .font(.caption2.weight(.bold))
-                        .tracking(2.2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-
-                    Text("Start with a structure")
-                        .font(
-                            .system(
-                                size: 30,
-                                weight: .bold,
-                                design: .serif
-                            )
+                LibraryPremiumIntro(
+                    eyebrow: "PLAN LIBRARY",
+                    title: "Train with a clear direction",
+                    subtitle:
+                        "Start from a curated structure, save it to My Plans, then make every week and workout your own.",
+                    icon: "sparkles.rectangle.stack.fill",
+                    accent: Color.orange
+                ) {
+                    HStack(spacing: 8) {
+                        LibraryStatPill(
+                            value: "\(catalog.entries.count)",
+                            label: "plans",
+                            icon: "square.stack.3d.up.fill",
+                            tint: Color.orange
                         )
 
-                    Text(
-                        "Save a plan to My Plans, then tailor every week and workout to you."
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                        LibraryStatPill(
+                            value: "\(favorites.count(for: .plan))",
+                            label: "saved",
+                            icon: "star.fill",
+                            tint: ATHLTHTheme.premiumGold
+                        )
+                    }
                 }
-                .padding(.bottom, 2)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -890,23 +1109,39 @@ struct TrainingPlanLibraryView: View {
         .foregroundStyle(
             selected
                 ? Color.white
-                : ATHLTHTheme.primaryText
+                : ATHLTHTheme.primaryText.opacity(0.82)
         )
-        .padding(.horizontal, 12)
-        .frame(height: 36)
+        .padding(.horizontal, 13)
+        .frame(height: 38)
         .background(
             selected
-                ? ATHLTHTheme.accent
-                : Color.white.opacity(0.82),
+                ? ATHLTHTheme.accentDeep
+                : Color.white.opacity(0.86),
             in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    selected
+                        ? Color.white.opacity(0.18)
+                        : Color.black.opacity(0.035),
+                    lineWidth: 0.8
+                )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(
+                selected ? 0.10 : 0.025
+            ),
+            radius: selected ? 8 : 5,
+            y: 3
         )
     }
 
     private func catalogCard(
         _ entry: TrainingPlanCatalogEntry
     ) -> some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 13) {
                 Image(
                     systemName:
                         entry.category == "strength"
@@ -916,17 +1151,34 @@ struct TrainingPlanLibraryView: View {
                                 : "figure.run"
                 )
                 .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
-                .frame(width: 48, height: 48)
+                .foregroundStyle(planAccent(entry))
+                .frame(width: 50, height: 50)
                 .background(
-                    ATHLTHTheme.accentSoft,
+                    planAccent(entry).opacity(0.10),
                     in: RoundedRectangle(
-                        cornerRadius: 15,
+                        cornerRadius: 16,
                         style: .continuous
                     )
                 )
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text(entry.categoryTitle.uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.3)
+                            .foregroundStyle(planAccent(entry))
+
+                        Text("CURATED")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Color.black.opacity(0.035),
+                                in: Capsule()
+                            )
+                    }
+
                     Text(entry.title)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
@@ -934,7 +1186,9 @@ struct TrainingPlanLibraryView: View {
 
                     Text(entry.goal)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText.opacity(0.70)
+                        )
                 }
 
                 Spacer(minLength: 0)
@@ -944,8 +1198,9 @@ struct TrainingPlanLibraryView: View {
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .multilineTextAlignment(.leading)
+                .lineSpacing(2)
 
-            HStack(spacing: 9) {
+            HStack(spacing: 7) {
                 planMetric(
                     "\(entry.durationWeeks) wk",
                     icon: "calendar"
@@ -961,29 +1216,46 @@ struct TrainingPlanLibraryView: View {
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
+                Image(systemName: "arrow.right")
                     .font(.caption.bold())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(planAccent(entry))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        planAccent(entry).opacity(0.08),
+                        in: Circle()
+                    )
             }
         }
-        .padding(16)
+        .padding(17)
         .background(
-            Color.white.opacity(0.86),
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.97),
+                    planAccent(entry).opacity(0.035)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
-                cornerRadius: 23,
+                cornerRadius: 25,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 23,
+                cornerRadius: 25,
                 style: .continuous
             )
             .stroke(
-                Color.black.opacity(0.04),
-                lineWidth: 0.8
+                Color.white.opacity(0.96),
+                lineWidth: 1
             )
         }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.035),
+            radius: 14,
+            y: 7
+        )
     }
 
     private func planMetric(
@@ -993,6 +1265,25 @@ struct TrainingPlanLibraryView: View {
         Label(text, systemImage: icon)
             .font(.caption2.weight(.semibold))
             .foregroundStyle(ATHLTHTheme.mutedText)
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .background(
+                Color.white.opacity(0.62),
+                in: Capsule()
+            )
+    }
+
+    private func planAccent(
+        _ entry: TrainingPlanCatalogEntry
+    ) -> Color {
+        switch entry.category {
+        case "strength":
+            return Color.indigo
+        case "hybrid":
+            return ATHLTHTheme.premiumGold
+        default:
+            return ATHLTHTheme.vitality
+        }
     }
 }
 
@@ -1007,24 +1298,87 @@ struct TrainingPlanCatalogDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(entry.categoryTitle.uppercased())
-                        .font(.caption2.weight(.bold))
-                        .tracking(2)
-                        .foregroundStyle(ATHLTHTheme.accent)
-
-                    Text(entry.title)
-                        .font(
-                            .system(
-                                size: 34,
-                                weight: .bold,
-                                design: .serif
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 13) {
+                        Image(systemName: detailIcon)
+                            .font(.system(size: 23, weight: .semibold))
+                            .foregroundStyle(detailAccent)
+                            .frame(width: 54, height: 54)
+                            .background(
+                                detailAccent.opacity(0.10),
+                                in: RoundedRectangle(
+                                    cornerRadius: 17,
+                                    style: .continuous
+                                )
                             )
-                        )
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(entry.categoryTitle.uppercased())
+                                .font(.system(size: 10, weight: .bold))
+                                .tracking(2.1)
+                                .foregroundStyle(detailAccent)
+
+                            Text(entry.title)
+                                .font(
+                                    .system(
+                                        size: 34,
+                                        weight: .semibold,
+                                        design: .serif
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                        }
+
+                        Spacer(minLength: 0)
+                    }
 
                     Text(entry.summary)
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineSpacing(2)
+
+                    HStack(spacing: 7) {
+                        Label(
+                            entry.level,
+                            systemImage: "speedometer"
+                        )
+                        Label(
+                            entry.goal,
+                            systemImage: "scope"
+                        )
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText.opacity(0.68)
+                    )
+                    .lineLimit(1)
+                }
+                .padding(18)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.96),
+                            detailAccent.opacity(0.055)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 28,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 28,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white.opacity(0.95),
+                        lineWidth: 1
+                    )
                 }
 
                 HStack(spacing: 10) {
@@ -1190,12 +1544,54 @@ struct TrainingPlanCatalogDetailView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .padding(12)
+        .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            Color.white.opacity(0.82),
-            in: RoundedRectangle(cornerRadius: 16)
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.94),
+                    detailAccent.opacity(0.025)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.035),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private var detailAccent: Color {
+        switch entry.category {
+        case "strength":
+            return Color.indigo
+        case "hybrid":
+            return ATHLTHTheme.premiumGold
+        default:
+            return ATHLTHTheme.vitality
+        }
+    }
+
+    private var detailIcon: String {
+        switch entry.category {
+        case "strength":
+            return "dumbbell.fill"
+        case "hybrid":
+            return "figure.run.square.stack.fill"
+        default:
+            return "figure.run"
+        }
     }
 }
 
@@ -1207,6 +1603,40 @@ struct MyTrainingPlansLibraryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                LibraryPremiumIntro(
+                    eyebrow: "MY PLANS",
+                    title: "Your training, organised",
+                    subtitle:
+                        "Keep reusable plans close, schedule what comes next and jump back into your active program.",
+                    icon: "calendar.badge.clock",
+                    accent: ATHLTHTheme.accent
+                ) {
+                    HStack(spacing: 8) {
+                        LibraryStatPill(
+                            value: "\(session.planTemplates.count)",
+                            label: "saved",
+                            icon: "bookmark.fill",
+                            tint: ATHLTHTheme.premiumGold
+                        )
+
+                        LibraryStatPill(
+                            value: "\(session.trainingPlans.count)",
+                            label: "scheduled",
+                            icon: "calendar",
+                            tint: ATHLTHTheme.accent
+                        )
+
+                        if activePlanCount > 0 {
+                            LibraryStatPill(
+                                value: "\(activePlanCount)",
+                                label: "active",
+                                icon: "play.fill",
+                                tint: ATHLTHTheme.vitality
+                            )
+                        }
+                    }
+                }
+
                 if !session.planTemplates.isEmpty {
                     planSectionHeader(
                         "Saved Plans",
@@ -1311,57 +1741,36 @@ struct MyTrainingPlansLibraryView: View {
     private func templateCard(
         _ template: TrainingPlan
     ) -> some View {
-        ATHLTHCard {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 13) {
                 Image(systemName: "square.stack.3d.up.fill")
-                    .font(.title3)
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 48, height: 48)
                     .background(
                         ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 13)
+                        in: RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
                     )
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("SAVED PLAN")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(ATHLTHTheme.accent)
+
                     Text(template.title)
                         .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
                     Text(
-                        "\(template.weeks.count) weeks · saved plan"
+                        "\(template.weeks.count) weeks · ready to schedule"
                     )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                    if !template.summary.isEmpty {
-                        Text(template.summary)
-                            .font(.caption)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
-                            .lineLimit(2)
-                    }
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
-
-                Spacer()
-            }
-
-            HStack {
-                Button {
-                    if session.usePlanTemplate(
-                        template.id,
-                        startDate:
-                            session.suggestedTrainingPlanStartDate
-                    ) == nil {
-                        scheduleError =
-                            "Another plan overlaps the suggested start date. Choose a different date when creating or scheduling the plan."
-                    }
-                } label: {
-                    Label(
-                        "Schedule Plan",
-                        systemImage: "calendar.badge.plus"
-                    )
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
-                .controlSize(.small)
 
                 Spacer()
 
@@ -1369,62 +1778,253 @@ struct MyTrainingPlansLibraryView: View {
                     session.deletePlanTemplate(template.id)
                 } label: {
                     Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText.opacity(0.72)
+                        )
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Color.white.opacity(0.68),
+                            in: Circle()
+                        )
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.top, 8)
+
+            if !template.summary.isEmpty {
+                Text(template.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
+            }
+
+            Button {
+                if session.usePlanTemplate(
+                    template.id,
+                    startDate:
+                        session.suggestedTrainingPlanStartDate
+                ) == nil {
+                    scheduleError =
+                        "Another plan overlaps the suggested start date. Choose a different date when creating or scheduling the plan."
+                }
+            } label: {
+                HStack {
+                    Label(
+                        "Schedule Plan",
+                        systemImage: "calendar.badge.plus"
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .font(.caption.bold())
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.accent,
+                            ATHLTHTheme.accentDeep
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                )
+            }
+            .buttonStyle(.plain)
         }
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    ATHLTHTheme.accent.opacity(0.035)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.035),
+            radius: 13,
+            y: 6
+        )
     }
 
     private func scheduledPlanCard(
         _ plan: TrainingPlan
     ) -> some View {
-        HStack(spacing: 13) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.title3)
-                .foregroundStyle(ATHLTHTheme.accent)
-                .frame(width: 44, height: 44)
+        let status = session.trainingPlanStatus(plan)
+
+        return HStack(spacing: 13) {
+            Image(systemName: statusIcon(status))
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(statusTint(status))
+                .frame(width: 48, height: 48)
                 .background(
-                    ATHLTHTheme.accentSoft,
-                    in: RoundedRectangle(cornerRadius: 13)
+                    statusTint(status).opacity(0.10),
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
                 )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(plan.title)
-                    .font(.headline)
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 7) {
+                    Text(plan.title)
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+
+                    Text(statusTitle(status))
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(statusTint(status))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            statusTint(status).opacity(0.10),
+                            in: Capsule()
+                        )
+                }
 
                 Text(
-                    "\(plan.weeks.count) weeks · \(session.trainingPlanStatus(plan).rawValue.capitalized)"
+                    "\(plan.weeks.count) weeks · \(scheduledDateText(plan))"
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            Image(systemName: "chevron.right")
+            Image(systemName: "arrow.right")
                 .font(.caption.bold())
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(statusTint(status))
+                .frame(width: 30, height: 30)
+                .background(
+                    statusTint(status).opacity(0.08),
+                    in: Circle()
+                )
         }
         .padding(15)
         .background(
-            Color.white.opacity(0.84),
-            in: RoundedRectangle(cornerRadius: 20)
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.95),
+                    statusTint(status).opacity(0.025)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 0.8
+            )
+        }
     }
 
     private func planSectionHeader(
         _ title: String,
         detail: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.title3.weight(.bold))
-            Text(detail)
-                .font(.caption)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.8)
                 .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Text(detail)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText.opacity(0.72)
+                )
         }
+        .padding(.top, 2)
+    }
+
+    private var activePlanCount: Int {
+        session.trainingPlans.filter {
+            session.trainingPlanStatus($0) == .active
+        }.count
+    }
+
+    private func statusTitle(
+        _ status: TrainingPlanTimingStatus
+    ) -> String {
+        switch status {
+        case .active: return "ACTIVE"
+        case .upcoming: return "UPCOMING"
+        case .completed: return "COMPLETED"
+        case .unscheduled: return "UNSCHEDULED"
+        }
+    }
+
+    private func statusIcon(
+        _ status: TrainingPlanTimingStatus
+    ) -> String {
+        switch status {
+        case .active: return "play.fill"
+        case .upcoming: return "calendar.badge.clock"
+        case .completed: return "checkmark"
+        case .unscheduled: return "calendar"
+        }
+    }
+
+    private func statusTint(
+        _ status: TrainingPlanTimingStatus
+    ) -> Color {
+        switch status {
+        case .active: return ATHLTHTheme.vitality
+        case .upcoming: return ATHLTHTheme.accent
+        case .completed: return ATHLTHTheme.mutedText
+        case .unscheduled: return Color.orange
+        }
+    }
+
+    private func scheduledDateText(
+        _ plan: TrainingPlan
+    ) -> String {
+        guard let start = plan.startDate else {
+            return "Not dated"
+        }
+
+        return start.formatted(
+            date: .abbreviated,
+            time: .omitted
+        )
     }
 }
 
@@ -1450,43 +2050,107 @@ struct LibraryFavoritesView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    favoriteFilter(
-                        "All",
-                        selected: selectedKind == nil
-                    ) {
-                        selectedKind = nil
-                    }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                LibraryPremiumIntro(
+                    eyebrow: "FAVORITES",
+                    title: "Your fastest way back",
+                    subtitle:
+                        "Keep the plans, workouts, exercises and routes you return to most in one place.",
+                    icon: "star.fill",
+                    accent: ATHLTHTheme.premiumGold
+                ) {
+                    HStack(spacing: 8) {
+                        LibraryStatPill(
+                            value: "\(favorites.favorites.count)",
+                            label: "saved",
+                            icon: "star.fill",
+                            tint: ATHLTHTheme.premiumGold
+                        )
 
-                    ForEach(LibraryFavoriteKind.allCases) { kind in
-                        favoriteFilter(
-                            kind.title,
-                            selected: selectedKind == kind
-                        ) {
-                            selectedKind = kind
+                        if let selectedKind {
+                            LibraryStatPill(
+                                value: "\(favorites.count(for: selectedKind))",
+                                label: selectedKind.title.lowercased(),
+                                icon: selectedKind.systemImage,
+                                tint: favoriteTint(selectedKind)
+                            )
+                        } else {
+                            LibraryStatPill(
+                                value: "\(favoriteKindsInUse)",
+                                label: "types",
+                                icon: "square.grid.2x2.fill",
+                                tint: ATHLTHTheme.accent
+                            )
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
 
-            if displayedFavorites.isEmpty {
-                ContentUnavailableView {
-                    Label(
-                        "No favorites yet",
-                        systemImage: "star"
-                    )
-                } description: {
-                    Text(
-                        "Tap the star on a plan, workout, exercise or route to keep it here."
-                    )
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        favoriteFilter(
+                            "All",
+                            icon: "sparkles",
+                            selected: selectedKind == nil
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                selectedKind = nil
+                            }
+                        }
+
+                        ForEach(LibraryFavoriteKind.allCases) { kind in
+                            favoriteFilter(
+                                kind.title,
+                                icon: kind.systemImage,
+                                selected: selectedKind == kind
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    selectedKind = kind
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
+
+                if displayedFavorites.isEmpty {
+                    VStack(spacing: 15) {
+                        Image(systemName: "star")
+                            .font(.system(size: 27, weight: .medium))
+                            .foregroundStyle(
+                                ATHLTHTheme.premiumGold
+                            )
+                            .frame(width: 66, height: 66)
+                            .background(
+                                ATHLTHTheme.premiumGold.opacity(0.10),
+                                in: Circle()
+                            )
+
+                        VStack(spacing: 5) {
+                            Text("Nothing saved here yet")
+                                .font(.title3.weight(.semibold))
+
+                            Text(
+                                "Tap the star on a plan, workout, exercise or route and it will appear here."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .multilineTextAlignment(.center)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 34)
+                    .padding(.horizontal, 22)
+                    .background(
+                        Color.white.opacity(0.78),
+                        in: RoundedRectangle(
+                            cornerRadius: 25,
+                            style: .continuous
+                        )
+                    )
+                } else {
                     LazyVStack(spacing: 10) {
                         ForEach(displayedFavorites) { item in
                             HStack(spacing: 8) {
@@ -1507,12 +2171,16 @@ struct LibraryFavoritesView: View {
                             }
                         }
                     }
-                    .padding(16)
                 }
             }
+            .padding(18)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
         .background(
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.premiumGold.opacity(0.20)
+            )
         )
         .navigationTitle("Favorites")
         .navigationBarTitleDisplayMode(.inline)
@@ -1594,25 +2262,40 @@ struct LibraryFavoritesView: View {
 
     private func favoriteFilter(
         _ title: String,
+        icon: String,
         selected: Bool,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(
-                    selected
-                        ? Color.white
-                        : ATHLTHTheme.primaryText
-                )
-                .padding(.horizontal, 13)
-                .frame(height: 35)
-                .background(
-                    selected
-                        ? ATHLTHTheme.accent
-                        : Color(.secondarySystemGroupedBackground),
-                    in: Capsule()
-                )
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+
+                Text(title)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(
+                selected
+                    ? Color.white
+                    : ATHLTHTheme.primaryText.opacity(0.80)
+            )
+            .padding(.horizontal, 13)
+            .frame(height: 38)
+            .background(
+                selected
+                    ? ATHLTHTheme.accentDeep
+                    : Color.white.opacity(0.84),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        selected
+                            ? Color.white.opacity(0.16)
+                            : Color.black.opacity(0.035),
+                        lineWidth: 0.8
+                    )
+            }
         }
         .buttonStyle(.plain)
     }
@@ -1620,21 +2303,31 @@ struct LibraryFavoritesView: View {
     private func favoriteRow(
         _ item: LibraryFavoriteRecord
     ) -> some View {
-        HStack(spacing: 12) {
+        let tint = favoriteTint(item.itemType)
+
+        return HStack(spacing: 13) {
             Image(
                 systemName:
                     item.icon ??
                     item.itemType.systemImage
             )
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(ATHLTHTheme.accent)
-            .frame(width: 42, height: 42)
+            .foregroundStyle(tint)
+            .frame(width: 46, height: 46)
             .background(
-                ATHLTHTheme.accentSoft,
-                in: RoundedRectangle(cornerRadius: 13)
+                tint.opacity(0.10),
+                in: RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
             )
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.itemType.title.uppercased())
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(tint)
+
                 Text(item.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
@@ -1645,20 +2338,64 @@ struct LibraryFavoritesView: View {
                     item.itemType.title
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ATHLTHTheme.mutedText)
                 .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            Image(systemName: "chevron.right")
+            Image(systemName: "arrow.right")
                 .font(.caption.bold())
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(tint)
+                .frame(width: 29, height: 29)
+                .background(
+                    tint.opacity(0.08),
+                    in: Circle()
+                )
         }
-        .padding(13)
+        .padding(14)
         .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 18)
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    tint.opacity(0.025)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var favoriteKindsInUse: Int {
+        Set(favorites.favorites.map(\.itemType)).count
+    }
+
+    private func favoriteTint(
+        _ kind: LibraryFavoriteKind
+    ) -> Color {
+        switch kind {
+        case .plan:
+            return Color.orange
+        case .workout:
+            return ATHLTHTheme.vitality
+        case .exercise:
+            return Color.indigo
+        case .route:
+            return Color.green
+        }
     }
 }
