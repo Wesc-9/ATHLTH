@@ -2373,8 +2373,12 @@ struct PersonalizeTrainingPlanView: View {
 
 struct MyTrainingPlansLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+
     @State private var showingCreatePlan = false
     @State private var scheduleError: String?
+    @State private var reviewingPlan: TrainingPlan?
 
     var body: some View {
         ScrollView {
@@ -2431,26 +2435,73 @@ struct MyTrainingPlansLibraryView: View {
                     )
 
                     ForEach(session.trainingPlans) { plan in
-                        NavigationLink {
-                            ScrollView {
-                                AdvancedPlannerView(
-                                    planID: plan.id
+                        let progress = planProgress(plan)
+
+                        VStack(spacing: 8) {
+                            NavigationLink {
+                                ScrollView {
+                                    AdvancedPlannerView(
+                                        planID: plan.id
+                                    )
+                                    .padding()
+                                }
+                                .background(
+                                    ATHLTHPremiumCanvas(
+                                        accent:
+                                            ATHLTHTheme.accent
+                                            .opacity(0.35)
+                                    )
                                 )
-                                .padding()
+                                .navigationTitle(plan.title)
+                                .navigationBarTitleDisplayMode(.inline)
+                            } label: {
+                                scheduledPlanCard(
+                                    plan,
+                                    progress: progress
+                                )
                             }
-                            .background(
-                                ATHLTHPremiumCanvas(
-                                    accent:
-                                        ATHLTHTheme.accent
-                                        .opacity(0.35)
-                                )
-                            )
-                            .navigationTitle(plan.title)
-                            .navigationBarTitleDisplayMode(.inline)
-                        } label: {
-                            scheduledPlanCard(plan)
+                            .buttonStyle(.plain)
+
+                            if !progress.missed.isEmpty {
+                                Button {
+                                    reviewingPlan = plan
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(
+                                            systemName:
+                                                "clock.arrow.circlepath"
+                                        )
+
+                                        Text(
+                                            progress.missed.count == 1
+                                                ? "Review 1 missed workout"
+                                                : "Review \(progress.missed.count) missed workouts"
+                                        )
+                                        .font(
+                                            .caption.weight(.semibold)
+                                        )
+
+                                        Spacer()
+
+                                        Image(
+                                            systemName: "chevron.right"
+                                        )
+                                        .font(.caption2.bold())
+                                    }
+                                    .foregroundStyle(Color.orange)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 38)
+                                    .background(
+                                        Color.orange.opacity(0.08),
+                                        in: RoundedRectangle(
+                                            cornerRadius: 12,
+                                            style: .continuous
+                                        )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
 
@@ -2498,6 +2549,11 @@ struct MyTrainingPlansLibraryView: View {
         }
         .sheet(isPresented: $showingCreatePlan) {
             TrainingPlanCreationView()
+        }
+        .sheet(item: $reviewingPlan) { plan in
+            MissedWorkoutsReviewView(
+                planID: plan.id
+            )
         }
         .alert(
             "Could not schedule plan",
@@ -2649,11 +2705,13 @@ struct MyTrainingPlansLibraryView: View {
     }
 
     private func scheduledPlanCard(
-        _ plan: TrainingPlan
+        _ plan: TrainingPlan,
+        progress: TrainingPlanProgressSnapshot
     ) -> some View {
         let status = session.trainingPlanStatus(plan)
 
-        return HStack(spacing: 13) {
+        return VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 13) {
             Image(systemName: statusIcon(status))
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(statusTint(status))
@@ -2696,14 +2754,49 @@ struct MyTrainingPlansLibraryView: View {
 
             Spacer(minLength: 8)
 
-            Image(systemName: "arrow.right")
-                .font(.caption.bold())
-                .foregroundStyle(statusTint(status))
-                .frame(width: 30, height: 30)
-                .background(
-                    statusTint(status).opacity(0.08),
-                    in: Circle()
+                Image(systemName: "arrow.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(statusTint(status))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        statusTint(status).opacity(0.08),
+                        in: Circle()
+                    )
+            }
+
+            if progress.totalSessions > 0 &&
+                status != .upcoming {
+                ProgressView(
+                    value: progress.completionFraction
                 )
+                .tint(statusTint(status))
+
+                HStack {
+                    Text(
+                        progressLabel(
+                            plan,
+                            progress: progress,
+                            status: status
+                        )
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                    Spacer()
+
+                    if progress.skippedSessions > 0 {
+                        Text(
+                            "\(progress.skippedSessions) skipped"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+                }
+            }
         }
         .padding(15)
         .background(
@@ -2729,6 +2822,33 @@ struct MyTrainingPlansLibraryView: View {
                 Color.white.opacity(0.94),
                 lineWidth: 0.8
             )
+        }
+    }
+
+    private func planProgress(
+        _ plan: TrainingPlan
+    ) -> TrainingPlanProgressSnapshot {
+        session.trainingPlanProgress(
+            plan,
+            healthWorkouts: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory
+        )
+    }
+
+    private func progressLabel(
+        _ plan: TrainingPlan,
+        progress: TrainingPlanProgressSnapshot,
+        status: TrainingPlanTimingStatus
+    ) -> String {
+        switch status {
+        case .active:
+            return "Week \(max(progress.currentWeek, 1)) of \(max(progress.totalWeeks, 1)) · \(progress.completedSessions)/\(progress.totalSessions) sessions"
+        case .completed:
+            return "\(progress.completedSessions)/\(progress.totalSessions) sessions completed"
+        case .upcoming:
+            return scheduledDateText(plan)
+        case .unscheduled:
+            return "\(progress.completedSessions)/\(progress.totalSessions) sessions"
         }
     }
 
