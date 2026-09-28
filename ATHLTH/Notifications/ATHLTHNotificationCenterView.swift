@@ -222,7 +222,7 @@ struct ATHLTHNotificationCenterView: View {
             .accessibilityLabel("Dismiss alert prompt")
         }
         .padding(16)
-        .background(
+        .background {
             ZStack {
                 ATHLTHTheme.card.opacity(0.98)
 
@@ -235,12 +235,14 @@ struct ATHLTHNotificationCenterView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-            },
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
+            }
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
             )
-        )
+        }
         .overlay {
             RoundedRectangle(
                 cornerRadius: 24,
