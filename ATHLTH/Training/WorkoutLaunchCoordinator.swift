@@ -1,0 +1,353 @@
+import Foundation
+
+struct PlannedWorkoutWatchBuilder {
+    static func watchKind(
+        for kind: WorkoutKind
+    ) -> WatchWorkoutKind? {
+        switch kind {
+        case .running:
+            return .running
+        case .walking:
+            return .walking
+        case .strength:
+            return .strength
+        case .mobility, .recovery, .custom:
+            return nil
+        }
+    }
+
+    static func route(
+        for workout: PlannedSession,
+        routes: [TrainingRoute]
+    ) -> TrainingRoute? {
+        guard let routeID = workout.routeID else {
+            return nil
+        }
+
+        return routes.first { $0.id == routeID }
+    }
+
+    static func audioCoachConfiguration(
+        for workout: PlannedSession,
+        selectedRoute: TrainingRoute?,
+        defaultConfiguration: WatchAudioCoachConfiguration
+    ) -> WatchAudioCoachConfiguration {
+        var configuration =
+            workout.audioCoachConfiguration ??
+            defaultConfiguration
+
+        configuration.routeDistanceMeters =
+            selectedRoute.map {
+                $0.distanceKilometers * 1_000
+            }
+            ?? workout.targetDistanceKilometers.map {
+                $0 * 1_000
+            }
+
+        return configuration
+    }
+
+    static func runningTransfer(
+        from workout: PlannedSession,
+        routeAlerts: WatchRouteAlertConfiguration
+    ) -> WatchRunningWorkoutTransfer {
+        let structured = workout.resolvedRunningWorkouts
+
+        if !structured.isEmpty {
+            return WatchRunningWorkoutTransfer(
+                title: workout.title,
+                steps: structured.flatMap {
+                    runningSteps(from: $0)
+                },
+                routeAlerts: routeAlerts,
+                targetAlerts:
+                    workout.targetAlertConfiguration
+            )
+        }
+
+        let fallback: WatchRunningWorkoutStep
+
+        if let distance =
+                workout.targetDistanceKilometers,
+           distance > 0 {
+            fallback = WatchRunningWorkoutStep(
+                id: UUID(),
+                title: workout.title,
+                measure: .distance,
+                distanceMeters: distance * 1_000,
+                durationSeconds: nil,
+                intensityText: plannedPaceText(workout),
+                targetPaceMinSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer,
+                targetPaceMaxSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer
+            )
+        } else if let minutes = workout.durationMinutes,
+                  minutes > 0 {
+            fallback = WatchRunningWorkoutStep(
+                id: UUID(),
+                title: workout.title,
+                measure: .time,
+                distanceMeters: nil,
+                durationSeconds:
+                    TimeInterval(minutes * 60),
+                intensityText: plannedPaceText(workout),
+                targetPaceMinSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer,
+                targetPaceMaxSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer
+            )
+        } else {
+            fallback = WatchRunningWorkoutStep(
+                id: UUID(),
+                title: workout.title,
+                measure: .open,
+                distanceMeters: nil,
+                durationSeconds: nil,
+                intensityText: plannedPaceText(workout),
+                targetPaceMinSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer,
+                targetPaceMaxSecondsPerKilometer:
+                    workout.targetPaceSecondsPerKilometer
+            )
+        }
+
+        return WatchRunningWorkoutTransfer(
+            title: workout.title,
+            steps: [fallback],
+            routeAlerts: routeAlerts,
+            targetAlerts:
+                workout.targetAlertConfiguration
+        )
+    }
+
+    private static func runningSteps(
+        from template: RunningWorkoutTemplate
+    ) -> [WatchRunningWorkoutStep] {
+        template.blocks.flatMap { block in
+            let repetitions = max(
+                block.repetitions,
+                1
+            )
+            var result:
+                [WatchRunningWorkoutStep] = []
+
+            for repetition in 0..<repetitions {
+                result.append(
+                    runningStep(
+                        title:
+                            repetitions > 1
+                                ? "\(block.title) \(repetition + 1)/\(repetitions)"
+                                : block.title,
+                        target: block.work
+                    )
+                )
+
+                if repetition < repetitions - 1,
+                   let recovery = block.recovery {
+                    result.append(
+                        runningStep(
+                            title: "Recovery",
+                            target: recovery
+                        )
+                    )
+                }
+            }
+
+            return result
+        }
+    }
+
+    private static func runningStep(
+        title: String,
+        target: RunningStepTarget
+    ) -> WatchRunningWorkoutStep {
+        let measure: WatchRunningStepMeasure
+
+        switch target.measure {
+        case .distance:
+            measure = .distance
+        case .time:
+            measure = .time
+        case .open:
+            measure = .open
+        }
+
+        return WatchRunningWorkoutStep(
+            id: UUID(),
+            title: title,
+            measure: measure,
+            distanceMeters: target.distanceMeters,
+            durationSeconds: target.durationSeconds,
+            intensityText:
+                runningIntensityText(
+                    target.intensity
+                ),
+            targetPaceMinSecondsPerKilometer:
+                target.intensity
+                    .paceMinSecondsPerKilometer,
+            targetPaceMaxSecondsPerKilometer:
+                target.intensity
+                    .paceMaxSecondsPerKilometer
+        )
+    }
+
+    private static func runningIntensityText(
+        _ intensity: RunningIntensityTarget
+    ) -> String? {
+        switch intensity.kind {
+        case .none:
+            return nil
+        case .easy:
+            return "Easy effort"
+        case .pace:
+            if let minimum =
+                    intensity
+                        .paceMinSecondsPerKilometer,
+               let maximum =
+                    intensity
+                        .paceMaxSecondsPerKilometer {
+                return
+                    "\(paceText(minimum))–\(paceText(maximum)) /km"
+            }
+
+            if let pace =
+                    intensity
+                        .paceMinSecondsPerKilometer ??
+                    intensity
+                        .paceMaxSecondsPerKilometer {
+                return "\(paceText(pace)) /km"
+            }
+
+            return "Pace target"
+        case .heartRateZone:
+            if let zone = intensity.heartRateZone {
+                return "Heart-rate zone \(zone)"
+            }
+            return "Heart-rate target"
+        case .rpe:
+            if let rpe = intensity.rpe {
+                return String(
+                    format: "RPE %.1f",
+                    rpe
+                )
+            }
+            return "RPE target"
+        }
+    }
+
+    private static func plannedPaceText(
+        _ workout: PlannedSession
+    ) -> String? {
+        guard let pace =
+                workout
+                    .targetPaceSecondsPerKilometer,
+              pace > 0
+        else {
+            return nil
+        }
+
+        return "\(paceText(pace)) /km"
+    }
+
+    private static func paceText(
+        _ secondsPerKilometer: Double
+    ) -> String {
+        let total = max(
+            Int(secondsPerKilometer.rounded()),
+            0
+        )
+
+        return String(
+            format: "%d:%02d",
+            total / 60,
+            total % 60
+        )
+    }
+}
+
+@MainActor
+enum WorkoutLaunchCoordinator {
+    static func startLinkedSpotifyIfNeeded(
+        workout: PlannedSession,
+        session: AppSessionStore,
+        settings: AppSettingsStore,
+        spotify: SpotifyPlaybackStore
+    ) {
+        guard settings
+                .spotifyAutoplayLinkedPlaylists,
+              let plan =
+                session.trainingPlan(
+                    containingSessionID:
+                        workout.id
+                ),
+              plan.spotifyAutoplayOnWorkoutStart,
+              let playlist = plan.spotifyPlaylist
+        else {
+            return
+        }
+
+        Task { @MainActor in
+            await spotify.startLinkedPlaylist(
+                playlist,
+                settings: settings
+            )
+        }
+    }
+
+    static func startStrength(
+        workout: PlannedSession,
+        captureDevice: WorkoutCaptureDevice,
+        trackingMode: StrengthTrackingMode,
+        selectedFriends: [SocialProfileCard],
+        audioCoach: WatchAudioCoachConfiguration,
+        session: AppSessionStore,
+        settings: AppSettingsStore,
+        social: SocialStore,
+        strengthWorkout: StrengthWorkoutStore,
+        watchConnection: AppleWatchConnectionStore,
+        spotify: SpotifyPlaybackStore
+    ) async throws {
+        await social.beginWorkoutWithFriends(
+            title: workout.title,
+            kind: .strength,
+            friends: selectedFriends,
+            creatorName:
+                session.profile.displayName,
+            creatorUsername:
+                session.profile.username
+        )
+
+        let watchSessionID: UUID?
+
+        if captureDevice == .appleWatch {
+            try await watchConnection
+                .startWorkoutOnWatch(.strength)
+            watchConnection
+                .sendAudioCoachConfiguration(
+                    audioCoach
+                )
+            watchSessionID = UUID()
+        } else {
+            watchSessionID = nil
+        }
+
+        session.beginTrainingStatus(
+            for: workout
+        )
+
+        strengthWorkout.start(
+            session: workout,
+            watchSessionID: watchSessionID,
+            trackingMode: trackingMode,
+            captureDevice: captureDevice
+        )
+
+        startLinkedSpotifyIfNeeded(
+            workout: workout,
+            session: session,
+            settings: settings,
+            spotify: spotify
+        )
+    }
+}
