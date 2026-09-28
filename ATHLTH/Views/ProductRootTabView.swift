@@ -51,14 +51,14 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
 
-            ATHLTHRecoveryView { tab in
+            ATHLTHInsightsView { tab in
                 selectedTab = tab
             }
-                .tabItem { Label("Recovery", systemImage: "leaf.fill") }
+                .tabItem { Label("Insights", systemImage: "sparkles") }
                 .tag(2)
 
-            ATHLTHProgressView()
-                .tabItem { Label("Progress", systemImage: "chart.bar.fill") }
+            ATHLTHExploreView()
+                .tabItem { Label("Explore", systemImage: "map.fill") }
                 .tag(3)
 
             ATHLTHCommunityView()
@@ -457,7 +457,7 @@ struct ATHLTHHomeView: View {
                         workouts: health.workouts,
                         streakCount: homeStreakCount
                     ) {
-                        onSelectTab(3)
+                        onSelectTab(2)
                     }
 
                     HomeHappeningCard(
