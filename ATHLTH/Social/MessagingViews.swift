@@ -1,6 +1,22 @@
 import CoreLocation
 import SwiftUI
 
+struct MessageInboxDestinationView: View {
+    @State private var showingNewMessage = false
+
+    var body: some View {
+        MessageInboxView {
+            showingNewMessage = true
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showingNewMessage) {
+            NewMessageView()
+        }
+    }
+}
+
 private enum MessageInboxFilter: String, CaseIterable, Identifiable {
     case priority
     case direct
