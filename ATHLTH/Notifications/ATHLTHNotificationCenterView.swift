@@ -4,6 +4,8 @@ import UserNotifications
 struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var health: HealthKitManager
+    @State private var selectedWorkoutImportIDs: Set<UUID> = []
 
     var body: some View {
         List {
@@ -29,7 +31,80 @@ struct ATHLTHNotificationCenterView: View {
                 }
             }
 
-            if notifications.items.isEmpty {
+            if !health.pendingWorkoutImports.isEmpty {
+                Section("Apple Health") {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(
+                            health.pendingWorkoutImports.count == 1
+                                ? "New workout available"
+                                : "\(health.pendingWorkoutImports.count) workouts ready to import"
+                        )
+                        .font(.headline)
+
+                        Text(
+                            "Workouts recorded outside ATHLTH stay here until you choose what to bring into your ATHLTH history."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+
+                    ForEach(health.pendingWorkoutImports) { item in
+                        pendingWorkoutRow(item)
+                    }
+
+                    HStack(spacing: 10) {
+                        Button(
+                            selectedWorkoutImportIDs.isEmpty
+                                ? "Import All"
+                                : "Import Selected"
+                        ) {
+                            let ids =
+                                selectedWorkoutImportIDs.isEmpty
+                                    ? Set(
+                                        health.pendingWorkoutImports.map(\.id)
+                                    )
+                                    : selectedWorkoutImportIDs
+
+                            health.importPendingWorkouts(ids)
+                            selectedWorkoutImportIDs.subtract(ids)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accent)
+
+                        Menu("More") {
+                            if !selectedWorkoutImportIDs.isEmpty {
+                                Button("Import All") {
+                                    health.importAllPendingWorkouts()
+                                    selectedWorkoutImportIDs.removeAll()
+                                }
+
+                                Button(
+                                    "Ignore Selected",
+                                    role: .destructive
+                                ) {
+                                    let ids = selectedWorkoutImportIDs
+                                    health.ignorePendingWorkouts(ids)
+                                    selectedWorkoutImportIDs.removeAll()
+                                }
+                            }
+
+                            Button(
+                                "Ignore All",
+                                role: .destructive
+                            ) {
+                                health.ignoreAllPendingWorkouts()
+                                selectedWorkoutImportIDs.removeAll()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            if notifications.items.isEmpty &&
+                health.pendingWorkoutImports.isEmpty {
                 Section {
                     ContentUnavailableView(
                         "No notifications yet",
@@ -37,7 +112,7 @@ struct ATHLTHNotificationCenterView: View {
                         description: Text("Completed workouts, reached milestones and goal updates will appear here.")
                     )
                 }
-            } else {
+            } else if !notifications.items.isEmpty {
                 Section {
                     ForEach(notifications.items) { item in
                         notificationRow(item)
@@ -66,8 +141,116 @@ struct ATHLTHNotificationCenterView: View {
             }
         }
         .task {
-            await notifications.refreshAuthorizationStatus()
+            async let notificationStatus: Void =
+                notifications.refreshAuthorizationStatus()
+            async let workoutImports: Bool =
+                health.refreshWorkoutImportInbox()
+            _ = await (notificationStatus, workoutImports)
         }
+    }
+
+    private func pendingWorkoutRow(
+        _ item: PendingWorkoutImport
+    ) -> some View {
+        let isSelected =
+            selectedWorkoutImportIDs.contains(item.id)
+
+        return HStack(alignment: .center, spacing: 12) {
+            Button {
+                if isSelected {
+                    selectedWorkoutImportIDs.remove(item.id)
+                } else {
+                    selectedWorkoutImportIDs.insert(item.id)
+                }
+            } label: {
+                Image(
+                    systemName:
+                        isSelected
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                )
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(
+                    isSelected
+                        ? ATHLTHTheme.accent
+                        : Color.secondary
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                isSelected ? "Deselect workout" : "Select workout"
+            )
+
+            Image(systemName: item.summary.activity.icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.accent.opacity(0.09),
+                    in: RoundedRectangle(
+                        cornerRadius: 11,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.summary.activity.rawValue)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(pendingWorkoutDetails(item))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Text(item.sourceDescription)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            Menu {
+                Button("Import") {
+                    health.importPendingWorkout(item.id)
+                    selectedWorkoutImportIDs.remove(item.id)
+                }
+
+                Button("Ignore", role: .destructive) {
+                    health.ignorePendingWorkout(item.id)
+                    selectedWorkoutImportIDs.remove(item.id)
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func pendingWorkoutDetails(
+        _ item: PendingWorkoutImport
+    ) -> String {
+        let summary = item.summary
+        let minutes = max(Int((summary.duration / 60).rounded()), 1)
+        var parts = [
+            summary.startDate.formatted(
+                date: .abbreviated,
+                time: .shortened
+            ),
+            "\(minutes) min"
+        ]
+
+        if let distance = summary.distanceKilometers,
+           distance > 0 {
+            parts.append(
+                String(format: "%.2f km", distance)
+            )
+        }
+
+        return parts.joined(separator: " · ")
     }
 
     private var shouldShowPermissionPrompt: Bool {
