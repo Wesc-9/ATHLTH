@@ -2675,9 +2675,18 @@ final class HealthKitManager: ObservableObject {
 
     func workoutAIInsightContext(
         for summary: WorkoutSummary,
+        detail existingDetail: WorkoutDetail? = nil,
         maximumHeartRateBPM: Int?
     ) async -> WorkoutAIInsightContext {
-        let detail = await workoutDetail(for: summary)
+        let detail: WorkoutDetail
+        if let existingDetail {
+            detail = existingDetail
+        } else {
+            detail =
+                await workoutDetail(
+                    for: summary
+                )
+        }
 
         let workout: HKWorkout?
         if let cached = workoutObjects[summary.id] {

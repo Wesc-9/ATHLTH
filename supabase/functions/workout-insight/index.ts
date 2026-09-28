@@ -291,7 +291,7 @@ function sanitizeContext(input: WorkoutContext | undefined) {
 const schema = {
   type: "object",
   additionalProperties: false,
-  required: ["headline", "summary"],
+  required: ["headline", "summary", "visualRecipe"],
   properties: {
     headline: {
       type: "string",
@@ -302,6 +302,45 @@ const schema = {
       type: "string",
       minLength: 1,
       maxLength: 420,
+    },
+    visualRecipe: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "palette",
+        "scene",
+        "light",
+        "motif",
+        "energy",
+        "variant",
+      ],
+      properties: {
+        palette: {
+          type: "string",
+          enum: ["sage", "ocean", "amber", "violet", "rose", "slate"],
+        },
+        scene: {
+          type: "string",
+          enum: ["coast", "forest", "city", "track", "mountain", "studio"],
+        },
+        light: {
+          type: "string",
+          enum: ["sunrise", "daylight", "golden_hour", "dusk"],
+        },
+        motif: {
+          type: "string",
+          enum: ["route", "waves", "steps", "pulse", "streak", "group"],
+        },
+        energy: {
+          type: "string",
+          enum: ["calm", "steady", "energetic"],
+        },
+        variant: {
+          type: "integer",
+          minimum: 1,
+          maximum: 4,
+        },
+      },
     },
   },
 };
@@ -323,6 +362,12 @@ Priorities:
 - Avoid generic praise. Prefer one concrete observation.
 - headline: 3-8 words.
 - summary: 1-2 concise sentences, roughly 25-60 words.
+- Also choose a visualRecipe for the workout card. This is art direction only; the app renders it natively.
+- visualRecipe must reflect the workout without inventing geography. Never infer an exact real-world location.
+- Use mountain/forest/coast/city/track/studio only as abstract visual mood, not as a claim about where the workout happened.
+- Prefer route motif when routePointCount indicates a route is available.
+- Keep the visual style bright, premium, modern, athletic and Scandinavian.
+- Use calm or steady for easier-looking sessions and energetic only when the supplied workout data supports a harder/longer effort.
 `.trim();
 
 Deno.serve(async (req: Request) => {
