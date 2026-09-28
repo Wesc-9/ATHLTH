@@ -751,6 +751,135 @@ struct LibraryFavoriteButton: View {
     }
 }
 
+enum TrainingPlanCatalogSessionBlueprint: String, Codable, Hashable {
+    case running
+    case walking
+    case strength
+    case mobility
+    case recovery
+    case custom
+    case easyRun = "easy_run"
+    case walkRun = "walk_run"
+    case tempoRun = "tempo_run"
+    case intervalRun = "interval_run"
+    case longRun = "long_run"
+    case fullBodyA = "full_body_a"
+    case fullBodyB = "full_body_b"
+    case fullBodyC = "full_body_c"
+
+    var kind: WorkoutKind {
+        switch self {
+        case .walking:
+            return .walking
+        case .strength, .fullBodyA, .fullBodyB, .fullBodyC:
+            return .strength
+        case .mobility:
+            return .mobility
+        case .recovery:
+            return .recovery
+        case .custom:
+            return .custom
+        default:
+            return .running
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .running: return "Run"
+        case .walking: return "Walk"
+        case .strength: return "Strength"
+        case .mobility: return "Mobility"
+        case .recovery: return "Recovery"
+        case .custom: return "Workout"
+        case .easyRun: return "Easy Run"
+        case .walkRun: return "Run / Walk"
+        case .tempoRun: return "Tempo Run"
+        case .intervalRun: return "Intervals"
+        case .longRun: return "Long Run"
+        case .fullBodyA: return "Full Body A"
+        case .fullBodyB: return "Full Body B"
+        case .fullBodyC: return "Full Body C"
+        }
+    }
+
+    func durationMinutes(
+        week: Int,
+        totalWeeks: Int
+    ) -> Int {
+        let week = max(week, 1)
+        let totalWeeks = max(totalWeeks, 1)
+        let deload = week.isMultiple(of: 4) && week < totalWeeks
+        let taper =
+            totalWeeks >= 12 &&
+            week >= totalWeeks - 1
+
+        let value: Int
+        switch self {
+        case .easyRun, .running:
+            value = 35 + min((week - 1) * 2, 25)
+        case .walkRun:
+            value = 30 + min((week - 1) * 3, 20)
+        case .tempoRun:
+            value = 35 + min((week - 1) * 2, 25)
+        case .intervalRun:
+            value = 35 + min((week - 1) * 2, 20)
+        case .longRun:
+            value = 50 + min((week - 1) * 5, 80)
+        case .walking:
+            value = 45
+        case .strength, .fullBodyA, .fullBodyB, .fullBodyC:
+            value = 50
+        case .mobility:
+            value = 25
+        case .recovery:
+            value = 30
+        case .custom:
+            value = 45
+        }
+
+        if taper {
+            return max(Int(Double(value) * 0.72), 25)
+        }
+
+        if deload {
+            return max(Int(Double(value) * 0.82), 25)
+        }
+
+        return value
+    }
+
+    func note(
+        week: Int,
+        totalWeeks: Int
+    ) -> String? {
+        if totalWeeks >= 12 && week >= totalWeeks - 1 {
+            return "Taper week · keep the effort controlled."
+        }
+
+        if week.isMultiple(of: 4) && week < totalWeeks {
+            return "Deload week · absorb the previous training block."
+        }
+
+        switch self {
+        case .easyRun:
+            return "Conversational effort. Keep this genuinely easy."
+        case .walkRun:
+            return "Alternate comfortable running and walking as needed."
+        case .tempoRun:
+            return "Controlled quality work. Finish with something left."
+        case .intervalRun:
+            return "Quality intervals with easy recovery between efforts."
+        case .longRun:
+            return "Build endurance at an easy, sustainable effort."
+        case .fullBodyA, .fullBodyB, .fullBodyC:
+            return "Full-body strength. Edit exercises to match your equipment."
+        default:
+            return nil
+        }
+    }
+}
+
 struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
     let id: UUID
     let slug: String
@@ -764,6 +893,7 @@ struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
     let workoutPattern: [String]
     let tags: [String]
     let sortOrder: Int
+    let catalogVersion: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -778,10 +908,17 @@ struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
         case workoutPattern = "workout_pattern"
         case tags
         case sortOrder = "sort_order"
+        case catalogVersion = "catalog_version"
+    }
+
+    var sessionBlueprints: [TrainingPlanCatalogSessionBlueprint] {
+        workoutPattern.compactMap(
+            TrainingPlanCatalogSessionBlueprint.init(rawValue:)
+        )
     }
 
     var workoutKinds: [WorkoutKind] {
-        workoutPattern.compactMap(WorkoutKind.init(rawValue:))
+        sessionBlueprints.map(\.kind)
     }
 
     var categoryTitle: String {
@@ -817,7 +954,7 @@ final class TrainingPlanLibraryStore: ObservableObject {
                 try await client
                     .from("training_plan_catalog")
                     .select(
-                        "id,slug,title,summary,category,goal,level,duration_weeks,sessions_per_week,workout_pattern,tags,sort_order"
+                        "id,slug,title,summary,category,goal,level,duration_weeks,sessions_per_week,workout_pattern,tags,sort_order,catalog_version"
                     )
                     .eq("is_published", value: true)
                     .order("sort_order", ascending: true)
@@ -849,9 +986,10 @@ extension TrainingPlanCatalogEntry {
             level: "Beginner",
             durationWeeks: 8,
             sessionsPerWeek: 3,
-            workoutPattern: ["running", "running", "running"],
+            workoutPattern: ["walk_run", "easy_run", "long_run"],
             tags: ["5k", "running", "beginner"],
-            sortOrder: 10
+            sortOrder: 10,
+            catalogVersion: 2
         ),
         TrainingPlanCatalogEntry(
             id: UUID(uuidString: "B1000000-0000-0000-0000-000000000002")!,
@@ -863,9 +1001,10 @@ extension TrainingPlanCatalogEntry {
             level: "Intermediate",
             durationWeeks: 10,
             sessionsPerWeek: 4,
-            workoutPattern: ["running", "running", "strength", "running"],
+            workoutPattern: ["easy_run", "tempo_run", "strength", "long_run"],
             tags: ["10k", "running", "strength"],
-            sortOrder: 20
+            sortOrder: 20,
+            catalogVersion: 2
         ),
         TrainingPlanCatalogEntry(
             id: UUID(uuidString: "B1000000-0000-0000-0000-000000000003")!,
@@ -877,9 +1016,10 @@ extension TrainingPlanCatalogEntry {
             level: "Intermediate",
             durationWeeks: 12,
             sessionsPerWeek: 4,
-            workoutPattern: ["running", "strength", "running", "running"],
+            workoutPattern: ["easy_run", "strength", "tempo_run", "long_run"],
             tags: ["half-marathon", "running"],
-            sortOrder: 30
+            sortOrder: 30,
+            catalogVersion: 2
         ),
         TrainingPlanCatalogEntry(
             id: UUID(uuidString: "B1000000-0000-0000-0000-000000000004")!,
@@ -891,9 +1031,10 @@ extension TrainingPlanCatalogEntry {
             level: "Advanced",
             durationWeeks: 16,
             sessionsPerWeek: 5,
-            workoutPattern: ["running", "strength", "running", "running", "running"],
+            workoutPattern: ["easy_run", "strength", "interval_run", "easy_run", "long_run"],
             tags: ["marathon", "running"],
-            sortOrder: 40
+            sortOrder: 40,
+            catalogVersion: 2
         ),
         TrainingPlanCatalogEntry(
             id: UUID(uuidString: "B1000000-0000-0000-0000-000000000005")!,
@@ -905,9 +1046,10 @@ extension TrainingPlanCatalogEntry {
             level: "Beginner",
             durationWeeks: 8,
             sessionsPerWeek: 3,
-            workoutPattern: ["strength", "strength", "strength"],
+            workoutPattern: ["full_body_a", "full_body_b", "full_body_c"],
             tags: ["strength", "full-body"],
-            sortOrder: 50
+            sortOrder: 50,
+            catalogVersion: 2
         ),
         TrainingPlanCatalogEntry(
             id: UUID(uuidString: "B1000000-0000-0000-0000-000000000006")!,
@@ -919,9 +1061,10 @@ extension TrainingPlanCatalogEntry {
             level: "All levels",
             durationWeeks: 8,
             sessionsPerWeek: 4,
-            workoutPattern: ["running", "strength", "running", "strength"],
+            workoutPattern: ["easy_run", "full_body_a", "tempo_run", "full_body_b"],
             tags: ["hybrid", "running", "strength"],
-            sortOrder: 60
+            sortOrder: 60,
+            catalogVersion: 2
         )
     ]
 }
