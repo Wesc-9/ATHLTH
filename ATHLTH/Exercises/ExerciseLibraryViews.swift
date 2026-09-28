@@ -20,6 +20,7 @@ enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
 struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
 
     let source: ExerciseLibrarySection?
     let selectionTitle: String?
@@ -28,6 +29,7 @@ struct ExerciseLibraryView: View {
     @State private var query = ""
     @State private var selectedBodyPart = "All"
     @State private var selectedEquipment = "All"
+    @State private var favoritesOnly = false
     @State private var showingCreateExercise = false
     @State private var selectedSection: ExerciseLibrarySection = .library
 
@@ -51,12 +53,22 @@ struct ExerciseLibraryView: View {
             equipment: selectedEquipment
         )
         .filter { entry in
+            let sourceMatches: Bool
             switch selectedSection {
             case .library:
-                return entry.source != .custom
+                sourceMatches = entry.source != .custom
             case .mine:
-                return entry.source == .custom
+                sourceMatches = entry.source == .custom
             }
+
+            let favoriteMatches =
+                !favoritesOnly ||
+                favorites.isFavorite(
+                    .exercise,
+                    itemID: entry.id.uuidString
+                )
+
+            return sourceMatches && favoriteMatches
         }
     }
 
@@ -109,16 +121,33 @@ struct ExerciseLibraryView: View {
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(results) { entry in
-                            NavigationLink {
-                                ExerciseDetailView(
-                                    entry: entry,
-                                    selectionTitle: selectionTitle,
-                                    onSelect: onSelect
+                            ZStack(alignment: .topTrailing) {
+                                NavigationLink {
+                                    ExerciseDetailView(
+                                        entry: entry,
+                                        selectionTitle: selectionTitle,
+                                        onSelect: onSelect
+                                    )
+                                } label: {
+                                    exerciseRow(entry)
+                                }
+                                .buttonStyle(.plain)
+
+                                LibraryFavoriteButton(
+                                    kind: .exercise,
+                                    itemID: entry.id.uuidString,
+                                    title: entry.name,
+                                    subtitle:
+                                        [
+                                            entry.bodyPart,
+                                            entry.exercise.equipment.first
+                                        ]
+                                        .compactMap { $0 }
+                                        .joined(separator: " · "),
+                                    icon: "dumbbell.fill"
                                 )
-                            } label: {
-                                exerciseRow(entry)
+                                .padding(8)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding()
@@ -146,7 +175,9 @@ struct ExerciseLibraryView: View {
                 .environmentObject(session)
         }
         .task {
-            await library.refresh()
+            async let exerciseRefresh: Void = library.refresh()
+            async let favoriteRefresh: Void = favorites.refresh()
+            _ = await (exerciseRefresh, favoriteRefresh)
         }
         .refreshable {
             await library.refresh(force: true)
@@ -180,6 +211,30 @@ struct ExerciseLibraryView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    Button {
+                        favoritesOnly.toggle()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "star.fill")
+                            Text("Favorites")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(
+                            favoritesOnly
+                                ? Color.white
+                                : Color.primary
+                        )
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 7)
+                        .background(
+                            favoritesOnly
+                                ? ATHLTHTheme.accent
+                                : Color(.secondarySystemGroupedBackground),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+
                     Menu {
                         Button("All") { selectedBodyPart = "All" }
                         ForEach(library.bodyParts, id: \.self) { part in
