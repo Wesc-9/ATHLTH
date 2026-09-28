@@ -94,7 +94,8 @@ jobs:
           except Exception as exc:
               print(f"BETA_LICENSE_AGREEMENT_QUERY_ERROR={type(exc).__name__}:{exc}")
 
-          groups = get(f"/v1/apps/{app_id}/betaGroups", {
+          groups = get("/v1/betaGroups", {
+              "filter[app]": app_id,
               "fields[betaGroups]": "name,createdDate,isInternalGroup,hasAccessToAllBuilds,publicLinkEnabled,publicLinkId,publicLinkLimitEnabled,publicLinkLimit,publicLink,feedbackEnabled,builds,betaTesters",
               "include": "builds,betaTesters",
               "limit": "200",
