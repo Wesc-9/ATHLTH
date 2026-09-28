@@ -4,9 +4,14 @@ import SwiftUI
 
 struct TrainingLibraryHomeView: View {
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var recents: LibraryRecentsStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var session: AppSessionStore
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
+    @StateObject private var planCatalog = TrainingPlanLibraryStore()
     @State private var showingCreatePlan = false
 
     var body: some View {
@@ -34,6 +39,10 @@ struct TrainingLibraryHomeView: View {
                         tint: ATHLTHTheme.accent
                     )
                 }
+            }
+
+            if !recents.items.isEmpty {
+                recentSection
             }
 
             librarySection(
@@ -187,7 +196,202 @@ struct TrainingLibraryHomeView: View {
             TrainingPlanCreationView()
         }
         .task {
-            await favorites.refresh()
+            recents.refresh()
+            async let favoriteRefresh: Void = favorites.refresh()
+            async let planRefresh: Void = planCatalog.refresh()
+            _ = await (favoriteRefresh, planRefresh)
+        }
+    }
+
+    private var recentSection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("RECENTLY USED")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.8)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text("Jump back in")
+                        .font(.title3.weight(.bold))
+                }
+
+                Spacer()
+
+                Text("\(min(recents.items.count, 4)) recent")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 10) {
+                    ForEach(recents.items.prefix(4)) { item in
+                        NavigationLink {
+                            recentDestination(item)
+                        } label: {
+                            recentCard(item)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private func recentCard(
+        _ item: LibraryRecentRecord
+    ) -> some View {
+        let tint = recentTint(item.itemType)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(
+                    systemName:
+                        item.icon ??
+                        item.itemType.systemImage
+                )
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
+                .background(
+                    tint.opacity(0.10),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText.opacity(0.72)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+
+                Text(
+                    item.subtitle ??
+                    item.itemType.title
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+            }
+        }
+        .padding(13)
+        .frame(width: 164, height: 116, alignment: .topLeading)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.94),
+                    tint.opacity(0.03)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.94),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func recentDestination(
+        _ item: LibraryRecentRecord
+    ) -> some View {
+        switch item.itemType {
+        case .plan:
+            if let entry = planCatalog.entries.first(
+                where: {
+                    $0.id.uuidString
+                        .caseInsensitiveCompare(item.itemID)
+                        == .orderedSame
+                }
+            ) {
+                TrainingPlanCatalogDetailView(entry: entry)
+            } else {
+                TrainingPlanLibraryView()
+            }
+
+        case .workout:
+            if let id = UUID(uuidString: item.itemID),
+               let workout = runningLibrary.allTemplates.first(
+                    where: { $0.id == id }
+               ) {
+                RunningWorkoutDetailView(
+                    workout: workout,
+                    selectionTitle: nil,
+                    onSelect: nil,
+                    onStart: onStartRunning
+                )
+            } else {
+                RunningWorkoutLibraryView(
+                    source: .library,
+                    onStart: onStartRunning
+                )
+            }
+
+        case .exercise:
+            if let id = UUID(uuidString: item.itemID),
+               let entry = exerciseLibrary.search(
+                    query: "",
+                    bodyPart: "All",
+                    equipment: "All"
+               ).first(where: { $0.id == id }) {
+                ExerciseDetailView(
+                    entry: entry,
+                    selectionTitle: nil,
+                    onSelect: nil
+                )
+            } else {
+                ExerciseLibraryView(source: .library)
+            }
+
+        case .route:
+            if let id = UUID(uuidString: item.itemID),
+               let saved = session.savedRoutes.first(
+                    where: { $0.id == id }
+               ) {
+                RouteDetailView(route: saved)
+            } else if let id = UUID(uuidString: item.itemID) {
+                RouteLibraryDetailLoader(routeID: id)
+            } else {
+                RouteLibraryListView(source: .database)
+            }
+        }
+    }
+
+    private func recentTint(
+        _ kind: LibraryFavoriteKind
+    ) -> Color {
+        switch kind {
+        case .plan:
+            return Color.orange
+        case .workout:
+            return ATHLTHTheme.vitality
+        case .exercise:
+            return Color.indigo
+        case .route:
+            return Color.green
         }
     }
 
