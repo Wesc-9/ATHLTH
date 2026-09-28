@@ -94,6 +94,45 @@ jobs:
           except Exception as exc:
               print(f"BETA_LICENSE_AGREEMENT_QUERY_ERROR={type(exc).__name__}:{exc}")
 
+          groups = get(f"/v1/apps/{app_id}/betaGroups", {
+              "fields[betaGroups]": "name,createdDate,isInternalGroup,hasAccessToAllBuilds,publicLinkEnabled,publicLinkId,publicLinkLimitEnabled,publicLinkLimit,publicLink,feedbackEnabled,builds,betaTesters",
+              "include": "builds,betaTesters",
+              "limit": "200",
+              "limit[builds]": "1000",
+              "limit[betaTesters]": "50",
+          })
+          g_included = {(x.get("type"), x.get("id")): x for x in groups.get("included", [])}
+          print(f"BETA_GROUP_TOTAL={len(groups.get('data', []))}")
+          for gi, group in enumerate(groups.get("data", [])):
+              ga = group.get("attributes", {})
+              print(f"GROUP[{gi}].ID={group.get('id')}")
+              print(f"GROUP[{gi}].NAME={ga.get('name')}")
+              print(f"GROUP[{gi}].INTERNAL={ga.get('isInternalGroup')}")
+              print(f"GROUP[{gi}].ALL_BUILDS={ga.get('hasAccessToAllBuilds')}")
+              print(f"GROUP[{gi}].PUBLIC_LINK_ENABLED={ga.get('publicLinkEnabled')}")
+              print(f"GROUP[{gi}].PUBLIC_LINK_ID={ga.get('publicLinkId')}")
+              print(f"GROUP[{gi}].PUBLIC_LINK={ga.get('publicLink')}")
+              print(f"GROUP[{gi}].PUBLIC_LINK_LIMIT_ENABLED={ga.get('publicLinkLimitEnabled')}")
+              print(f"GROUP[{gi}].PUBLIC_LINK_LIMIT={ga.get('publicLinkLimit')}")
+              build_refs = group.get("relationships", {}).get("builds", {}).get("data", [])
+              tester_refs = group.get("relationships", {}).get("betaTesters", {}).get("data", [])
+              print(f"GROUP[{gi}].BUILD_COUNT={len(build_refs)}")
+              print(f"GROUP[{gi}].TESTER_COUNT={len(tester_refs)}")
+              for bi, bref in enumerate(build_refs):
+                  item = g_included.get((bref.get("type"), bref.get("id")), {})
+                  ba = item.get("attributes", {})
+                  print(f"GROUP[{gi}].BUILD[{bi}].NUMBER={ba.get('version')}")
+                  print(f"GROUP[{gi}].BUILD[{bi}].STATE={ba.get('processingState')}")
+                  print(f"GROUP[{gi}].BUILD[{bi}].AUDIENCE={ba.get('buildAudienceType')}")
+              states = {}
+              for tref in tester_refs:
+                  item = g_included.get((tref.get("type"), tref.get("id")), {})
+                  ta = item.get("attributes", {})
+                  state = str(ta.get("state"))
+                  states[state] = states.get(state, 0) + 1
+              for state, count in sorted(states.items()):
+                  print(f"GROUP[{gi}].TESTER_STATE[{state}]={count}")
+
           builds = get("/v1/builds", {
               "filter[app]": app_id,
               "filter[version]": os.environ["BUILD_NUMBER"],
