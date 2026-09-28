@@ -2293,17 +2293,23 @@ struct PersonalizeTrainingPlanView: View {
         selectedDays.count == entry.sessionsPerWeek
     }
 
+    private var resolvedStartDate: Date {
+        AppSessionStore.catalogWeekStart(
+            onOrAfter: startDate
+        )
+    }
+
     private var endDate: Date {
         Calendar.current.date(
             byAdding: .day,
             value: max(entry.durationWeeks * 7 - 1, 0),
-            to: Calendar.current.startOfDay(for: startDate)
-        ) ?? startDate
+            to: resolvedStartDate
+        ) ?? resolvedStartDate
     }
 
     private var conflictingPlan: TrainingPlan? {
         session.trainingPlanConflict(
-            startDate: startDate,
+            startDate: resolvedStartDate,
             weekCount: entry.durationWeeks
         )
     }
@@ -2347,13 +2353,39 @@ struct PersonalizeTrainingPlanView: View {
                                 )
 
                             DatePicker(
-                                "Start date",
+                                "Preferred start",
                                 selection: $startDate,
                                 in: Calendar.current.startOfDay(
                                     for: Date()
                                 )...,
                                 displayedComponents: .date
                             )
+
+                            Divider()
+
+                            HStack {
+                                Text("Plan begins")
+                                    .font(.subheadline)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.mutedText
+                                    )
+
+                                Spacer()
+
+                                Text(
+                                    resolvedStartDate.formatted(
+                                        date: .abbreviated,
+                                        time: .omitted
+                                    )
+                                )
+                                .font(.subheadline.weight(.semibold))
+                            }
+
+                            Text(
+                                "Library plans run Monday–Sunday. ATHLTH starts this plan on the first Monday on or after your preferred date."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
 
                             Divider()
 
@@ -2657,7 +2689,7 @@ struct PersonalizeTrainingPlanView: View {
 
         guard session.scheduleCatalogPlan(
             entry,
-            startDate: startDate,
+            startDate: resolvedStartDate,
             preferredDayIndexes:
                 selectedDays.sorted()
         ) != nil else {
