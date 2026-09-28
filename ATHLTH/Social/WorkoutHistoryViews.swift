@@ -300,6 +300,7 @@ struct WorkoutHistoryDetailView: View {
     @State private var activity: SocialActivityRecord?
     @State private var healthDetail = WorkoutDetail()
     @State private var healthDetailLoaded = false
+    @State private var replayContext: WorkoutAIInsightContext?
     @State private var showingReview = false
     @State private var startingGhostRace = false
     @State private var ghostRaceError: String?
@@ -339,6 +340,11 @@ struct WorkoutHistoryDetailView: View {
                         }
                     }
                 }
+
+                ATHLTHWorkoutReplayCard(
+                    workout: workout,
+                    context: replayContext
+                )
 
                 if workout.activity == .running {
                     ghostRaceCard
@@ -421,6 +427,11 @@ struct WorkoutHistoryDetailView: View {
 
             activity = await social.workoutActivity(for: workout.id)
             healthDetail = await health.workoutDetail(for: workout.id)
+            replayContext = await health.athlthReplayContext(
+                for: workout,
+                maximumHeartRateBPM:
+                    session.onboardingProfile?.maximumHeartRateBPM
+            )
             await gearRefresh
             healthDetailLoaded = true
         }
@@ -935,6 +946,7 @@ struct PostWorkoutReviewView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var health: HealthKitManager
 
     let workout: SocialPublishableWorkout
     let wasAutoPublished: Bool
@@ -957,12 +969,18 @@ struct PostWorkoutReviewView: View {
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var saving = false
     @State private var alreadyPublished = false
+    @State private var replayContext: WorkoutAIInsightContext?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
                     summaryCard
+
+                    ATHLTHWorkoutReplayCard(
+                        workout: workout,
+                        context: replayContext
+                    )
 
                     ATHLTHCard {
                         VStack(alignment: .leading, spacing: 13) {
@@ -1086,7 +1104,15 @@ struct PostWorkoutReviewView: View {
                 }
             }
             .task {
-                await loadExistingReview()
+                async let reviewLoad: Void =
+                    loadExistingReview()
+                async let replayLoad: Void =
+                    loadReplayContext()
+
+                _ = await (
+                    reviewLoad,
+                    replayLoad
+                )
             }
         }
     }
@@ -1249,6 +1275,15 @@ struct PostWorkoutReviewView: View {
         case .publicProfile:
             Text("Visible on your ATHLTH profile to people allowed to view public activity.")
         }
+    }
+
+    @MainActor
+    private func loadReplayContext() async {
+        replayContext = await health.athlthReplayContext(
+            for: workout,
+            maximumHeartRateBPM:
+                session.onboardingProfile?.maximumHeartRateBPM
+        )
     }
 
     private func loadExistingReview() async {
