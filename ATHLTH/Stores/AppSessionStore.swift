@@ -2654,20 +2654,26 @@ final class AppSessionStore: ObservableObject {
         let versionTag =
             "catalog-version:\(entry.catalogVersion)"
 
-        if let existing = planTemplates.first(
+        if preferredDayIndexes == nil,
+           let existing = planTemplates.first(
             where: {
                 $0.tags.contains(catalogTag) &&
                 $0.tags.contains(versionTag)
             }
-        ) {
+           ) {
             return existing
         }
 
-        let template = makeCatalogPlan(
+        var template = makeCatalogPlan(
             entry,
             startDate: nil,
             preferredDayIndexes: preferredDayIndexes
         )
+
+        if preferredDayIndexes != nil {
+            template.title = "\(entry.title) · Custom"
+            template.updatedAt = Date()
+        }
 
         planTemplates.insert(template, at: 0)
         persistPlanTemplates()
