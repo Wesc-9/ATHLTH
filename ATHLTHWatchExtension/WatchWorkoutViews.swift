@@ -1526,6 +1526,30 @@ private struct WatchRunWalkWorkoutPager: View {
                 .buttonStyle(.bordered)
             }
 
+            if workoutManager.audioCoachConfigured {
+                NavigationLink {
+                    WatchAudioCoachLiveSettingsView(
+                        workoutManager: workoutManager
+                    )
+                } label: {
+                    HStack {
+                        Label(
+                            "Coach settings",
+                            systemImage: "slider.horizontal.3"
+                        )
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 34)
+                }
+                .buttonStyle(.bordered)
+            }
+
             if let error =
                     workoutManager.errorMessage {
                 Text(error)
@@ -1973,5 +1997,318 @@ private struct WatchRunWalkWorkoutPager: View {
             "checkmark.circle.fill",
             WatchTheme.green
         )
+    }
+}
+
+
+private struct WatchAudioCoachLiveSettingsView: View {
+    @ObservedObject var workoutManager: WatchWorkoutManager
+
+    var body: some View {
+        Form {
+            Section("Audio Coach") {
+                Toggle(
+                    "Enabled",
+                    isOn: boolBinding(\.enabled)
+                )
+
+                Text(
+                    "Changes apply immediately to this workout only."
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+
+            if configuration.enabled {
+                Section("When to speak") {
+                    Toggle(
+                        "Distance",
+                        isOn: distanceTriggerBinding
+                    )
+
+                    if configuration.distanceIntervalMeters != nil {
+                        Stepper(
+                            distanceIntervalLabel,
+                            value: distanceIntervalBinding,
+                            in: 250...10_000,
+                            step: 250
+                        )
+                    }
+
+                    Toggle(
+                        "Time",
+                        isOn: timeTriggerBinding
+                    )
+
+                    if configuration.timeIntervalSeconds != nil {
+                        Stepper(
+                            timeIntervalLabel,
+                            value: timeIntervalBinding,
+                            in: 60...3_600,
+                            step: 60
+                        )
+                    }
+                }
+
+                Section("Workout updates") {
+                    Toggle(
+                        "Distance",
+                        isOn: boolBinding(\.announceDistance)
+                    )
+                    Toggle(
+                        "Elapsed time",
+                        isOn: boolBinding(\.announceElapsedTime)
+                    )
+                    Toggle(
+                        "Average pace",
+                        isOn: boolBinding(\.announceAveragePace)
+                    )
+                    Toggle(
+                        "Current time",
+                        isOn: boolBinding(\.announceClockTime)
+                    )
+                    Toggle(
+                        "Heart rate",
+                        isOn: boolBinding(\.announceHeartRate)
+                    )
+                }
+
+                Section("Route") {
+                    Toggle(
+                        "Remaining distance",
+                        isOn:
+                            boolBinding(
+                                \.announceRemainingRouteDistance
+                            )
+                    )
+                    Toggle(
+                        "Estimated time left",
+                        isOn:
+                            boolBinding(
+                                \.announceEstimatedRemainingRouteTime
+                            )
+                    )
+                }
+
+                Section("Structured workout") {
+                    Toggle(
+                        "Current / next step",
+                        isOn:
+                            boolBinding(
+                                \.announceCurrentWorkoutStep
+                            )
+                    )
+                    Toggle(
+                        "Remaining step time",
+                        isOn:
+                            boolBinding(
+                                \.announceRemainingStepTime
+                            )
+                    )
+                    Toggle(
+                        "Remaining step distance",
+                        isOn:
+                            boolBinding(
+                                \.announceRemainingStepDistance
+                            )
+                    )
+                }
+
+                Section("Music") {
+                    Toggle(
+                        "Lower music for coach",
+                        isOn: duckOtherAudioBinding
+                    )
+
+                    Text(
+                        configuration.shouldDuckOtherAudio
+                            ? "Spotify returns to normal volume after each cue."
+                            : "Coach mixes with music at full music volume."
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section("Voice") {
+                    Picker(
+                        "Language",
+                        selection: languageBinding
+                    ) {
+                        ForEach(
+                            WatchAudioCoachLanguage.allCases,
+                            id: \.self
+                        ) { language in
+                            Text(language.title)
+                                .tag(language)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Audio Coach")
+    }
+
+    private var configuration:
+        WatchAudioCoachConfiguration {
+        workoutManager.audioCoachConfiguration
+    }
+
+    private func update(
+        _ mutate:
+            (inout WatchAudioCoachConfiguration) -> Void
+    ) {
+        var updated = configuration
+        mutate(&updated)
+        workoutManager.updateAudioCoachDuringWorkout(updated)
+    }
+
+    private func boolBinding(
+        _ keyPath:
+            WritableKeyPath<
+                WatchAudioCoachConfiguration,
+                Bool
+            >
+    ) -> Binding<Bool> {
+        Binding(
+            get: {
+                configuration[keyPath: keyPath]
+            },
+            set: { value in
+                update {
+                    $0[keyPath: keyPath] = value
+                }
+            }
+        )
+    }
+
+    private var languageBinding:
+        Binding<WatchAudioCoachLanguage> {
+        Binding(
+            get: {
+                configuration.language
+            },
+            set: { value in
+                update {
+                    $0.language = value
+                }
+            }
+        )
+    }
+
+    private var duckOtherAudioBinding:
+        Binding<Bool> {
+        Binding(
+            get: {
+                configuration.shouldDuckOtherAudio
+            },
+            set: { value in
+                update {
+                    $0.duckOtherAudio = value
+                }
+            }
+        )
+    }
+
+    private var distanceTriggerBinding:
+        Binding<Bool> {
+        Binding(
+            get: {
+                configuration.distanceIntervalMeters != nil
+            },
+            set: { enabled in
+                update {
+                    $0.distanceIntervalMeters =
+                        enabled
+                            ? (
+                                $0.distanceIntervalMeters ??
+                                1_000
+                            )
+                            : nil
+                }
+            }
+        )
+    }
+
+    private var timeTriggerBinding:
+        Binding<Bool> {
+        Binding(
+            get: {
+                configuration.timeIntervalSeconds != nil
+            },
+            set: { enabled in
+                update {
+                    $0.timeIntervalSeconds =
+                        enabled
+                            ? (
+                                $0.timeIntervalSeconds ??
+                                600
+                            )
+                            : nil
+                }
+            }
+        )
+    }
+
+    private var distanceIntervalBinding:
+        Binding<Double> {
+        Binding(
+            get: {
+                configuration.distanceIntervalMeters ??
+                1_000
+            },
+            set: { value in
+                update {
+                    $0.distanceIntervalMeters = value
+                }
+            }
+        )
+    }
+
+    private var timeIntervalBinding:
+        Binding<Double> {
+        Binding(
+            get: {
+                configuration.timeIntervalSeconds ??
+                600
+            },
+            set: { value in
+                update {
+                    $0.timeIntervalSeconds = value
+                }
+            }
+        )
+    }
+
+    private var distanceIntervalLabel: String {
+        let meters =
+            configuration.distanceIntervalMeters ??
+            1_000
+
+        if meters >= 1_000 {
+            return String(
+                format: "%.2g km",
+                meters / 1_000
+            )
+        }
+
+        return "\(Int(meters.rounded())) m"
+    }
+
+    private var timeIntervalLabel: String {
+        let minutes =
+            max(
+                Int(
+                    (
+                        (
+                            configuration
+                                .timeIntervalSeconds ??
+                            600
+                        ) / 60
+                    ).rounded()
+                ),
+                1
+            )
+
+        return "\(minutes) min"
     }
 }
