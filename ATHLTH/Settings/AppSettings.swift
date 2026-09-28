@@ -255,6 +255,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
     @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
+    @Published var aiHealthDataSharingEnabled: Bool { didSet { persist() } }
     @Published var autoPublishCompletedWorkouts: Bool { didSet { persist() } }
     @Published var workoutSharingChoiceCompleted: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
@@ -400,6 +401,10 @@ final class AppSettingsStore: ObservableObject {
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
         backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
+        aiHealthDataSharingEnabled =
+            defaults.object(
+                forKey: "settings.ai.healthDataSharingEnabled"
+            ) as? Bool ?? false
         autoPublishCompletedWorkouts = defaults.object(forKey: "settings.autoPublishCompletedWorkouts") as? Bool ?? false
         workoutSharingChoiceCompleted = defaults.object(
             forKey: "settings.workoutSharingChoiceCompleted"
@@ -587,6 +592,10 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
         defaults.set(backgroundHealthSyncEnabled, forKey: "settings.backgroundHealthSyncEnabled")
+        defaults.set(
+            aiHealthDataSharingEnabled,
+            forKey: "settings.ai.healthDataSharingEnabled"
+        )
         defaults.set(autoPublishCompletedWorkouts, forKey: "settings.autoPublishCompletedWorkouts")
         defaults.set(
             workoutSharingChoiceCompleted,
