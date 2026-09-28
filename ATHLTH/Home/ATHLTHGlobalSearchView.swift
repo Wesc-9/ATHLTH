@@ -4,9 +4,11 @@ import SwiftUI
 
 enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
     case all = "All"
-    case users = "Users"
+    case users = "People"
+    case routes = "Routes"
+    case groups = "Clubs"
     case events = "Events"
-    case groups = "Groups"
+    case challenges = "Challenges"
 
     var id: String { rawValue }
 
@@ -14,13 +16,16 @@ enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
         switch self {
         case .all: return "sparkles"
         case .users: return "person.2.fill"
-        case .events: return "calendar"
+        case .routes: return "map.fill"
         case .groups: return "person.3.fill"
+        case .events: return "calendar"
+        case .challenges: return "flag.checkered"
         }
     }
 }
 
 struct ATHLTHGlobalSearchView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var routes: RouteDiscoveryStore
     @EnvironmentObject private var community: CommunityEventStore
@@ -57,11 +62,13 @@ struct ATHLTHGlobalSearchView: View {
         NavigationStack {
             ZStack {
                 ATHLTHPremiumCanvas(
-                    accent: ATHLTHTheme.vitality.opacity(0.45)
+                    accent: ATHLTHTheme.vitality.opacity(0.34)
                 )
 
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        searchHeader
+                        premiumSearchField
                         filterBar
 
                         if normalizedQuery.isEmpty {
@@ -70,20 +77,15 @@ struct ATHLTHGlobalSearchView: View {
                             searchResults
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 34)
                     .frame(maxWidth: 760)
                     .frame(maxWidth: .infinity)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("Search ATHLTH")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(
-                text: $query,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Users, events, groups and more"
-            )
-            .focused($searchFocused)
+            .toolbar(.hidden, for: .navigationBar)
             .onSubmit(of: .search) {
                 rememberSearch(query)
             }
@@ -98,9 +100,104 @@ struct ATHLTHGlobalSearchView: View {
                     eventRefresh,
                     groupRefresh
                 )
-                searchFocused = true
             }
         }
+    }
+
+    private var searchHeader: some View {
+        ZStack {
+            Text("Search")
+                .font(.system(size: 25, weight: .bold, design: .rounded))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            HStack {
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(width: 38, height: 38)
+                        .background(
+                            .ultraThinMaterial,
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.primary.opacity(0.08),
+                                    lineWidth: 1
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close search")
+            }
+        }
+        .frame(height: 44)
+    }
+
+    private var premiumSearchField: some View {
+        HStack(spacing: 11) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+            TextField(
+                "People, routes, clubs, events and challenges",
+                text: $query
+            )
+            .font(.subheadline)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.search)
+            .focused($searchFocused)
+
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                    searchFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 54)
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                searchFocused
+                    ? ATHLTHTheme.accent.opacity(0.28)
+                    : Color.primary.opacity(0.07),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(searchFocused ? 0.07 : 0.035),
+            radius: searchFocused ? 14 : 9,
+            y: 5
+        )
+        .animation(
+            .easeOut(duration: 0.16),
+            value: searchFocused
+        )
     }
 
     private var filterBar: some View {
@@ -112,97 +209,61 @@ struct ATHLTHGlobalSearchView: View {
                             scope = item
                         }
                     } label: {
-                        Label(item.rawValue, systemImage: item.icon)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(
-                                scope == item
-                                    ? Color.white
-                                    : ATHLTHTheme.primaryText
-                            )
-                            .padding(.horizontal, 13)
-                            .frame(height: 36)
-                            .background(
-                                scope == item
-                                    ? ATHLTHTheme.accentDeep
-                                    : ATHLTHTheme.card,
-                                in: Capsule()
-                            )
-                            .overlay {
-                                if scope != item {
-                                    Capsule()
-                                        .stroke(
-                                            Color.primary.opacity(0.08),
-                                            lineWidth: 1
-                                        )
-                                }
+                        HStack(spacing: 6) {
+                            Image(systemName: item.icon)
+                                .font(.system(size: 11, weight: .bold))
+                            Text(item.rawValue)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(
+                            scope == item
+                                ? Color.white
+                                : ATHLTHTheme.primaryText
+                        )
+                        .padding(.horizontal, 13)
+                        .frame(height: 38)
+                        .background(
+                            scope == item
+                                ? ATHLTHTheme.accentDeep
+                                : ATHLTHTheme.card.opacity(0.92),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            if scope != item {
+                                Capsule()
+                                    .stroke(
+                                        Color.primary.opacity(0.07),
+                                        lineWidth: 1
+                                    )
                             }
+                        }
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.vertical, 2)
         }
     }
 
     private var searchLanding: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 20) {
             if !recentSearches.isEmpty {
                 recentSearchesSection
             }
 
-            ATHLTHCard {
-                HStack(spacing: 14) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 21, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.vitality)
-                        .frame(width: 48, height: 48)
-                        .background(
-                            ATHLTHTheme.vitalitySoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                        )
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Find anything in ATHLTH")
-                            .font(.headline)
-                        Text(
-                            "Search users, local groups, upcoming events, routes and challenges."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-                }
-            }
-
             if scope == .all {
                 discoverSection
-            } else if scope == .groups && groups.groups.isEmpty {
-                NavigationLink {
-                    CommunityGroupsView()
-                } label: {
-                    discoveryRow(
-                        icon: "person.3.fill",
-                        tint: .indigo,
-                        title: "Discover Groups",
-                        subtitle: "Find or create a group for your city or area"
-                    )
-                }
-                .buttonStyle(.plain)
+            } else {
+                categoryLanding
             }
         }
+        .padding(.top, 4)
     }
 
     private var recentSearchesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("RECENT SEARCHES")
-                    .font(.caption.weight(.semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                searchSectionTitle("Recent")
 
                 Spacer()
 
@@ -213,44 +274,36 @@ struct ATHLTHGlobalSearchView: View {
                 .foregroundStyle(ATHLTHTheme.accentDeep)
             }
 
-            ATHLTHCard {
-                VStack(spacing: 0) {
-                    ForEach(
-                        Array(recentSearches.prefix(6).enumerated()),
-                        id: \.offset
-                    ) { index, value in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(recentSearches.prefix(6), id: \.self) { value in
                         Button {
                             query = value
                             searchFocused = true
                         } label: {
-                            HStack(spacing: 11) {
+                            HStack(spacing: 7) {
                                 Image(systemName: "clock.arrow.circlepath")
-                                    .foregroundStyle(
-                                        ATHLTHTheme.mutedText
-                                    )
-                                    .frame(width: 24)
-
+                                    .font(.system(size: 11, weight: .semibold))
                                 Text(value)
-                                    .font(.subheadline)
-                                    .foregroundStyle(
-                                        ATHLTHTheme.primaryText
-                                    )
                                     .lineLimit(1)
-
-                                Spacer()
-
-                                Image(systemName: "arrow.up.left")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
                             }
-                            .frame(height: 44)
-                            .contentShape(Rectangle())
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .padding(.horizontal, 12)
+                            .frame(height: 36)
+                            .background(
+                                ATHLTHTheme.card,
+                                in: Capsule()
+                            )
+                            .overlay {
+                                Capsule()
+                                    .stroke(
+                                        Color.primary.opacity(0.06),
+                                        lineWidth: 1
+                                    )
+                            }
                         }
                         .buttonStyle(.plain)
-
-                        if index < min(recentSearches.count, 6) - 1 {
-                            Divider()
-                        }
                     }
                 }
             }
@@ -334,6 +387,70 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     @ViewBuilder
+    private var categoryLanding: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            searchSectionTitle(scope.rawValue)
+
+            ATHLTHCard {
+                HStack(spacing: 14) {
+                    Image(systemName: scope.icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 14,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Search \(scope.rawValue.lowercased())")
+                            .font(.headline)
+                        Text("Start typing to narrow ATHLTH to this category.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    private func searchSectionTitle(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 11, weight: .bold))
+            .tracking(1.7)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+    }
+
+    private var searchEmptyState: some View {
+        ATHLTHCard {
+            VStack(spacing: 13) {
+                Image(systemName: "magnifyingglass.circle.fill")
+                    .font(.system(size: 42, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                Text("Nothing found")
+                    .font(.title3.weight(.bold))
+
+                Text(
+                    "Try another name, place or training term — or switch category above."
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 330)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+        }
+    }
+
+    @ViewBuilder
     private var searchResults: some View {
         let users = matchingUsers
         let eventResults = matchingEvents
@@ -351,8 +468,8 @@ struct ATHLTHGlobalSearchView: View {
             )
             .padding(.vertical, 80)
         } else if visibleResultCount == 0 {
-            ContentUnavailableView.search(text: query)
-                .padding(.vertical, 80)
+            searchEmptyState
+                .padding(.top, 18)
         } else {
             if (scope == .all || scope == .users) && !users.isEmpty {
                 resultSection("USERS") {
@@ -458,7 +575,8 @@ struct ATHLTHGlobalSearchView: View {
                 }
             }
 
-            if scope == .all && !routeResults.isEmpty {
+            if (scope == .all || scope == .routes) &&
+                !routeResults.isEmpty {
                 resultSection("ROUTES") {
                     ForEach(routeResults.prefix(6)) { route in
                         NavigationLink {
@@ -481,7 +599,8 @@ struct ATHLTHGlobalSearchView: View {
                 }
             }
 
-            if scope == .all && !challengeResults.isEmpty {
+            if (scope == .all || scope == .challenges) &&
+                !challengeResults.isEmpty {
                 resultSection("CHALLENGES") {
                     ForEach(challengeResults.prefix(6)) { challenge in
                         NavigationLink {
@@ -530,6 +649,10 @@ struct ATHLTHGlobalSearchView: View {
             return matchingEvents.count
         case .groups:
             return matchingGroups.count
+        case .routes:
+            return matchingRoutes.count
+        case .challenges:
+            return matchingChallenges.count
         }
     }
 
@@ -639,19 +762,24 @@ struct ATHLTHGlobalSearchView: View {
                 content()
             }
             .background(
-                ATHLTHTheme.card,
+                ATHLTHTheme.card.opacity(0.96),
                 in: RoundedRectangle(
-                    cornerRadius: 20,
+                    cornerRadius: 22,
                     style: .continuous
                 )
             )
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: 20,
+                    cornerRadius: 22,
                     style: .continuous
                 )
-                .stroke(Color.white.opacity(0.70), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.055), lineWidth: 1)
             }
+            .shadow(
+                color: Color.black.opacity(0.035),
+                radius: 12,
+                y: 5
+            )
         }
     }
 
@@ -704,8 +832,23 @@ struct ATHLTHGlobalSearchView: View {
             subtitle: subtitle
         )
         .background(
-            ATHLTHTheme.card,
-            in: RoundedRectangle(cornerRadius: 18)
+            ATHLTHTheme.card.opacity(0.96),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(Color.primary.opacity(0.055), lineWidth: 1)
+        }
+        .shadow(
+            color: Color.black.opacity(0.03),
+            radius: 10,
+            y: 4
         )
     }
 
