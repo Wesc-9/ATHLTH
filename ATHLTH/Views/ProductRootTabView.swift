@@ -475,9 +475,7 @@ struct ATHLTHHomeView: View {
                 WorkoutStartOptionsView(
                     session: workout,
                     trainingDeviceProvider: settings.trainingDeviceProvider,
-                    watchConnected:
-                        settings.trainingDeviceProvider == .appleWatch &&
-                        watchConnection.isReady,
+                    watchConnected: watchConnection.isReady,
                     defaultCapture: settings.preferredWorkoutCapture,
                     defaultTracking: settings.defaultStrengthTracking
                 ) { captureDevice, trackingMode, selectedFriends, audioCoach in
@@ -508,9 +506,7 @@ struct ATHLTHHomeView: View {
                 QuickWorkoutStartSheet(
                     kind: kind,
                     trainingDeviceProvider: settings.trainingDeviceProvider,
-                    watchConnected:
-                        settings.trainingDeviceProvider == .appleWatch &&
-                        watchConnection.isReady
+                    watchConnected: watchConnection.isReady
                 ) { selectedFriends, gearIDs, audioCoach in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
@@ -1757,8 +1753,7 @@ struct ATHLTHHomeView: View {
             return false
         }
 
-        return settings.trainingDeviceProvider != .appleWatch ||
-            !watchConnection.isReady
+        return !watchConnection.isReady
     }
 
     private func homeCanStartDirectly(
@@ -1773,8 +1768,7 @@ struct ATHLTHHomeView: View {
             return strengthWorkout.activeWorkout == nil
 
         case .running, .walking:
-            return settings.trainingDeviceProvider == .appleWatch &&
-                watchConnection.isReady &&
+            return watchConnection.isReady &&
                 !watchConnection.workoutLaunchInProgress
 
         case .mobility, .recovery, .custom:
@@ -1837,7 +1831,7 @@ struct ATHLTHHomeView: View {
 
         switch workout.kind {
         case .strength:
-            startHomePlannedStrengthWorkout(workout)
+            selectedHomeStrengthSession = workout
 
         case .running, .walking:
             startHomePlannedWorkoutOnWatch(workout)
@@ -1852,8 +1846,7 @@ struct ATHLTHHomeView: View {
         gearIDs: Set<UUID>,
         audioCoach: WatchAudioCoachConfiguration
     ) {
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady,
+        guard watchConnection.isReady,
               let watchKind = PlannedWorkoutWatchBuilder.watchKind(for: kind)
         else {
             homeWatchTransferError =
@@ -2795,9 +2788,7 @@ struct ATHLTHTrainView: View {
                 WorkoutStartOptionsView(
                     session: workout,
                     trainingDeviceProvider: settings.trainingDeviceProvider,
-                    watchConnected:
-                        settings.trainingDeviceProvider == .appleWatch &&
-                        watchConnection.isReady,
+                    watchConnected: watchConnection.isReady,
                     defaultCapture: settings.preferredWorkoutCapture,
                     defaultTracking: settings.defaultStrengthTracking
                 ) { captureDevice, trackingMode, selectedFriends, audioCoach in
@@ -2828,9 +2819,7 @@ struct ATHLTHTrainView: View {
                 RunQuickStartSheet(
                     trainingDeviceProvider:
                         settings.trainingDeviceProvider,
-                    watchConnected:
-                        settings.trainingDeviceProvider == .appleWatch &&
-                        watchConnection.isReady
+                    watchConnected: watchConnection.isReady
                 ) { configuration in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
@@ -2848,9 +2837,7 @@ struct ATHLTHTrainView: View {
                 WalkQuickStartSheet(
                     trainingDeviceProvider:
                         settings.trainingDeviceProvider,
-                    watchConnected:
-                        settings.trainingDeviceProvider == .appleWatch &&
-                        watchConnection.isReady
+                    watchConnected: watchConnection.isReady
                 ) { configuration in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
@@ -2882,9 +2869,7 @@ struct ATHLTHTrainView: View {
                 QuickWorkoutStartSheet(
                     kind: .running,
                     trainingDeviceProvider: settings.trainingDeviceProvider,
-                    watchConnected:
-                        settings.trainingDeviceProvider == .appleWatch &&
-                        watchConnection.isReady
+                    watchConnected: watchConnection.isReady
                 ) { selectedFriends, gearIDs, audioCoach in
                     Task { @MainActor in
                         await social.beginWorkoutWithFriends(
@@ -2905,9 +2890,7 @@ struct ATHLTHTrainView: View {
             .sheet(isPresented: $showingCustomQuickStart) {
                 CustomQuickStartSheet(
                     trainingDeviceProvider: settings.trainingDeviceProvider,
-                    watchConnected:
-                        settings.trainingDeviceProvider == .appleWatch &&
-                        watchConnection.isReady
+                    watchConnected: watchConnection.isReady
                 ) { configuration in
                     startCustomWorkoutOnWatch(configuration)
                 }
@@ -3343,8 +3326,7 @@ struct ATHLTHTrainView: View {
     private func startCustomWorkoutOnWatch(
         _ configuration: CustomQuickWorkoutConfiguration
     ) {
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady
+        guard watchConnection.isReady
         else {
             return
         }
@@ -3368,14 +3350,14 @@ struct ATHLTHTrainView: View {
     private func startRunQuickWorkout(
         _ configuration: RunQuickStartConfiguration
     ) {
-        if settings.trainingDeviceProvider == .none {
+        if configuration.captureDevice == .iPhone {
             guard configuration.mode == .free else { return }
+            gear.prepareNextWorkoutGear(configuration.gearIDs)
             phoneWorkout.start(walking: false)
             return
         }
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady
-        else {
+
+        guard watchConnection.isReady else {
             watchTransferError =
                 "Apple Watch is not ready to start this run."
             return
@@ -3451,13 +3433,13 @@ struct ATHLTHTrainView: View {
     private func startWalkQuickWorkout(
         _ configuration: WalkQuickStartConfiguration
     ) {
-        if settings.trainingDeviceProvider == .none {
+        if configuration.captureDevice == .iPhone {
+            gear.prepareNextWorkoutGear(configuration.gearIDs)
             phoneWorkout.start(walking: true)
             return
         }
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady
-        else {
+
+        guard watchConnection.isReady else {
             watchTransferError =
                 "Apple Watch is not ready to start this walk."
             return
@@ -3493,8 +3475,7 @@ struct ATHLTHTrainView: View {
     }
 
     private func startQuickWorkoutOnWatch(_ kind: WorkoutKind) {
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady,
+        guard watchConnection.isReady,
               let watchKind = watchWorkoutKind(for: kind)
         else {
             return
@@ -3515,8 +3496,7 @@ struct ATHLTHTrainView: View {
         gearIDs: Set<UUID>,
         audioCoach: WatchAudioCoachConfiguration
     ) {
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady
+        guard watchConnection.isReady
         else {
             watchTransferError =
                 "Connect Apple Watch to start a live running workout from the library."
