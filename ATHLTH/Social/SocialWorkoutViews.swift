@@ -1058,7 +1058,19 @@ private struct HomeActivityOutdoorCard: View {
 
     private var visualRecipe:
         HomeActivityVisualRecipe {
-        HomeActivityVisualRecipe.local(
+        if let recipe =
+            aiInsight?.visualRecipe {
+            return HomeActivityVisualRecipe(
+                palette: recipe.palette,
+                scene: recipe.scene,
+                light: recipe.light,
+                motif: recipe.motif,
+                energy: recipe.energy,
+                variant: recipe.variant
+            )
+        }
+
+        return HomeActivityVisualRecipe.local(
             for: workout,
             hasRoute:
                 routeCoordinates.count >= 2
