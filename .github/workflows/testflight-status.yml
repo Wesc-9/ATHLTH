@@ -78,6 +78,22 @@ jobs:
           app_id = app["id"]
           print(f"APP_ID={app_id}")
 
+          # TestFlight's install backend can fail even for VALID builds when the
+          # app-level beta contract / license relationship is missing or stale.
+          try:
+              agreement = get(f"/v1/apps/{app_id}/betaLicenseAgreement")
+              adata = agreement.get("data")
+              if adata:
+                  attrs = adata.get("attributes", {})
+                  text = attrs.get("agreementText")
+                  print(f"BETA_LICENSE_AGREEMENT_PRESENT=true")
+                  print(f"BETA_LICENSE_AGREEMENT_ID={adata.get('id')}")
+                  print(f"BETA_LICENSE_AGREEMENT_TEXT_LENGTH={len(text or '')}")
+              else:
+                  print("BETA_LICENSE_AGREEMENT_PRESENT=false")
+          except Exception as exc:
+              print(f"BETA_LICENSE_AGREEMENT_QUERY_ERROR={type(exc).__name__}:{exc}")
+
           builds = get("/v1/builds", {
               "filter[app]": app_id,
               "filter[version]": os.environ["BUILD_NUMBER"],
