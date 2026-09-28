@@ -1378,6 +1378,22 @@ final class AppSessionStore: ObservableObject {
         }
 
         scheduledPlans.removeAll { $0.id == planID }
+
+        let prefix =
+            planID.uuidString.lowercased() + "|"
+        manuallyCompletedPlanSessions =
+            Set(
+                manuallyCompletedPlanSessions.filter {
+                    !$0.hasPrefix(prefix)
+                }
+            )
+        skippedPlanSessions =
+            Set(
+                skippedPlanSessions.filter {
+                    !$0.hasPrefix(prefix)
+                }
+            )
+
         persistScheduledPlans()
         refreshActivePlanForToday()
     }
@@ -2812,7 +2828,7 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
-    static func catalogWeekStart(
+    nonisolated static func catalogWeekStart(
         onOrAfter date: Date
     ) -> Date {
         let calendar = Calendar.current
