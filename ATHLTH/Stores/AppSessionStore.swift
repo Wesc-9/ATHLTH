@@ -2278,100 +2278,111 @@ final class AppSessionStore: ObservableObject {
 
     @discardableResult
     func saveCatalogPlanTemplate(
-        _ entry: TrainingPlanCatalogEntry
+        _ entry: TrainingPlanCatalogEntry,
+        preferredDayIndexes: [Int]? = nil
     ) -> TrainingPlan? {
         let catalogTag = "catalog:\(entry.slug)"
+        let versionTag =
+            "catalog-version:\(entry.catalogVersion)"
 
         if let existing = planTemplates.first(
-            where: { $0.tags.contains(catalogTag) }
+            where: {
+                $0.tags.contains(catalogTag) &&
+                $0.tags.contains(versionTag)
+            }
         ) {
             return existing
         }
 
-        let weekCount = min(max(entry.durationWeeks, 1), 52)
+        let template = makeCatalogPlan(
+            entry,
+            startDate: nil,
+            preferredDayIndexes: preferredDayIndexes
+        )
+
+        planTemplates.insert(template, at: 0)
+        persistPlanTemplates()
+        return template
+    }
+
+    @discardableResult
+    func scheduleCatalogPlan(
+        _ entry: TrainingPlanCatalogEntry,
+        startDate: Date,
+        preferredDayIndexes: [Int]
+    ) -> TrainingPlan? {
+        let start = Calendar.current.startOfDay(
+            for: startDate
+        )
+        let plan = makeCatalogPlan(
+            entry,
+            startDate: start,
+            preferredDayIndexes: preferredDayIndexes
+        )
+
+        guard addTrainingPlan(plan) else {
+            return nil
+        }
+
+        return plan
+    }
+
+    private func makeCatalogPlan(
+        _ entry: TrainingPlanCatalogEntry,
+        startDate: Date?,
+        preferredDayIndexes: [Int]?
+    ) -> TrainingPlan {
+        let weekCount = min(
+            max(entry.durationWeeks, 1),
+            52
+        )
         let sessionsPerWeek = min(
             max(entry.sessionsPerWeek, 2),
             6
         )
-        let pattern =
-            entry.workoutKinds.isEmpty
-                ? [WorkoutKind.running, .strength]
-                : entry.workoutKinds
-
-        let targetDayIndexes: [Int]
-        switch sessionsPerWeek {
-        case 2:
-            targetDayIndexes = [1, 4]
-        case 3:
-            targetDayIndexes = [1, 3, 5]
-        case 4:
-            targetDayIndexes = [1, 2, 4, 6]
-        case 5:
-            targetDayIndexes = [1, 2, 3, 5, 6]
-        default:
-            targetDayIndexes = [1, 2, 3, 4, 5, 6]
-        }
+        let blueprints =
+            entry.sessionBlueprints.isEmpty
+                ? [
+                    TrainingPlanCatalogSessionBlueprint.easyRun,
+                    .strength
+                ]
+                : entry.sessionBlueprints
+        let targetDayIndexes =
+            resolvedCatalogDayIndexes(
+                preferredDayIndexes,
+                sessionsPerWeek: sessionsPerWeek
+            )
 
         func makeCatalogSession(
-            _ kind: WorkoutKind,
-            weekNumber: Int,
-            slot: Int
+            _ blueprint: TrainingPlanCatalogSessionBlueprint,
+            weekNumber: Int
         ) -> PlannedSession {
-            let title: String
-            let duration: Int
-            let distance: Double?
-
-            switch kind {
-            case .running:
-                title =
-                    slot == sessionsPerWeek - 1
-                        ? "Long Run"
-                        : "Run"
-                duration =
-                    min(
-                        40 + max(weekNumber - 1, 0) * 2,
-                        90
-                    )
-                distance = nil
-
-            case .walking:
-                title = "Walk"
-                duration = 45
-                distance = nil
-
-            case .strength:
-                title = "Strength"
-                duration = 50
-                distance = nil
-
-            case .mobility:
-                title = "Mobility"
-                duration = 25
-                distance = nil
-
-            case .recovery:
-                title = "Recovery"
-                duration = 30
-                distance = nil
-
-            case .custom:
-                title = "Workout"
-                duration = 45
-                distance = nil
-            }
+            let blueprintNote = blueprint.note(
+                week: weekNumber,
+                totalWeeks: weekCount
+            )
+            let noteParts = [
+                "From ATHLTH Plan Library · \(entry.title)",
+                blueprintNote
+            ]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
 
             return PlannedSession(
                 id: UUID(),
-                title: title,
-                kind: kind,
+                title: blueprint.title,
+                kind: blueprint.kind,
                 scheduledStart: nil,
-                durationMinutes: duration,
-                targetDistanceKilometers: distance,
+                durationMinutes:
+                    blueprint.durationMinutes(
+                        week: weekNumber,
+                        totalWeeks: weekCount
+                    ),
+                targetDistanceKilometers: nil,
                 targetPaceSecondsPerKilometer: nil,
                 routeID: nil,
                 exercises: [],
-                notes:
-                    "From ATHLTH Plan Library · \(entry.title)",
+                notes: noteParts.joined(separator: "\n"),
                 runningWorkout: nil
             )
         }
@@ -2393,27 +2404,35 @@ final class AppSessionStore: ObservableObject {
                     continue
                 }
 
-                let patternIndex =
-                    (
-                        weekIndex *
-                        sessionsPerWeek +
-                        slot
-                    ) %
-                    pattern.count
+                let blueprint =
+                    blueprints[slot % blueprints.count]
 
                 weeks[weekIndex]
                     .days[actualDayIndex]
                     .sessions = [
                         makeCatalogSession(
-                            pattern[patternIndex],
-                            weekNumber: weekIndex + 1,
-                            slot: slot
+                            blueprint,
+                            weekNumber: weekIndex + 1
                         )
                     ]
             }
         }
 
-        let template = TrainingPlan(
+        let catalogTag = "catalog:\(entry.slug)"
+        let versionTag =
+            "catalog-version:\(entry.catalogVersion)"
+        let resolvedStart = startDate.map {
+            Calendar.current.startOfDay(for: $0)
+        }
+        let resolvedEnd = resolvedStart.flatMap {
+            Calendar.current.date(
+                byAdding: .day,
+                value: max(weekCount * 7 - 1, 0),
+                to: $0
+            )
+        }
+
+        return TrainingPlan(
             id: UUID(),
             ownerID: profile.userID,
             title: entry.title,
@@ -2427,6 +2446,7 @@ final class AppSessionStore: ObservableObject {
                         entry.tags +
                         [
                             catalogTag,
+                            versionTag,
                             entry.category,
                             entry.level.lowercased()
                         ]
@@ -2434,13 +2454,43 @@ final class AppSessionStore: ObservableObject {
                 ),
             createdAt: Date(),
             updatedAt: Date(),
-            startDate: nil,
-            endDate: nil
+            startDate: resolvedStart,
+            endDate: resolvedEnd
         )
+    }
 
-        planTemplates.insert(template, at: 0)
-        persistPlanTemplates()
-        return template
+    private func resolvedCatalogDayIndexes(
+        _ preferred: [Int]?,
+        sessionsPerWeek: Int
+    ) -> [Int] {
+        if let preferred {
+            let normalized =
+                Array(
+                    Set(
+                        preferred.filter {
+                            (1...7).contains($0)
+                        }
+                    )
+                )
+                .sorted()
+
+            if normalized.count == sessionsPerWeek {
+                return normalized
+            }
+        }
+
+        switch sessionsPerWeek {
+        case 2:
+            return [2, 5]
+        case 3:
+            return [2, 4, 6]
+        case 4:
+            return [1, 3, 5, 7]
+        case 5:
+            return [1, 2, 4, 5, 7]
+        default:
+            return [1, 2, 3, 4, 5, 6]
+        }
     }
 
     func saveSharedPlan(
