@@ -1229,6 +1229,28 @@ struct ATHLTHPrivacyCenterView: View {
                 .foregroundStyle(.secondary)
             }
 
+            Section("ATHLTH Coach & AI") {
+                Toggle(
+                    "Allow Coach to use health data",
+                    isOn: $settings.aiHealthDataSharingEnabled
+                )
+
+                Text(
+                    settings.aiHealthDataSharingEnabled
+                        ? "ATHLTH Coach may send the minimum relevant health context, such as sleep, HRV, heart rate and workout metrics, through ATHLTH's backend to the configured AI provider. You can turn this off at any time."
+                        : "Off by default. Recovery and workout insights stay local and deterministic until you explicitly allow health data to be used by ATHLTH Coach."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Label(
+                    "This is separate from Apple Health permission, cloud backup and personalized offers.",
+                    systemImage: "lock.shield.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             Section("Personalization") {
                 Toggle(
                     "Personalized ATHLTH offers",
@@ -1263,7 +1285,7 @@ struct ATHLTHPrivacyCenterView: View {
                 }
             }
         }
-        .navigationTitle("Privacy & Visibility")
+        .navigationTitle("Privacy & Data")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             guard draft == nil else { return }
