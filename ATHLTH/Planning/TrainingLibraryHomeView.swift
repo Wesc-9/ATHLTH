@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct TrainingLibraryHomeView: View {
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
+
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
     var body: some View {
@@ -21,10 +23,69 @@ struct TrainingLibraryHomeView: View {
                     )
 
                 Text(
-                    "Workouts, exercises and routes — ready when you are."
+                    "Plans, workouts, exercises and routes — ready when you are."
                 )
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            librarySection(
+                "Your Library",
+                subtitle: "Keep the things you use most close at hand."
+            ) {
+                NavigationLink {
+                    LibraryFavoritesView(
+                        onStartRunning: onStartRunning
+                    )
+                } label: {
+                    LibraryDestinationTile(
+                        title: "Favorites",
+                        subtitle:
+                            favorites.favorites.isEmpty
+                                ? "Save plans, workouts & more"
+                                : "\(favorites.favorites.count) saved items",
+                        icon: "star.fill",
+                        tint: ATHLTHTheme.premiumGold
+                    )
+                }
+
+                NavigationLink {
+                    MyTrainingPlansLibraryView()
+                } label: {
+                    LibraryDestinationTile(
+                        title: "My Plans",
+                        subtitle: "Created, saved & scheduled",
+                        icon: "calendar.badge.clock",
+                        tint: ATHLTHTheme.accent
+                    )
+                }
+            }
+
+            librarySection(
+                "Training Plans",
+                subtitle: "Start from a proven structure or build your own."
+            ) {
+                NavigationLink {
+                    TrainingPlanLibraryView()
+                } label: {
+                    LibraryDestinationTile(
+                        title: "Plan Library",
+                        subtitle: "Running, strength & hybrid",
+                        icon: "square.stack.3d.up.fill",
+                        tint: Color.orange
+                    )
+                }
+
+                NavigationLink {
+                    TrainingPlanCreationView()
+                } label: {
+                    LibraryDestinationTile(
+                        title: "Create Plan",
+                        subtitle: "Build it your way",
+                        icon: "plus.rectangle.on.rectangle",
+                        tint: ATHLTHTheme.accent
+                    )
+                }
             }
 
             librarySection(
@@ -115,6 +176,9 @@ struct TrainingLibraryHomeView: View {
             }
         }
         .buttonStyle(.plain)
+        .task {
+            await favorites.refresh()
+        }
     }
 
     private func librarySection<Content: View>(
