@@ -325,6 +325,7 @@ final class GoalStore: ObservableObject {
     private func persist() {
         guard let accountID else { return }
         AccountLocalStorage.write(goals, name: "goals", userID: accountID)
+        ATHLTHTrainingDataChangeSignal.post(userID: accountID)
     }
 
     private static func loadGoals() -> [ATHLTHGoal] {
