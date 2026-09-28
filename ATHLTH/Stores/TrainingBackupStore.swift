@@ -130,6 +130,11 @@ final class TrainingBackupStore: ObservableObject {
             try checkAccount(userID)
             rememberConsent(value, userID: userID)
             status = value ? "Cloud backup enabled. Waiting for the next backup." : "Backup stopped for this account. Existing copies remain until you delete them."
+            if value {
+                // The first copy must not depend on keeping the app open for five minutes.
+                isBusy = false
+                await backUp(userID: userID, force: true)
+            }
         } catch {
             if accountID == userID {
                 status = value ? "Could not enable backup: \(error.localizedDescription)" : "Stopped on this phone. Could not stop other devices; reconnect and turn backup off again: \(error.localizedDescription)"
