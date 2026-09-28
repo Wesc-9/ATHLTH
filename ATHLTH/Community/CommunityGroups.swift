@@ -1298,40 +1298,94 @@ final class CommunityGroupStore: ObservableObject {
     }
 
     func refreshCalendarContent() async {
-        guard let userID = currentUserID else { return }
+        guard let userID = currentUserID else {
+            return
+        }
 
-        for groupID in joinedGroupIDs {
-            do {
-                async let eventsQuery: [CommunityGroupEventRecord] = client
-                    .from("community_group_events")
-                    .select()
-                    .eq("group_id", value: groupID)
-                    .order("starts_at", ascending: true)
-                    .limit(100)
-                    .execute()
-                    .value
+        let groupIDs = Array(joinedGroupIDs)
 
-                async let rsvpQuery: [CommunityGroupEventRSVPRecord] = client
-                    .from("community_group_event_rsvps")
-                    .select()
-                    .eq("group_id", value: groupID)
-                    .eq("user_id", value: userID)
-                    .execute()
-                    .value
+        guard !groupIDs.isEmpty else {
+            return
+        }
 
-                let loadedEvents = try await eventsQuery
-                let loadedRSVPs = try await rsvpQuery
+        do {
+            let values =
+                groupIDs.map(\.uuidString)
 
-                guard !Task.isCancelled else { return }
+            async let eventsQuery:
+                [CommunityGroupEventRecord] =
+                    client
+                        .from(
+                            "community_group_events"
+                        )
+                        .select()
+                        .in(
+                            "group_id",
+                            values: values
+                        )
+                        .order(
+                            "starts_at",
+                            ascending: true
+                        )
+                        .limit(1_000)
+                        .execute()
+                        .value
 
-                eventsByGroup[groupID] = loadedEvents
-                eventRSVPsByGroup[groupID] = loadedRSVPs
-            } catch is CancellationError {
+            async let rsvpQuery:
+                [CommunityGroupEventRSVPRecord] =
+                    client
+                        .from(
+                            "community_group_event_rsvps"
+                        )
+                        .select()
+                        .in(
+                            "group_id",
+                            values: values
+                        )
+                        .eq(
+                            "user_id",
+                            value: userID
+                        )
+                        .limit(1_000)
+                        .execute()
+                        .value
+
+            let loadedEvents =
+                try await eventsQuery
+            let loadedRSVPs =
+                try await rsvpQuery
+
+            guard !Task.isCancelled else {
                 return
-            } catch {
-                guard !Task.isCancelled else { return }
-                errorMessage = error.localizedDescription
             }
+
+            let eventsByID =
+                Dictionary(
+                    grouping: loadedEvents,
+                    by: \.groupID
+                )
+            let rsvpsByID =
+                Dictionary(
+                    grouping: loadedRSVPs,
+                    by: \.groupID
+                )
+
+            for groupID in groupIDs {
+                eventsByGroup[groupID] =
+                    eventsByID[groupID] ?? []
+                eventRSVPsByGroup[groupID] =
+                    rsvpsByID[groupID] ?? []
+            }
+
+            errorMessage = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else {
+                return
+            }
+            errorMessage =
+                error.localizedDescription
         }
     }
 
