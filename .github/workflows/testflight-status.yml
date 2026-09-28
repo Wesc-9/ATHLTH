@@ -142,7 +142,7 @@ jobs:
           all_inc = {(x.get("type"), x.get("id")): x for x in all_builds.get("included", [])}
           for build in all_builds.get("data", []):
               ba = build.get("attributes", {})
-              if str(ba.get("version")) not in {"43", "45", "47"}:
+              if str(ba.get("version")) not in {"42", "43", "45", "47"}:
                   continue
               bid = build.get("id")
               print(f"COMPARE_BUILD[{ba.get('version')}].ID={bid}")
