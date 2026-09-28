@@ -1437,6 +1437,8 @@ struct TrainingPlanCatalogDetailView: View {
     let entry: TrainingPlanCatalogEntry
 
     @State private var addedToLibrary = false
+    @State private var showingPersonalizePlan = false
+    @State private var showAllWeeks = false
 
     var body: some View {
         ScrollView {
@@ -1605,6 +1607,44 @@ struct TrainingPlanCatalogDetailView: View {
                     }
                 }
 
+                planPreview
+
+                Button {
+                    showingPersonalizePlan = true
+                } label: {
+                    HStack {
+                        Label(
+                            "Make it mine",
+                            systemImage: "slider.horizontal.3"
+                        )
+                        .font(.headline)
+
+                        Spacer()
+
+                        Image(systemName: "arrow.right")
+                            .font(.caption.bold())
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 17)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.accent,
+                                ATHLTHTheme.accentDeep
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: RoundedRectangle(
+                            cornerRadius: 16,
+                            style: .continuous
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+
                 Button {
                     _ = session.saveCatalogPlanTemplate(
                         entry
@@ -1613,18 +1653,18 @@ struct TrainingPlanCatalogDetailView: View {
                 } label: {
                     Label(
                         isAlreadySaved
-                            ? "Saved in My Plans"
-                            : "Add to My Plans",
+                            ? "Saved for later"
+                            : "Save for later",
                         systemImage:
                             isAlreadySaved
                                 ? "checkmark.circle.fill"
-                                : "plus.circle.fill"
+                                : "bookmark"
                     )
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+                    .frame(height: 46)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .tint(ATHLTHTheme.accent)
                 .disabled(isAlreadySaved)
             }
@@ -1651,6 +1691,9 @@ struct TrainingPlanCatalogDetailView: View {
                 )
             }
         }
+        .sheet(isPresented: $showingPersonalizePlan) {
+            PersonalizeTrainingPlanView(entry: entry)
+        }
         .alert(
             "Added to My Plans",
             isPresented: $addedToLibrary
@@ -1667,6 +1710,199 @@ struct TrainingPlanCatalogDetailView: View {
         session.planTemplates.contains {
             $0.tags.contains(
                 "catalog:\(entry.slug)"
+            ) &&
+            $0.tags.contains(
+                "catalog-version:\(entry.catalogVersion)"
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var planPreview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("FULL PLAN PREVIEW")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.6)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text("Week by week")
+                        .font(.title3.weight(.semibold))
+                }
+
+                Spacer()
+
+                Text(
+                    "v\(entry.catalogVersion)"
+                )
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(detailAccent)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    detailAccent.opacity(0.09),
+                    in: Capsule()
+                )
+            }
+
+            ForEach(
+                1...max(
+                    showAllWeeks
+                        ? entry.durationWeeks
+                        : min(entry.durationWeeks, 4),
+                    1
+                ),
+                id: \.self
+            ) { week in
+                previewWeekCard(week)
+            }
+
+            if entry.durationWeeks > 4 {
+                Button {
+                    withAnimation(
+                        .easeInOut(duration: 0.20)
+                    ) {
+                        showAllWeeks.toggle()
+                    }
+                } label: {
+                    HStack {
+                        Text(
+                            showAllWeeks
+                                ? "Show fewer weeks"
+                                : "Show all \(entry.durationWeeks) weeks"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                showAllWeeks
+                                    ? "chevron.up"
+                                    : "chevron.down"
+                        )
+                        .font(.caption.bold())
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.84),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+    }
+
+    private func previewWeekCard(
+        _ week: Int
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Text("Week \(week)")
+                    .font(.subheadline.weight(.bold))
+
+                Spacer()
+
+                if week.isMultiple(of: 4) &&
+                    week < entry.durationWeeks {
+                    Text("DELOAD")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Color.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            Color.orange.opacity(0.09),
+                            in: Capsule()
+                        )
+                } else if entry.durationWeeks >= 12 &&
+                            week >= entry.durationWeeks - 1 {
+                    Text("TAPER")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(
+                            ATHLTHTheme.vitality
+                        )
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            ATHLTHTheme.vitality.opacity(0.09),
+                            in: Capsule()
+                        )
+                }
+            }
+
+            ForEach(
+                Array(
+                    entry.sessionBlueprints
+                        .prefix(entry.sessionsPerWeek)
+                        .enumerated()
+                ),
+                id: \.offset
+            ) { _, blueprint in
+                HStack(spacing: 10) {
+                    Image(
+                        systemName:
+                            blueprint.kind.systemImage
+                    )
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(detailAccent)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        detailAccent.opacity(0.08),
+                        in: RoundedRectangle(
+                            cornerRadius: 9
+                        )
+                    )
+
+                    Text(blueprint.title)
+                        .font(.caption.weight(.semibold))
+
+                    Spacer()
+
+                    Text(
+                        "\(blueprint.durationMinutes(week: week, totalWeeks: entry.durationWeeks)) min"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+            }
+        }
+        .padding(13)
+        .background(
+            Color.white.opacity(0.70),
+            in: RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.035),
+                lineWidth: 0.7
             )
         }
     }
