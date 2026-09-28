@@ -1,3 +1,4 @@
+import Supabase
 import SwiftUI
 
 struct TrainingLibraryHomeView: View {
@@ -245,5 +246,1413 @@ private struct LibraryDestinationTile: View {
                 .stroke(ATHLTHTheme.accent.opacity(0.12), lineWidth: 1)
         }
         .contentShape(RoundedRectangle(cornerRadius: 22))
+    }
+}
+
+
+enum LibraryFavoriteKind: String, Codable, CaseIterable, Identifiable {
+    case plan
+    case workout
+    case exercise
+    case route
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .plan: return "Plans"
+        case .workout: return "Workouts"
+        case .exercise: return "Exercises"
+        case .route: return "Routes"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .plan: return "calendar.badge.clock"
+        case .workout: return "figure.run"
+        case .exercise: return "dumbbell.fill"
+        case .route: return "map.fill"
+        }
+    }
+}
+
+struct LibraryFavoriteRecord: Codable, Hashable, Identifiable {
+    let userID: UUID
+    let itemType: LibraryFavoriteKind
+    let itemID: String
+    let title: String
+    let subtitle: String?
+    let icon: String?
+    let createdAt: Date
+
+    var id: String {
+        "\(itemType.rawValue)|\(itemID)"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case itemType = "item_type"
+        case itemID = "item_id"
+        case title
+        case subtitle
+        case icon
+        case createdAt = "created_at"
+    }
+}
+
+@MainActor
+final class LibraryFavoritesStore: ObservableObject {
+    @Published private(set) var favorites: [LibraryFavoriteRecord] = []
+    @Published private(set) var isLoading = false
+    @Published private(set) var errorMessage: String?
+
+    private let client: SupabaseClient
+    private var activeUserID: UUID?
+    private var lastRefreshAt: Date?
+
+    init(client: SupabaseClient = SupabaseEnvironment.client) {
+        self.client = client
+    }
+
+    func refresh(force: Bool = false) async {
+        guard let user = client.auth.currentUser else {
+            activeUserID = nil
+            favorites = []
+            errorMessage = nil
+            return
+        }
+
+        if activeUserID != user.id {
+            activeUserID = user.id
+            favorites =
+                AccountLocalStorage.read(
+                    [LibraryFavoriteRecord].self,
+                    name: "libraryFavorites",
+                    userID: user.id
+                ) ?? []
+            lastRefreshAt = nil
+        }
+
+        if !force,
+           let lastRefreshAt,
+           Date().timeIntervalSince(lastRefreshAt) < 120 {
+            return
+        }
+
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let rows: [LibraryFavoriteRecord] =
+                try await client
+                    .from("library_favorites")
+                    .select()
+                    .eq("user_id", value: user.id)
+                    .order("created_at", ascending: false)
+                    .execute()
+                    .value
+
+            favorites = rows
+            lastRefreshAt = Date()
+            persistLocal()
+            errorMessage = nil
+        } catch {
+            // Favorites remain fully usable from the account-local cache.
+            // The next refresh retries Supabase automatically.
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func isFavorite(
+        _ kind: LibraryFavoriteKind,
+        itemID: String
+    ) -> Bool {
+        favorites.contains {
+            $0.itemType == kind &&
+            $0.itemID == itemID
+        }
+    }
+
+    func count(for kind: LibraryFavoriteKind) -> Int {
+        favorites.filter { $0.itemType == kind }.count
+    }
+
+    func toggle(
+        _ kind: LibraryFavoriteKind,
+        itemID: String,
+        title: String,
+        subtitle: String? = nil,
+        icon: String? = nil
+    ) {
+        guard let user = client.auth.currentUser else { return }
+
+        if activeUserID != user.id {
+            activeUserID = user.id
+            favorites =
+                AccountLocalStorage.read(
+                    [LibraryFavoriteRecord].self,
+                    name: "libraryFavorites",
+                    userID: user.id
+                ) ?? []
+        }
+
+        if isFavorite(kind, itemID: itemID) {
+            favorites.removeAll {
+                $0.itemType == kind &&
+                $0.itemID == itemID
+            }
+            persistLocal()
+
+            Task {
+                do {
+                    try await client
+                        .from("library_favorites")
+                        .delete()
+                        .eq("user_id", value: user.id)
+                        .eq("item_type", value: kind.rawValue)
+                        .eq("item_id", value: itemID)
+                        .execute()
+                    errorMessage = nil
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        } else {
+            let record = LibraryFavoriteRecord(
+                userID: user.id,
+                itemType: kind,
+                itemID: itemID,
+                title: title,
+                subtitle: subtitle,
+                icon: icon,
+                createdAt: Date()
+            )
+            favorites.insert(record, at: 0)
+            persistLocal()
+
+            Task {
+                do {
+                    try await client
+                        .from("library_favorites")
+                        .upsert(record)
+                        .execute()
+                    errorMessage = nil
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func persistLocal() {
+        guard let activeUserID else { return }
+        AccountLocalStorage.write(
+            favorites,
+            name: "libraryFavorites",
+            userID: activeUserID
+        )
+    }
+}
+
+struct LibraryFavoriteButton: View {
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
+
+    let kind: LibraryFavoriteKind
+    let itemID: String
+    let title: String
+    let subtitle: String?
+    let icon: String?
+
+    init(
+        kind: LibraryFavoriteKind,
+        itemID: String,
+        title: String,
+        subtitle: String? = nil,
+        icon: String? = nil
+    ) {
+        self.kind = kind
+        self.itemID = itemID
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+    }
+
+    var body: some View {
+        let selected = favorites.isFavorite(
+            kind,
+            itemID: itemID
+        )
+
+        Button {
+            favorites.toggle(
+                kind,
+                itemID: itemID,
+                title: title,
+                subtitle: subtitle,
+                icon: icon
+            )
+        } label: {
+            Image(
+                systemName:
+                    selected
+                        ? "star.fill"
+                        : "star"
+            )
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(
+                selected
+                    ? ATHLTHTheme.premiumGold
+                    : ATHLTHTheme.mutedText
+            )
+            .frame(width: 38, height: 38)
+            .background(
+                Color.white.opacity(0.88),
+                in: Circle()
+            )
+            .overlay {
+                Circle()
+                    .stroke(
+                        Color.black.opacity(0.05),
+                        lineWidth: 0.8
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            selected
+                ? "Remove from favorites"
+                : "Add to favorites"
+        )
+    }
+}
+
+struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
+    let id: UUID
+    let slug: String
+    let title: String
+    let summary: String
+    let category: String
+    let goal: String
+    let level: String
+    let durationWeeks: Int
+    let sessionsPerWeek: Int
+    let workoutPattern: [String]
+    let tags: [String]
+    let sortOrder: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case slug
+        case title
+        case summary
+        case category
+        case goal
+        case level
+        case durationWeeks = "duration_weeks"
+        case sessionsPerWeek = "sessions_per_week"
+        case workoutPattern = "workout_pattern"
+        case tags
+        case sortOrder = "sort_order"
+    }
+
+    var workoutKinds: [WorkoutKind] {
+        workoutPattern.compactMap(WorkoutKind.init(rawValue:))
+    }
+
+    var categoryTitle: String {
+        category
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+    }
+}
+
+@MainActor
+final class TrainingPlanLibraryStore: ObservableObject {
+    @Published private(set) var entries: [TrainingPlanCatalogEntry] =
+        TrainingPlanCatalogEntry.fallbackCatalog
+    @Published private(set) var isLoading = false
+    @Published private(set) var errorMessage: String?
+
+    private let client: SupabaseClient
+    private var loadedRemote = false
+
+    init(client: SupabaseClient = SupabaseEnvironment.client) {
+        self.client = client
+    }
+
+    func refresh(force: Bool = false) async {
+        if loadedRemote && !force { return }
+        guard !isLoading else { return }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let remote: [TrainingPlanCatalogEntry] =
+                try await client
+                    .from("training_plan_catalog")
+                    .select(
+                        "id,slug,title,summary,category,goal,level,duration_weeks,sessions_per_week,workout_pattern,tags,sort_order"
+                    )
+                    .eq("is_published", value: true)
+                    .order("sort_order", ascending: true)
+                    .execute()
+                    .value
+
+            if !remote.isEmpty {
+                entries = remote
+                loadedRemote = true
+            }
+            errorMessage = nil
+        } catch {
+            // The curated local catalog intentionally remains available
+            // offline and before a new backend migration is deployed.
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private extension TrainingPlanCatalogEntry {
+    static let fallbackCatalog: [TrainingPlanCatalogEntry] = [
+        TrainingPlanCatalogEntry(
+            id: UUID(uuidString: "B1000000-0000-0000-0000-000000000001")!,
+            slug: "first-5k",
+            title: "First 5K",
+            summary: "An approachable 8-week run plan that builds consistency before speed.",
+            category: "running",
+            goal: "Complete a comfortable 5K",
+            level: "Beginner",
+            durationWeeks: 8,
+            sessionsPerWeek: 3,
+            workoutPattern: ["running", "running", "running"],
+            tags: ["5k", "running", "beginner"],
+            sortOrder: 10
+        ),
+        TrainingPlanCatalogEntry(
+            id: UUID(uuidString: "B1000000-0000-0000-0000-000000000002")!,
+            slug: "10k-builder",
+            title: "10K Builder",
+            summary: "Build aerobic volume with running plus one supporting strength session each week.",
+            category: "running",
+            goal: "Build toward 10K",
+            level: "Intermediate",
+            durationWeeks: 10,
+            sessionsPerWeek: 4,
+            workoutPattern: ["running", "running", "strength", "running"],
+            tags: ["10k", "running", "strength"],
+            sortOrder: 20
+        ),
+        TrainingPlanCatalogEntry(
+            id: UUID(uuidString: "B1000000-0000-0000-0000-000000000003")!,
+            slug: "half-marathon-foundation",
+            title: "Half Marathon Foundation",
+            summary: "A balanced 12-week structure with easy running, long-run volume and strength support.",
+            category: "running",
+            goal: "Half marathon",
+            level: "Intermediate",
+            durationWeeks: 12,
+            sessionsPerWeek: 4,
+            workoutPattern: ["running", "strength", "running", "running"],
+            tags: ["half-marathon", "running"],
+            sortOrder: 30
+        ),
+        TrainingPlanCatalogEntry(
+            id: UUID(uuidString: "B1000000-0000-0000-0000-000000000004")!,
+            slug: "marathon-build",
+            title: "Marathon Build",
+            summary: "A 16-week endurance structure for runners ready for higher weekly volume.",
+            category: "running",
+            goal: "Marathon",
+            level: "Advanced",
+            durationWeeks: 16,
+            sessionsPerWeek: 5,
+            workoutPattern: ["running", "strength", "running", "running", "running"],
+            tags: ["marathon", "running"],
+            sortOrder: 40
+        ),
+        TrainingPlanCatalogEntry(
+            id: UUID(uuidString: "B1000000-0000-0000-0000-000000000005")!,
+            slug: "strength-foundations",
+            title: "Strength Foundations",
+            summary: "Three full-body sessions each week with room to customize exercises and progression.",
+            category: "strength",
+            goal: "Build strength",
+            level: "Beginner",
+            durationWeeks: 8,
+            sessionsPerWeek: 3,
+            workoutPattern: ["strength", "strength", "strength"],
+            tags: ["strength", "full-body"],
+            sortOrder: 50
+        ),
+        TrainingPlanCatalogEntry(
+            id: UUID(uuidString: "B1000000-0000-0000-0000-000000000006")!,
+            slug: "hybrid-foundation",
+            title: "Hybrid Foundation",
+            summary: "Two running and two strength sessions each week for balanced all-round fitness.",
+            category: "hybrid",
+            goal: "General fitness",
+            level: "All levels",
+            durationWeeks: 8,
+            sessionsPerWeek: 4,
+            workoutPattern: ["running", "strength", "running", "strength"],
+            tags: ["hybrid", "running", "strength"],
+            sortOrder: 60
+        )
+    ]
+}
+
+struct TrainingPlanLibraryView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
+
+    @StateObject private var catalog = TrainingPlanLibraryStore()
+    @State private var query = ""
+    @State private var selectedCategory = "All"
+    @State private var favoritesOnly = false
+
+    private var categories: [String] {
+        ["All"] +
+        Array(Set(catalog.entries.map(\.categoryTitle)))
+            .sorted()
+    }
+
+    private var filteredEntries: [TrainingPlanCatalogEntry] {
+        let cleanQuery = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        return catalog.entries.filter { entry in
+            let categoryMatches =
+                selectedCategory == "All" ||
+                entry.categoryTitle == selectedCategory
+            let favoriteMatches =
+                !favoritesOnly ||
+                favorites.isFavorite(
+                    .plan,
+                    itemID: entry.id.uuidString
+                )
+            let searchMatches =
+                cleanQuery.isEmpty ||
+                entry.title.localizedCaseInsensitiveContains(cleanQuery) ||
+                entry.summary.localizedCaseInsensitiveContains(cleanQuery) ||
+                entry.goal.localizedCaseInsensitiveContains(cleanQuery) ||
+                entry.level.localizedCaseInsensitiveContains(cleanQuery)
+
+            return categoryMatches &&
+                favoriteMatches &&
+                searchMatches
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("PLAN LIBRARY")
+                        .font(.caption2.weight(.bold))
+                        .tracking(2.2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text("Start with a structure")
+                        .font(
+                            .system(
+                                size: 30,
+                                weight: .bold,
+                                design: .serif
+                            )
+                        )
+
+                    Text(
+                        "Save a plan to My Plans, then tailor every week and workout to you."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .padding(.bottom, 2)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        Button {
+                            favoritesOnly.toggle()
+                        } label: {
+                            catalogChip(
+                                "Favorites",
+                                systemImage: "star.fill",
+                                selected: favoritesOnly
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        ForEach(categories, id: \.self) { category in
+                            Button {
+                                selectedCategory = category
+                            } label: {
+                                catalogChip(
+                                    category,
+                                    systemImage: nil,
+                                    selected:
+                                        selectedCategory == category
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if filteredEntries.isEmpty {
+                    ContentUnavailableView(
+                        favoritesOnly
+                            ? "No favorite plans yet"
+                            : "No plans found",
+                        systemImage:
+                            favoritesOnly
+                                ? "star"
+                                : "calendar.badge.exclamationmark",
+                        description: Text(
+                            favoritesOnly
+                                ? "Tap the star on a plan to keep it here."
+                                : "Try another search or category."
+                        )
+                    )
+                    .padding(.top, 32)
+                } else {
+                    ForEach(filteredEntries) { entry in
+                        ZStack(alignment: .topTrailing) {
+                            NavigationLink {
+                                TrainingPlanCatalogDetailView(
+                                    entry: entry
+                                )
+                            } label: {
+                                catalogCard(entry)
+                            }
+                            .buttonStyle(.plain)
+
+                            LibraryFavoriteButton(
+                                kind: .plan,
+                                itemID: entry.id.uuidString,
+                                title: entry.title,
+                                subtitle:
+                                    "\(entry.durationWeeks) weeks · \(entry.level)",
+                                icon: "calendar.badge.clock"
+                            )
+                            .padding(12)
+                        }
+                    }
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: Color.orange.opacity(0.20)
+            )
+        )
+        .navigationTitle("Plan Library")
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(
+            text: $query,
+            prompt: "Search plans or goals"
+        )
+        .task {
+            async let plans: Void = catalog.refresh()
+            async let saved: Void = favorites.refresh()
+            _ = await (plans, saved)
+        }
+        .refreshable {
+            async let plans: Void = catalog.refresh(force: true)
+            async let saved: Void = favorites.refresh(force: true)
+            _ = await (plans, saved)
+        }
+    }
+
+    private func catalogChip(
+        _ title: String,
+        systemImage: String?,
+        selected: Bool
+    ) -> some View {
+        HStack(spacing: 6) {
+            if let systemImage {
+                Image(systemName: systemImage)
+            }
+            Text(title)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(
+            selected
+                ? Color.white
+                : ATHLTHTheme.primaryText
+        )
+        .padding(.horizontal, 12)
+        .frame(height: 36)
+        .background(
+            selected
+                ? ATHLTHTheme.accent
+                : Color.white.opacity(0.82),
+            in: Capsule()
+        )
+    }
+
+    private func catalogCard(
+        _ entry: TrainingPlanCatalogEntry
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(
+                    systemName:
+                        entry.category == "strength"
+                            ? "dumbbell.fill"
+                            : entry.category == "hybrid"
+                                ? "figure.run.square.stack.fill"
+                                : "figure.run"
+                )
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+                .frame(width: 48, height: 48)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.title)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .padding(.trailing, 42)
+
+                    Text(entry.goal)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Text(entry.summary)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .multilineTextAlignment(.leading)
+
+            HStack(spacing: 9) {
+                planMetric(
+                    "\(entry.durationWeeks) wk",
+                    icon: "calendar"
+                )
+                planMetric(
+                    "\(entry.sessionsPerWeek)/wk",
+                    icon: "repeat"
+                )
+                planMetric(
+                    entry.level,
+                    icon: "speedometer"
+                )
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.86),
+            in: RoundedRectangle(
+                cornerRadius: 23,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 23,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.04),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func planMetric(
+        _ text: String,
+        icon: String
+    ) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+    }
+}
+
+struct TrainingPlanCatalogDetailView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
+
+    let entry: TrainingPlanCatalogEntry
+
+    @State private var addedToLibrary = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(entry.categoryTitle.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .tracking(2)
+                        .foregroundStyle(ATHLTHTheme.accent)
+
+                    Text(entry.title)
+                        .font(
+                            .system(
+                                size: 34,
+                                weight: .bold,
+                                design: .serif
+                            )
+                        )
+
+                    Text(entry.summary)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                HStack(spacing: 10) {
+                    detailMetric(
+                        "\(entry.durationWeeks)",
+                        label: "weeks",
+                        icon: "calendar"
+                    )
+                    detailMetric(
+                        "\(entry.sessionsPerWeek)",
+                        label: "sessions / week",
+                        icon: "repeat"
+                    )
+                    detailMetric(
+                        entry.level,
+                        label: "level",
+                        icon: "speedometer"
+                    )
+                }
+
+                ATHLTHCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Weekly rhythm")
+                            .font(.headline)
+
+                        HStack(spacing: 8) {
+                            ForEach(
+                                Array(
+                                    entry.workoutKinds.enumerated()
+                                ),
+                                id: \.offset
+                            ) { index, kind in
+                                VStack(spacing: 6) {
+                                    Image(
+                                        systemName:
+                                            kind.systemImage
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 16,
+                                            weight: .semibold
+                                        )
+                                    )
+
+                                    Text("\(index + 1)")
+                                        .font(.caption2.weight(.bold))
+                                }
+                                .foregroundStyle(
+                                    ATHLTHTheme.accent
+                                )
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 11)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 12
+                                    )
+                                )
+                            }
+                        }
+
+                        Text(
+                            "ATHLTH spreads these sessions across the week. Once saved, every day, workout, exercise and target can be changed."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                ATHLTHCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Goal")
+                            .font(.headline)
+                        Text(entry.goal)
+                            .font(.title3.weight(.semibold))
+                        Text(
+                            "This is a reusable starting structure, not a fixed prescription. Adapt volume and intensity to your current training history."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                Button {
+                    _ = session.saveCatalogPlanTemplate(
+                        entry
+                    )
+                    addedToLibrary = true
+                } label: {
+                    Label(
+                        isAlreadySaved
+                            ? "Saved in My Plans"
+                            : "Add to My Plans",
+                        systemImage:
+                            isAlreadySaved
+                                ? "checkmark.circle.fill"
+                                : "plus.circle.fill"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accent)
+                .disabled(isAlreadySaved)
+            }
+            .padding(20)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
+        }
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.accent.opacity(0.32)
+            )
+        )
+        .navigationTitle(entry.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                LibraryFavoriteButton(
+                    kind: .plan,
+                    itemID: entry.id.uuidString,
+                    title: entry.title,
+                    subtitle:
+                        "\(entry.durationWeeks) weeks · \(entry.level)",
+                    icon: "calendar.badge.clock"
+                )
+            }
+        }
+        .alert(
+            "Added to My Plans",
+            isPresented: $addedToLibrary
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(
+                "\(entry.title) is now saved as a reusable plan. Open My Plans when you are ready to schedule it."
+            )
+        }
+    }
+
+    private var isAlreadySaved: Bool {
+        session.planTemplates.contains {
+            $0.tags.contains(
+                "catalog:\(entry.slug)"
+            )
+        }
+    }
+
+    private func detailMetric(
+        _ value: String,
+        label: String,
+        icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: icon)
+                .foregroundStyle(ATHLTHTheme.accent)
+            Text(value)
+                .font(.headline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.white.opacity(0.82),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+}
+
+struct MyTrainingPlansLibraryView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var showingCreatePlan = false
+    @State private var scheduleError: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                if !session.planTemplates.isEmpty {
+                    planSectionHeader(
+                        "Saved Plans",
+                        detail: "Reusable plans that are not on your calendar yet."
+                    )
+
+                    ForEach(session.planTemplates) { template in
+                        templateCard(template)
+                    }
+                }
+
+                if !session.trainingPlans.isEmpty {
+                    planSectionHeader(
+                        "Scheduled Plans",
+                        detail: "Active, upcoming and completed plans."
+                    )
+
+                    ForEach(session.trainingPlans) { plan in
+                        NavigationLink {
+                            ScrollView {
+                                AdvancedPlannerView(
+                                    planID: plan.id
+                                )
+                                .padding()
+                            }
+                            .background(
+                                ATHLTHPremiumCanvas(
+                                    accent:
+                                        ATHLTHTheme.accent
+                                        .opacity(0.35)
+                                )
+                            )
+                            .navigationTitle(plan.title)
+                            .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            scheduledPlanCard(plan)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if session.planTemplates.isEmpty &&
+                    session.trainingPlans.isEmpty {
+                    ContentUnavailableView {
+                        Label(
+                            "No plans yet",
+                            systemImage: "calendar.badge.plus"
+                        )
+                    } description: {
+                        Text(
+                            "Save a plan from Plan Library or create one from scratch."
+                        )
+                    } actions: {
+                        Button("Create Plan") {
+                            showingCreatePlan = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accent)
+                    }
+                    .padding(.top, 36)
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.accent.opacity(0.26)
+            )
+        )
+        .navigationTitle("My Plans")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingCreatePlan = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Create training plan")
+            }
+        }
+        .sheet(isPresented: $showingCreatePlan) {
+            TrainingPlanCreationView()
+        }
+        .alert(
+            "Could not schedule plan",
+            isPresented: Binding(
+                get: { scheduleError != nil },
+                set: { shown in
+                    if !shown { scheduleError = nil }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(scheduleError ?? "")
+        }
+    }
+
+    private func templateCard(
+        _ template: TrainingPlan
+    ) -> some View {
+        ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.title3)
+                    .foregroundStyle(ATHLTHTheme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(template.title)
+                        .font(.headline)
+                    Text(
+                        "\(template.weeks.count) weeks · saved plan"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    if !template.summary.isEmpty {
+                        Text(template.summary)
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .lineLimit(2)
+                    }
+                }
+
+                Spacer()
+            }
+
+            HStack {
+                Button {
+                    if session.usePlanTemplate(
+                        template.id,
+                        startDate:
+                            session.suggestedTrainingPlanStartDate
+                    ) == nil {
+                        scheduleError =
+                            "Another plan overlaps the suggested start date. Choose a different date when creating or scheduling the plan."
+                    }
+                } label: {
+                    Label(
+                        "Schedule Plan",
+                        systemImage: "calendar.badge.plus"
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accent)
+                .controlSize(.small)
+
+                Spacer()
+
+                Button(role: .destructive) {
+                    session.deletePlanTemplate(template.id)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    private func scheduledPlanCard(
+        _ plan: TrainingPlan
+    ) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.title3)
+                .foregroundStyle(ATHLTHTheme.accent)
+                .frame(width: 44, height: 44)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(plan.title)
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(
+                    "\(plan.weeks.count) weeks · \(session.trainingPlanStatus(plan).rawValue.capitalized)"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption.bold())
+                .foregroundStyle(.tertiary)
+        }
+        .padding(15)
+        .background(
+            Color.white.opacity(0.84),
+            in: RoundedRectangle(cornerRadius: 20)
+        )
+    }
+
+    private func planSectionHeader(
+        _ title: String,
+        detail: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.title3.weight(.bold))
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+    }
+}
+
+struct LibraryFavoritesView: View {
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var session: AppSessionStore
+
+    let onStartRunning: (RunningWorkoutTemplate) -> Void
+
+    @StateObject private var planLibrary = TrainingPlanLibraryStore()
+    @State private var selectedKind: LibraryFavoriteKind?
+
+    private var displayedFavorites: [LibraryFavoriteRecord] {
+        guard let selectedKind else {
+            return favorites.favorites
+        }
+
+        return favorites.favorites.filter {
+            $0.itemType == selectedKind
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    favoriteFilter(
+                        "All",
+                        selected: selectedKind == nil
+                    ) {
+                        selectedKind = nil
+                    }
+
+                    ForEach(LibraryFavoriteKind.allCases) { kind in
+                        favoriteFilter(
+                            kind.title,
+                            selected: selectedKind == kind
+                        ) {
+                            selectedKind = kind
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+
+            if displayedFavorites.isEmpty {
+                ContentUnavailableView {
+                    Label(
+                        "No favorites yet",
+                        systemImage: "star"
+                    )
+                } description: {
+                    Text(
+                        "Tap the star on a plan, workout, exercise or route to keep it here."
+                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(displayedFavorites) { item in
+                            HStack(spacing: 8) {
+                                NavigationLink {
+                                    favoriteDestination(item)
+                                } label: {
+                                    favoriteRow(item)
+                                }
+                                .buttonStyle(.plain)
+
+                                LibraryFavoriteButton(
+                                    kind: item.itemType,
+                                    itemID: item.itemID,
+                                    title: item.title,
+                                    subtitle: item.subtitle,
+                                    icon: item.icon
+                                )
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .background(
+            Color(.systemGroupedBackground).ignoresSafeArea()
+        )
+        .navigationTitle("Favorites")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            async let saved: Void = favorites.refresh()
+            async let plans: Void = planLibrary.refresh()
+            async let exercises: Void = exerciseLibrary.refresh()
+            _ = await (saved, plans, exercises)
+        }
+    }
+
+    @ViewBuilder
+    private func favoriteDestination(
+        _ item: LibraryFavoriteRecord
+    ) -> some View {
+        switch item.itemType {
+        case .plan:
+            if let entry = planLibrary.entries.first(
+                where: {
+                    $0.id.uuidString
+                        .caseInsensitiveCompare(item.itemID)
+                        == .orderedSame
+                }
+            ) {
+                TrainingPlanCatalogDetailView(entry: entry)
+            } else {
+                TrainingPlanLibraryView()
+            }
+
+        case .workout:
+            if let id = UUID(uuidString: item.itemID),
+               let workout = runningLibrary.allTemplates.first(
+                    where: { $0.id == id }
+               ) {
+                RunningWorkoutDetailView(
+                    workout: workout,
+                    selectionTitle: nil,
+                    onSelect: nil,
+                    onStart: onStartRunning
+                )
+            } else {
+                RunningWorkoutLibraryView(
+                    source: .library,
+                    onStart: onStartRunning
+                )
+            }
+
+        case .exercise:
+            if let id = UUID(uuidString: item.itemID),
+               let entry = exerciseLibrary.search(
+                    query: "",
+                    bodyPart: "All",
+                    equipment: "All"
+               ).first(
+                    where: { $0.id == id }
+               ) {
+                ExerciseDetailView(
+                    entry: entry,
+                    selectionTitle: nil,
+                    onSelect: nil
+                )
+            } else {
+                ExerciseLibraryView(source: .library)
+            }
+
+        case .route:
+            if let id = UUID(uuidString: item.itemID),
+               let saved = session.savedRoutes.first(
+                    where: { $0.id == id }
+               ) {
+                RouteDetailView(route: saved)
+            } else if let id = UUID(uuidString: item.itemID) {
+                RouteLibraryDetailLoader(routeID: id)
+            } else {
+                RouteLibraryListView(source: .database)
+            }
+        }
+    }
+
+    private func favoriteFilter(
+        _ title: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    selected
+                        ? Color.white
+                        : ATHLTHTheme.primaryText
+                )
+                .padding(.horizontal, 13)
+                .frame(height: 35)
+                .background(
+                    selected
+                        ? ATHLTHTheme.accent
+                        : Color(.secondarySystemGroupedBackground),
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func favoriteRow(
+        _ item: LibraryFavoriteRecord
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    item.icon ??
+                    item.itemType.systemImage
+            )
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(ATHLTHTheme.accent)
+            .frame(width: 42, height: 42)
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: RoundedRectangle(cornerRadius: 13)
+            )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(2)
+
+                Text(
+                    item.subtitle ??
+                    item.itemType.title
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption.bold())
+                .foregroundStyle(.tertiary)
+        }
+        .padding(13)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
     }
 }
