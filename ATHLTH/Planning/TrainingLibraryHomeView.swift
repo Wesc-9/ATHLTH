@@ -473,7 +473,7 @@ private struct LibraryStatPill: View {
     }
 }
 
-enum LibraryFavoriteKind: String, Codable, CaseIterable, Identifiable {
+enum LibraryFavoriteKind: String, Codable, CaseIterable, Identifiable, Hashable {
     case plan
     case workout
     case exercise
