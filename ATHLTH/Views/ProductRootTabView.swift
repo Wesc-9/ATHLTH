@@ -234,7 +234,7 @@ struct ATHLTHHomeView: View {
                         .accessibilityLabel("Search ATHLTH")
 
                         NavigationLink {
-                            SocialHubView(initialTab: .messages)
+                            MessageInboxDestinationView()
                         } label: {
                             ZStack(alignment: .topTrailing) {
                                 Image(
