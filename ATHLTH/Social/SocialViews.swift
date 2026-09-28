@@ -1078,6 +1078,7 @@ struct FriendProfileView: View {
         _ profile: SocialFriendProfile
     ) -> some View {
         let relationship = social.relationshipState(with: userID)
+        let followsYou = social.isFollowedBy(userID)
 
         if social.isFollowing(userID) {
             Button {
@@ -1095,82 +1096,40 @@ struct FriendProfileView: View {
             }
             .buttonStyle(.bordered)
             .tint(ATHLTHTheme.accentDeep)
+        } else if relationship == .outgoingPending {
+            Label("Requested", systemImage: "clock.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(
+                    Color.primary.opacity(0.05),
+                    in: Capsule()
+                )
+        } else if relationship == .blocked {
+            Label("Blocked", systemImage: "nosign")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+        } else if relationship == .selfUser {
+            EmptyView()
         } else if profile.card.isPrivateProfile {
-            switch relationship {
-            case .outgoingPending:
-                Label("Requested", systemImage: "clock.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(
-                        Color.primary.opacity(0.05),
-                        in: Capsule()
-                    )
-
-            case .incomingPending:
-                if let request = social.incomingRequests.first(where: {
-                    $0.profile.userID == userID
-                }) {
-                    Button {
-                        Task {
-                            await social.accept(request)
-                            await load(force: true)
-                        }
-                    } label: {
-                        Label(
-                            "Accept request",
-                            systemImage: "person.crop.circle.badge.checkmark"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
+            Button {
+                Task {
+                    await social.sendFriendRequest(to: profile.card)
                 }
-
-            case .friends:
-                Button {
-                    Task {
-                        await social.follow(profile.card)
-                        followOverview = await social.loadFollowOverview(
-                            for: userID
-                        )
-                    }
-                } label: {
-                    Label("Follow", systemImage: "person.badge.plus")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
-
-            case .none:
-                Button {
-                    Task {
-                        await social.sendFriendRequest(to: profile.card)
-                    }
-                } label: {
-                    Label("Follow", systemImage: "person.badge.plus")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
-
-            case .blocked:
-                Label("Blocked", systemImage: "nosign")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-
-            case .selfUser:
-                EmptyView()
+            } label: {
+                Label(
+                    followsYou ? "Request to follow back" : "Request to follow",
+                    systemImage: "person.badge.plus"
+                )
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
         } else {
             Button {
                 Task {
@@ -1180,10 +1139,13 @@ struct FriendProfileView: View {
                     )
                 }
             } label: {
-                Label("Follow", systemImage: "person.badge.plus")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
+                Label(
+                    followsYou ? "Follow back" : "Follow",
+                    systemImage: "person.badge.plus"
+                )
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
             }
             .buttonStyle(.borderedProminent)
             .tint(ATHLTHTheme.accentDeep)
