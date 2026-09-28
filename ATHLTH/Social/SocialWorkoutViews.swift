@@ -801,7 +801,7 @@ private struct HomeActivityScenicWash: View {
     let recipe: HomeActivityVisualRecipe
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack {
             LinearGradient(
                 colors: paletteColors,
                 startPoint: .topLeading,
@@ -813,16 +813,182 @@ private struct HomeActivityScenicWash: View {
                     : 0.30
             )
 
-            Image(systemName: sceneSymbol)
-                .font(.system(size: 86, weight: .light))
-                .foregroundStyle(
-                    Color.white.opacity(0.14)
-                )
-                .padding(.trailing, 28)
-                .padding(.bottom, 22)
+            lightWash
+            motifArtwork
+
+            HStack {
+                Spacer()
+
+                Image(systemName: sceneSymbol)
+                    .font(
+                        .system(
+                            size: 78,
+                            weight: .light
+                        )
+                    )
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(
+                        Color.white.opacity(0.13)
+                    )
+                    .rotationEffect(
+                        .degrees(
+                            recipe.variant
+                                .isMultiple(of: 2)
+                                ? -4
+                                : 4
+                        )
+                    )
+                    .offset(
+                        x:
+                            recipe.variant >= 3
+                                ? 8
+                                : 0,
+                        y:
+                            recipe.variant
+                                .isMultiple(of: 2)
+                                ? 8
+                                : -2
+                    )
+                    .padding(.trailing, 26)
+            }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var lightWash: some View {
+        switch recipe.light {
+        case "sunrise":
+            RadialGradient(
+                colors: [
+                    Color.yellow.opacity(0.20),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 4,
+                endRadius: 190
+            )
+        case "golden_hour":
+            RadialGradient(
+                colors: [
+                    Color.orange.opacity(0.22),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 6,
+                endRadius: 200
+            )
+        case "dusk":
+            LinearGradient(
+                colors: [
+                    Color.indigo.opacity(0.18),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        default:
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(0.10),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 4,
+                endRadius: 180
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var motifArtwork: some View {
+        switch recipe.motif {
+        case "route":
+            HomeActivityFlowLines()
+                .stroke(
+                    Color.white.opacity(0.11),
+                    style: StrokeStyle(
+                        lineWidth: 3,
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
+                )
+                .padding(34)
+                .rotationEffect(
+                    .degrees(
+                        recipe.variant
+                            .isMultiple(of: 2)
+                            ? -5
+                            : 5
+                    )
+                )
+
+        case "waves":
+            Image(systemName: "water.waves")
+                .font(
+                    .system(
+                        size: 108,
+                        weight: .ultraLight
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(0.10)
+                )
+                .offset(x: 92, y: 48)
+
+        case "steps":
+            Image(systemName: "figure.walk")
+                .font(
+                    .system(
+                        size: 96,
+                        weight: .ultraLight
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(0.10)
+                )
+                .offset(x: 96, y: 38)
+
+        case "streak":
+            Image(systemName: "wind")
+                .font(
+                    .system(
+                        size: 112,
+                        weight: .ultraLight
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(0.10)
+                )
+                .offset(x: 92, y: 36)
+
+        case "group":
+            Image(systemName: "person.3.fill")
+                .font(
+                    .system(
+                        size: 84,
+                        weight: .ultraLight
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(0.09)
+                )
+                .offset(x: 94, y: 34)
+
+        default:
+            Image(systemName: "waveform.path.ecg")
+                .font(
+                    .system(
+                        size: 102,
+                        weight: .ultraLight
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(0.10)
+                )
+                .offset(x: 92, y: 38)
+        }
     }
 
     private var paletteColors: [Color] {
@@ -837,6 +1003,18 @@ private struct HomeActivityScenicWash: View {
             return [
                 Color.orange.opacity(0.20),
                 Color.yellow.opacity(0.07),
+                .clear
+            ]
+        case "violet":
+            return [
+                Color.indigo.opacity(0.20),
+                Color.purple.opacity(0.07),
+                .clear
+            ]
+        case "rose":
+            return [
+                Color.pink.opacity(0.15),
+                Color.orange.opacity(0.05),
                 .clear
             ]
         case "slate":
@@ -2847,8 +3025,8 @@ private struct HomeActivityStrengthCard: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(displayTitle)
                         .font(.system(size: 23, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
@@ -2859,37 +3037,81 @@ private struct HomeActivityStrengthCard: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         .lineLimit(3)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                HStack(alignment: .center, spacing: 8) {
-                    HomeActivityMuscleArtwork(
-                        muscleGroups: focusAreas
-                    )
-                    .frame(width: 92, height: 128)
 
                     if !focusAreas.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
                             Text("Focus Areas")
-                                .font(.system(size: 9.5, weight: .semibold))
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .font(
+                                    .system(
+                                        size: 9.5,
+                                        weight: .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
 
-                            ForEach(focusAreas.prefix(4), id: \.self) { group in
+                            ForEach(
+                                focusAreas.prefix(4),
+                                id: \.self
+                            ) { group in
                                 HStack(spacing: 5) {
                                     Circle()
-                                        .fill(Color.indigo.opacity(0.72))
-                                        .frame(width: 6, height: 6)
+                                        .fill(
+                                            Color.indigo
+                                                .opacity(0.72)
+                                        )
+                                        .frame(
+                                            width: 6,
+                                            height: 6
+                                        )
 
                                     Text(group)
-                                        .font(.system(size: 9.5, weight: .medium))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .font(
+                                            .system(
+                                                size: 10,
+                                                weight: .medium
+                                            )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme.primaryText
+                                        )
                                         .lineLimit(1)
                                 }
                             }
                         }
-                        .frame(width: 72, alignment: .leading)
                     }
                 }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+
+                HomeActivityMuscleArtwork(
+                    muscleGroups: focusAreas
+                )
+                .frame(
+                    width: 118,
+                    height: 148
+                )
+            }
+            .padding(12)
+            .background(
+                Color.indigo.opacity(0.035),
+                in: RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.indigo.opacity(0.07),
+                    lineWidth: 0.8
+                )
             }
 
             Divider()
