@@ -593,10 +593,30 @@ struct HomeActivitySection: View {
         var refreshed: [UUID: SocialActivityRecord] = [:]
 
         for workout in featuredWorkouts {
-            if let activity = await social.workoutActivity(
-                for: workout.id
-            ) {
-                refreshed[workout.id] = activity
+            if let feedItem =
+                social.feed.first(
+                    where: {
+                        $0.actor.userID ==
+                            social.currentUserID &&
+                        $0.activity.kind ==
+                            "workout" &&
+                        $0.activity.metadata?[
+                            "workout_id"
+                        ] ==
+                            workout.id.uuidString
+                    }
+                ) {
+                refreshed[workout.id] =
+                    feedItem.activity
+                continue
+            }
+
+            if let activity =
+                await social.workoutActivity(
+                    for: workout.id
+                ) {
+                refreshed[workout.id] =
+                    activity
             }
         }
 
