@@ -139,12 +139,14 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
     var trophyCabinetVisibility: String
     var recentActivityVisibility: String
     var goalsVisibility: String
+    var gearVisibility: String
     var runningPRsVisibility: String
     var strengthPRsVisibility: String
     var shareTrainingPresence: Bool
     var sharePerformanceStats: Bool
     var shareTrophyCabinet: Bool
     var shareGoals: Bool
+    var shareGear: Bool
     var shareRecentActivity: Bool
     var shareRunningPRs: Bool
     var shareStrengthPRs: Bool
@@ -165,12 +167,14 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
         case trophyCabinetVisibility = "trophy_cabinet_visibility"
         case recentActivityVisibility = "recent_activity_visibility"
         case goalsVisibility = "goals_visibility"
+        case gearVisibility = "gear_visibility"
         case runningPRsVisibility = "running_prs_visibility"
         case strengthPRsVisibility = "strength_prs_visibility"
         case shareTrainingPresence = "share_training_presence"
         case sharePerformanceStats = "share_performance_stats"
         case shareTrophyCabinet = "share_trophy_cabinet"
         case shareGoals = "share_goals"
+        case shareGear = "share_gear"
         case shareRecentActivity = "share_recent_activity"
         case shareRunningPRs = "share_running_prs"
         case shareStrengthPRs = "share_strength_prs"
@@ -193,12 +197,14 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
             trophyCabinetVisibility: "private",
             recentActivityVisibility: "private",
             goalsVisibility: "private",
+            gearVisibility: "private",
             runningPRsVisibility: "private",
             strengthPRsVisibility: "private",
             shareTrainingPresence: false,
             sharePerformanceStats: false,
             shareTrophyCabinet: false,
             shareGoals: false,
+            shareGear: false,
             shareRecentActivity: false,
             shareRunningPRs: false,
             shareStrengthPRs: false,
@@ -307,6 +313,32 @@ struct SocialTrophyShowcaseItem: Codable, Hashable, Identifiable {
         case category
         case systemImage = "system_image"
         case unlockedAt = "unlocked_at"
+    }
+}
+
+struct SocialProfileGoalRecord: Identifiable, Codable, Hashable {
+    let id: UUID
+    let userID: UUID
+    let title: String
+    let category: String
+    let status: String
+    let progress: Double
+    let isPrimary: Bool
+    let deadline: Date?
+    let visibility: String
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userID = "user_id"
+        case title
+        case category
+        case status
+        case progress
+        case isPrimary = "is_primary"
+        case deadline
+        case visibility
+        case updatedAt = "updated_at"
     }
 }
 
@@ -437,6 +469,8 @@ struct SocialFriendProfile: Hashable {
     let presence: SocialPresenceRecord?
     let performance: SocialPerformanceStats?
     let trophies: [SocialTrophyShowcaseItem]
+    let goals: [SocialProfileGoalRecord]
+    let gear: [ProfileGearItem]
     let recentActivities: [SocialFeedItem]
 }
 
@@ -905,6 +939,7 @@ extension SocialPrivacySettings {
         trophyCabinetVisibility = scope(shareTrophyCabinet, trophyCabinetVisibility)
         recentActivityVisibility = scope(shareRecentActivity, recentActivityVisibility)
         goalsVisibility = scope(shareGoals, goalsVisibility)
+        gearVisibility = scope(shareGear, gearVisibility)
         runningPRsVisibility = scope(shareRunningPRs, runningPRsVisibility)
         strengthPRsVisibility = scope(shareStrengthPRs, strengthPRsVisibility)
         // Training focus has its own audience picker, not a sharing toggle.
