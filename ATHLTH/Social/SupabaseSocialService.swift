@@ -127,7 +127,7 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
-    func sendFriendRequest(to recipientID: UUID, message: String? = nil) async throws {
+    func sendFollowRequest(to recipientID: UUID, message: String? = nil) async throws {
         guard let senderID = currentUserID else {
             throw SocialServiceError.notAuthenticated
         }
@@ -197,12 +197,14 @@ final class SupabaseSocialService: Sendable {
             trophyCabinetVisibility: settings.trophyCabinetVisibility,
             recentActivityVisibility: settings.recentActivityVisibility,
             goalsVisibility: settings.goalsVisibility,
+            gearVisibility: settings.gearVisibility,
             runningPRsVisibility: settings.runningPRsVisibility,
             strengthPRsVisibility: settings.strengthPRsVisibility,
             shareTrainingPresence: settings.shareTrainingPresence,
             sharePerformanceStats: settings.sharePerformanceStats,
             shareTrophyCabinet: settings.shareTrophyCabinet,
             shareGoals: settings.shareGoals,
+            shareGear: settings.shareGear,
             shareRecentActivity: settings.shareRecentActivity,
             shareRunningPRs: settings.shareRunningPRs,
             shareStrengthPRs: settings.shareStrengthPRs,
@@ -336,6 +338,61 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
+    func syncGoalShowcase(
+        _ goals: [ATHLTHGoal],
+        enabled: Bool
+    ) async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        // Keep cloud social goal data deliberately minimal. Private goals are
+        // never written to this table at all.
+        try await client
+            .from("social_profile_goals")
+            .delete()
+            .eq("user_id", value: currentUserID)
+            .execute()
+
+        guard enabled else { return }
+
+        let rows = goals.compactMap { goal -> SocialProfileGoalRecord? in
+            guard goal.status == .active || goal.status == .paused else {
+                return nil
+            }
+
+            let visibility: String
+            switch goal.privacy {
+            case .privateOnly:
+                return nil
+            case .friends:
+                visibility = "friends"
+            case .publicVisible:
+                visibility = "public"
+            }
+
+            return SocialProfileGoalRecord(
+                id: goal.id,
+                userID: currentUserID,
+                title: String(goal.title.prefix(160)),
+                category: goal.category.rawValue,
+                status: goal.status.rawValue,
+                progress: min(max(goal.progress, 0), 1),
+                isPrimary: goal.isPrimary,
+                deadline: goal.deadline,
+                visibility: visibility,
+                updatedAt: Date()
+            )
+        }
+
+        guard !rows.isEmpty else { return }
+
+        try await client
+            .from("social_profile_goals")
+            .upsert(rows)
+            .execute()
+    }
+
     func syncPresence(
         state: TrainingPresenceState,
         workoutTitle: String?,
@@ -360,7 +417,7 @@ final class SupabaseSocialService: Sendable {
     }
 
     func loadFriendProfile(_ userID: UUID) async throws -> SocialFriendProfile {
-        let rawCard: SocialProfileCard = try await client
+        async let rawCardTask: SocialProfileCard = client
             .from("social_profile_cards")
             .select()
             .eq("user_id", value: userID)
@@ -368,12 +425,17 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
-        let detailRows: [SocialProfileDetailRecord] = try await client
+        async let detailRowsTask: [SocialProfileDetailRecord] = client
             .from("social_profile_details")
             .select()
             .eq("user_id", value: userID)
             .execute()
             .value
+
+        let (rawCard, detailRows) = try await (
+            rawCardTask,
+            detailRowsTask
+        )
 
         let card = SocialProfileCard(
             userID: rawCard.userID,
@@ -386,35 +448,55 @@ final class SupabaseSocialService: Sendable {
             updatedAt: rawCard.updatedAt
         )
 
-        let focusRows: [SocialTrainingFocusRecord] = try await client
+        async let focusRowsTask: [SocialTrainingFocusRecord] = client
             .from("social_training_focus")
             .select()
             .eq("user_id", value: userID)
             .execute()
             .value
 
-        let presenceRows: [SocialPresenceRecord] = try await client
+        async let presenceRowsTask: [SocialPresenceRecord] = client
             .from("social_presence")
             .select()
             .eq("user_id", value: userID)
             .execute()
             .value
 
-        let performanceRows: [SocialPerformanceStats] = try await client
+        async let performanceRowsTask: [SocialPerformanceStats] = client
             .from("social_performance_stats")
             .select()
             .eq("user_id", value: userID)
             .execute()
             .value
 
-        let trophyRows: [SocialTrophyShowcaseRecord] = try await client
+        async let trophyRowsTask: [SocialTrophyShowcaseRecord] = client
             .from("social_trophy_showcases")
             .select()
             .eq("user_id", value: userID)
             .execute()
             .value
 
-        let activities: [SocialActivityRecord] = try await client
+        async let goalRowsTask: [SocialProfileGoalRecord] = client
+            .from("social_profile_goals")
+            .select()
+            .eq("user_id", value: userID)
+            .order("is_primary", ascending: false)
+            .order("updated_at", ascending: false)
+            .limit(12)
+            .execute()
+            .value
+
+        async let gearRowsTask: [ProfileGearItem] = client
+            .from("profile_gear")
+            .select()
+            .eq("user_id", value: userID)
+            .order("is_featured", ascending: false)
+            .order("updated_at", ascending: false)
+            .limit(12)
+            .execute()
+            .value
+
+        async let activitiesTask: [SocialActivityRecord] = client
             .from("social_activities")
             .select()
             .eq("actor_id", value: userID)
@@ -423,13 +505,33 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
-        let reactions: [SocialActivityReactionRecord] = try await client
+        async let reactionsTask: [SocialActivityReactionRecord] = client
             .from("social_activity_reactions")
             .select()
             .order("created_at", ascending: false)
             .limit(1_000)
             .execute()
             .value
+
+        let (
+            focusRows,
+            presenceRows,
+            performanceRows,
+            trophyRows,
+            goalRows,
+            gearRows,
+            activities,
+            reactions
+        ) = try await (
+            focusRowsTask,
+            presenceRowsTask,
+            performanceRowsTask,
+            trophyRowsTask,
+            goalRowsTask,
+            gearRowsTask,
+            activitiesTask,
+            reactionsTask
+        )
 
         let grouped = Dictionary(grouping: reactions, by: \.activityID)
         let feed = activities.map {
@@ -446,6 +548,8 @@ final class SupabaseSocialService: Sendable {
             presence: presenceRows.first,
             performance: performanceRows.first,
             trophies: trophyRows.first?.items ?? [],
+            goals: goalRows,
+            gear: gearRows,
             recentActivities: feed
         )
     }
@@ -844,12 +948,14 @@ private struct SocialPrivacyUpdate: Encodable {
     let trophyCabinetVisibility: String
     let recentActivityVisibility: String
     let goalsVisibility: String
+    let gearVisibility: String
     let runningPRsVisibility: String
     let strengthPRsVisibility: String
     let shareTrainingPresence: Bool
     let sharePerformanceStats: Bool
     let shareTrophyCabinet: Bool
     let shareGoals: Bool
+    let shareGear: Bool
     let shareRecentActivity: Bool
     let shareRunningPRs: Bool
     let shareStrengthPRs: Bool
@@ -867,12 +973,14 @@ private struct SocialPrivacyUpdate: Encodable {
         case trophyCabinetVisibility = "trophy_cabinet_visibility"
         case recentActivityVisibility = "recent_activity_visibility"
         case goalsVisibility = "goals_visibility"
+        case gearVisibility = "gear_visibility"
         case runningPRsVisibility = "running_prs_visibility"
         case strengthPRsVisibility = "strength_prs_visibility"
         case shareTrainingPresence = "share_training_presence"
         case sharePerformanceStats = "share_performance_stats"
         case shareTrophyCabinet = "share_trophy_cabinet"
         case shareGoals = "share_goals"
+        case shareGear = "share_gear"
         case shareRecentActivity = "share_recent_activity"
         case shareRunningPRs = "share_running_prs"
         case shareStrengthPRs = "share_strength_prs"
