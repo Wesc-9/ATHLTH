@@ -4984,6 +4984,7 @@ struct ATHLTHRecoveryView: View {
         force: Bool = false
     ) async {
         guard session.hasPaidAccess,
+              settings.aiHealthDataSharingEnabled,
               shouldShowWearableRecoveryContent else {
             recoveryAIInsight = nil
             recoveryAIError = nil
