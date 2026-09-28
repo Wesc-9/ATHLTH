@@ -883,7 +883,38 @@ private struct HomeActivityOutdoorCard: View {
     let onPost: () -> Void
 
     private var routeCoordinates: [CLLocationCoordinate2D] {
-        detail?.route.map(\.coordinate) ?? []
+        guard let route = detail?.route,
+              !route.isEmpty
+        else {
+            return []
+        }
+
+        let maximumCount = 180
+        guard route.count > maximumCount else {
+            return route.map(\.coordinate)
+        }
+
+        let lastIndex = route.count - 1
+        let step =
+            Double(lastIndex) /
+            Double(maximumCount - 1)
+
+        return (0..<maximumCount).map {
+            index in
+            route[
+                min(
+                    Int(
+                        (
+                            Double(index) *
+                            step
+                        )
+                        .rounded()
+                    ),
+                    lastIndex
+                )
+            ]
+            .coordinate
+        }
     }
 
     private var singleLocation: CLLocation? {
@@ -916,60 +947,6 @@ private struct HomeActivityOutdoorCard: View {
             for: workout,
             hasRoute:
                 routeCoordinates.count >= 2
-        )
-    }
-
-    private var mapRegion: MKCoordinateRegion {
-        let coordinates: [CLLocationCoordinate2D]
-
-        if routeCoordinates.count >= 2 {
-            coordinates = routeCoordinates
-        } else if let singleLocation {
-            coordinates = [singleLocation.coordinate]
-        } else {
-            coordinates = []
-        }
-
-        guard let first = coordinates.first else {
-            return MKCoordinateRegion(
-                center: CLLocationCoordinate2D(
-                    latitude: 63.4305,
-                    longitude: 10.3951
-                ),
-                span: MKCoordinateSpan(
-                    latitudeDelta: 0.08,
-                    longitudeDelta: 0.08
-                )
-            )
-        }
-
-        var minLatitude = first.latitude
-        var maxLatitude = first.latitude
-        var minLongitude = first.longitude
-        var maxLongitude = first.longitude
-
-        for coordinate in coordinates.dropFirst() {
-            minLatitude = min(minLatitude, coordinate.latitude)
-            maxLatitude = max(maxLatitude, coordinate.latitude)
-            minLongitude = min(minLongitude, coordinate.longitude)
-            maxLongitude = max(maxLongitude, coordinate.longitude)
-        }
-
-        return MKCoordinateRegion(
-            center: CLLocationCoordinate2D(
-                latitude: (minLatitude + maxLatitude) / 2,
-                longitude: (minLongitude + maxLongitude) / 2
-            ),
-            span: MKCoordinateSpan(
-                latitudeDelta: max(
-                    (maxLatitude - minLatitude) * 1.55,
-                    0.008
-                ),
-                longitudeDelta: max(
-                    (maxLongitude - minLongitude) * 1.55,
-                    0.008
-                )
-            )
         )
     }
 
