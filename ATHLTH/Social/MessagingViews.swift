@@ -137,6 +137,10 @@ struct MessageInboxView: View {
                                     unreadCount:
                                         messaging.unreadCount(
                                             for: item.conversation.id
+                                        ),
+                                    requestLabel:
+                                        conversationRequestLabel(
+                                            item.conversation
                                         )
                                 )
                             }
@@ -717,7 +721,12 @@ struct MessageInboxView: View {
             conversations = activeConversations.filter {
                 messaging.unreadCount(
                     for: $0.conversation.id
-                ) > 0
+                ) > 0 ||
+                (
+                    $0.conversation.requestStatus == .pending &&
+                    $0.conversation.requestedBy !=
+                        messaging.currentUserID
+                )
             }
         case .direct:
             conversations = activeConversations
@@ -761,15 +770,11 @@ struct MessageInboxView: View {
     }
 
     private var shouldShowIncomingRequests: Bool {
-        selectedFilter == .priority &&
-            !incomingRequestItems.isEmpty &&
-            normalizedSearch.isEmpty
+        false
     }
 
     private var shouldShowOutgoingRequests: Bool {
-        selectedFilter == .direct &&
-            !outgoingRequestItems.isEmpty &&
-            normalizedSearch.isEmpty
+        false
     }
 
     private var shouldShowEmptyState: Bool {
@@ -789,7 +794,11 @@ struct MessageInboxView: View {
         [MessageConversationItem] {
         items(
             from: messaging.conversations.filter {
-                $0.requestStatus == .accepted
+                $0.requestStatus == .accepted ||
+                    (
+                        $0.requestStatus == .pending &&
+                        messaging.lastMessage(for: $0.id) != nil
+                    )
             }
         )
     }
@@ -840,6 +849,18 @@ struct MessageInboxView: View {
             ($1.conversation.lastMessageAt ??
                 $1.conversation.createdAt)
         }
+    }
+
+    private func conversationRequestLabel(
+        _ conversation: DirectConversationRecord
+    ) -> String? {
+        guard conversation.requestStatus == .pending else {
+            return nil
+        }
+
+        return conversation.requestedBy == messaging.currentUserID
+            ? "Pending"
+            : "Request"
     }
 
     private func profile(
@@ -956,6 +977,7 @@ private struct MessageConversationRow: View {
     let friend: SocialProfileCard
     let lastMessage: DirectMessageRecord?
     let unreadCount: Int
+    let requestLabel: String?
 
     var body: some View {
         HStack(spacing: 13) {
@@ -1009,6 +1031,25 @@ private struct MessageConversationRow: View {
                             ATHLTHTheme.primaryText
                         )
                         .lineLimit(1)
+
+                    if let requestLabel {
+                        Text(requestLabel)
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: Capsule()
+                            )
+                    }
 
                     if let label = attachmentLabel {
                         Text(label)
