@@ -632,10 +632,7 @@ struct ATHLTHCommunityView: View {
                                 ? 212
                                 : 190,
                         alignment: .leading,
-                        focalOffsetX:
-                            useImmersiveCommunityHero
-                                ? -8
-                                : -18,
+                        focalOffsetX: 0,
                         focalOffsetY:
                             useImmersiveCommunityHero
                                 ? 8
