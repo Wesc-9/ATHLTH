@@ -1719,10 +1719,6 @@ private struct HomeActivityRouteArtwork: View {
                         )
                     )
                     .padding(30)
-
-                ProgressView()
-                    .tint(ATHLTHTheme.accentDeep)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .clipped()
