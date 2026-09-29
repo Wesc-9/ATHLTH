@@ -108,13 +108,22 @@ struct ATHLTHLiveShareContext: Codable, Hashable {
     var viewerSummary: String?
 }
 
+struct ATHLTHLiveGhostContext: Codable, Hashable {
+    var title: String
+    var distanceDeltaMeters: Double?
+    var estimatedTimeDeltaSeconds: TimeInterval?
+    var updatedAt: Date
+}
+
 struct ATHLTHLiveWorkoutContext: Codable, Hashable {
     var challenge: ATHLTHLiveChallengeContext?
     var liveShare: ATHLTHLiveShareContext?
+    var liveGhost: ATHLTHLiveGhostContext? = nil
 
     static let empty = ATHLTHLiveWorkoutContext(
         challenge: nil,
-        liveShare: nil
+        liveShare: nil,
+        liveGhost: nil
     )
 }
 
