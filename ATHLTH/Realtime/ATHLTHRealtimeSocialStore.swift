@@ -198,6 +198,20 @@ private struct ATHLTHLiveWorkoutSessionInsert: Encodable {
     }
 }
 
+private struct ATHLTHLiveWorkoutSessionRouteUpdate: Encodable {
+    let routeKey: UUID
+    let routeDistanceMeters: Double?
+    let routeTitle: String?
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case routeKey = "route_key"
+        case routeDistanceMeters = "route_distance_meters"
+        case routeTitle = "route_title"
+        case updatedAt = "updated_at"
+    }
+}
+
 private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
     let sessionID: UUID
     let userID: UUID
@@ -637,6 +651,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             return
         }
 
+        await bindRouteContextIfNeeded(
+            snapshot
+        )
+
         let now = Date()
         if let lastPublishedLocationAt,
            now.timeIntervalSince(lastPublishedLocationAt) <
@@ -688,6 +706,129 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             return
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func bindRouteContextIfNeeded(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) async {
+        guard let routeKey =
+                snapshot.routeComparisonID,
+              let currentUserID,
+              let activeSession =
+                currentSession,
+              activeSession.ownerID ==
+                currentUserID,
+              activeSession.isActive
+        else {
+            return
+        }
+
+        let distance =
+            sanitizedNonNegative(
+                snapshot.routeDistanceMeters
+            )
+        let cleanTitle =
+            snapshot.routeTitle?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+        let title =
+            cleanTitle.flatMap {
+                $0.isEmpty
+                    ? nil
+                    : String($0.prefix(160))
+            }
+
+        let alreadyBound =
+            activeSession.routeKey == routeKey &&
+            activeSession.routeDistanceMeters ==
+                distance &&
+            activeSession.routeTitle ==
+                title
+
+        guard !alreadyBound else {
+            return
+        }
+
+        let now = Date()
+
+        do {
+            try await client
+                .from("live_workout_sessions")
+                .update(
+                    ATHLTHLiveWorkoutSessionRouteUpdate(
+                        routeKey: routeKey,
+                        routeDistanceMeters:
+                            distance,
+                        routeTitle:
+                            title,
+                        updatedAt: now
+                    )
+                )
+                .eq(
+                    "id",
+                    value:
+                        activeSession.id
+                )
+                .eq(
+                    "owner_id",
+                    value:
+                        currentUserID
+                )
+                .execute()
+
+            let updated =
+                ATHLTHLiveWorkoutSession(
+                    id: activeSession.id,
+                    ownerID:
+                        activeSession.ownerID,
+                    opponentUserID:
+                        activeSession
+                            .opponentUserID,
+                    ghostChallengeID:
+                        activeSession
+                            .ghostChallengeID,
+                    activity:
+                        activeSession.activity,
+                    title:
+                        activeSession.title,
+                    visibility:
+                        activeSession.visibility,
+                    status:
+                        activeSession.status,
+                    startedAt:
+                        activeSession.startedAt,
+                    endedAt:
+                        activeSession.endedAt,
+                    createdAt:
+                        activeSession.createdAt,
+                    updatedAt: now,
+                    routeKey: routeKey,
+                    routeDistanceMeters:
+                        distance,
+                    routeTitle: title
+                )
+
+            currentSession = updated
+
+            if let index =
+                    visibleLiveSessions
+                        .firstIndex(
+                            where: {
+                                $0.id ==
+                                    updated.id
+                            }
+                        ) {
+                visibleLiveSessions[
+                    index
+                ] = updated
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            // Route context improves comparison accuracy but must never stop
+            // live location sharing or the workout itself.
         }
     }
 
