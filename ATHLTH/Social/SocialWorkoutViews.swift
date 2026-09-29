@@ -305,6 +305,7 @@ struct HomeActivitySection: View {
     @State private var selectedPublishWorkoutID: UUID?
     @State private var workoutDetails: [UUID: WorkoutDetail] = [:]
     @State private var workoutAIInsights: [UUID: WorkoutAIInsight] = [:]
+    @State private var workoutHeroRecipes: [UUID: WorkoutVisualRecipe] = [:]
     @State private var loadingAIInsightIDs: Set<UUID> = []
     @State private var publishedActivities: [UUID: SocialActivityRecord] = [:]
     @State private var selectedCoachInsight: CoachInsightPresentation?
@@ -455,6 +456,8 @@ struct HomeActivitySection: View {
                             detail: workoutDetails[workout.id],
                             isPublished: isPublished(workout),
                             caption: caption(for: workout),
+                            heroRecipe:
+                                workoutHeroRecipes[workout.id],
                             aiInsight:
                                 workoutAIInsights[workout.id],
                             isAIInsightLoading:
@@ -543,9 +546,22 @@ struct HomeActivitySection: View {
             // Keep Home responsive: render the workout visual first,
             // then enrich the card with social state and Coach data.
             await loadFeaturedWorkoutDetails()
-            await social.refreshHomeFeed()
-            await loadPublishedActivityRecords()
-            await loadWorkoutAIInsights()
+
+            async let heroDirections: Void =
+                loadWorkoutHeroRecipes()
+            async let feedRefresh: Void =
+                social.refreshHomeFeed()
+            async let publishedRefresh: Void =
+                loadPublishedActivityRecords()
+            async let insightRefresh: Void =
+                loadWorkoutAIInsights()
+
+            _ = await (
+                heroDirections,
+                feedRefresh,
+                publishedRefresh,
+                insightRefresh
+            )
         }
     }
 
@@ -654,6 +670,65 @@ struct HomeActivitySection: View {
                 for: workout.id
             )
         }
+    }
+
+    @MainActor
+    private func loadWorkoutHeroRecipes() async {
+        let service = WorkoutHeroAIService()
+
+        for workout in featuredWorkouts
+            where isOutdoor(workout.activity) {
+            guard workoutHeroRecipes[workout.id] == nil else {
+                continue
+            }
+
+            let detail =
+                workoutDetails[workout.id]
+
+            do {
+                workoutHeroRecipes[workout.id] =
+                    try await service.generate(
+                        workout: workout,
+                        elevationGainMeters:
+                            elevationGain(
+                                route:
+                                    detail?.route ?? []
+                            ),
+                        routePointCount:
+                            detail?.route.count ?? 0
+                    )
+            } catch {
+                // The card has a deterministic local visual recipe,
+                // so hero generation never blocks Home.
+            }
+        }
+    }
+
+    private func elevationGain(
+        route: [CLLocation]
+    ) -> Double? {
+        guard route.count >= 2 else {
+            return nil
+        }
+
+        var total = 0.0
+
+        for index in 1..<route.count {
+            let previous = route[index - 1]
+            let current = route[index]
+            let delta =
+                current.altitude -
+                previous.altitude
+
+            if delta > 0 &&
+                delta < 50 {
+                total += delta
+            }
+        }
+
+        return total > 0
+            ? total
+            : nil
     }
 
     @MainActor
@@ -1055,6 +1130,7 @@ private struct HomeActivityOutdoorCard: View {
     let detail: WorkoutDetail?
     let isPublished: Bool
     let caption: String?
+    let heroRecipe: WorkoutVisualRecipe?
     let aiInsight: WorkoutAIInsight?
     let isAIInsightLoading: Bool
     let onCoach: (WorkoutAIInsight) -> Void
@@ -1108,33 +1184,39 @@ private struct HomeActivityOutdoorCard: View {
     }
 
     private var visualRecipe:
-        HomeActivityVisualRecipe {
-        if let recipe =
-            aiInsight?.visualRecipe {
-            return HomeActivityVisualRecipe(
-                palette: recipe.palette,
-                scene: recipe.scene,
-                light: recipe.light,
-                motif: recipe.motif,
-                energy: recipe.energy,
-                variant: recipe.variant
-            )
+        WorkoutVisualRecipe {
+        if let heroRecipe {
+            return heroRecipe
         }
 
-        return HomeActivityVisualRecipe.local(
-            for: workout,
-            hasRoute:
-                routeCoordinates.count >= 2
+        if let recipe =
+            aiInsight?.visualRecipe {
+            return recipe
+        }
+
+        let local =
+            HomeActivityVisualRecipe.local(
+                for: workout,
+                hasRoute:
+                    routeCoordinates.count >= 2
+            )
+
+        return WorkoutVisualRecipe(
+            palette: local.palette,
+            scene: local.scene,
+            light: local.light,
+            motif: local.motif,
+            energy: local.energy,
+            variant: local.variant
         )
     }
 
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .topLeading) {
-                mapBackground
-
-                HomeActivityScenicWash(
-                    recipe: visualRecipe
+                HomeActivityGeneratedHeroArtwork(
+                    recipe: visualRecipe,
+                    coordinates: routeCoordinates
                 )
 
                 LinearGradient(
@@ -1242,36 +1324,36 @@ private struct HomeActivityOutdoorCard: View {
                 }
                 .padding(16)
 
-                if routeCoordinates.count >= 2 {
-                    VStack {
+                VStack {
+                    Spacer()
+
+                    HStack {
                         Spacer()
 
-                        HStack {
-                            Spacer()
-
-                            VStack(alignment: .trailing, spacing: 7) {
+                        VStack(alignment: .trailing, spacing: 7) {
+                            if workout.distanceMeters != nil {
                                 Label(
                                     distanceText,
                                     systemImage:
                                         "point.topleft.down.to.point.bottomright.curvepath"
                                 )
                                 .homeRouteGlassPill()
+                            }
 
-                                if let ascentText {
-                                    Label(
-                                        ascentText,
-                                        systemImage: "mountain.2.fill"
-                                    )
-                                    .homeRouteGlassPill()
-                                }
+                            if let ascentText {
+                                Label(
+                                    ascentText,
+                                    systemImage: "mountain.2.fill"
+                                )
+                                .homeRouteGlassPill()
                             }
                         }
                     }
-                    .padding(15)
-                    .allowsHitTesting(false)
                 }
+                .padding(15)
+                .allowsHitTesting(false)
             }
-            .frame(height: 240)
+            .frame(height: 286)
             .clipped()
 
             VStack(spacing: 10) {
