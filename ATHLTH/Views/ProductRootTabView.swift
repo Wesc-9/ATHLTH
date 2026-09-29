@@ -3306,7 +3306,8 @@ struct ATHLTHTrainView: View {
                         gear: gear,
                         phoneWorkout: phoneWorkout,
                         watchConnection:
-                            watchConnection
+                            watchConnection,
+                        ghostRace: ghostRace
                     )
 
                 watchTransferMessage =
