@@ -49,9 +49,9 @@ struct ATHLTHLiveWorkoutSession: Identifiable, Codable, Hashable {
     let endedAt: Date?
     let createdAt: Date
     let updatedAt: Date?
-    let routeKey: UUID?
-    let routeDistanceMeters: Double?
-    let routeTitle: String?
+    let routeKey: UUID? = nil
+    let routeDistanceMeters: Double? = nil
+    let routeTitle: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -91,8 +91,8 @@ struct ATHLTHLiveWorkoutLocation: Identifiable, Codable, Hashable {
     let heartRateBPM: Double?
     let distanceMeters: Double
     let elapsedSeconds: Double
-    let routeProgressPercent: Double?
-    let routeDeviationMeters: Double?
+    let routeProgressPercent: Double? = nil
+    let routeDeviationMeters: Double? = nil
     let updatedAt: Date
     let expiresAt: Date
 
