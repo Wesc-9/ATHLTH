@@ -649,6 +649,90 @@ struct WatchActiveWorkoutView: View {
                 }
                 .padding(.vertical, 9)
                 .watchSurface()
+
+                if let match =
+                        result.routeMatchPercent {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 7
+                    ) {
+                        HStack {
+                            Label(
+                                "Route match",
+                                systemImage:
+                                    "checkmark.seal.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                WatchTheme.green
+                            )
+
+                            Spacer()
+
+                            Text(
+                                "\(Int(match.rounded()))%"
+                            )
+                            .font(
+                                .system(
+                                    size: 13,
+                                    weight: .bold
+                                )
+                            )
+                            .monospacedDigit()
+                        }
+
+                        if let average =
+                                result
+                                    .routeAverageDeviationMeters,
+                           let maximum =
+                                result
+                                    .routeMaxDeviationMeters {
+                            Text(
+                                "Avg \(Int(average.rounded())) m · Max \(Int(maximum.rounded())) m deviation"
+                            )
+                            .font(
+                                .system(size: 8)
+                            )
+                            .foregroundStyle(
+                                WatchTheme.muted
+                            )
+                        }
+
+                        Label(
+                            result
+                                .routeLeaderboardEligible ==
+                                true
+                                ? "Leaderboard eligible"
+                                : "Route match below leaderboard requirements",
+                            systemImage:
+                                result
+                                    .routeLeaderboardEligible ==
+                                    true
+                                    ? "trophy.fill"
+                                    : "info.circle"
+                        )
+                        .font(
+                            .system(
+                                size: 8,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            result
+                                .routeLeaderboardEligible ==
+                                true
+                                ? WatchTheme.green
+                                : WatchTheme.muted
+                        )
+                    }
+                    .padding(10)
+                    .watchSurface()
+                }
             }
 
             Button("Done") {
