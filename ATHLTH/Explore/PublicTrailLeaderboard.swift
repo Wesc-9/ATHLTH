@@ -266,8 +266,7 @@ final class PublicTrailAttemptStore: ObservableObject {
                     routeMeters
 
                 let deviationOK =
-                    analysis.averageDeviationMeters == nil ||
-                    analysis.averageDeviationMeters! <= 120
+                    analysis.averageDeviationMeters <= 120
 
                 let leaderboardEligible =
                     analysis.routeMatchPercent >= 90 &&
