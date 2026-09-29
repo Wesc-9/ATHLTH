@@ -439,6 +439,30 @@ final class GhostRaceStore: ObservableObject {
         }
     }
 
+    func setLiveSharingEnabled(
+        _ enabled: Bool
+    ) async {
+        liveSharingEnabledForNextRace =
+            enabled
+
+        if enabled {
+            if isLive,
+               liveSession == nil {
+                await beginLiveSharingIfNeeded(
+                    title:
+                        reference?.title ??
+                        "Ghost Race"
+                )
+            }
+        } else {
+            scheduleLiveEnd(
+                status: "cancelled"
+            )
+            liveSharingMessage =
+                "Live location sharing is off."
+        }
+    }
+
     func refreshVisibleLiveRunners() async {
         do {
             let currentUserID =
