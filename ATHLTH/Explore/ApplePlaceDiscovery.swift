@@ -1,6 +1,7 @@
 import CoreLocation
 import Foundation
 import MapKit
+import SwiftUI
 
 enum ApplePlaceKind: String, CaseIterable, Identifiable {
     case fitnessCenter
