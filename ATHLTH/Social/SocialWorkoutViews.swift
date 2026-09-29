@@ -306,6 +306,7 @@ struct HomeActivitySection: View {
     @State private var workoutDetails: [UUID: WorkoutDetail] = [:]
     @State private var workoutAIInsights: [UUID: WorkoutAIInsight] = [:]
     @State private var workoutHeroRecipes: [UUID: WorkoutVisualRecipe] = [:]
+    @State private var workoutHeroImageURLs: [UUID: URL] = [:]
     @State private var loadingAIInsightIDs: Set<UUID> = []
     @State private var publishedActivities: [UUID: SocialActivityRecord] = [:]
     @State private var selectedCoachInsight: CoachInsightPresentation?
@@ -458,6 +459,8 @@ struct HomeActivitySection: View {
                             caption: caption(for: workout),
                             heroRecipe:
                                 workoutHeroRecipes[workout.id],
+                            heroImageURL:
+                                workoutHeroImageURLs[workout.id],
                             aiInsight:
                                 workoutAIInsights[workout.id],
                             isAIInsightLoading:
@@ -674,32 +677,60 @@ struct HomeActivitySection: View {
 
     @MainActor
     private func loadWorkoutHeroRecipes() async {
-        let service = WorkoutHeroAIService()
+        let directionService =
+            WorkoutHeroAIService()
+        let imageService =
+            WorkoutHeroImageService()
 
         for workout in featuredWorkouts
             where isOutdoor(workout.activity) {
-            guard workoutHeroRecipes[workout.id] == nil else {
+            let detail =
+                workoutDetails[workout.id]
+            let route =
+                detail?.route ?? []
+            let ascent =
+                elevationGain(route: route)
+
+            var recipe =
+                workoutHeroRecipes[workout.id]
+
+            if recipe == nil {
+                recipe =
+                    try? await directionService.generate(
+                        workout: workout,
+                        elevationGainMeters: ascent,
+                        routePointCount: route.count
+                    )
+
+                if let recipe {
+                    workoutHeroRecipes[workout.id] =
+                        recipe
+                }
+            }
+
+            guard let recipe,
+                  workoutHeroImageURLs[workout.id] == nil
+            else {
                 continue
             }
 
-            let detail =
-                workoutDetails[workout.id]
-
             do {
-                workoutHeroRecipes[workout.id] =
-                    try await service.generate(
+                let imageURL =
+                    try await imageService.imageURL(
                         workout: workout,
-                        elevationGainMeters:
-                            elevationGain(
-                                route:
-                                    detail?.route ?? []
-                            ),
-                        routePointCount:
-                            detail?.route.count ?? 0
+                        recipe: recipe,
+                        elevationGainMeters: ascent,
+                        routePointCount: route.count
                     )
+
+                if let imageURL {
+                    workoutHeroImageURLs[workout.id] =
+                        imageURL
+                }
             } catch {
-                // The card has a deterministic local visual recipe,
-                // so hero generation never blocks Home.
+                // Photoreal generation is optional. The cached
+                // local hero remains visible if Cloudflare is
+                // unavailable, unconfigured, or out of quota.
             }
         }
     }
@@ -1131,6 +1162,7 @@ private struct HomeActivityOutdoorCard: View {
     let isPublished: Bool
     let caption: String?
     let heroRecipe: WorkoutVisualRecipe?
+    let heroImageURL: URL?
     let aiInsight: WorkoutAIInsight?
     let isAIInsightLoading: Bool
     let onCoach: (WorkoutAIInsight) -> Void
@@ -1214,7 +1246,8 @@ private struct HomeActivityOutdoorCard: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .topLeading) {
-                HomeActivityGeneratedHeroArtwork(
+                HomeActivityHeroArtwork(
+                    imageURL: heroImageURL,
                     recipe: visualRecipe,
                     coordinates: routeCoordinates
                 )
