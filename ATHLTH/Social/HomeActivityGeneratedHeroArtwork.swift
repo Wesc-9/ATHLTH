@@ -259,9 +259,8 @@ private struct HomeActivityRouteRibbonMapArtwork: View {
                 }
             }
             .mapStyle(
-                .standard(
+                .hybrid(
                     elevation: .realistic,
-                    emphasis: .muted,
                     pointsOfInterest: .excludingAll,
                     showsTraffic: false
                 )
