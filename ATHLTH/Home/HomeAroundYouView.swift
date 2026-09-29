@@ -1077,7 +1077,15 @@ struct AroundYouExploreView: View {
                     }
                 }
                 .mapStyle(
-                    .standard(elevation: .realistic)
+                    .standard(
+                        elevation: .realistic,
+                        emphasis: .automatic,
+                        pointsOfInterest:
+                            trailMode || placesMode
+                                ? .excludingAll
+                                : .all,
+                        showsTraffic: false
+                    )
                 )
                 .mapControls {
                     MapCompass()
