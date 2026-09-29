@@ -634,8 +634,11 @@ private struct WorkoutPlacePickerView:
         let distance =
             place.distanceMeters
         let canCheckIn =
-            distance != nil &&
-            distance! <= 150
+            distance.map {
+                $0.isFinite &&
+                $0 >= 0 &&
+                $0 <= 150
+            } ?? false
 
         return Button {
             guard canCheckIn else {
@@ -822,23 +825,19 @@ private struct WorkoutPlacePickerView:
         }
 
         do {
-            async let nearbyTask =
-                places.nearbyFitnessCenters(
-                    near:
-                        currentLocation
-                )
-
-            async let frequentTask =
-                places
-                    .resolvedFrequentPlaces(
+            nearby =
+                try await places
+                    .nearbyFitnessCenters(
                         near:
                             currentLocation
                     )
 
-            nearby =
-                try await nearbyTask
             frequent =
-                await frequentTask
+                await places
+                    .resolvedFrequentPlaces(
+                        near:
+                            currentLocation
+                    )
                     .filter {
                         item in
 
