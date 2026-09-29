@@ -296,6 +296,11 @@ enum GhostRaceStartService {
                                 .routeAlertConfiguration
                     )
                 )
+
+            await ghostRace
+                .beginLiveSharingIfNeeded(
+                    title: title
+                )
         } catch {
             ghostRace.cancel()
             watchConnection
