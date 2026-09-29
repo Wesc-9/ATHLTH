@@ -13,6 +13,12 @@ struct ATHLTHWorkoutActivityAttributes: ActivityAttributes {
         var routeDeviationMeters: Double? = nil
         var routeDeviationThresholdMeters: Double? = nil
 
+        var runningStepTitle: String? = nil
+        var runningStepIndex: Int? = nil
+        var runningStepCount: Int? = nil
+        var runningStepProgress: Double? = nil
+        var runningNextStepTitle: String? = nil
+
         var heartRateTargetZone: Int? = nil
         var heartRateTargetMinimumBPM: Double? = nil
         var heartRateTargetMaximumBPM: Double? = nil
