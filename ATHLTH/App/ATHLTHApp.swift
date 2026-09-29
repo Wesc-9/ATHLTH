@@ -167,6 +167,32 @@ struct AppRootView: View {
     private let minimumLifecycleRefreshInterval:
         TimeInterval = 90
 
+    private func refreshLivePresenceForAccount(
+        _ userID: UUID?
+    ) async {
+        await livePresence.reset()
+
+        guard userID != nil,
+              scenePhase == .active
+        else {
+            return
+        }
+
+        let privacy = social.privacy
+        let showOnline =
+            privacy?.showOnlineStatus ?? false
+        let shareLiveLocation =
+            privacy?.shareLiveWorkoutLocation
+                ?? false
+
+        await livePresence.configure(
+            showOnlineStatus: showOnline,
+            shareLiveLocation:
+                shareLiveLocation
+        )
+        await livePresence.activate()
+    }
+
     private var lifecycleContent: some View {
         AnyView(
             Group {
@@ -777,21 +803,9 @@ struct AppRootView: View {
             phoneWorkout.switchAccount(userID)
 
             Task {
-                await livePresence.reset()
-                if userID != nil,
-                   scenePhase == .active {
-                    let privacy = social.privacy
-                    await livePresence.configure(
-                        showOnlineStatus:
-                            privacy?.showOnlineStatus
-                                ?? false,
-                        shareLiveLocation:
-                            privacy?
-                                .shareLiveWorkoutLocation
-                                ?? false
-                    )
-                    await livePresence.activate()
-                }
+                await refreshLivePresenceForAccount(
+                    userID
+                )
             }
 
             trainingBackups.switchAccount(userID)
