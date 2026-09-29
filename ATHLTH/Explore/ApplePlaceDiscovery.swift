@@ -3,7 +3,7 @@ import Foundation
 import MapKit
 import SwiftUI
 
-enum ApplePlaceKind: String, CaseIterable, Identifiable {
+enum ApplePlaceKind: String, CaseIterable, Identifiable, Sendable {
     case fitnessCenter
     case nature
 
@@ -28,7 +28,7 @@ enum ApplePlaceKind: String, CaseIterable, Identifiable {
     }
 }
 
-enum ApplePlaceFilter: String, CaseIterable, Identifiable {
+enum ApplePlaceFilter: String, CaseIterable, Identifiable, Sendable {
     case all = "All"
     case gyms = "Gyms"
     case nature = "Nature"
@@ -36,23 +36,31 @@ enum ApplePlaceFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-struct AppleMapPlace: Identifiable {
+struct AppleMapPlace: Identifiable, Sendable {
     let id: String
     let applePlaceID: String?
     let name: String
     let kind: ApplePlaceKind
-    let mapItem: MKMapItem
+    let latitude: Double
+    let longitude: Double
+    let phoneNumber: String?
+    let websiteURLString: String?
 
     var coordinate: CLLocationCoordinate2D {
-        mapItem.placemark.coordinate
-    }
-
-    var phoneNumber: String? {
-        mapItem.phoneNumber
+        CLLocationCoordinate2D(
+            latitude: latitude,
+            longitude: longitude
+        )
     }
 
     var websiteURL: URL? {
-        mapItem.url
+        guard let websiteURLString else {
+            return nil
+        }
+
+        return URL(
+            string: websiteURLString
+        )
     }
 
     var isPersistableForCheckIn: Bool {
@@ -69,9 +77,24 @@ struct AppleMapPlace: Identifiable {
 
         return location.distance(
             from: CLLocation(
-                latitude: coordinate.latitude,
-                longitude: coordinate.longitude
+                latitude: latitude,
+                longitude: longitude
             )
+        )
+    }
+
+    @MainActor
+    func openInMaps() {
+        let item = MKMapItem(
+            location: CLLocation(
+                latitude: latitude,
+                longitude: longitude
+            ),
+            address: nil
+        )
+        item.name = name
+        item.openInMaps(
+            launchOptions: nil
         )
     }
 }
@@ -241,7 +264,10 @@ final class ApplePlaceDiscoveryService {
             applePlaceID: placeID,
             name: cleanName,
             kind: kind,
-            mapItem: item
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            phoneNumber: item.phoneNumber,
+            websiteURLString: item.url?.absoluteString
         )
     }
 
@@ -674,11 +700,7 @@ struct AppleMapPlaceDetailView:
             }
 
             Button {
-                place.mapItem
-                    .openInMaps(
-                        launchOptions:
-                            nil
-                    )
+                place.openInMaps()
             } label: {
                 Label(
                     "Open in Apple Maps",
