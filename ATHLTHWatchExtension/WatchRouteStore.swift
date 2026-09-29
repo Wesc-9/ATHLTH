@@ -117,6 +117,28 @@ final class WatchRouteStore: NSObject, ObservableObject {
                         : ghost
                 )
 
+        case .liveSurfaceConfiguration:
+            guard let configuration = try? JSONDecoder().decode(
+                ATHLTHLiveWorkoutSurfaceConfiguration.self,
+                from: data
+            ) else {
+                return
+            }
+
+            WatchWorkoutManager.shared
+                .configureLiveSurface(configuration)
+
+        case .liveSurfaceContext:
+            guard let context = try? JSONDecoder().decode(
+                ATHLTHLiveWorkoutContext.self,
+                from: data
+            ) else {
+                return
+            }
+
+            WatchWorkoutManager.shared
+                .configureLiveSurfaceContext(context)
+
         case .strengthSnapshot:
             guard let snapshot = try? JSONDecoder().decode(
                 WatchStrengthSessionSnapshot.self,
@@ -354,6 +376,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 .audioCoachConfiguration ||
            transferKind == .runningWorkout ||
            transferKind == .ghostRace ||
+           transferKind == .liveSurfaceConfiguration ||
+           transferKind == .liveSurfaceContext ||
            transferKind == .strengthSnapshot {
             Task { @MainActor [weak self] in
                 self?.applyWorkoutConfiguration(

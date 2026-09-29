@@ -168,6 +168,7 @@ enum ATHLTHSurfaceCoordinator {
             lhs.1 < rhs.1
         }
     }
+
 }
 
 @MainActor
@@ -192,12 +193,74 @@ private final class ATHLTHLiveActivityController {
             return
         }
 
+        let surfaceConfiguration =
+            snapshot.liveSurfaceConfiguration ??
+            ATHLTHLiveWorkoutPreferencesStore.load()
+
+        if !surfaceConfiguration.dynamicIslandEnabled {
+            await endExistingActivities()
+            return
+        }
+
+        let storedLiveContext =
+            ATHLTHLiveWorkoutContextStore.load()
+        let snapshotLiveContext =
+            snapshot.liveSurfaceContext
+
+        let liveContext: ATHLTHLiveWorkoutContext
+        if snapshotLiveContext?.challenge != nil ||
+            snapshotLiveContext?.liveShare?.isSharing == true {
+            liveContext = snapshotLiveContext ?? storedLiveContext
+        } else {
+            liveContext = storedLiveContext
+        }
+
         let contentState =
             ATHLTHWorkoutActivityAttributes.ContentState(
                 phase: snapshot.state.rawValue,
                 elapsedTime: snapshot.elapsedTime,
                 distanceMeters: snapshot.distanceMeters,
                 heartRate: snapshot.heartRate,
+                currentPaceSecondsPerKilometer:
+                    snapshot.currentPaceSecondsPerKilometer,
+                routeProgressPercent:
+                    snapshot.routeProgressPercent,
+                routeRemainingMeters:
+                    snapshot.routeRemainingMeters,
+                routeDeviationMeters:
+                    snapshot.routeDeviationMeters,
+                routeDeviationThresholdMeters:
+                    snapshot.routeDeviationThresholdMeters,
+                heartRateTargetZone:
+                    snapshot.heartRateTargetZone,
+                heartRateTargetMinimumBPM:
+                    snapshot.heartRateTargetMinimumBPM,
+                heartRateTargetMaximumBPM:
+                    snapshot.heartRateTargetMaximumBPM,
+                heartRateTargetStatus:
+                    snapshot.heartRateTargetStatus,
+                ghostRaceTitle:
+                    snapshot.ghostRaceTitle,
+                ghostDistanceDeltaMeters:
+                    snapshot.ghostDistanceDeltaMeters,
+                ghostTimeDeltaSeconds:
+                    snapshot.ghostTimeDeltaSeconds,
+                strengthExerciseName:
+                    snapshot.strengthExerciseName,
+                strengthSetIndex:
+                    snapshot.strengthSetIndex,
+                strengthSetCount:
+                    snapshot.strengthSetCount,
+                strengthReps:
+                    snapshot.strengthReps,
+                strengthWeightKilograms:
+                    snapshot.strengthWeightKilograms,
+                strengthRestEndsAt:
+                    snapshot.strengthRestEndsAt,
+                surfaceConfiguration:
+                    surfaceConfiguration,
+                liveContext:
+                    liveContext,
                 updatedAt: snapshot.capturedAt
             )
 
@@ -262,6 +325,19 @@ private final class ATHLTHLiveActivityController {
                     )
                 )
             }
+        }
+    }
+
+    private func endExistingActivities() async {
+        let activities =
+            Activity<ATHLTHWorkoutActivityAttributes>
+                .activities
+
+        for activity in activities {
+            await activity.end(
+                nil,
+                dismissalPolicy: .immediate
+            )
         }
     }
 }

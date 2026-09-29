@@ -951,6 +951,8 @@ private struct WatchRunWalkWorkoutPager: View {
                 icon: workoutManager.kind.systemImage
             )
 
+            WatchLiveWorkoutFocusCard()
+
             VStack(spacing: 2) {
                 Text("CURRENT PACE")
                     .font(.system(size: 8, weight: .bold))
