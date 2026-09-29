@@ -950,6 +950,29 @@ struct AroundYouExploreView: View {
                     MapScaleView()
                     MapUserLocationButton()
                 }
+                .overlay(alignment: .bottomTrailing) {
+                    if trailMode {
+                        Link(
+                            "© OpenStreetMap",
+                            destination:
+                                URL(
+                                    string:
+                                        "https://www.openstreetmap.org/copyright"
+                                )!
+                        )
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            .ultraThinMaterial,
+                            in: Capsule()
+                        )
+                        .padding(8)
+                    }
+                }
                 .onTapGesture { point in
                     guard let coordinate = proxy.convert(
                         point,
