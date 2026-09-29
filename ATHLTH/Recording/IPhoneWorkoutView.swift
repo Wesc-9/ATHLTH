@@ -29,19 +29,6 @@ struct IPhoneWorkoutView: View {
                                 LabeledContent("Average pace", value: String(format: "%.1f min/%@", elapsed / 60 / (workout.distanceMeters / (settings.measurementPreference == .metric ? 1000 : 1609.344)), settings.measurementPreference.distanceUnit))
                             }
 
-                            if let delta =
-                                realtime.liveGhostDeltaMeters(
-                                    ownDistanceMeters:
-                                        workout.distanceMeters
-                                ) {
-                                LabeledContent(
-                                    "Live Ghost",
-                                    value:
-                                        liveGhostText(
-                                            delta
-                                        )
-                                )
-                            }
                         }
                         if workout.resumedAt == nil { Button("Resume workout") { recorder.resume() } }
                         else { Button("Pause workout") { recorder.pause() } }
@@ -49,6 +36,83 @@ struct IPhoneWorkoutView: View {
                             confirmFinish = true
                         }
                         .disabled(recorder.saving)
+                    }
+
+                    if let ghostTitle =
+                            workout.ghostRaceTitle,
+                       let distanceDelta =
+                            workout
+                                .ghostDistanceDeltaMeters {
+                        Section("Ghost") {
+                            HStack(
+                                alignment:
+                                    .firstTextBaseline
+                            ) {
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(ghostTitle)
+                                        .font(.headline)
+
+                                    Text(
+                                        "Live comparison"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+
+                                Spacer()
+
+                                Text(
+                                    liveGhostText(
+                                        distanceDelta
+                                    )
+                                )
+                                .font(
+                                    .title3
+                                        .weight(.bold)
+                                )
+                                .monospacedDigit()
+                                .foregroundStyle(
+                                    abs(distanceDelta) <
+                                        8
+                                        ? .secondary
+                                        : distanceDelta >= 0
+                                            ? ATHLTHTheme
+                                                .vitality
+                                            : .orange
+                                )
+                            }
+
+                            if let timeDelta =
+                                    workout
+                                        .ghostTimeDeltaSeconds {
+                                LabeledContent(
+                                    "Estimated gap",
+                                    value:
+                                        ghostTimeText(
+                                            timeDelta
+                                        )
+                                )
+                            }
+
+                            if workout
+                                .ghostAudioConfiguration?
+                                .enabled == true {
+                                Label(
+                                    "Ghost Updates active",
+                                    systemImage:
+                                        "waveform"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                        }
                     }
 
                     if workout.plannedRouteTitle != nil {
@@ -902,6 +966,36 @@ struct IPhoneWorkoutView: View {
                     longitudeDelta: longitudeDelta
                 )
         )
+    }
+
+    private func ghostTimeText(
+        _ seconds: TimeInterval
+    ) -> String {
+        let amount =
+            max(
+                Int(
+                    abs(seconds)
+                        .rounded()
+                ),
+                0
+            )
+        let minutes = amount / 60
+        let remainder = amount % 60
+        let value =
+            String(
+                format:
+                    "%d:%02d",
+                minutes,
+                remainder
+            )
+
+        if abs(seconds) < 1 {
+            return "Even"
+        }
+
+        return seconds >= 0
+            ? "\(value) ahead"
+            : "\(value) behind"
     }
 
     private func liveGhostText(
