@@ -241,12 +241,27 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         _ ghost: WatchGhostRaceTransfer?
     ) {
         ghostRaceConfiguration = ghost
+        resetGhostAnnouncementThresholds(
+            audio: ghost?.audio
+        )
+
+        publish {
+            self.ghostRaceTitle = ghost?.title
+            self.ghostDistanceDeltaMeters = nil
+            self.ghostTimeDeltaSeconds = nil
+        }
+    }
+
+    private func resetGhostAnnouncementThresholds(
+        audio:
+            WatchGhostRaceAudioConfiguration?
+    ) {
         lastGhostAnnouncedLeadMeters = nil
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
 
         if let interval =
-                ghost?.audio?.distanceIntervalMeters,
+                audio?.distanceIntervalMeters,
            interval > 0 {
             nextGhostDistanceAnnouncementMeters =
                 (
@@ -256,11 +271,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     ) + 1
                 ) * interval
         } else {
-            nextGhostDistanceAnnouncementMeters = nil
+            nextGhostDistanceAnnouncementMeters =
+                nil
         }
 
         if let interval =
-                ghost?.audio?.timeIntervalSeconds,
+                audio?.timeIntervalSeconds,
            interval > 0 {
             nextGhostTimeAnnouncementSeconds =
                 (
@@ -270,13 +286,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     ) + 1
                 ) * interval
         } else {
-            nextGhostTimeAnnouncementSeconds = nil
-        }
-
-        publish {
-            self.ghostRaceTitle = ghost?.title
-            self.ghostDistanceDeltaMeters = nil
-            self.ghostTimeDeltaSeconds = nil
+            nextGhostTimeAnnouncementSeconds =
+                nil
         }
     }
 
@@ -397,9 +408,76 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func configureLiveSurfaceContext(
         _ context: ATHLTHLiveWorkoutContext
     ) {
+        let previousLiveGhostTitle =
+            liveSurfaceContext
+                .liveGhost?
+                .title
+
         publish {
             self.liveSurfaceContext = context
         }
+
+        // A fixed Replay/Target Ghost owns its own comparison stream.
+        guard ghostRaceConfiguration == nil
+        else {
+            return
+        }
+
+        guard let liveGhost =
+                    context.liveGhost
+        else {
+            resetGhostAnnouncementThresholds(
+                audio: nil
+            )
+            publish {
+                self.ghostRaceTitle = nil
+                self.ghostDistanceDeltaMeters =
+                    nil
+                self.ghostTimeDeltaSeconds =
+                    nil
+            }
+            return
+        }
+
+        if previousLiveGhostTitle !=
+            liveGhost.title {
+            resetGhostAnnouncementThresholds(
+                audio: liveGhost.audio
+            )
+        }
+
+        publish {
+            self.ghostRaceTitle =
+                liveGhost.title
+            self.ghostDistanceDeltaMeters =
+                liveGhost.distanceDeltaMeters
+            self.ghostTimeDeltaSeconds =
+                liveGhost
+                    .estimatedTimeDeltaSeconds
+        }
+
+        guard isActive,
+              kind == .running,
+              let distanceDelta =
+                    liveGhost
+                        .distanceDeltaMeters,
+              let timeDelta =
+                    liveGhost
+                        .estimatedTimeDeltaSeconds
+        else {
+            return
+        }
+
+        evaluateGhostRaceCoach(
+            configuration:
+                liveGhost.audio,
+            userDistance:
+                distanceMeters,
+            distanceDelta:
+                distanceDelta,
+            timeDelta:
+                timeDelta
+        )
     }
 
     func updateStrengthDraft(
