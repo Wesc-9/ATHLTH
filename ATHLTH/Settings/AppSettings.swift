@@ -263,6 +263,9 @@ final class AppSettingsStore: ObservableObject {
     @Published var profileVisibility: ProfileVisibility { didSet { persist() } }
     @Published var defaultActivityVisibility: ProfileVisibility { didSet { persist() } }
     @Published var shareTrainingPresence: Bool { didSet { persist() } }
+    @Published var shareOnlineStatus: Bool { didSet { persist() } }
+    @Published var shareLiveWorkoutLocation: Bool { didSet { persist() } }
+    @Published var liveWorkoutAudience: LiveWorkoutAudience { didSet { persist() } }
     @Published var hideRouteStartAndEnd: Bool { didSet { persist() } }
 
     @Published var profileSetupPromptDismissed: Bool { didSet { persist() } }
@@ -365,6 +368,14 @@ final class AppSettingsStore: ObservableObject {
         profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .publicProfile
         defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .privateOnly
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? false
+        shareOnlineStatus = defaults.object(forKey: "settings.shareOnlineStatus") as? Bool ?? false
+        shareLiveWorkoutLocation = defaults.object(forKey: "settings.shareLiveWorkoutLocation") as? Bool ?? false
+        liveWorkoutAudience =
+            LiveWorkoutAudience(
+                rawValue: defaults.string(
+                    forKey: "settings.liveWorkoutAudience"
+                ) ?? ""
+            ) ?? .mutuals
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
 
         profileSetupPromptDismissed = defaults.object(forKey: "settings.profileSetupPromptDismissed") as? Bool ?? false
@@ -599,6 +610,9 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(profileVisibility.rawValue, forKey: "settings.profileVisibility")
         defaults.set(defaultActivityVisibility.rawValue, forKey: "settings.defaultActivityVisibility")
         defaults.set(shareTrainingPresence, forKey: "settings.shareTrainingPresence")
+        defaults.set(shareOnlineStatus, forKey: "settings.shareOnlineStatus")
+        defaults.set(shareLiveWorkoutLocation, forKey: "settings.shareLiveWorkoutLocation")
+        defaults.set(liveWorkoutAudience.rawValue, forKey: "settings.liveWorkoutAudience")
         defaults.set(hideRouteStartAndEnd, forKey: "settings.hideRouteStartAndEnd")
 
         defaults.set(profileSetupPromptDismissed, forKey: "settings.profileSetupPromptDismissed")
