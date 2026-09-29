@@ -5,6 +5,8 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.dismiss) private var dismiss
     @State private var confirmFinish = false
 
@@ -26,8 +28,39 @@ struct IPhoneWorkoutView: View {
                         }
                         if workout.resumedAt == nil { Button("Resume workout") { recorder.resume() } }
                         else { Button("Pause workout") { recorder.pause() } }
-                        Button("Finish & save", role: .destructive) { confirmFinish = true }.disabled(recorder.saving)
+                        Button("Finish & save", role: .destructive) {
+                            confirmFinish = true
+                        }
+                        .disabled(recorder.saving)
                     }
+
+                    if let liveSession = realtime.currentSession,
+                       realtime.isSharingLiveLocation {
+                        Section("Live") {
+                            NavigationLink {
+                                ATHLTHLiveWorkoutMapView(
+                                    session: liveSession
+                                )
+                            } label: {
+                                Label(
+                                    liveSession.ghostChallengeID == nil
+                                        ? "View live workout"
+                                        : "View live Ghost Run",
+                                    systemImage:
+                                        "location.circle.fill"
+                                )
+                            }
+
+                            Text(
+                                liveSession.ghostChallengeID == nil
+                                    ? "Your latest position is shared only with the audience selected in Social Privacy."
+                                    : "This Ghost Run live position is private to the race participants."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+
                     if let last = workout.points.last {
                         Section("Current GPS position") {
                             Map(initialPosition: .region(MKCoordinateRegion(center: last.location.coordinate, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)))) {
@@ -54,15 +87,80 @@ struct IPhoneWorkoutView: View {
             }
             .navigationTitle("iPhone workout")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .confirmationDialog("Finish this workout?", isPresented: $confirmFinish, titleVisibility: .visible) {
-                Button("Finish & save") { Task { await recorder.finish() } }
+            .confirmationDialog(
+                "Finish this workout?",
+                isPresented: $confirmFinish,
+                titleVisibility: .visible
+            ) {
+                Button("Finish & save") {
+                    Task {
+                        await recorder.finish()
+                        await realtime
+                            .leaveCurrentLiveWorkout()
+                    }
+                }
             }
             .task {
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(5))
-                    if !Task.isCancelled { recorder.checkpoint() }
+                    try? await Task.sleep(
+                        for: .seconds(5)
+                    )
+
+                    guard !Task.isCancelled else {
+                        break
+                    }
+
+                    recorder.checkpoint()
+                    await publishLivePointIfNeeded()
                 }
             }
         }
+
+    @MainActor
+    private func publishLivePointIfNeeded() async {
+        guard let workout = recorder.active,
+              workout.resumedAt != nil,
+              let lastPoint =
+                workout.points.last?
+                    .location
+        else {
+            return
+        }
+
+        if realtime.currentSession == nil {
+            guard social.privacy?
+                    .shareLiveWorkoutLocation ==
+                    true
+            else {
+                return
+            }
+
+            let visibility =
+                ATHLTHLiveWorkoutVisibility(
+                    rawValue:
+                        social.privacy?
+                            .liveLocationVisibility ??
+                        "followers"
+                ) ?? .followers
+
+            _ = await realtime
+                .beginLiveWorkout(
+                    title: workout.title,
+                    activity:
+                        workout.walking
+                            ? "walking"
+                            : "running",
+                    visibility: visibility
+                )
+        }
+
+        await realtime.publishLocation(
+            lastPoint,
+            distanceMeters:
+                workout.distanceMeters,
+            elapsedSeconds:
+                workout.elapsed(at: Date())
+        )
+    }
     }
 }
