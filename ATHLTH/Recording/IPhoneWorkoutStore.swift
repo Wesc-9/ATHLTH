@@ -317,6 +317,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         manager.stopUpdatingLocation()
         lastLocation = nil
         persistActiveCheckpoint(force: true)
+        syncLiveActivity()
     }
 
     func resume() {
@@ -342,18 +343,53 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         manager.allowsBackgroundLocationUpdates = true
         manager.startUpdatingLocation()
         persistActiveCheckpoint(force: true)
+        syncLiveActivity()
     }
 
     func finish() async {
         guard !saving else { return }
         pause()
-        guard var workout = active, let userID = accountID else { return }
+
+        guard var workout = active,
+              let userID = accountID
+        else {
+            return
+        }
+
         workout.end = Date()
+        let completion =
+            routeCompletionSummary(
+                for: workout
+            )
+
+        if let completion {
+            workout.finalRouteMatchPercent =
+                completion.routeMatchPercent
+            workout.finalAverageDeviationMeters =
+                completion.averageDeviationMeters
+            workout.finalMaxDeviationMeters =
+                completion.maxDeviationMeters
+            workout.finalLeaderboardEligible =
+                completion.leaderboardEligible
+            lastRouteCompletion = completion
+        }
+
+        syncLiveActivity(
+            workout: workout,
+            state: .completed
+        )
+
         history.insert(workout, at: 0)
         active = nil
+        resetRouteRuntime()
         persistActiveCheckpoint(force: true)
         persistHistory()
-        await saveToHealth(workout, userID: userID)
+        deactivateCoachAudioSession()
+
+        await saveToHealth(
+            workout,
+            userID: userID
+        )
     }
 
     func retryHealthSave(_ workout: PhoneWorkout) async {
@@ -833,9 +869,943 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
 
     func checkpoint() {
         guard var workout = active else { return }
+
         workout.lastCheckpoint = Date()
+
+        if workout.resumedAt != nil {
+            evaluateStructuredWorkout(
+                &workout
+            )
+            evaluateCoachAnnouncements(
+                workout
+            )
+        }
+
         active = workout
         persistActiveCheckpoint(force: true)
+        syncLiveActivity()
+    }
+
+    var currentStructuredStep:
+        WatchRunningWorkoutStep?
+    {
+        guard let workout = active,
+              let plan =
+                workout.structuredRunningWorkout,
+              plan.steps.indices.contains(
+                workout.structuredStepIndex
+              )
+        else {
+            return nil
+        }
+
+        return plan.steps[
+            workout.structuredStepIndex
+        ]
+    }
+
+    var nextStructuredStep:
+        WatchRunningWorkoutStep?
+    {
+        guard let workout = active,
+              let plan =
+                workout.structuredRunningWorkout
+        else {
+            return nil
+        }
+
+        let next =
+            workout.structuredStepIndex + 1
+
+        return plan.steps.indices.contains(next)
+            ? plan.steps[next]
+            : nil
+    }
+
+    func currentStructuredStepProgress(
+        at date: Date = Date()
+    ) -> Double {
+        guard let workout = active,
+              let step = currentStructuredStep
+        else {
+            return 0
+        }
+
+        return ATHLTHRunningStepEngine
+            .progress(
+                step: step,
+                elapsedTime:
+                    workout.elapsed(at: date),
+                distanceMeters:
+                    workout.distanceMeters,
+                stepStartElapsedTime:
+                    workout
+                        .structuredStepStartElapsedTime,
+                stepStartDistanceMeters:
+                    workout
+                        .structuredStepStartDistanceMeters
+            )
+    }
+
+    private func cachePlannedRouteGeometry(
+        _ route: TrainingRoute?
+    ) {
+        guard let route,
+              route.coordinates.count >= 2
+        else {
+            plannedRouteLocations = []
+            plannedRouteCumulativeMeters = []
+            plannedRouteGeometryMeters = 0
+            return
+        }
+
+        let locations =
+            route.coordinates
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocation(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+
+        let geometry =
+            ATHLTHRouteGuidanceEngine
+                .cumulativeGeometry(
+                    locations: locations
+                )
+
+        plannedRouteLocations = locations
+        plannedRouteCumulativeMeters =
+            geometry.cumulativeMeters
+        plannedRouteGeometryMeters =
+            geometry.totalMeters
+    }
+
+    private func restoreRouteGeometry(
+        from workout: PhoneWorkout
+    ) {
+        guard plannedRouteLocations.isEmpty,
+              let coordinates =
+                workout.plannedRouteCoordinates,
+              coordinates.count >= 2
+        else {
+            return
+        }
+
+        let locations =
+            coordinates
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocation(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+        let geometry =
+            ATHLTHRouteGuidanceEngine
+                .cumulativeGeometry(
+                    locations: locations
+                )
+
+        plannedRouteLocations = locations
+        plannedRouteCumulativeMeters =
+            geometry.cumulativeMeters
+        plannedRouteGeometryMeters =
+            geometry.totalMeters
+    }
+
+    private func resetRouteRuntime() {
+        plannedRouteLocations = []
+        plannedRouteCumulativeMeters = []
+        plannedRouteGeometryMeters = 0
+        nextDistanceAnnouncementMeters = nil
+        nextTimeAnnouncementSeconds = nil
+        resetRouteAlertRuntime()
+        speechSynthesizer.stopSpeaking(
+            at: .immediate
+        )
+    }
+
+    private func resetCoachThresholds(
+        configuration:
+            WatchAudioCoachConfiguration?
+    ) {
+        guard let configuration,
+              configuration.enabled
+        else {
+            nextDistanceAnnouncementMeters = nil
+            nextTimeAnnouncementSeconds = nil
+            return
+        }
+
+        if let interval =
+                configuration.distanceIntervalMeters,
+           interval > 0 {
+            nextDistanceAnnouncementMeters =
+                interval
+        } else {
+            nextDistanceAnnouncementMeters = nil
+        }
+
+        if let interval =
+                configuration.timeIntervalSeconds,
+           interval > 0 {
+            nextTimeAnnouncementSeconds =
+                interval
+        } else {
+            nextTimeAnnouncementSeconds = nil
+        }
+    }
+
+    private func resetRouteAlertRuntime() {
+        offRouteStartedAt = nil
+        lastOffRouteAlertAt = nil
+        routeWasOff = false
+    }
+
+    private func updatePace(
+        workout: inout PhoneWorkout,
+        location: CLLocation
+    ) {
+        guard location.speed >= 0.35 else {
+            return
+        }
+
+        let rawPace =
+            1_000 / location.speed
+
+        guard rawPace >= 120,
+              rawPace <= 1_800
+        else {
+            return
+        }
+
+        if let existing =
+            workout
+                .currentPaceSecondsPerKilometer {
+            workout
+                .currentPaceSecondsPerKilometer =
+                    existing * 0.72 +
+                    rawPace * 0.28
+        } else {
+            workout
+                .currentPaceSecondsPerKilometer =
+                    rawPace
+        }
+    }
+
+    private func updateRouteGuidance(
+        workout: inout PhoneWorkout,
+        location: CLLocation
+    ) {
+        restoreRouteGeometry(
+            from: workout
+        )
+
+        guard let guidance =
+                ATHLTHRouteGuidanceEngine.state(
+                    location: location,
+                    routeLocations:
+                        plannedRouteLocations,
+                    cumulativeMeters:
+                        plannedRouteCumulativeMeters,
+                    geometryTotalMeters:
+                        plannedRouteGeometryMeters,
+                    advertisedDistanceMeters:
+                        workout
+                            .plannedRouteDistanceKilometers
+                            .map { $0 * 1_000 }
+                )
+        else {
+            return
+        }
+
+        workout.routeProgressPercent =
+            guidance.progressPercent
+        workout.routeRemainingMeters =
+            guidance.remainingMeters
+        workout.routeDeviationMeters =
+            guidance.deviationMeters
+        workout.routeDistanceToStartMeters =
+            guidance.distanceToStartMeters
+        workout.routeDistanceToFinishMeters =
+            guidance.distanceToFinishMeters
+        workout.routeNextBearingDegrees =
+            nextBearing(
+                from: location,
+                nearestIndex:
+                    guidance
+                        .nearestRoutePointIndex
+            )
+
+        evaluateRouteAlert(
+            workout: workout,
+            deviationMeters:
+                guidance.deviationMeters,
+            horizontalAccuracy:
+                location.horizontalAccuracy
+        )
+    }
+
+    private func nextBearing(
+        from location: CLLocation,
+        nearestIndex: Int
+    ) -> Double? {
+        guard !plannedRouteLocations.isEmpty else {
+            return nil
+        }
+
+        let nextIndex =
+            min(
+                nearestIndex + 1,
+                plannedRouteLocations.count - 1
+            )
+        let next =
+            plannedRouteLocations[nextIndex]
+
+        guard nextIndex != nearestIndex else {
+            return nil
+        }
+
+        let latitude1 =
+            location.coordinate.latitude *
+            .pi / 180
+        let latitude2 =
+            next.coordinate.latitude *
+            .pi / 180
+        let longitudeDelta =
+            (
+                next.coordinate.longitude -
+                location.coordinate.longitude
+            ) * .pi / 180
+
+        let y =
+            sin(longitudeDelta) *
+            cos(latitude2)
+        let x =
+            cos(latitude1) *
+                sin(latitude2) -
+            sin(latitude1) *
+                cos(latitude2) *
+                cos(longitudeDelta)
+        let degrees =
+            atan2(y, x) *
+            180 / .pi
+
+        return (
+            degrees + 360
+        ).truncatingRemainder(
+            dividingBy: 360
+        )
+    }
+
+    private func evaluateRouteAlert(
+        workout: PhoneWorkout,
+        deviationMeters: Double,
+        horizontalAccuracy: Double
+    ) {
+        guard let configuration =
+                workout.routeAlertConfiguration,
+              configuration.enabled,
+              horizontalAccuracy >= 0,
+              horizontalAccuracy <= 50
+        else {
+            return
+        }
+
+        let now = Date()
+        let offRoute =
+            deviationMeters >
+            configuration.deviationMeters
+
+        if offRoute {
+            if offRouteStartedAt == nil {
+                offRouteStartedAt = now
+            }
+
+            let hasGrace =
+                now.timeIntervalSince(
+                    offRouteStartedAt ?? now
+                ) >= configuration.graceSeconds
+            let canRepeat =
+                lastOffRouteAlertAt.map {
+                    now.timeIntervalSince($0) >=
+                        configuration.repeatSeconds
+                } ?? true
+
+            if hasGrace && canRepeat {
+                deliverRouteAlert(
+                    configuration: configuration,
+                    phrase:
+                        "You are \(Int(deviationMeters.rounded())) meters off route."
+                )
+                lastOffRouteAlertAt = now
+            }
+
+            routeWasOff = true
+            return
+        }
+
+        offRouteStartedAt = nil
+        lastOffRouteAlertAt = nil
+
+        if routeWasOff,
+           configuration.announceBackOnRoute {
+            deliverRouteAlert(
+                configuration: configuration,
+                phrase: "Back on route."
+            )
+        }
+
+        routeWasOff = false
+    }
+
+    private func deliverRouteAlert(
+        configuration:
+            WatchRouteAlertConfiguration,
+        phrase: String
+    ) {
+        if configuration.delivery.usesHaptics {
+            UINotificationFeedbackGenerator()
+                .notificationOccurred(.warning)
+        }
+
+        if configuration.delivery.usesVoice {
+            speak(
+                phrase,
+                configuration:
+                    active?
+                        .audioCoachConfiguration
+            )
+        }
+    }
+
+    private func evaluateStructuredWorkout(
+        _ workout: inout PhoneWorkout
+    ) {
+        guard !workout.structuredWorkoutComplete,
+              let plan =
+                workout.structuredRunningWorkout,
+              plan.steps.indices.contains(
+                workout.structuredStepIndex
+              )
+        else {
+            return
+        }
+
+        let step =
+            plan.steps[
+                workout.structuredStepIndex
+            ]
+
+        guard ATHLTHRunningStepEngine
+            .isCompleted(
+                step: step,
+                elapsedTime:
+                    workout.elapsed(at: Date()),
+                distanceMeters:
+                    workout.distanceMeters,
+                stepStartElapsedTime:
+                    workout
+                        .structuredStepStartElapsedTime,
+                stepStartDistanceMeters:
+                    workout
+                        .structuredStepStartDistanceMeters
+            )
+        else {
+            return
+        }
+
+        let nextIndex =
+            workout.structuredStepIndex + 1
+
+        guard plan.steps.indices.contains(
+            nextIndex
+        ) else {
+            workout.structuredWorkoutComplete = true
+            UINotificationFeedbackGenerator()
+                .notificationOccurred(.success)
+
+            if workout
+                .audioCoachConfiguration?
+                .enabled == true {
+                speak(
+                    "Structured workout complete. Continue easy or finish when ready.",
+                    configuration:
+                        workout.audioCoachConfiguration
+                )
+            }
+            return
+        }
+
+        workout.structuredStepIndex =
+            nextIndex
+        workout.structuredStepStartElapsedTime =
+            workout.elapsed(at: Date())
+        workout.structuredStepStartDistanceMeters =
+            workout.distanceMeters
+
+        UINotificationFeedbackGenerator()
+            .notificationOccurred(.success)
+
+        if workout
+            .audioCoachConfiguration?
+            .announceCurrentWorkoutStep == true {
+            let next =
+                plan.steps[nextIndex]
+            speak(
+                "Next. \(next.title).",
+                configuration:
+                    workout.audioCoachConfiguration
+            )
+        }
+    }
+
+    private func announceStructuredStepIfNeeded(
+        prefix: String
+    ) {
+        guard let workout = active,
+              workout
+                .audioCoachConfiguration?
+                .enabled == true,
+              workout
+                .audioCoachConfiguration?
+                .announceCurrentWorkoutStep == true,
+              let plan =
+                workout.structuredRunningWorkout,
+              plan.steps.indices.contains(
+                workout.structuredStepIndex
+              )
+        else {
+            return
+        }
+
+        speak(
+            "\(prefix). \(plan.steps[workout.structuredStepIndex].title).",
+            configuration:
+                workout.audioCoachConfiguration
+        )
+    }
+
+    private func evaluateCoachAnnouncements(
+        _ workout: PhoneWorkout
+    ) {
+        guard let configuration =
+                workout.audioCoachConfiguration,
+              configuration.enabled
+        else {
+            return
+        }
+
+        var shouldAnnounce = false
+
+        if let interval =
+                configuration.distanceIntervalMeters,
+           interval > 0,
+           let next =
+                nextDistanceAnnouncementMeters,
+           workout.distanceMeters >= next {
+            repeat {
+                nextDistanceAnnouncementMeters =
+                    (
+                        nextDistanceAnnouncementMeters ??
+                        next
+                    ) + interval
+            } while workout.distanceMeters >=
+                (
+                    nextDistanceAnnouncementMeters ??
+                    .greatestFiniteMagnitude
+                )
+            shouldAnnounce = true
+        }
+
+        let elapsed =
+            workout.elapsed(at: Date())
+
+        if let interval =
+                configuration.timeIntervalSeconds,
+           interval > 0,
+           let next =
+                nextTimeAnnouncementSeconds,
+           elapsed >= next {
+            repeat {
+                nextTimeAnnouncementSeconds =
+                    (
+                        nextTimeAnnouncementSeconds ??
+                        next
+                    ) + interval
+            } while elapsed >=
+                (
+                    nextTimeAnnouncementSeconds ??
+                    .greatestFiniteMagnitude
+                )
+            shouldAnnounce = true
+        }
+
+        guard shouldAnnounce else {
+            return
+        }
+
+        var parts: [String] = []
+
+        if configuration.announceDistance {
+            parts.append(
+                String(
+                    format:
+                        "%.1f kilometers",
+                    workout.distanceMeters /
+                        1_000
+                )
+            )
+        }
+
+        if configuration.announceElapsedTime {
+            parts.append(
+                durationPhrase(elapsed)
+            )
+        }
+
+        if configuration.announceAveragePace,
+           workout.distanceMeters >= 100 {
+            let pace =
+                elapsed /
+                (
+                    workout.distanceMeters /
+                    1_000
+                )
+            parts.append(
+                "average pace \(pacePhrase(pace))"
+            )
+        }
+
+        if configuration
+            .announceRemainingRouteDistance,
+           let remaining =
+                workout.routeRemainingMeters {
+            parts.append(
+                remaining < 1_000
+                    ? "\(Int(remaining.rounded())) meters remaining"
+                    : String(
+                        format:
+                            "%.1f kilometers remaining",
+                        remaining / 1_000
+                    )
+            )
+        }
+
+        if configuration
+            .announceEstimatedRemainingRouteTime,
+           let remaining =
+                workout.routeRemainingMeters,
+           let pace =
+                workout
+                    .currentPaceSecondsPerKilometer,
+           pace > 0 {
+            parts.append(
+                "about \(durationPhrase((remaining / 1_000) * pace)) remaining"
+            )
+        }
+
+        if configuration.announceClockTime {
+            parts.append(
+                Date().formatted(
+                    date: .omitted,
+                    time: .shortened
+                )
+            )
+        }
+
+        guard !parts.isEmpty else {
+            return
+        }
+
+        speak(
+            parts.joined(
+                separator: ". "
+            ),
+            configuration: configuration
+        )
+    }
+
+    private func speak(
+        _ phrase: String,
+        configuration:
+            WatchAudioCoachConfiguration?
+    ) {
+        guard !phrase.isEmpty else {
+            return
+        }
+
+        let configuration =
+            configuration ??
+            .disabled
+
+        do {
+            let session =
+                AVAudioSession.sharedInstance()
+            let options:
+                AVAudioSession.CategoryOptions =
+                    configuration
+                        .shouldDuckOtherAudio
+                        ? [.duckOthers]
+                        : [.mixWithOthers]
+            try session.setCategory(
+                .playback,
+                mode: .spokenAudio,
+                options: options
+            )
+            try session.setActive(true)
+        } catch {
+            // Speech remains best-effort and must never stop the workout.
+        }
+
+        let utterance =
+            AVSpeechUtterance(
+                string: phrase
+            )
+
+        switch configuration.language {
+        case .english:
+            utterance.voice =
+                AVSpeechSynthesisVoice(
+                    language: "en-US"
+                )
+        case .norwegian:
+            utterance.voice =
+                AVSpeechSynthesisVoice(
+                    language: "nb-NO"
+                )
+        case .system:
+            break
+        }
+
+        speechSynthesizer.speak(utterance)
+    }
+
+    private func deactivateCoachAudioSession() {
+        speechSynthesizer.stopSpeaking(
+            at: .immediate
+        )
+
+        try? AVAudioSession
+            .sharedInstance()
+            .setActive(
+                false,
+                options:
+                    .notifyOthersOnDeactivation
+            )
+    }
+
+    private func durationPhrase(
+        _ seconds: TimeInterval
+    ) -> String {
+        let totalMinutes =
+            max(
+                Int(
+                    (seconds / 60)
+                        .rounded()
+                ),
+                0
+            )
+        let hours =
+            totalMinutes / 60
+        let minutes =
+            totalMinutes % 60
+
+        if hours > 0 {
+            return minutes > 0
+                ? "\(hours) hours \(minutes) minutes"
+                : "\(hours) hours"
+        }
+
+        return "\(minutes) minutes"
+    }
+
+    private func pacePhrase(
+        _ seconds: TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(seconds.rounded()),
+                0
+            )
+        return String(
+            format:
+                "%d minutes %02d seconds per kilometer",
+            total / 60,
+            total % 60
+        )
+    }
+
+    private func routeCompletionSummary(
+        for workout: PhoneWorkout
+    ) -> PhoneRouteCompletionSummary? {
+        guard let routeID =
+                workout.plannedRouteID,
+              let routeTitle =
+                workout.plannedRouteTitle,
+              let coordinates =
+                workout.plannedRouteCoordinates,
+              coordinates.count >= 2
+        else {
+            return nil
+        }
+
+        let actual =
+            workout.points
+                .filter {
+                    $0.accuracy >= 0 &&
+                    $0.accuracy <= 65
+                }
+                .map(\.location)
+        let reference =
+            coordinates
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocation(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+
+        guard let analysis =
+                ATHLTHRouteCompletionAnalyzer
+                    .analyze(
+                        actualLocations: actual,
+                        referenceLocations:
+                            reference
+                    )
+        else {
+            return nil
+        }
+
+        let duration =
+            workout.accumulatedSeconds
+        let previousBest =
+            history
+                .filter {
+                    $0.plannedRouteID ==
+                        routeID &&
+                    $0.finalLeaderboardEligible ==
+                        true
+                }
+                .map(\.accumulatedSeconds)
+                .filter { $0 > 0 }
+                .min()
+
+        let personalBest =
+            analysis.leaderboardEligible &&
+            (
+                previousBest == nil ||
+                duration <
+                    (previousBest ??
+                        .greatestFiniteMagnitude)
+            )
+
+        return PhoneRouteCompletionSummary(
+            routeID: routeID,
+            routeTitle: routeTitle,
+            routeMatchPercent:
+                analysis.routeMatchPercent,
+            averageDeviationMeters:
+                analysis
+                    .averageDeviationMeters,
+            maxDeviationMeters:
+                analysis.maxDeviationMeters,
+            distanceMeters:
+                workout.distanceMeters,
+            durationSeconds: duration,
+            leaderboardEligible:
+                analysis.leaderboardEligible,
+            personalBest: personalBest
+        )
+    }
+
+    private func syncLiveActivity() {
+        guard let workout = active else {
+            return
+        }
+
+        syncLiveActivity(
+            workout: workout,
+            state:
+                workout.resumedAt == nil
+                    ? .paused
+                    : .running
+        )
+    }
+
+    private func syncLiveActivity(
+        workout: PhoneWorkout,
+        state: WatchWorkoutMirrorState
+    ) {
+        let latest =
+            workout.points.last
+
+        let snapshot =
+            WatchWorkoutLiveSnapshot(
+                kind:
+                    workout.walking
+                        ? .walking
+                        : .running,
+                state: state,
+                startedAt:
+                    workout.start,
+                capturedAt: Date(),
+                elapsedTime:
+                    workout.elapsed(at: Date()),
+                heartRate: 0,
+                activeCalories: 0,
+                distanceMeters:
+                    workout.distanceMeters,
+                averageHeartRate: nil,
+                maxHeartRate: nil,
+                routePointCount:
+                    workout.points.count,
+                currentLatitude:
+                    latest?.latitude,
+                currentLongitude:
+                    latest?.longitude,
+                routeProgressPercent:
+                    workout.routeProgressPercent,
+                routeComparisonID:
+                    workout.plannedRouteID,
+                routeTitle:
+                    workout.plannedRouteTitle,
+                routeDistanceMeters:
+                    workout
+                        .plannedRouteDistanceKilometers
+                        .map { $0 * 1_000 },
+                currentPaceSecondsPerKilometer:
+                    workout
+                        .currentPaceSecondsPerKilometer,
+                routeRemainingMeters:
+                    workout.routeRemainingMeters,
+                routeDeviationMeters:
+                    workout.routeDeviationMeters,
+                routeDeviationThresholdMeters:
+                    workout
+                        .routeAlertConfiguration?
+                        .deviationMeters,
+                liveSurfaceConfiguration:
+                    ATHLTHLiveWorkoutPreferencesStore
+                        .load(),
+                liveSurfaceContext:
+                    ATHLTHLiveWorkoutContextStore
+                        .load()
+            )
+
+        ATHLTHSurfaceCoordinator
+            .syncLiveActivity(
+                with: snapshot
+            )
     }
 
     private func persistActiveCheckpoint(
@@ -914,24 +1884,86 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         Task { @MainActor in self.message = "GPS is unavailable. Time continues; distance will resume when the signal returns."; self.lastLocation = nil }
     }
 
-    private func accept(_ locations: [CLLocation]) {
-        guard var workout = active, let resumedAt = workout.resumedAt else { return }
+    private func accept(
+        _ locations: [CLLocation]
+    ) {
+        guard var workout = active,
+              let resumedAt =
+                workout.resumedAt
+        else {
+            return
+        }
+
+        var accepted = false
+
         for location in locations {
-            guard location.timestamp >= resumedAt, abs(location.timestamp.timeIntervalSinceNow) < 15,
-                  location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 30 else { continue }
-            if let previous = lastLocation {
-                let seconds = location.timestamp.timeIntervalSince(previous.timestamp)
-                guard seconds > 0 else { continue }
-                let distance = location.distance(from: previous)
-                // Ignore long signal gaps and implausible jumps rather than inventing distance.
-                if seconds <= 30, distance / seconds <= 12 { workout.distanceMeters += distance }
+            guard
+                location.timestamp >= resumedAt,
+                abs(
+                    location.timestamp
+                        .timeIntervalSinceNow
+                ) < 15,
+                location.horizontalAccuracy >= 0,
+                location.horizontalAccuracy <= 30
+            else {
+                continue
             }
+
+            if let previous = lastLocation {
+                let seconds =
+                    location.timestamp
+                        .timeIntervalSince(
+                            previous.timestamp
+                        )
+
+                guard seconds > 0 else {
+                    continue
+                }
+
+                let distance =
+                    location.distance(
+                        from: previous
+                    )
+
+                // Ignore long signal gaps and implausible jumps rather than
+                // inventing distance.
+                if seconds <= 30,
+                   distance / seconds <= 12 {
+                    workout.distanceMeters +=
+                        distance
+                }
+            }
+
             lastLocation = location
-            workout.points.append(PhoneRoutePoint(location))
+            workout.points.append(
+                PhoneRoutePoint(location)
+            )
             workout.lastCheckpoint = Date()
+            updatePace(
+                workout: &workout,
+                location: location
+            )
+            updateRouteGuidance(
+                workout: &workout,
+                location: location
+            )
+            accepted = true
             message = nil
         }
+
+        guard accepted else {
+            return
+        }
+
+        evaluateStructuredWorkout(
+            &workout
+        )
+        evaluateCoachAnnouncements(
+            workout
+        )
+
         active = workout
         persistActiveCheckpoint()
+        syncLiveActivity()
     }
 }
