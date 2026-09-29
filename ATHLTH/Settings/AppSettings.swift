@@ -856,7 +856,17 @@ final class AppSettingsStore: ObservableObject {
             announceRemainingStepDistance:
                 audioCoachAnnounceRemainingStepDistance,
             duckOtherAudio:
-                audioCoachDuckOtherAudio
+                audioCoachDuckOtherAudio,
+            guidanceQuietPeriodSeconds:
+                TimeInterval(
+                    min(
+                        max(
+                            guidanceQuietPeriodSeconds,
+                            0
+                        ),
+                        30
+                    )
+                )
         )
     }
 
