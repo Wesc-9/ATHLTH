@@ -1205,6 +1205,10 @@ struct AroundYouExploreView: View {
                 return
             }
 
+            if activeSearchCenter == nil {
+                activeSearchCenter = location
+            }
+
             await publicTrailDiscovery.refresh(
                 near: location
             )
