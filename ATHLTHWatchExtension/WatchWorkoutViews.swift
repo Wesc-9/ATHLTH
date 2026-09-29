@@ -1395,6 +1395,30 @@ private struct WatchRunWalkWorkoutPager: View {
                         .tint(WatchTheme.green)
                     }
 
+                    if let toStart =
+                            workoutManager
+                                .routeDistanceToStartMeters,
+                       toStart > 250,
+                       (
+                            workoutManager
+                                .routeProgressPercent ??
+                            0
+                       ) < 3 {
+                        Label(
+                            routeDistanceText(toStart) +
+                                " to start",
+                            systemImage:
+                                "location.circle.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(.orange)
+                    }
+
                     HStack(spacing: 7) {
                         runMetric(
                             title: "REMAINING",
@@ -1599,6 +1623,19 @@ private struct WatchRunWalkWorkoutPager: View {
         }
 
         return "Free session"
+    }
+
+    private func routeDistanceText(
+        _ meters: Double
+    ) -> String {
+        if meters >= 1_000 {
+            return String(
+                format: "%.1f km",
+                meters / 1_000
+            )
+        }
+
+        return "\(Int(meters.rounded())) m"
     }
 
     private var routeRemainingText: String {
