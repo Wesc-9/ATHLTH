@@ -8,7 +8,9 @@ struct ATHLTHSurfaceRuntimeObserver: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var realtime:
         ATHLTHRealtimeSocialStore
     @EnvironmentObject private var watchConnection:
@@ -39,6 +41,23 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                         )
                 )
                 ghostRace.update(with: snapshot)
+            }
+            .onChange(
+                of:
+                    phoneWorkout
+                        .active?
+                        .points
+                        .count
+            ) { _, _ in
+                syncPhoneWorkoutGuidance()
+            }
+            .onChange(
+                of:
+                    phoneWorkout
+                        .active?
+                        .resumedAt
+            ) { _, _ in
+                syncPhoneWorkoutGuidance()
             }
             .onChange(of: realtime.liveLocations) { _, _ in
                 guard ghostRace.reference == nil
@@ -80,11 +99,51 @@ struct ATHLTHSurfaceRuntimeObserver: View {
             goals: goals,
             workout:
                 enrichedWorkoutSnapshot(
-                    workoutMirroring.snapshot
+                    workoutMirroring.snapshot ??
+                    phoneWorkout
+                        .currentLiveSnapshot()
                 )
         )
 
         syncLiveGhostWatchContext()
+    }
+
+    private func syncPhoneWorkoutGuidance() {
+        guard workoutMirroring.snapshot == nil,
+              let snapshot =
+                phoneWorkout
+                    .currentLiveSnapshot()
+        else {
+            return
+        }
+
+        ghostRace.update(with: snapshot)
+
+        if let reference =
+                ghostRace.reference,
+           let comparison =
+                ghostRace.comparison {
+            phoneWorkout.applyGhostComparison(
+                comparison,
+                title: reference.title,
+                configuration:
+                    settings
+                        .ghostRaceAudioConfiguration
+            )
+        }
+
+        let enriched =
+            enrichedWorkoutSnapshot(
+                phoneWorkout
+                    .currentLiveSnapshot() ??
+                snapshot
+            )
+
+        ATHLTHSurfaceCoordinator
+            .syncLiveActivity(
+                with: enriched
+            )
+        publishSurface()
     }
 
     private func syncLiveGhostWatchContext() {
@@ -152,9 +211,23 @@ struct ATHLTHSurfaceRuntimeObserver: View {
             return nil
         }
 
-        // Replay and Target Ghost already arrive from Watch with their own
-        // fixed ghost timing fields. Only enrich snapshots for Live Ghost
-        // when no fixed Ghost Race reference is active.
+        if let reference =
+                ghostRace.reference,
+           let comparison =
+                ghostRace.comparison {
+            snapshot.ghostRaceTitle =
+                reference.title
+            snapshot.ghostDistanceDeltaMeters =
+                comparison
+                    .signedDistanceMeters
+            snapshot.ghostTimeDeltaSeconds =
+                comparison
+                    .signedTimeSeconds
+            return snapshot
+        }
+
+        // Fixed Ghost comparisons are now shared by Watch and iPhone.
+        // Only fall through to Live Ghost when no fixed reference is active.
         guard ghostRace.reference == nil,
               snapshot.kind == .running,
               let session =
