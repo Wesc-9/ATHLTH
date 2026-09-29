@@ -1284,73 +1284,128 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
               horizontalAccuracy >= 0,
               horizontalAccuracy <= 50
         else {
+            offRouteStartedAt = nil
             return
         }
 
         let now = Date()
-        let offRoute =
+        let isOffRoute =
             deviationMeters >
             configuration.deviationMeters
 
-        if offRoute {
-            if offRouteStartedAt == nil {
-                offRouteStartedAt = now
+        guard isOffRoute else {
+            offRouteStartedAt = nil
+            lastOffRouteAlertAt = nil
+
+            if routeWasOff {
+                routeWasOff = false
+
+                if configuration
+                    .announceBackOnRoute {
+                    deliverRouteAlert(
+                        configuration:
+                            configuration,
+                        english:
+                            "Back on route.",
+                        norwegian:
+                            "Tilbake på ruten.",
+                        haptic: .success
+                    )
+                }
             }
 
-            let hasGrace =
-                now.timeIntervalSince(
-                    offRouteStartedAt ?? now
-                ) >= configuration.graceSeconds
-            let canRepeat =
-                lastOffRouteAlertAt.map {
-                    now.timeIntervalSince($0) >=
-                        configuration.repeatSeconds
-                } ?? true
-
-            if hasGrace && canRepeat {
-                deliverRouteAlert(
-                    configuration: configuration,
-                    phrase:
-                        "You are \(Int(deviationMeters.rounded())) meters off route."
-                )
-                lastOffRouteAlertAt = now
-            }
-
-            routeWasOff = true
             return
         }
 
-        offRouteStartedAt = nil
-        lastOffRouteAlertAt = nil
-
-        if routeWasOff,
-           configuration.announceBackOnRoute {
-            deliverRouteAlert(
-                configuration: configuration,
-                phrase: "Back on route."
-            )
+        if offRouteStartedAt == nil {
+            offRouteStartedAt = now
         }
 
-        routeWasOff = false
+        guard now.timeIntervalSince(
+            offRouteStartedAt ?? now
+        ) >= configuration.graceSeconds
+        else {
+            return
+        }
+
+        if let lastOffRouteAlertAt,
+           now.timeIntervalSince(
+                lastOffRouteAlertAt
+           ) < configuration.repeatSeconds {
+            return
+        }
+
+        routeWasOff = true
+        lastOffRouteAlertAt = now
+
+        deliverRouteAlert(
+            configuration: configuration,
+            english:
+                "You are off route. " +
+                "\(Int(deviationMeters.rounded())) meters.",
+            norwegian:
+                "Du er utenfor ruten. " +
+                "\(Int(deviationMeters.rounded())) meter.",
+            haptic: .warning
+        )
     }
 
     private func deliverRouteAlert(
         configuration:
             WatchRouteAlertConfiguration,
-        phrase: String
+        english: String,
+        norwegian: String,
+        haptic:
+            UINotificationFeedbackGenerator
+                .FeedbackType
     ) {
         if configuration.delivery.usesHaptics {
             UINotificationFeedbackGenerator()
-                .notificationOccurred(.warning)
+                .notificationOccurred(haptic)
         }
 
         if configuration.delivery.usesVoice {
+            let coachConfiguration =
+                active?
+                    .audioCoachConfiguration
+            let phrase =
+                localizedCoachPhrase(
+                    english: english,
+                    norwegian: norwegian,
+                    configuration:
+                        coachConfiguration
+                )
+
             speak(
                 phrase,
                 configuration:
-                    active?
-                        .audioCoachConfiguration
+                    coachConfiguration
             )
+        }
+    }
+
+    private func localizedCoachPhrase(
+        english: String,
+        norwegian: String,
+        configuration:
+            WatchAudioCoachConfiguration?
+    ) -> String {
+        switch configuration?.language {
+        case .norwegian:
+            return norwegian
+        case .english:
+            return english
+        case .system, .none:
+            let code =
+                Locale.current.language
+                    .languageCode?
+                    .identifier
+                    .lowercased()
+            return code == "nb" ||
+                code == "nn" ||
+                code == "no"
+                ? norwegian
+                : english
         }
     }
 
