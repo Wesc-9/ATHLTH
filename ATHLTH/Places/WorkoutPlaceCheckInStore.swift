@@ -1,6 +1,6 @@
 @preconcurrency import CoreLocation
 import Foundation
-import MapKit
+@preconcurrency import MapKit
 import Supabase
 
 struct WorkoutPlaceCheckInRecord:
@@ -612,41 +612,33 @@ final class WorkoutPlaceCheckInStore:
                     identifier
             )
 
-        let mapItem: MKMapItem? =
-            await withCheckedContinuation {
-                continuation in
+        do {
+            let mapItem =
+                try await request.mapItem
 
-                request.getMapItem {
-                    item,
-                    _ in
-
-                    continuation.resume(
-                        returning: item
-                    )
-                }
+            guard let name =
+                    mapItem.name?
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        ),
+                  !name.isEmpty
+            else {
+                return nil
             }
 
-        guard let mapItem,
-              let name =
-                mapItem.name?
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    ),
-              !name.isEmpty
-        else {
+            return
+                WorkoutPlacePresentation(
+                    id: placeID,
+                    name: name,
+                    coordinate:
+                        mapItem
+                            .placemark
+                            .coordinate,
+                    distanceMeters: nil
+                )
+        } catch {
             return nil
         }
-
-        return
-            WorkoutPlacePresentation(
-                id: placeID,
-                name: name,
-                coordinate:
-                    mapItem
-                        .placemark
-                        .coordinate,
-                distanceMeters: nil
-            )
     }
 }
