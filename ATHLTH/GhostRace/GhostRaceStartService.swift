@@ -324,6 +324,71 @@ enum GhostRaceStartService {
         }
     }
 
+    static func preparedTransfer(
+        ghostRace: GhostRaceStore,
+        audio:
+            WatchGhostRaceAudioConfiguration
+    ) -> WatchGhostRaceTransfer? {
+        guard let reference =
+                ghostRace.reference
+        else {
+            return nil
+        }
+
+        let pointStep =
+            max(
+                reference.points.count /
+                    320,
+                1
+            )
+        var points =
+            reference.points
+                .enumerated()
+                .compactMap {
+                    index,
+                    point
+                    -> WatchGhostRaceTimingPoint? in
+
+                    guard index % pointStep == 0 ||
+                            index ==
+                            reference.points.count - 1
+                    else {
+                        return nil
+                    }
+
+                    return WatchGhostRaceTimingPoint(
+                        elapsedTime:
+                            point.elapsedTime,
+                        cumulativeMeters:
+                            point.cumulativeMeters
+                    )
+                }
+
+        if let final =
+                reference.points.last,
+           points.last?.cumulativeMeters !=
+                final.cumulativeMeters {
+            points.append(
+                WatchGhostRaceTimingPoint(
+                    elapsedTime:
+                        final.elapsedTime,
+                    cumulativeMeters:
+                        final.cumulativeMeters
+                )
+            )
+        }
+
+        return WatchGhostRaceTransfer(
+            title: reference.title,
+            referenceDuration:
+                reference.durationSeconds,
+            routeDistanceMeters:
+                reference.routeDistanceMeters,
+            points: points,
+            audio: audio
+        )
+    }
+
     private static func launchPrepared(
         title: String,
         ownerID: UUID,
