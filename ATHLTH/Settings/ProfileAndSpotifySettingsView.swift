@@ -506,14 +506,31 @@ struct ATHLTHEditProfileView: View {
     private var avatarPreview: some View {
         if let selectedAvatarData,
            let image = UIImage(data: selectedAvatarData) {
-            Image(uiImage: image)
+            image
                 .resizable()
                 .scaledToFill()
-                .frame(width: 112, height: 112)
+                .frame(width: 118, height: 118)
                 .clipShape(Circle())
                 .overlay {
-                    Circle().stroke(ATHLTHTheme.border, lineWidth: 1)
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white,
+                                    ATHLTHTheme.champagne,
+                                    ATHLTHTheme.accent.opacity(0.24)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 3
+                        )
                 }
+                .shadow(
+                    color: ATHLTHTheme.accentDeep.opacity(0.16),
+                    radius: 14,
+                    y: 7
+                )
         } else if let avatarURL = session.profile.avatarURL {
             AsyncImage(url: avatarURL) { phase in
                 switch phase {
@@ -525,14 +542,43 @@ struct ATHLTHEditProfileView: View {
                     avatarFallback
                 }
             }
-            .frame(width: 112, height: 112)
+            .frame(width: 118, height: 118)
             .clipShape(Circle())
             .overlay {
-                Circle().stroke(ATHLTHTheme.border, lineWidth: 1)
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white,
+                                ATHLTHTheme.champagne,
+                                ATHLTHTheme.accent.opacity(0.24)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 3
+                    )
             }
+            .shadow(
+                color: ATHLTHTheme.accentDeep.opacity(0.16),
+                radius: 14,
+                y: 7
+            )
         } else {
             avatarFallback
-                .frame(width: 112, height: 112)
+                .frame(width: 118, height: 118)
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white.opacity(0.88),
+                            lineWidth: 3
+                        )
+                }
+                .shadow(
+                    color: ATHLTHTheme.accentDeep.opacity(0.12),
+                    radius: 12,
+                    y: 6
+                )
         }
     }
 
