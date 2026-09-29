@@ -173,7 +173,7 @@ struct RunGuidanceSetupView: View {
                         )
                     } label: {
                         guidanceRow(
-                            title: "Ghost",
+                            title: "Ghost Updates",
                             subtitle:
                                 ghost.enabled
                                     ? "Target \(ghost.targetTimeText)"
@@ -429,13 +429,13 @@ private struct PerWorkoutGhostView: View {
                         ATHLTHGhostUpdatesSettingsView()
                     } label: {
                         Text(
-                            "Adjust Ghost defaults"
+                            "Adjust Ghost Updates defaults"
                         )
                     }
                 }
             }
         }
-        .navigationTitle("Ghost")
+        .navigationTitle("Ghost Updates")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
