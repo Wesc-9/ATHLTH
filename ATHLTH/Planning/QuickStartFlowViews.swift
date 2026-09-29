@@ -1221,20 +1221,77 @@ struct WalkQuickStartSheet: View {
                         activity: .walking
                     )
 
-                    if captureDevice == .appleWatch {
-                        ATHLTHPlusFeatureGate(
-                            feature: .audioCoach,
-                            title: "Audio Coach · ATHLTH+",
-                            message:
-                                "Unlock spoken distance, time, pace and heart-rate updates."
-                        ) {
-                            AudioCoachSetupCard(
-                                draft: $audioCoachDraft,
-                                showRouteOptions: false,
-                                showStructuredOptions: false
-                            )
+                    NavigationLink {
+                        PerWorkoutAudioCoachView(
+                            draft:
+                                $audioCoachDraft,
+                            showRouteOptions: false,
+                            showStructuredOptions: false
+                        )
+                    } label: {
+                        ATHLTHCard {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "waveform.and.mic"
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .premiumGold
+                                )
+                                .frame(
+                                    width: 40,
+                                    height: 40
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .premiumGoldSoft,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                12
+                                        )
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        "Guidance & Alerts"
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+
+                                    Text(
+                                        audioCoachDraft
+                                            .enabled
+                                            ? "Audio Coach · tap to adjust"
+                                            : "Tap to configure this walk"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
                     ATHLTHCard {
                         WorkoutFriendPicker(
                             selectedFriendIDs: $selectedFriendIDs
@@ -1250,7 +1307,6 @@ struct WalkQuickStartSheet: View {
                             WalkQuickStartConfiguration(
                                 captureDevice: captureDevice,
                                 audioCoach:
-                                    captureDevice == .appleWatch &&
                                     session.canAccess(.audioCoach)
                                         ? audioCoachDraft.configuration()
                                         : .disabled,
