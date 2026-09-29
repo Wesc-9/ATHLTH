@@ -1154,7 +1154,7 @@ struct AroundYouExploreView: View {
                     if let route = selectedRoute {
                         routePreviewCard(route)
                             .padding(.horizontal, 12)
-                            .padding(.bottom, 68)
+                            .padding(.bottom, 12)
                             .transition(
                                 .move(edge: .bottom)
                                     .combined(with: .opacity)
