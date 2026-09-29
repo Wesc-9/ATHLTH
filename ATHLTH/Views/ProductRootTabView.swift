@@ -3296,82 +3296,31 @@ struct ATHLTHTrainView: View {
     private func startRunQuickWorkout(
         _ configuration: RunQuickStartConfiguration
     ) {
-        if configuration.captureDevice == .iPhone {
-            guard configuration.mode == .free else { return }
-            gear.prepareNextWorkoutGear(configuration.gearIDs)
-            phoneWorkout.start(walking: false)
-            return
-        }
-
-        guard watchConnection.isReady else {
-            watchTransferError =
-                "Apple Watch is not ready to start this run."
-            return
-        }
-
-        do {
-            if let route = configuration.route {
-                try watchConnection.sendRoute(route)
-                watchConnection.sendWorkoutRouteSelection(route.id)
-            } else if let workout = configuration.workout,
-                      let routeID = workout.routeID,
-                      let route = session.savedRoutes.first(
-                        where: { $0.id == routeID }
-                      ) {
-                try watchConnection.sendRoute(route)
-                watchConnection.sendWorkoutRouteSelection(route.id)
-            } else {
-                watchConnection.sendWorkoutRouteSelection(nil)
-            }
-        } catch {
-            Task { @MainActor in
-                await social.cancelActiveWorkout()
-            }
-            watchTransferError = error.localizedDescription
-            return
-        }
-
-        Task {
+        Task { @MainActor in
             do {
-                try await watchConnection
-                    .startWorkoutOnWatch(.running)
-
-                gear.prepareNextWorkoutGear(
-                    configuration.gearIDs
-                )
-
-                watchConnection.sendAudioCoachConfiguration(
-                    configuration.audioCoach
-                )
-
-                if let workout = configuration.workout {
-                    var watchTransfer =
-                        watchRunningWorkoutTransfer(
-                            from: workout
-                        )
-                    watchTransfer.routeAlerts =
-                        settings
-                            .routeAlertConfiguration
-                    watchConnection.sendRunningWorkout(
-                        watchTransfer
+                try await WorkoutLaunchCoordinator
+                    .startRunQuick(
+                        configuration: configuration,
+                        session: session,
+                        settings: settings,
+                        gear: gear,
+                        phoneWorkout: phoneWorkout,
+                        watchConnection:
+                            watchConnection
                     )
-                } else {
-                    watchConnection.sendRunningWorkout(
-                        WatchRunningWorkoutTransfer(
-                            title: "",
-                            steps: [],
-                            routeAlerts:
-                                settings
-                                    .routeAlertConfiguration
-                        )
-                    )
-                }
 
                 watchTransferMessage =
-                    "\(configuration.title) started on Apple Watch."
+                    "\(configuration.title) started" +
+                    (
+                        configuration.captureDevice ==
+                            .appleWatch
+                            ? " on Apple Watch."
+                            : " on iPhone."
+                    )
             } catch {
                 await social.cancelActiveWorkout()
-                watchTransferError = error.localizedDescription
+                watchTransferError =
+                    error.localizedDescription
             }
         }
     }
