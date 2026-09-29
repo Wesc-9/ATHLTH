@@ -23,134 +23,102 @@ struct ATHLTHEditProfileView: View {
     private var hasEditedATHLTHProfile = false
 
     var body: some View {
-        let photoButtonTitle =
-            selectedAvatarData == nil
-            ? "Choose Photo"
-            : "Change Photo"
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.premiumGold.opacity(0.34)
+            )
 
-        return Form {
-            Section {
-                VStack(spacing: 14) {
-                    avatarPreview
+            ScrollView {
+                LazyVStack(spacing: 22) {
+                    profileIdentityCard
 
-                    HStack(spacing: 10) {
-                        PhotosPicker(
-                            selection: $selectedPhoto,
-                            matching: .images
-                        ) {
-                            Label(
-                                photoButtonTitle,
-                                systemImage: "photo"
+                    VStack(spacing: 12) {
+                        ATHLTHSectionHeader(title: "Public profile")
+                            .padding(.horizontal, 2)
+
+                        publicProfileCard
+                    }
+
+                    VStack(spacing: 12) {
+                        ATHLTHSectionHeader(title: "Training identity")
+                            .padding(.horizontal, 2)
+
+                        trainingIdentityCard
+                    }
+
+                    VStack(spacing: 12) {
+                        ATHLTHSectionHeader(title: "My gear")
+                            .padding(.horizontal, 2)
+
+                        gearCard
+                    }
+
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 30, height: 30)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 10,
+                                    style: .continuous
+                                )
                             )
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accent)
 
-                        if session.profile.avatarURL != nil || selectedAvatarData != nil {
-                            Button(role: .destructive) {
-                                Task { await removePhoto() }
-                            } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(saving)
-                        }
-                    }
-
-                    Text("Your photo is shown only where your profile visibility allows it.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            }
-
-            Section {
-                TextField("Display name", text: $displayName)
-                    .textContentType(.name)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField("Username", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .textContentType(.username)
-
-                    usernameStatus
-                }
-
-                VStack(alignment: .trailing, spacing: 6) {
-                    TextEditor(text: $bio)
-                        .frame(minHeight: 92)
-                        .scrollContentBackground(.hidden)
-                        .padding(8)
-                        .background(
-                            Color(.secondarySystemGroupedBackground),
-                            in: RoundedRectangle(cornerRadius: 12)
+                        Text(
+                            "Display name, username, bio and profile photo are social profile data. Health details remain private and are managed separately."
                         )
-
-                    Text("\(bio.count)/160")
-                        .font(.caption2)
-                        .foregroundStyle(bio.count > 160 ? .red : .secondary)
-                }
-            } header: {
-                Text("Public profile")
-            } footer: {
-                Text("Display name, username, bio and profile photo are social profile data. Health details remain private and are managed separately.")
-            }
-
-            Section("Training Identity") {
-                Picker("Training focus", selection: $selectedTrainingFocus) {
-                    Text("Not set").tag(TrainingFocus?.none)
-                    ForEach(TrainingFocus.allCases) { focus in
-                        Label(focus.title, systemImage: focus.systemImage)
-                            .tag(Optional(focus))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 12)
                 }
-
-                Text(
-                    selectedTrainingFocus?.subtitle
-                        ?? "Choose the training identity that best describes how you train."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 120)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
             }
-
-            Section("My Gear") {
-                NavigationLink {
-                    ProfileGearManagerView()
-                } label: {
-                    LabeledContent {
-                        Text("\(gear.items.count) saved")
-                            .foregroundStyle(.secondary)
-                    } label: {
-                        Label("Manage gear", systemImage: "backpack.fill")
-                    }
-                }
-
-                Text("Save multiple watches, shoes, headphones and other gear. Pick one item in each category to show on your profile.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
+            .scrollIndicators(.hidden)
         }
         .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task { await saveProfile() }
                 } label: {
-                    if saving {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text("Save")
-                            .fontWeight(.semibold)
+                    Group {
+                        if saving {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                                .frame(width: 48)
+                        } else {
+                            Text("Save")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(width: 48)
+                        }
                     }
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 8)
+                    .background(
+                        canSave && !saving
+                            ? ATHLTHTheme.accentDeep
+                            : ATHLTHTheme.mutedText.opacity(0.45),
+                        in: Capsule()
+                    )
                 }
+                .buttonStyle(.plain)
                 .disabled(!canSave || saving)
-                .accessibilityLabel(saving ? "Saving profile" : "Save profile")
+                .accessibilityLabel(
+                    saving ? "Saving profile" : "Save profile"
+                )
             }
         }
         .onAppear(perform: loadCurrentProfile)
@@ -161,12 +129,16 @@ struct ATHLTHEditProfileView: View {
             guard let newItem else { return }
             Task {
                 do {
-                    guard let data = try await newItem.loadTransferable(type: Data.self),
-                          let image = UIImage(data: data),
-                          let jpeg = image.jpegData(compressionQuality: 0.82)
+                    guard
+                        let data = try await newItem.loadTransferable(
+                            type: Data.self
+                        ),
+                        let image = UIImage(data: data),
+                        let jpeg = image.jpegData(compressionQuality: 0.82)
                     else {
                         throw ProfileEditingError.invalidImage
                     }
+
                     await MainActor.run {
                         selectedAvatarData = jpeg
                     }
@@ -196,6 +168,338 @@ struct ATHLTHEditProfileView: View {
         } message: {
             Text(errorMessage ?? "Profile updated.")
         }
+    }
+
+    private var profileIdentityCard: some View {
+        ATHLTHCard {
+            VStack(spacing: 16) {
+                ZStack(alignment: .bottomTrailing) {
+                    avatarPreview
+
+                    PhotosPicker(
+                        selection: $selectedPhoto,
+                        matching: .images
+                    ) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 34, height: 34)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white.opacity(0.90),
+                                        lineWidth: 2
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: 2, y: 2)
+                    .accessibilityLabel("Change profile photo")
+                }
+
+                VStack(spacing: 4) {
+                    Text(
+                        displayName.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).isEmpty
+                            ? "Your profile"
+                            : displayName
+                    )
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+
+                    if !cleanedUsername.isEmpty {
+                        Text("@\(cleanedUsername)")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(1)
+                    }
+
+                    Text("Public identity")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(
+                            ATHLTHTheme.champagneSoft,
+                            in: Capsule()
+                        )
+                        .padding(.top, 3)
+                }
+
+                HStack(spacing: 10) {
+                    PhotosPicker(
+                        selection: $selectedPhoto,
+                        matching: .images
+                    ) {
+                        Label(
+                            selectedAvatarData == nil
+                                ? "Change photo"
+                                : "Use another",
+                            systemImage: "photo.on.rectangle"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    if session.profile.avatarURL != nil ||
+                        selectedAvatarData != nil {
+                        Button(role: .destructive) {
+                            Task { await removePhoto() }
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                                .font(.caption.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 40)
+                                .background(
+                                    Color.red.opacity(0.07),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(saving)
+                    }
+                }
+
+                Text(
+                    "Your photo follows your profile visibility settings."
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var publicProfileCard: some View {
+        ATHLTHCard {
+            VStack(spacing: 0) {
+                profileField(
+                    title: "Display name",
+                    icon: "person.fill"
+                ) {
+                    TextField("Display name", text: $displayName)
+                        .textContentType(.name)
+                        .multilineTextAlignment(.trailing)
+                }
+
+                profileDivider
+
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack(spacing: 12) {
+                        profileFieldIcon("at")
+
+                        Text("Username")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Spacer(minLength: 12)
+
+                        TextField("Username", text: $username)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .textContentType(.username)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                    }
+
+                    usernameStatus
+                        .padding(.leading, 42)
+                }
+                .padding(.vertical, 15)
+
+                profileDivider
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        profileFieldIcon("text.alignleft")
+
+                        Text("Bio")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Spacer()
+
+                        Text("\(bio.count)/160")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(
+                                bio.count > 160
+                                    ? Color.red
+                                    : ATHLTHTheme.mutedText
+                            )
+                    }
+
+                    TextEditor(text: $bio)
+                        .frame(minHeight: 104)
+                        .scrollContentBackground(.hidden)
+                        .font(.body)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .padding(12)
+                        .background(
+                            ATHLTHTheme.surfaceStone.opacity(0.82),
+                            in: RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                            .stroke(
+                                ATHLTHTheme.border,
+                                lineWidth: 0.8
+                            )
+                        }
+                }
+                .padding(.top, 15)
+            }
+        }
+    }
+
+    private var trainingIdentityCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    profileFieldIcon(
+                        selectedTrainingFocus?.systemImage
+                            ?? "figure.run"
+                    )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Training focus")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(
+                            selectedTrainingFocus?.subtitle
+                                ?? "Choose what best describes how you train."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 10)
+
+                    Picker(
+                        "Training focus",
+                        selection: $selectedTrainingFocus
+                    ) {
+                        Text("Not set")
+                            .tag(TrainingFocus?.none)
+
+                        ForEach(TrainingFocus.allCases) { focus in
+                            Label(
+                                focus.title,
+                                systemImage: focus.systemImage
+                            )
+                            .tag(Optional(focus))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(ATHLTHTheme.accentDeep)
+                }
+            }
+        }
+    }
+
+    private var gearCard: some View {
+        NavigationLink {
+            ProfileGearManagerView()
+        } label: {
+            ATHLTHCard {
+                HStack(spacing: 13) {
+                    Image(systemName: "backpack.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .frame(width: 42, height: 42)
+                        .background(
+                            ATHLTHTheme.vitalitySoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Manage gear")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(
+                            gear.items.isEmpty
+                                ? "Add watches, shoes, headphones and more."
+                                : "\(gear.items.count) saved item\(gear.items.count == 1 ? "" : "s")"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func profileField<Field: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder field: () -> Field
+    ) -> some View {
+        HStack(spacing: 12) {
+            profileFieldIcon(icon)
+
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Spacer(minLength: 12)
+
+            field()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+        }
+        .padding(.vertical, 15)
+    }
+
+    private func profileFieldIcon(_ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+            .frame(width: 30, height: 30)
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: RoundedRectangle(
+                    cornerRadius: 10,
+                    style: .continuous
+                )
+            )
+    }
+
+    private var profileDivider: some View {
+        Rectangle()
+            .fill(ATHLTHTheme.divider)
+            .frame(height: 1)
+            .padding(.leading, 42)
     }
 
     @ViewBuilder
