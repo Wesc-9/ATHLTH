@@ -540,7 +540,8 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     }
 
     func publishMirroredSnapshot(
-        _ snapshot: WatchWorkoutLiveSnapshot
+        _ snapshot: WatchWorkoutLiveSnapshot,
+        includeHeartRate: Bool = false
     ) async {
         guard let session = currentSession,
               session.isActive,
@@ -574,6 +575,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             speedMetersPerSecond: nil,
             courseDegrees: nil,
             heartRateBPM:
+                includeHeartRate &&
                 snapshot.heartRate > 0 &&
                 snapshot.heartRate.isFinite
                     ? snapshot.heartRate
