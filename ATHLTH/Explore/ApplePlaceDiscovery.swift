@@ -386,8 +386,11 @@ final class ApplePlaceDiscoveryStore:
            ) < 0.035,
            Date().timeIntervalSince(
                 lastRefreshAt
-           ) < 180,
-           !places.isEmpty {
+           ) < 180 {
+            return
+        }
+
+        guard !isLoading else {
             return
         }
 
