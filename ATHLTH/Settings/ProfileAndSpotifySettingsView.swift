@@ -171,7 +171,12 @@ struct ATHLTHEditProfileView: View {
     }
 
     private var profileIdentityCard: some View {
-        ATHLTHCard {
+        let photoButtonTitle =
+            selectedAvatarData == nil
+                ? "Change photo"
+                : "Use another"
+
+        return ATHLTHCard {
             VStack(spacing: 16) {
                 ZStack(alignment: .bottomTrailing) {
                     avatarPreview
@@ -238,9 +243,7 @@ struct ATHLTHEditProfileView: View {
                         matching: .images
                     ) {
                         Label(
-                            selectedAvatarData == nil
-                                ? "Change photo"
-                                : "Use another",
+                            photoButtonTitle,
                             systemImage: "photo.on.rectangle"
                         )
                         .font(.caption.weight(.semibold))
@@ -506,7 +509,7 @@ struct ATHLTHEditProfileView: View {
     private var avatarPreview: some View {
         if let selectedAvatarData,
            let image = UIImage(data: selectedAvatarData) {
-            image
+            Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
                 .frame(width: 118, height: 118)
