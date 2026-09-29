@@ -52,6 +52,21 @@ struct HomeActivityCenterV2: View {
         latestWorkout?.id.uuidString ?? "activity-center-empty"
     }
 
+
+    private var communityFeed: [SocialFeedItem] {
+        guard let currentUserID = social.currentUserID else {
+            return Array(social.feed.prefix(2))
+        }
+
+        return Array(
+            social.feed
+                .filter {
+                    $0.actor.userID != currentUserID
+                }
+                .prefix(2)
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
@@ -64,6 +79,10 @@ struct HomeActivityCenterV2: View {
                 workoutCard(workout)
             } else {
                 emptyState
+            }
+
+            if !communityFeed.isEmpty {
+                communityPreview
             }
         }
         .sheet(
@@ -253,6 +272,43 @@ struct HomeActivityCenterV2: View {
         .accessibilityLabel("Workout actions")
     }
 
+    private var communityPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Community Activity")
+                    .font(.headline)
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Spacer()
+
+                NavigationLink {
+                    SocialHubView(initialTab: .feed)
+                } label: {
+                    Text("See all")
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 4)
+
+            ForEach(communityFeed) { item in
+                HomeActivityCommunityRowV2(
+                    item: item
+                )
+            }
+        }
+        .padding(.top, 2)
+    }
+
     private var emptyState: some View {
         HStack(spacing: 13) {
             Image(systemName: "figure.run.circle.fill")
@@ -350,6 +406,137 @@ struct HomeActivityCenterV2: View {
 
         detail = loaded
         detailWorkoutID = workout.id
+    }
+}
+
+private struct HomeActivityCommunityRowV2: View {
+    let item: SocialFeedItem
+
+    var body: some View {
+        NavigationLink {
+            FriendProfileView(
+                userID: item.actor.userID
+            )
+        } label: {
+            HStack(spacing: 11) {
+                SocialAvatar(
+                    profile: item.actor,
+                    size: 42
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    HStack(spacing: 5) {
+                        Text(
+                            item.actor.resolvedName
+                        )
+                        .font(
+                            .subheadline.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+
+                        Text("·")
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+
+                        Text(
+                            item.activity.createdAt,
+                            style: .relative
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+
+                    Text(item.activity.title)
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                                .opacity(0.82)
+                        )
+                        .lineLimit(1)
+
+                    if let subtitle =
+                        item.activity.subtitle {
+                        Text(subtitle)
+                            .font(.caption2)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: activityIcon)
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+                    .frame(
+                        width: 34,
+                        height: 34
+                    )
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: Circle()
+                    )
+            }
+            .padding(13)
+            .background(
+                Color.white.opacity(0.92),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.black.opacity(0.045),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var activityIcon: String {
+        switch item.activity.kind {
+        case "workout":
+            return "figure.run"
+        case "trophy":
+            return "trophy.fill"
+        case "goal":
+            return "target"
+        case "challenge":
+            return "person.2.fill"
+        case "personal_record":
+            return "bolt.fill"
+        default:
+            return "sparkles"
+        }
     }
 }
 
