@@ -1,4 +1,84 @@
+import CoreLocation
+import MapKit
 import SwiftUI
+
+@MainActor
+private final class QuickStartRouteLocationProbe:
+    NSObject,
+    ObservableObject,
+    CLLocationManagerDelegate
+{
+    @Published private(set)
+    var location: CLLocation?
+
+    private let manager =
+        CLLocationManager()
+
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy =
+            kCLLocationAccuracyHundredMeters
+    }
+
+    func refresh() {
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            manager
+                .requestWhenInUseAuthorization()
+
+        case .authorizedAlways,
+             .authorizedWhenInUse:
+            manager.requestLocation()
+
+        default:
+            break
+        }
+    }
+
+    nonisolated func
+        locationManagerDidChangeAuthorization(
+            _ manager: CLLocationManager
+        ) {
+        guard manager.authorizationStatus ==
+                .authorizedAlways ||
+                manager.authorizationStatus ==
+                .authorizedWhenInUse
+        else {
+            return
+        }
+
+        manager.requestLocation()
+    }
+
+    nonisolated func locationManager(
+        _ manager: CLLocationManager,
+        didUpdateLocations
+            locations: [CLLocation]
+    ) {
+        guard let location =
+                locations
+                    .filter {
+                        $0.horizontalAccuracy >= 0
+                    }
+                    .min {
+                        $0.horizontalAccuracy <
+                            $1.horizontalAccuracy
+                    }
+        else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            self?.location = location
+        }
+    }
+
+    nonisolated func locationManager(
+        _ manager: CLLocationManager,
+        didFailWithError error: Error
+    ) {}
+}
 
 struct AudioCoachDraft {
     var enabled = false
@@ -292,6 +372,8 @@ struct RunQuickStartSheet: View {
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var captureDevice: WorkoutCaptureDevice
+    @StateObject private var routeLocationProbe =
+        QuickStartRouteLocationProbe()
 
     init(
         trainingDeviceProvider: TrainingDeviceProvider,
@@ -363,22 +445,20 @@ struct RunQuickStartSheet: View {
                         activity: .running
                     )
 
-                    if captureDevice == .appleWatch {
-                        ATHLTHPlusFeatureGate(
-                            feature: .audioCoach,
-                            title: "Audio Coach · ATHLTH+",
-                            message:
-                                "Choose spoken pace, time, route progress and workout-step updates."
-                        ) {
-                            AudioCoachSetupCard(
-                                draft: $audioCoachDraft,
-                                showRouteOptions:
-                                    mode == .route ||
-                                    selectedWorkout?.routeID != nil,
-                                showStructuredOptions:
-                                    mode == .structured
-                            )
-                        }
+                    ATHLTHPlusFeatureGate(
+                        feature: .audioCoach,
+                        title: "Audio Coach · ATHLTH+",
+                        message:
+                            "Choose spoken pace, time, route progress and workout-step updates on iPhone or Apple Watch."
+                    ) {
+                        AudioCoachSetupCard(
+                            draft: $audioCoachDraft,
+                            showRouteOptions:
+                                mode == .route ||
+                                selectedWorkout?.routeID != nil,
+                            showStructuredOptions:
+                                mode == .structured
+                        )
                     }
                     ATHLTHCard {
                         WorkoutFriendPicker(
@@ -452,6 +532,13 @@ struct RunQuickStartSheet: View {
                             for: .running
                         )
                 }
+
+                routeLocationProbe.refresh()
+            }
+            .onChange(
+                of: selectedRoute?.id
+            ) { _, _ in
+                routeLocationProbe.refresh()
             }
         }
     }
@@ -623,6 +710,62 @@ struct RunQuickStartSheet: View {
                     .tint(ATHLTHTheme.accent)
                 }
 
+                if let distance =
+                        distanceToSelectedRouteStart,
+                   distance > 250 {
+                    Divider()
+                        .padding(.vertical, 8)
+
+                    HStack(
+                        alignment: .top,
+                        spacing: 10
+                    ) {
+                        Image(
+                            systemName:
+                                "location.circle.fill"
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.premiumGold
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 4
+                        ) {
+                            Text(
+                                routeStartDistanceText(
+                                    distance
+                                )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(.semibold)
+                            )
+
+                            Text(
+                                "You can start anyway, but ATHLTH will mark your route progress only when you reach the course."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                            Button {
+                                openDirectionsToRouteStart()
+                            } label: {
+                                Label(
+                                    "Directions to start",
+                                    systemImage:
+                                        "arrow.triangle.turn.up.right.diamond.fill"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .padding(.top, 3)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                }
+
                 if session.savedRoutes.isEmpty {
                     NavigationLink {
                         RunRouteBuilderView()
@@ -747,8 +890,7 @@ struct RunQuickStartSheet: View {
 
     private var audioCoachConfiguration:
         WatchAudioCoachConfiguration {
-        guard captureDevice == .appleWatch,
-              session.canAccess(.audioCoach)
+        guard session.canAccess(.audioCoach)
         else {
             return .disabled
         }
@@ -772,6 +914,85 @@ struct RunQuickStartSheet: View {
         return audioCoachDraft.configuration(
             routeDistanceMeters: routeDistanceMeters
         )
+    private var distanceToSelectedRouteStart:
+        CLLocationDistance?
+    {
+        guard let route = selectedRoute,
+              let first =
+                route.coordinates
+                    .min(
+                        by: {
+                            $0.sequence <
+                                $1.sequence
+                        }
+                    ),
+              let location =
+                routeLocationProbe.location
+        else {
+            return nil
+        }
+
+        let start =
+            CLLocation(
+                latitude: first.latitude,
+                longitude: first.longitude
+            )
+
+        return location.distance(from: start)
+    }
+
+    private func routeStartDistanceText(
+        _ meters: CLLocationDistance
+    ) -> String {
+        if meters >= 1_000 {
+            return String(
+                format:
+                    "%.1f km from route start",
+                meters / 1_000
+            )
+        }
+
+        return "\(Int(meters.rounded())) m from route start"
+    }
+
+    private func openDirectionsToRouteStart() {
+        guard let route = selectedRoute,
+              let first =
+                route.coordinates
+                    .min(
+                        by: {
+                            $0.sequence <
+                                $1.sequence
+                        }
+                    )
+        else {
+            return
+        }
+
+        let item =
+            MKMapItem(
+                placemark:
+                    MKPlacemark(
+                        coordinate:
+                            CLLocationCoordinate2D(
+                                latitude:
+                                    first.latitude,
+                                longitude:
+                                    first.longitude
+                            )
+                    )
+            )
+        item.name =
+            route.title + " · Start"
+
+        item.openInMaps(
+            launchOptions: [
+                MKLaunchOptionsDirectionsModeKey:
+                    MKLaunchOptionsDirectionsModeWalking
+            ]
+        )
+    }
+
     }
 
 }
