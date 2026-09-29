@@ -133,6 +133,81 @@ final class SupabasePublicTrailDiscoveryService {
 
         return response
     }
+
+
+    func cachedTrails(
+        near location: CLLocation,
+        radiusKilometers: Double
+    ) async throws -> [PublicTrailRecord] {
+        let radius =
+            min(
+                max(radiusKilometers, 3),
+                20
+            )
+        let latitude =
+            location.coordinate.latitude
+        let longitude =
+            location.coordinate.longitude
+        let latitudeDelta =
+            radius / 111
+        let longitudeScale =
+            max(
+                0.2,
+                cos(
+                    latitude *
+                    .pi / 180
+                )
+            )
+        let longitudeDelta =
+            radius /
+            (111 * longitudeScale)
+
+        let rows: [PublicTrailRecord] =
+            try await client
+                .from("public_trails")
+                .select()
+                .gte(
+                    "center_latitude",
+                    value:
+                        latitude -
+                        latitudeDelta
+                )
+                .lte(
+                    "center_latitude",
+                    value:
+                        latitude +
+                        latitudeDelta
+                )
+                .gte(
+                    "center_longitude",
+                    value:
+                        longitude -
+                        longitudeDelta
+                )
+                .lte(
+                    "center_longitude",
+                    value:
+                        longitude +
+                        longitudeDelta
+                )
+                .gte(
+                    "distance_kilometers",
+                    value: 0.5
+                )
+                .order(
+                    "athlth_verified",
+                    ascending: false
+                )
+                .order(
+                    "distance_kilometers",
+                    ascending: true
+                )
+                .limit(24)
+                .execute()
+                .value
+
+        return rows.filter(\.isUsable)
+    }
     func fetch(
         id: UUID
     ) async throws -> PublicTrailRecord? {
@@ -220,23 +295,52 @@ final class PublicTrailDiscoveryStore:
         }
 
         isLoading = true
+        isWarmingCache = false
         errorMessage = nil
         defer {
             isLoading = false
         }
 
+        let radius =
+            min(
+                max(
+                    radiusKilometers,
+                    3
+                ),
+                20
+            )
+
+        // Supabase is the durable source shown to the user. Read the local
+        // trail cache before touching the external discovery refresh so
+        // Explore remains useful when OpenStreetMap/Overpass is slow or down.
         do {
-            var response =
+            let cached =
+                try await service.cachedTrails(
+                    near: location,
+                    radiusKilometers: radius
+                )
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            if !cached.isEmpty {
+                trails = cached
+                lastRefreshAt = Date()
+                lastCenter = location
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            // A failed cache read should not prevent the refresh endpoint
+            // from trying to recover the durable cache.
+        }
+
+        do {
+            let response =
                 try await service.discover(
                     near: location,
-                    radiusKilometers:
-                        min(
-                            max(
-                                radiusKilometers,
-                                3
-                            ),
-                            20
-                        )
+                    radiusKilometers: radius
                 )
 
             guard !Task.isCancelled else {
@@ -248,49 +352,19 @@ final class PublicTrailDiscoveryStore:
                 center: location
             )
 
-            // A cold cell returns immediately while the Edge Function warms
-            // the OpenStreetMap cache in the background. Retry exactly once
-            // so first-time Explore users usually see routes without having
-            // to close and reopen the screen.
-            if response.trails.isEmpty,
-               response.isRefreshing {
-                isWarmingCache = true
-
-                try await Task.sleep(
-                    for: .seconds(4)
-                )
-
-                guard !Task.isCancelled else {
-                    return
-                }
-
-                response =
-                    try await service.discover(
-                        near: location,
-                        radiusKilometers:
-                            min(
-                                max(
-                                    radiusKilometers,
-                                    3
-                                ),
-                                20
-                            )
-                    )
-
-                guard !Task.isCancelled else {
-                    return
-                }
-
-                apply(
-                    response,
-                    center: location
-                )
-            }
-
+            // The backend now performs cold-cache population itself. Do not
+            // hammer Overpass with an app-side four-second retry loop.
             isWarmingCache =
                 response.isRefreshing &&
-                response.trails.isEmpty
-            errorMessage = nil
+                trails.isEmpty
+
+            if trails.isEmpty &&
+               !response.isRefreshing {
+                errorMessage =
+                    "No cached public trails are available nearby yet."
+            } else {
+                errorMessage = nil
+            }
         } catch is CancellationError {
             return
         } catch {
@@ -298,7 +372,8 @@ final class PublicTrailDiscoveryStore:
                 return
             }
 
-            // Preserve already-discovered routes when a refresh fails.
+            // If durable Supabase data was loaded, keep showing it even when
+            // the external refresh endpoint is unavailable.
             if trails.isEmpty {
                 errorMessage =
                     "Public trails are temporarily unavailable."
