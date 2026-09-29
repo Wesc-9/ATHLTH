@@ -30,6 +30,10 @@ struct HomeActivityStrengthDetailView: View {
             VStack(spacing: 16) {
                 overviewCard
 
+                WorkoutPlaceCheckInSection(
+                    workoutID: workout.id
+                )
+
                 muscleMapCard
 
                 exercisesCard
