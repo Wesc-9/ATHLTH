@@ -85,10 +85,10 @@ struct PhoneWorkout: Codable, Identifiable {
 
     // The same structured running model is used by Apple Watch.
     var structuredRunningWorkout: WatchRunningWorkoutTransfer? = nil
-    var structuredStepIndex: Int = 0
-    var structuredStepStartElapsedTime: TimeInterval = 0
-    var structuredStepStartDistanceMeters: Double = 0
-    var structuredWorkoutComplete: Bool = false
+    var structuredStepIndex: Int? = nil
+    var structuredStepStartElapsedTime: TimeInterval? = nil
+    var structuredStepStartDistanceMeters: Double? = nil
+    var structuredWorkoutComplete: Bool? = nil
 
     var audioCoachConfiguration:
         WatchAudioCoachConfiguration? = nil
@@ -948,14 +948,14 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
               let plan =
                 workout.structuredRunningWorkout,
               plan.steps.indices.contains(
-                workout.structuredStepIndex
+                workout.structuredStepIndex ?? 0
               )
         else {
             return nil
         }
 
         return plan.steps[
-            workout.structuredStepIndex
+            workout.structuredStepIndex ?? 0
         ]
     }
 
@@ -970,7 +970,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         }
 
         let next =
-            workout.structuredStepIndex + 1
+            (workout.structuredStepIndex ?? 0) + 1
 
         return plan.steps.indices.contains(next)
             ? plan.steps[next]
@@ -995,10 +995,12 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                     workout.distanceMeters,
                 stepStartElapsedTime:
                     workout
-                        .structuredStepStartElapsedTime,
+                        .structuredStepStartElapsedTime ??
+                    0,
                 stepStartDistanceMeters:
                     workout
-                        .structuredStepStartDistanceMeters
+                        .structuredStepStartDistanceMeters ??
+                    0
             )
     }
 
@@ -1343,11 +1345,11 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
     private func evaluateStructuredWorkout(
         _ workout: inout PhoneWorkout
     ) {
-        guard !workout.structuredWorkoutComplete,
+        guard workout.structuredWorkoutComplete != true,
               let plan =
                 workout.structuredRunningWorkout,
               plan.steps.indices.contains(
-                workout.structuredStepIndex
+                workout.structuredStepIndex ?? 0
               )
         else {
             return
@@ -1355,7 +1357,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
 
         let step =
             plan.steps[
-                workout.structuredStepIndex
+                workout.structuredStepIndex ?? 0
             ]
 
         guard ATHLTHRunningStepEngine
@@ -1367,17 +1369,19 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                     workout.distanceMeters,
                 stepStartElapsedTime:
                     workout
-                        .structuredStepStartElapsedTime,
+                        .structuredStepStartElapsedTime ??
+                    0,
                 stepStartDistanceMeters:
                     workout
-                        .structuredStepStartDistanceMeters
+                        .structuredStepStartDistanceMeters ??
+                    0
             )
         else {
             return
         }
 
         let nextIndex =
-            workout.structuredStepIndex + 1
+            (workout.structuredStepIndex ?? 0) + 1
 
         guard plan.steps.indices.contains(
             nextIndex
@@ -1434,14 +1438,14 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
               let plan =
                 workout.structuredRunningWorkout,
               plan.steps.indices.contains(
-                workout.structuredStepIndex
+                workout.structuredStepIndex ?? 0
               )
         else {
             return
         }
 
         speak(
-            "\(prefix). \(plan.steps[workout.structuredStepIndex].title).",
+            "\(prefix). \(plan.steps[workout.structuredStepIndex ?? 0].title).",
             configuration:
                 workout.audioCoachConfiguration
         )
@@ -1809,14 +1813,14 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                     workout
                         .structuredRunningWorkout,
                   plan.steps.indices.contains(
-                    workout.structuredStepIndex
+                    workout.structuredStepIndex ?? 0
                   )
             else {
                 return nil
             }
 
             return plan.steps[
-                workout.structuredStepIndex
+                workout.structuredStepIndex ?? 0
             ]
         }()
         let runningStepProgress =
@@ -1832,10 +1836,12 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                             workout.distanceMeters,
                         stepStartElapsedTime:
                             workout
-                                .structuredStepStartElapsedTime,
+                                .structuredStepStartElapsedTime ??
+                            0,
                         stepStartDistanceMeters:
                             workout
-                                .structuredStepStartDistanceMeters
+                                .structuredStepStartDistanceMeters ??
+                            0
                     )
             }
         let nextStepTitle: String? = {
@@ -1847,7 +1853,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
             }
 
             let next =
-                workout.structuredStepIndex + 1
+                (workout.structuredStepIndex ?? 0) + 1
             return plan.steps.indices.contains(
                 next
             )
