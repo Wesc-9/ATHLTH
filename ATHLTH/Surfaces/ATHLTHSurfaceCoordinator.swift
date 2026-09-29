@@ -305,7 +305,9 @@ private final class ATHLTHLiveActivityController {
             } else {
                 let attributes =
                     ATHLTHWorkoutActivityAttributes(
-                        workoutTitle: snapshot.kind.title,
+                        workoutTitle:
+                            snapshot.workoutDisplayTitle ??
+                            snapshot.kind.title,
                         systemImage: snapshot.kind.systemImage,
                         startedAt: snapshot.startedAt
                     )
