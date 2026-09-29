@@ -1091,6 +1091,41 @@ struct ATHLTHPrivacyCenterView: View {
                         "Training now",
                         isOn: binding.shareTrainingPresence
                     )
+
+                    Toggle(
+                        "Show when I'm online",
+                        isOn: Binding(
+                            get: {
+                                binding.wrappedValue
+                                    .showOnlineStatus ?? false
+                            },
+                            set: { enabled in
+                                binding.wrappedValue
+                                    .showOnlineStatus = enabled
+                            }
+                        )
+                    )
+
+                    Toggle(
+                        "Share live location during workouts",
+                        isOn: Binding(
+                            get: {
+                                binding.wrappedValue
+                                    .shareLiveWorkoutLocation ?? false
+                            },
+                            set: { enabled in
+                                binding.wrappedValue
+                                    .shareLiveWorkoutLocation = enabled
+                            }
+                        )
+                    )
+
+                    Text(
+                        "Online status follows your profile audience. Live workout location is stricter: only mutual follows and an accepted Ghost Race opponent can see it, and live GPS points expire automatically."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                     Toggle(
                         "Performance stats",
                         isOn: binding.sharePerformanceStats
