@@ -170,63 +170,37 @@ struct ATHLTHHomeView: View {
     private var hasEditedATHLTHProfile = false
 
     var body: some View {
-        let useImmersiveHomeHero =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
-        return NavigationStack {
-            ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.premiumGold.opacity(0.70),
-                softTransition: true,
-                immersiveTransition: useImmersiveHomeHero,
-                scrollFadeTransition: true
+        NavigationStack {
+            ATHLTHExclusiveHomeHeroLayout(
+                accent: ATHLTHTheme.premiumGold.opacity(0.44)
             ) {
                 ZStack(alignment: .topTrailing) {
-                    ATHLTHTabHero(
+                    ATHLTHExclusiveHomeHero(
                         imageName: "HomeHero",
                         title: greetingTitle,
                         subtitle:
                             session.profile.presence.state == .training
                                 ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
-                                : "Today, training and recovery at a glance.",
-                        height:
-                            useImmersiveHomeHero
-                                ? 242
-                                : 190,
-                        alignment: .leading,
-                        focalOffsetX:
-                            useImmersiveHomeHero
-                                ? 10
-                                : 18,
-                        focalOffsetY:
-                            useImmersiveHomeHero
-                                ? 8
-                                : 14,
-                        titleFontSize:
-                            useImmersiveHomeHero
-                                ? 30
-                                : 27,
-                        copyWidthFraction:
-                            useImmersiveHomeHero
-                                ? 0.76
-                                : 0.86,
-                        immersiveCopy: useImmersiveHomeHero
+                                : "Today, training and recovery at a glance."
                     )
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: 7) {
                         Button {
                             showingGlobalSearch = true
                         } label: {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.white)
-                                .frame(width: 38, height: 38)
-                                .background(.ultraThinMaterial, in: Circle())
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Color.black.opacity(0.20),
+                                    in: Circle()
+                                )
                                 .overlay {
                                     Circle()
                                         .stroke(
-                                            .white.opacity(0.38),
-                                            lineWidth: 1
+                                            Color.white.opacity(0.30),
+                                            lineWidth: 0.8
                                         )
                                 }
                         }
@@ -243,13 +217,19 @@ struct ATHLTHHomeView: View {
                                             ? "tray.full.fill"
                                             : "tray"
                                 )
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.white)
-                                .frame(width: 38, height: 38)
-                                .background(.ultraThinMaterial, in: Circle())
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Color.black.opacity(0.20),
+                                    in: Circle()
+                                )
                                 .overlay {
                                     Circle()
-                                        .stroke(.white.opacity(0.38), lineWidth: 1)
+                                        .stroke(
+                                            Color.white.opacity(0.30),
+                                            lineWidth: 0.8
+                                        )
                                 }
 
                                 if homeInboxUnreadCount > 0 {
@@ -287,13 +267,19 @@ struct ATHLTHHomeView: View {
                                             ? "bell.fill"
                                             : "bell"
                                 )
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.white)
-                                .frame(width: 38, height: 38)
-                                .background(.ultraThinMaterial, in: Circle())
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Color.black.opacity(0.20),
+                                    in: Circle()
+                                )
                                 .overlay {
                                     Circle()
-                                        .stroke(.white.opacity(0.38), lineWidth: 1)
+                                        .stroke(
+                                            Color.white.opacity(0.30),
+                                            lineWidth: 0.8
+                                        )
                                 }
 
                                 if homeNotificationCount > 0 {
@@ -325,12 +311,13 @@ struct ATHLTHHomeView: View {
                             ATHLTHProfileView()
                         } label: {
                             homeProfileShortcut
+                                .frame(width: 36, height: 36)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Profile")
                     }
-                    .padding(.top, 66)
-                    .padding(.trailing, 14)
+                    .padding(.top, 64)
+                    .padding(.trailing, 16)
                 }
             } content: {
                 LazyVStack(spacing: 18) {
