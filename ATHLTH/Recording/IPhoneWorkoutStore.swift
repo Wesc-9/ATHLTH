@@ -67,6 +67,7 @@ struct PhoneWorkout: Codable, Identifiable {
     // Optional route metadata keeps older TestFlight recordings decodable
     // while allowing iPhone route runs to use the same selected route as Watch.
     var plannedRouteID: UUID? = nil
+    var plannedComparisonRouteID: UUID? = nil
     var plannedRouteTitle: String? = nil
     var plannedRouteDistanceKilometers: Double? = nil
     var plannedRouteCoordinates: [RouteCoordinate]? = nil
@@ -319,6 +320,9 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
             lastCheckpoint: now,
             pauses: [],
             plannedRouteID: route?.id,
+            plannedComparisonRouteID:
+                route?.sharedSourceRouteID ??
+                route?.id,
             plannedRouteTitle: route?.title,
             plannedRouteDistanceKilometers:
                 route?.distanceKilometers,
@@ -541,6 +545,12 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                 history[index].healthID = saved.uuid
             }
             persistHistory()
+
+            await syncRouteAttemptIfNeeded(
+                workout: workout,
+                healthWorkoutID: saved.uuid,
+                userID: userID
+            )
 
             if message?.contains("GPS route remains") != true {
                 if workout.distanceMeters > 0,
@@ -1701,6 +1711,202 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         )
     }
 
+    private func syncRouteAttemptIfNeeded(
+        workout: PhoneWorkout,
+        healthWorkoutID: UUID,
+        userID: UUID
+    ) async {
+        guard let routeID =
+                workout
+                    .plannedComparisonRouteID ??
+                workout.plannedRouteID,
+              let coordinates =
+                workout.plannedRouteCoordinates,
+              coordinates.count >= 2
+        else {
+            return
+        }
+
+        let actual =
+            workout.points
+                .filter {
+                    $0.accuracy >= 0 &&
+                    $0.accuracy <= 65
+                }
+                .map(\.location)
+        let reference =
+            coordinates
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocation(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+
+        guard let match =
+                ATHLTHRouteCompletionAnalyzer
+                    .analyze(
+                        actualLocations: actual,
+                        referenceLocations:
+                            reference
+                    )
+        else {
+            return
+        }
+
+        let routeMeters =
+            max(
+                (
+                    workout
+                        .plannedRouteDistanceKilometers ??
+                    0
+                ) * 1_000,
+                1
+            )
+        let ratio =
+            workout.distanceMeters /
+            routeMeters
+
+        guard match.routeMatchPercent >= 60,
+              match.startDistanceMeters <= 450,
+              match.endDistanceMeters <= 450,
+              ratio >= 0.55,
+              ratio <= 1.55
+        else {
+            return
+        }
+
+        let analysis =
+            RoutePerformanceAnalysis(
+                workoutID: healthWorkoutID,
+                activity:
+                    workout.walking
+                        ? .walking
+                        : .running,
+                startedAt: workout.start,
+                durationSeconds:
+                    workout.accumulatedSeconds,
+                distanceMeters:
+                    workout.distanceMeters,
+                routeMatchPercent:
+                    match.routeMatchPercent,
+                averageDeviationMeters:
+                    match
+                        .averageDeviationMeters,
+                maxDeviationMeters:
+                    match.maxDeviationMeters,
+                startDistanceMeters:
+                    match.startDistanceMeters,
+                endDistanceMeters:
+                    match.endDistanceMeters
+            )
+
+        do {
+            let attempts:
+                [RouteAttemptRecord]
+
+            if workout.plannedRouteSource ==
+                "openstreetmap" {
+                let service =
+                    SupabasePublicTrailAttemptService()
+                try await service.upsert(
+                    trailID: routeID,
+                    userID: userID,
+                    analysis: analysis
+                )
+                attempts =
+                    try await service.load(
+                        trailID: routeID
+                    )
+            } else {
+                let service =
+                    SupabaseRouteAttemptService()
+                try await service.upsert(
+                    routeID: routeID,
+                    userID: userID,
+                    analysis: analysis
+                )
+                attempts =
+                    try await service.load(
+                        routeID: routeID
+                    )
+            }
+
+            updateLeaderboardRank(
+                attempts: attempts,
+                userID: userID
+            )
+        } catch {
+            // The workout and Health save are authoritative. Leaderboard
+            // upload retries naturally when route details sync Health later.
+        }
+    }
+
+    private func updateLeaderboardRank(
+        attempts: [RouteAttemptRecord],
+        userID: UUID
+    ) {
+        let eligible =
+            attempts
+                .filter(\.leaderboardEligible)
+
+        var bestByUser:
+            [UUID: RouteAttemptRecord] = [:]
+
+        for attempt in eligible {
+            if let current =
+                bestByUser[attempt.userID] {
+                if attempt.durationSeconds <
+                    current.durationSeconds {
+                    bestByUser[
+                        attempt.userID
+                    ] = attempt
+                }
+            } else {
+                bestByUser[
+                    attempt.userID
+                ] = attempt
+            }
+        }
+
+        let ordered =
+            bestByUser.values.sorted {
+                if abs(
+                    $0.durationSeconds -
+                    $1.durationSeconds
+                ) > 0.1 {
+                    return $0.durationSeconds <
+                        $1.durationSeconds
+                }
+
+                return $0.routeMatchPercent >
+                    $1.routeMatchPercent
+            }
+
+        guard let rank =
+                ordered.firstIndex(
+                    where: {
+                        $0.userID == userID
+                    }
+                )
+        else {
+            return
+        }
+
+        if var completion =
+            lastRouteCompletion {
+            completion.leaderboardRank =
+                rank + 1
+            completion.leaderboardFieldSize =
+                ordered.count
+            lastRouteCompletion =
+                completion
+        }
+    }
+
     private func routeCompletionSummary(
         for workout: PhoneWorkout
     ) -> PhoneRouteCompletionSummary? {
@@ -1888,6 +2094,8 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                 routeProgressPercent:
                     workout.routeProgressPercent,
                 routeComparisonID:
+                    workout
+                        .plannedComparisonRouteID ??
                     workout.plannedRouteID,
                 routeTitle:
                     workout.plannedRouteTitle,
