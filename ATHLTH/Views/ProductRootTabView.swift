@@ -169,8 +169,6 @@ struct ATHLTHHomeView: View {
     @State private var showingGettingStartedPopup = false
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
-    @AppStorage("homeGettingStartedPopupShownV1")
-    private var homeGettingStartedPopupShown = false
 
     var body: some View {
         NavigationStack {
@@ -592,13 +590,22 @@ struct ATHLTHHomeView: View {
                     session.activePlan != nil &&
                     !goalStore.activeGoals.isEmpty
 
-                guard !homeGettingStartedPopupShown,
-                      !gettingStartedComplete
+                let popupKey =
+                    "homeGettingStartedPopupShownV1." +
+                    session.profile.userID.uuidString
+
+                guard !UserDefaults.standard.bool(
+                    forKey: popupKey
+                ),
+                !gettingStartedComplete
                 else {
                     return
                 }
 
-                homeGettingStartedPopupShown = true
+                UserDefaults.standard.set(
+                    true,
+                    forKey: popupKey
+                )
 
                 Task { @MainActor in
                     try? await Task.sleep(
