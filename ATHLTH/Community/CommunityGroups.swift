@@ -1659,8 +1659,8 @@ final class CommunityGroupStore: ObservableObject {
                     try await client.storage
                         .from("community-group-images")
                         .upload(
-                            path: path,
-                            file: imageJPEGData,
+                            path,
+                            data: imageJPEGData,
                             options: FileOptions(
                                 cacheControl: "3600",
                                 contentType: "image/jpeg",
@@ -1821,8 +1821,8 @@ final class CommunityGroupStore: ObservableObject {
             try await client.storage
                 .from("community-group-images")
                 .upload(
-                    path: path,
-                    file: jpegData,
+                    path,
+                    data: jpegData,
                     options: FileOptions(
                         cacheControl: "3600",
                         contentType: "image/jpeg",
@@ -1878,7 +1878,7 @@ final class CommunityGroupStore: ObservableObject {
         let path = "\(group.id.uuidString.lowercased())/cover.jpg"
 
         do {
-            try? await client.storage
+            _ = try? await client.storage
                 .from("community-group-images")
                 .remove(paths: [path])
 
@@ -1916,7 +1916,7 @@ final class CommunityGroupStore: ObservableObject {
             // Storage objects do not cascade with the database row, so remove
             // the group photo while the group still exists and permissions can
             // be evaluated.
-            try? await client.storage
+            _ = try? await client.storage
                 .from("community-group-images")
                 .remove(paths: [imagePath])
 
@@ -2530,8 +2530,8 @@ final class CommunityGroupStore: ObservableObject {
         try await client.storage
             .from("community-content-images")
             .upload(
-                path: path,
-                file: jpegData,
+                path,
+                data: jpegData,
                 options: FileOptions(
                     cacheControl: "3600",
                     contentType: "image/jpeg",
@@ -2557,7 +2557,7 @@ final class CommunityGroupStore: ObservableObject {
             contentID: contentID
         )
 
-        try? await client.storage
+        _ = try? await client.storage
             .from("community-content-images")
             .remove(paths: [path])
     }
