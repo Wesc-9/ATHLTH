@@ -234,7 +234,7 @@ struct IPhoneWorkoutView: View {
                                             active
                                                 .structuredRunningWorkout {
                                             Text(
-                                                "Step \(active.structuredStepIndex + 1) / \(plan.steps.count)"
+                                                "Step \((active.structuredStepIndex ?? 0) + 1) / \(plan.steps.count)"
                                             )
                                             .font(
                                                 .caption
@@ -695,7 +695,8 @@ struct IPhoneWorkoutView: View {
                 max(
                     workout.elapsed(at: date) -
                         workout
-                            .structuredStepStartElapsedTime,
+                            .structuredStepStartElapsedTime ??
+                        0,
                     0
                 )
             let remaining =
@@ -715,7 +716,8 @@ struct IPhoneWorkoutView: View {
                 max(
                     workout.distanceMeters -
                         workout
-                            .structuredStepStartDistanceMeters,
+                            .structuredStepStartDistanceMeters ??
+                        0,
                     0
                 )
 
