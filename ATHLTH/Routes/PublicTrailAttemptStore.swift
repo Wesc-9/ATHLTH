@@ -295,6 +295,7 @@ final class PublicTrailAttemptStore:
 
     func syncHealthAttempts(
         for trail: TrainingRoute,
+        trailID: UUID,
         userID: UUID,
         health: HealthKitManager
     ) async {
@@ -314,12 +315,12 @@ final class PublicTrailAttemptStore:
         do {
             guard let configuration =
                 try await service.configuration(
-                    trailID: trail.id
+                    trailID: trailID
                 )
             else {
                 leaderboardEnabled = false
                 attempts = []
-                loadedTrailID = trail.id
+                loadedTrailID = trailID
                 return
             }
 
@@ -333,9 +334,9 @@ final class PublicTrailAttemptStore:
             else {
                 attempts =
                     try await service.load(
-                        trailID: trail.id
+                        trailID: trailID
                     )
-                loadedTrailID = trail.id
+                loadedTrailID = trailID
                 return
             }
 
@@ -367,7 +368,7 @@ final class PublicTrailAttemptStore:
 
             let existing =
                 try await service.load(
-                    trailID: trail.id
+                    trailID: trailID
                 )
 
             attempts = existing
@@ -416,7 +417,7 @@ final class PublicTrailAttemptStore:
                 }
 
                 try await service.upsert(
-                    trailID: trail.id,
+                    trailID: trailID,
                     userID: userID,
                     analysis: analysis
                 )
@@ -424,9 +425,9 @@ final class PublicTrailAttemptStore:
 
             attempts =
                 try await service.load(
-                    trailID: trail.id
+                    trailID: trailID
                 )
-            loadedTrailID = trail.id
+            loadedTrailID = trailID
         } catch is CancellationError {
             return
         } catch {
