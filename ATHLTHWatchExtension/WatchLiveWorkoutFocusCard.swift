@@ -48,7 +48,9 @@ struct WatchLiveWorkoutFocusCard: View {
                 zoneStatus:
                     workoutManager.liveTargetStatus,
                 hasGhost:
-                    workoutManager.ghostRaceTitle != nil,
+                    workoutManager.ghostRaceTitle != nil ||
+                    workoutManager.liveSurfaceContext
+                        .liveGhost != nil,
                 hasChallenge:
                     workoutManager.liveSurfaceContext
                         .challenge != nil,
@@ -169,10 +171,37 @@ struct WatchLiveWorkoutFocusCard: View {
     }
 
     private var ghostContent: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let liveGhost =
+            workoutManager
+                .liveSurfaceContext
+                .liveGhost
+        let title =
+            workoutManager
+                .ghostRaceTitle ??
+            liveGhost?.title ??
+            "Ghost"
+        let distance =
+            workoutManager
+                .ghostDistanceDeltaMeters ??
+            liveGhost?
+                .distanceDeltaMeters
+        let time =
+            workoutManager
+                .ghostTimeDeltaSeconds ??
+            liveGhost?
+                .estimatedTimeDeltaSeconds
+
+        return VStack(
+            alignment: .leading,
+            spacing: 6
+        ) {
             HStack {
                 Label(
-                    "GHOST GAP",
+                    liveGhost != nil &&
+                    workoutManager
+                        .ghostRaceTitle == nil
+                        ? "LIVE GHOST"
+                        : "GHOST GAP",
                     systemImage: "figure.run"
                 )
                 .font(.system(size: 9, weight: .bold))
@@ -180,25 +209,28 @@ struct WatchLiveWorkoutFocusCard: View {
 
                 Spacer()
 
-                if let delta =
-                    workoutManager.ghostTimeDeltaSeconds {
-                    Text(ghostTime(delta))
+                if let time {
+                    Text(ghostTime(time))
                         .font(.system(size: 11, weight: .bold))
                         .monospacedDigit()
                 }
             }
 
-            if let meters =
-                workoutManager.ghostDistanceDeltaMeters {
-                Text(ghostDistance(meters))
+            if let distance {
+                Text(ghostDistance(distance))
                     .font(.system(
                         size: 20,
                         weight: .bold,
                         design: .rounded
                     ))
                     .minimumScaleFactor(0.72)
+
+                Text(title)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+                    .lineLimit(1)
             } else {
-                Text(workoutManager.ghostRaceTitle ?? "Ghost")
+                Text(title)
                     .font(.system(size: 14, weight: .bold))
                     .lineLimit(1)
             }
