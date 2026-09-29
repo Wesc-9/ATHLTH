@@ -425,7 +425,6 @@ relation
   ["type"="route"]
   ["route"~"^(hiking|foot)$"]
   ["name"]
-  ["network"="lwn"]
   (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
 out body geom qt;
 `.trim();
@@ -440,7 +439,9 @@ out body geom qt;
       ? [configuredOverpassURL]
       : [
           "https://overpass.private.coffee/api/interpreter",
-          "https://overpass-api.de/api/interpreter",
+          "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+          "https://lz4.overpass-api.de/api/interpreter",
+          "https://z.overpass-api.de/api/interpreter",
         ];
 
   try {
@@ -460,15 +461,11 @@ out body geom qt;
               method: "POST",
               signal:
                 AbortSignal.timeout(
-                  10_000,
+                  9_000,
                 ),
               headers: {
-                "Content-Type":
-                  "application/x-www-form-urlencoded",
-                "Accept":
-                  "application/json",
                 "User-Agent":
-                  "ATHLTH/1.4.5 public-trail-cache",
+                  "ATHLTH/1.5 public-trail-cache",
               },
               body:
                 "data=" +
@@ -930,7 +927,7 @@ Deno.serve(
 
     const [
       cellResult,
-      cachedTrails,
+      initialCachedTrails,
     ] =
       await Promise.all([
         admin
@@ -988,6 +985,8 @@ Deno.serve(
 
     let refreshScheduled =
       false;
+    let coldRefreshAttempted =
+      false;
 
     if (
       !cacheFresh &&
@@ -1034,17 +1033,41 @@ Deno.serve(
         refreshScheduled =
           true;
 
-        EdgeRuntime
-          .waitUntil(
-            refreshCell(
-              admin,
-              key,
-              latitude,
-              longitude,
-              radiusKilometers,
-              bounds,
-            ),
+        if (
+          initialCachedTrails.length === 0
+        ) {
+          // A cold cache has no durable fallback yet. Populate it before
+          // responding once, then every later request is served from
+          // Supabase even if all Overpass instances are unavailable.
+          coldRefreshAttempted =
+            true;
+
+          await refreshCell(
+            admin,
+            key,
+            latitude,
+            longitude,
+            radiusKilometers,
+            bounds,
           );
+
+          isRefreshing =
+            false;
+          refreshScheduled =
+            false;
+        } else {
+          EdgeRuntime
+            .waitUntil(
+              refreshCell(
+                admin,
+                key,
+                latitude,
+                longitude,
+                radiusKilometers,
+                bounds,
+              ),
+            );
+        }
       } else {
         console.error(
           "Unable to claim trail refresh",
@@ -1058,14 +1081,25 @@ Deno.serve(
       }
     }
 
+    const cachedTrails =
+      coldRefreshAttempted
+        ? await loadCachedTrails(
+            admin,
+            bounds,
+          )
+        : initialCachedTrails;
+
     const source =
-      cacheFresh
+      coldRefreshAttempted &&
+      cachedTrails.length > 0
         ? "cache"
-        : cachedTrails.length > 0
-          ? "stale_cache"
-          : isRefreshing
-            ? "warming"
-            : "empty_cache";
+        : cacheFresh
+          ? "cache"
+          : cachedTrails.length > 0
+            ? "stale_cache"
+            : isRefreshing
+              ? "warming"
+              : "empty_cache";
 
     return json({
       trails:
