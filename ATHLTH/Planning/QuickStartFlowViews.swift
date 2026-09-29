@@ -103,6 +103,8 @@ struct AudioCoachDraft {
     var announceRemainingStepTime = true
     var announceRemainingStepDistance = true
     var duckOtherAudio = true
+    var guidanceQuietPeriodSeconds:
+        TimeInterval = 10
 
     var language: WatchAudioCoachLanguage = .system
 
@@ -139,6 +141,11 @@ struct AudioCoachDraft {
             settings.audioCoachAnnounceRemainingStepDistance
         duckOtherAudio =
             settings.audioCoachDuckOtherAudio
+        guidanceQuietPeriodSeconds =
+            TimeInterval(
+                settings
+                    .guidanceQuietPeriodSeconds
+            )
         language = settings.audioCoachLanguage
     }
 
@@ -178,7 +185,9 @@ struct AudioCoachDraft {
             announceRemainingStepDistance:
                 enabled && announceRemainingStepDistance,
             duckOtherAudio:
-                duckOtherAudio
+                duckOtherAudio,
+            guidanceQuietPeriodSeconds:
+                guidanceQuietPeriodSeconds
         )
     }
 }
