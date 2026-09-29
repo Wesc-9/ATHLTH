@@ -305,6 +305,34 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var currentLatitude: Double? = nil
     var currentLongitude: Double? = nil
     var routeProgressPercent: Double? = nil
+
+    // Optional presentation fields for Dynamic Island, Lock Screen and Watch.
+    // Defaults keep older mirrored snapshots backwards compatible.
+    var currentPaceSecondsPerKilometer: TimeInterval? = nil
+    var routeRemainingMeters: Double? = nil
+    var routeDeviationMeters: Double? = nil
+    var routeDeviationThresholdMeters: Double? = nil
+
+    var heartRateTargetZone: Int? = nil
+    var heartRateTargetMinimumBPM: Double? = nil
+    var heartRateTargetMaximumBPM: Double? = nil
+    var heartRateTargetStatus: String? = nil
+
+    var ghostRaceTitle: String? = nil
+    var ghostDistanceDeltaMeters: Double? = nil
+    var ghostTimeDeltaSeconds: TimeInterval? = nil
+
+    var strengthExerciseName: String? = nil
+    var strengthSetIndex: Int? = nil
+    var strengthSetCount: Int? = nil
+    var strengthReps: Int? = nil
+    var strengthWeightKilograms: Double? = nil
+    var strengthRestEndsAt: Date? = nil
+
+    var liveSurfaceConfiguration:
+        ATHLTHLiveWorkoutSurfaceConfiguration? = nil
+    var liveSurfaceContext:
+        ATHLTHLiveWorkoutContext? = nil
 }
 
 struct WatchGhostRaceTimingPoint: Codable, Hashable {
@@ -356,6 +384,8 @@ enum WatchTransferKind: String {
     case audioCoachConfiguration
     case runningWorkout
     case ghostRace
+    case liveSurfaceConfiguration
+    case liveSurfaceContext
     case strengthSnapshot
     case strengthCommand
     case connectivityProbe
