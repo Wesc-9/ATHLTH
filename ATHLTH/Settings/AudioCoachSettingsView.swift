@@ -195,7 +195,7 @@ struct ATHLTHAudioCoachSettingsView: View {
         settingsCard(
             title: "Voice",
             subtitle:
-                "The selected language is used for Audio Coach speech on Apple Watch."
+                "The selected language is used for Audio Coach speech on iPhone or Apple Watch."
         ) {
             pickerRow("Language") {
                 Picker(
@@ -214,7 +214,7 @@ struct ATHLTHAudioCoachSettingsView: View {
             }
 
             Text(
-                "System uses the Apple Watch language when an appropriate voice is available."
+                "System uses the recording device language when an appropriate voice is available."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
