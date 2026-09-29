@@ -354,6 +354,8 @@ final class AdminControlCenterStore: ObservableObject {
 }
 
 struct AdminCenterView: View {
+    @AppStorage("admin.activityCenterAIVisualsEnabled")
+    private var activityCenterAIVisualsEnabled = false
     @EnvironmentObject private var session: AppSessionStore
     @StateObject private var store = AdminControlCenterStore()
 
@@ -531,6 +533,25 @@ struct AdminCenterView: View {
                 AdminSectionCard(title: "System", icon: "gearshape.2.fill") {
                     adminMetricRow("Marketing delivery", value: "Disabled")
                     adminMetricRow("Signed-in role", value: session.currentRole.title)
+
+                    Divider()
+
+                    Toggle(isOn: $activityCenterAIVisualsEnabled) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("AI Activity Center visuals")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(
+                                activityCenterAIVisualsEnabled
+                                    ? "AI visual recipes may enrich outdoor workout cards."
+                                    : "Off · Route Ribbon is the only running-route visual."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(ATHLTHTheme.vitality)
 
                     Divider()
 
