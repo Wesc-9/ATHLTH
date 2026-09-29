@@ -1748,6 +1748,57 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
     ) {
         let latest =
             workout.points.last
+        let currentStep:
+            WatchRunningWorkoutStep? = {
+            guard let plan =
+                    workout
+                        .structuredRunningWorkout,
+                  plan.steps.indices.contains(
+                    workout.structuredStepIndex
+                  )
+            else {
+                return nil
+            }
+
+            return plan.steps[
+                workout.structuredStepIndex
+            ]
+        }()
+        let runningStepProgress =
+            currentStep.map {
+                ATHLTHRunningStepEngine
+                    .progress(
+                        step: $0,
+                        elapsedTime:
+                            workout.elapsed(
+                                at: Date()
+                            ),
+                        distanceMeters:
+                            workout.distanceMeters,
+                        stepStartElapsedTime:
+                            workout
+                                .structuredStepStartElapsedTime,
+                        stepStartDistanceMeters:
+                            workout
+                                .structuredStepStartDistanceMeters
+                    )
+            }
+        let nextStepTitle: String? = {
+            guard let plan =
+                    workout
+                        .structuredRunningWorkout
+            else {
+                return nil
+            }
+
+            let next =
+                workout.structuredStepIndex + 1
+            return plan.steps.indices.contains(
+                next
+            )
+                ? plan.steps[next].title
+                : nil
+        }()
 
         let snapshot =
             WatchWorkoutLiveSnapshot(
@@ -1794,6 +1845,21 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                     workout
                         .routeAlertConfiguration?
                         .deviationMeters,
+                runningStepTitle:
+                    currentStep?.title,
+                runningStepIndex:
+                    currentStep == nil
+                        ? nil
+                        : workout
+                            .structuredStepIndex,
+                runningStepCount:
+                    workout
+                        .structuredRunningWorkout?
+                        .steps.count,
+                runningStepProgress:
+                    runningStepProgress,
+                runningNextStepTitle:
+                    nextStepTitle,
                 liveSurfaceConfiguration:
                     ATHLTHLiveWorkoutPreferencesStore
                         .load(),
