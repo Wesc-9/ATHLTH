@@ -143,6 +143,9 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
     var runningPRsVisibility: String
     var strengthPRsVisibility: String
     var shareTrainingPresence: Bool
+    var shareOnlineStatus: Bool
+    var shareLiveWorkoutLocation: Bool
+    var liveWorkoutAudience: String
     var sharePerformanceStats: Bool
     var shareTrophyCabinet: Bool
     var shareGoals: Bool
@@ -171,6 +174,9 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
         case runningPRsVisibility = "running_prs_visibility"
         case strengthPRsVisibility = "strength_prs_visibility"
         case shareTrainingPresence = "share_training_presence"
+        case shareOnlineStatus = "share_online_status"
+        case shareLiveWorkoutLocation = "share_live_workout_location"
+        case liveWorkoutAudience = "live_workout_audience"
         case sharePerformanceStats = "share_performance_stats"
         case shareTrophyCabinet = "share_trophy_cabinet"
         case shareGoals = "share_goals"
@@ -201,6 +207,9 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
             runningPRsVisibility: "private",
             strengthPRsVisibility: "private",
             shareTrainingPresence: false,
+            shareOnlineStatus: false,
+            shareLiveWorkoutLocation: false,
+            liveWorkoutAudience: LiveWorkoutAudience.mutuals.rawValue,
             sharePerformanceStats: false,
             shareTrophyCabinet: false,
             shareGoals: false,
