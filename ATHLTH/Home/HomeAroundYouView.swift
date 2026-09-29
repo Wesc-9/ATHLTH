@@ -750,7 +750,52 @@ struct AroundYouExploreView: View {
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+
+            if publicTrailDiscovery.isLoading &&
+               publicTrailDiscovery.trails.isEmpty {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+
+                    Text(
+                        publicTrailDiscovery.isWarmingCache
+                            ? "Finding public trails nearby…"
+                            : "Loading public trails…"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                    Spacer()
+
+                    Text("OpenStreetMap")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.vitality
+                        )
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            } else if let publicTrailError =
+                publicTrailDiscovery.errorMessage,
+                publicTrailDiscovery.trails.isEmpty {
+                HStack(spacing: 7) {
+                    Image(
+                        systemName:
+                            "exclamationmark.triangle"
+                    )
+                    Text(publicTrailError)
+                }
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            }
 
             MapReader { proxy in
                 Map(position: $mapPosition) {
@@ -770,10 +815,18 @@ struct AroundYouExploreView: View {
                             .stroke(
                                 route.isMine
                                     ? ATHLTHTheme.premiumGold
-                                    : ATHLTHTheme.accent,
+                                    : route.isPublicTrail
+                                        ? ATHLTHTheme.vitality
+                                        : ATHLTHTheme.accent,
                                 lineWidth: isSelected
                                     ? 7
-                                    : (route.isMine ? 5 : 4)
+                                    : (
+                                        route.isMine
+                                            ? 5
+                                            : route.isPublicTrail
+                                                ? 4.5
+                                                : 4
+                                    )
                             )
 
                             if let center = route.centerCoordinate {
@@ -800,7 +853,9 @@ struct AroundYouExploreView: View {
                                         .foregroundStyle(
                                             route.isMine
                                                 ? ATHLTHTheme.premiumGold
-                                                : ATHLTHTheme.accentDeep
+                                                : route.isPublicTrail
+                                                    ? ATHLTHTheme.vitality
+                                                    : ATHLTHTheme.accentDeep
                                         )
                                         .background(
                                             .white,
@@ -993,7 +1048,11 @@ struct AroundYouExploreView: View {
             )
         }
         .task(id: selectedRoute?.id) {
-            guard let selectedRoute else {
+            guard let selectedRoute,
+                  !isPublicTrailRoute(
+                    selectedRoute
+                  )
+            else {
                 return
             }
 
@@ -1208,15 +1267,52 @@ struct AroundYouExploreView: View {
                     )
                 }
 
-                previewMetric(
-                    value:
-                        "\(previewAttemptCount(for: route))",
-                    icon:
-                        "arrow.trianglehead.2.clockwise.rotate.90"
-                )
+                if !isPublicTrailRoute(route) {
+                    previewMetric(
+                        value:
+                            "\(previewAttemptCount(for: route))",
+                        icon:
+                            "arrow.trianglehead.2.clockwise.rotate.90"
+                    )
+                }
             }
 
-            if routeAttempts.isLoading &&
+            if isPublicTrailRoute(route) {
+                HStack(spacing: 9) {
+                    Image(
+                        systemName: "map.fill"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text("Public Trail")
+                            .font(
+                                .caption.weight(
+                                    .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+
+                        Text(
+                            publicTrailDiscovery.attribution
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+
+                    Spacer()
+                }
+                .frame(height: 46)
+            } else if routeAttempts.isLoading &&
                routeAttempts.loadedRouteID != route.id {
                 HStack(spacing: 8) {
                     ProgressView()
