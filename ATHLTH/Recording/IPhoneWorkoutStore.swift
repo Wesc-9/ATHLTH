@@ -1381,6 +1381,235 @@ final class IPhoneWorkoutStore:
         )
     }
 
+    private func evaluateGhostUpdates(
+        workout: PhoneWorkout,
+        comparison: GhostRaceComparison
+    ) {
+        guard let configuration =
+                workout.ghostAudioConfiguration,
+              configuration.enabled,
+              workout.resumedAt != nil
+        else {
+            return
+        }
+
+        var periodic = false
+
+        if let interval =
+                configuration.distanceIntervalMeters,
+           interval > 0,
+           let next =
+                nextGhostDistanceAnnouncementMeters,
+           workout.distanceMeters >= next {
+            periodic = true
+            var updatedNext = next
+            repeat {
+                updatedNext += interval
+            } while workout.distanceMeters >=
+                updatedNext
+            nextGhostDistanceAnnouncementMeters =
+                updatedNext
+        }
+
+        let elapsed =
+            workout.elapsed(at: Date())
+
+        if let interval =
+                configuration.timeIntervalSeconds,
+           interval > 0,
+           let next =
+                nextGhostTimeAnnouncementSeconds,
+           elapsed >= next {
+            periodic = true
+            var updatedNext = next
+            repeat {
+                updatedNext += interval
+            } while elapsed >= updatedNext
+            nextGhostTimeAnnouncementSeconds =
+                updatedNext
+        }
+
+        let distanceDelta =
+            comparison.signedDistanceMeters
+        let timeDelta =
+            comparison.signedTimeSeconds
+
+        if periodic {
+            deliverGhostUpdate(
+                distanceDelta: distanceDelta,
+                timeDelta: timeDelta,
+                delivery:
+                    configuration
+                        .resolvedPeriodicDelivery,
+                priority:
+                    .ghostPeriodic,
+                workout: workout
+            )
+            lastGhostAnnouncedLeadMeters =
+                distanceDelta
+            lastGhostLeadAlertAt = Date()
+            lastGhostLeadSign =
+                ghostLeadSign(
+                    distanceDelta
+                )
+            return
+        }
+
+        guard configuration
+                .announceLeadChanges,
+              elapsed >= 20
+        else {
+            return
+        }
+
+        let currentSign =
+            ghostLeadSign(distanceDelta)
+        let signChanged =
+            currentSign != 0 &&
+            lastGhostLeadSign != 0 &&
+            currentSign != lastGhostLeadSign
+        let change =
+            lastGhostAnnouncedLeadMeters.map {
+                abs(distanceDelta - $0)
+            } ?? 0
+        let movedEnough =
+            change >=
+            max(
+                configuration
+                    .leadChangeThresholdMeters,
+                10
+            )
+        let cooldownSatisfied =
+            lastGhostLeadAlertAt.map {
+                Date().timeIntervalSince($0) >=
+                    30
+            } ?? true
+
+        guard cooldownSatisfied &&
+                (signChanged || movedEnough)
+        else {
+            if lastGhostAnnouncedLeadMeters ==
+                nil {
+                lastGhostAnnouncedLeadMeters =
+                    distanceDelta
+                lastGhostLeadSign =
+                    currentSign
+            }
+            return
+        }
+
+        let important =
+            signChanged ||
+            change >=
+                configuration
+                    .resolvedImportantLeadChangeMeters
+
+        deliverGhostUpdate(
+            distanceDelta: distanceDelta,
+            timeDelta: timeDelta,
+            delivery:
+                important
+                    ? configuration
+                        .resolvedImportantLeadChangeDelivery
+                    : configuration
+                        .resolvedLeadChangeDelivery,
+            priority:
+                important
+                    ? .ghostImportant
+                    : .ghostPeriodic,
+            workout: workout
+        )
+
+        lastGhostAnnouncedLeadMeters =
+            distanceDelta
+        lastGhostLeadAlertAt = Date()
+        lastGhostLeadSign = currentSign
+    }
+
+    private func deliverGhostUpdate(
+        distanceDelta: Double,
+        timeDelta: TimeInterval,
+        delivery: WatchAlertDelivery,
+        priority: ATHLTHGuidancePriority,
+        workout: PhoneWorkout
+    ) {
+        let meters = abs(distanceDelta)
+        let seconds = abs(timeDelta)
+        let english: String
+        let norwegian: String
+
+        if meters < 8 {
+            english =
+                "Ghost Race. Neck and neck."
+            norwegian =
+                "Spøkelsesløp. Helt jevnt."
+        } else if distanceDelta > 0 {
+            english =
+                "Ghost Race. You are " +
+                routeDistancePhrase(meters) +
+                " ahead. About " +
+                durationPhrase(seconds) +
+                " ahead."
+            norwegian =
+                "Spøkelsesløp. Du er " +
+                routeDistancePhrase(meters) +
+                " foran. Omtrent " +
+                durationPhrase(seconds) +
+                " foran."
+        } else {
+            english =
+                "Ghost Race. Your ghost is " +
+                routeDistancePhrase(meters) +
+                " ahead. About " +
+                durationPhrase(seconds) +
+                " behind."
+            norwegian =
+                "Spøkelsesløp. Spøkelset er " +
+                routeDistancePhrase(meters) +
+                " foran. Omtrent " +
+                durationPhrase(seconds) +
+                " bak."
+        }
+
+        deliverPhoneGuidanceAlert(
+            english: english,
+            norwegian: norwegian,
+            delivery: delivery,
+            haptic:
+                distanceDelta >= 0
+                    ? .success
+                    : .warning,
+            priority: priority,
+            coachConfiguration:
+                workout.audioCoachConfiguration
+        )
+    }
+
+    private func ghostLeadSign(
+        _ distanceDelta: Double
+    ) -> Int {
+        if abs(distanceDelta) < 8 {
+            return 0
+        }
+
+        return distanceDelta > 0 ? 1 : -1
+    }
+
+    private func routeDistancePhrase(
+        _ meters: Double
+    ) -> String {
+        if meters >= 1_000 {
+            return String(
+                format:
+                    "%.1f kilometers",
+                meters / 1_000
+            )
+        }
+
+        return
+            "\(Int(meters.rounded())) meters"
+    }
+
     private func evaluateRouteAlert(
         workout: PhoneWorkout,
         deviationMeters: Double,
@@ -1467,15 +1696,42 @@ final class IPhoneWorkoutStore:
             UINotificationFeedbackGenerator
                 .FeedbackType
     ) {
-        if configuration.delivery.usesHaptics {
+        deliverPhoneGuidanceAlert(
+            english: english,
+            norwegian: norwegian,
+            delivery:
+                configuration.delivery,
+            haptic: haptic,
+            priority:
+                .routeCritical,
+            coachConfiguration:
+                active?
+                    .audioCoachConfiguration
+        )
+    }
+
+    private func deliverPhoneGuidanceAlert(
+        english: String,
+        norwegian: String,
+        delivery: WatchAlertDelivery,
+        haptic:
+            UINotificationFeedbackGenerator
+                .FeedbackType,
+        priority:
+            ATHLTHGuidancePriority,
+        coachConfiguration:
+            WatchAudioCoachConfiguration?
+    ) {
+        if delivery.usesHaptics,
+           guidancePriorityGate
+            .allowsHaptic(
+                for: priority
+            ) {
             UINotificationFeedbackGenerator()
                 .notificationOccurred(haptic)
         }
 
-        if configuration.delivery.usesVoice {
-            let coachConfiguration =
-                active?
-                    .audioCoachConfiguration
+        if delivery.usesVoice {
             let phrase =
                 localizedCoachPhrase(
                     english: english,
@@ -1487,7 +1743,8 @@ final class IPhoneWorkoutStore:
             speak(
                 phrase,
                 configuration:
-                    coachConfiguration
+                    coachConfiguration,
+                priority: priority
             )
         }
     }
