@@ -1765,7 +1765,13 @@ final class IPhoneWorkoutStore:
         coachConfiguration:
             WatchAudioCoachConfiguration?
     ) {
+        let deliveryPreferences =
+            ATHLTHLiveWorkoutPreferencesStore
+                .load()
+
         if delivery.usesHaptics,
+           deliveryPreferences
+                .hapticsEnabled,
            guidancePriorityGate
             .allowsHaptic(
                 for: priority
@@ -1774,7 +1780,9 @@ final class IPhoneWorkoutStore:
                 .notificationOccurred(haptic)
         }
 
-        if delivery.usesVoice {
+        if delivery.usesVoice,
+           deliveryPreferences
+                .audioAlertsEnabled {
             let phrase =
                 localizedCoachPhrase(
                     english: english,
