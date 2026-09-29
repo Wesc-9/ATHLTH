@@ -1828,7 +1828,9 @@ final class IPhoneWorkoutStore:
                 speak(
                     "Structured workout complete. Continue easy or finish when ready.",
                     configuration:
-                        workout.audioCoachConfiguration
+                        workout.audioCoachConfiguration,
+                    priority:
+                        .structuredStep
                 )
             }
             return
@@ -1852,7 +1854,9 @@ final class IPhoneWorkoutStore:
             speak(
                 "Next. \(next.title).",
                 configuration:
-                    workout.audioCoachConfiguration
+                    workout.audioCoachConfiguration,
+                priority:
+                    .structuredStep
             )
         }
     }
@@ -1879,7 +1883,9 @@ final class IPhoneWorkoutStore:
         speak(
             "\(prefix). \(plan.steps[workout.structuredStepIndex ?? 0].title).",
             configuration:
-                workout.audioCoachConfiguration
+                workout.audioCoachConfiguration,
+            priority:
+                .structuredStep
         )
     }
 
@@ -2019,14 +2025,19 @@ final class IPhoneWorkoutStore:
             parts.joined(
                 separator: ". "
             ),
-            configuration: configuration
+            configuration: configuration,
+            priority:
+                .routineCoach
         )
     }
 
     private func speak(
         _ phrase: String,
         configuration:
-            WatchAudioCoachConfiguration?
+            WatchAudioCoachConfiguration?,
+        priority:
+            ATHLTHGuidancePriority =
+                .routineCoach
     ) {
         guard !phrase.isEmpty else {
             return
@@ -2035,6 +2046,29 @@ final class IPhoneWorkoutStore:
         let configuration =
             configuration ??
             .disabled
+        let decision =
+            guidancePriorityGate
+                .voiceDecision(
+                    for: priority,
+                    isSpeaking:
+                        speechSynthesizer
+                            .isSpeaking,
+                    quietPeriodSeconds:
+                        configuration
+                            .resolvedGuidanceQuietPeriodSeconds
+                )
+
+        switch decision {
+        case .drop:
+            return
+        case .interruptAndDeliver:
+            speechSynthesizer
+                .stopSpeaking(
+                    at: .immediate
+                )
+        case .deliver:
+            break
+        }
 
         do {
             let session =
@@ -2645,6 +2679,44 @@ final class IPhoneWorkoutStore:
             userID: accountID
         )
         ATHLTHTrainingDataChangeSignal.post(userID: accountID)
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance:
+            AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  !self
+                    .speechSynthesizer
+                    .isSpeaking
+            else {
+                return
+            }
+
+            self.guidancePriorityGate
+                .voiceDidFinish()
+        }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didCancel utterance:
+            AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  !self
+                    .speechSynthesizer
+                    .isSpeaking
+            else {
+                return
+            }
+
+            self.guidancePriorityGate
+                .voiceDidFinish()
+        }
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
