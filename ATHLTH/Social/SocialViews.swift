@@ -1624,6 +1624,41 @@ struct SocialPrivacySettingsView: View {
 
                 Section("Shared with allowed viewers") {
                     Toggle("Training now", isOn: binding.shareTrainingPresence)
+
+                    Toggle(
+                        "Show when I'm online",
+                        isOn: Binding(
+                            get: {
+                                binding.wrappedValue
+                                    .showOnlineStatus ?? false
+                            },
+                            set: { enabled in
+                                binding.wrappedValue
+                                    .showOnlineStatus = enabled
+                            }
+                        )
+                    )
+
+                    Toggle(
+                        "Share live location during workouts",
+                        isOn: Binding(
+                            get: {
+                                binding.wrappedValue
+                                    .shareLiveWorkoutLocation ?? false
+                            },
+                            set: { enabled in
+                                binding.wrappedValue
+                                    .shareLiveWorkoutLocation = enabled
+                            }
+                        )
+                    )
+
+                    Text(
+                        "Live GPS is temporary and is limited to mutual follows or an accepted Ghost Race opponent."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
                     Toggle("Trophy Cabinet", isOn: binding.shareTrophyCabinet)
                     Toggle("Recent activity", isOn: binding.shareRecentActivity)
