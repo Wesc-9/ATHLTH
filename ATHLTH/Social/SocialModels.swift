@@ -370,6 +370,19 @@ struct SocialPresenceRecord: Codable, Hashable {
     }
 }
 
+struct OnlinePresenceSessionRecord: Codable, Hashable {
+    let userID: UUID
+    let sessionID: UUID
+    let lastSeenAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case sessionID = "session_id"
+        case lastSeenAt = "last_seen_at"
+    }
+}
+
+
 enum SocialActivityReaction: String, CaseIterable, Identifiable, Codable, Hashable {
     case fire
     case strong
