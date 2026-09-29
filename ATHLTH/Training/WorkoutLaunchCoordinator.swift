@@ -431,15 +431,16 @@ enum WorkoutLaunchCoordinator {
         }
 
         if let ghostRace,
-           let ghostUpdates =
-                configuration.ghostUpdates,
            configuration
                 .ghostTargetDurationSeconds != nil,
            let transfer =
                 GhostRaceStartService
                     .preparedTransfer(
                         ghostRace: ghostRace,
-                        audio: ghostUpdates
+                        audio:
+                            configuration
+                                .ghostUpdates ??
+                            .disabled
                     ) {
             watchConnection
                 .sendGhostRace(transfer)
