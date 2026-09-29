@@ -1584,7 +1584,7 @@ private final class
                                 0.08
                             )
                     overlay.setFill()
-                    context.fill(
+                    context.cgContext.fill(
                         CGRect(
                             origin: .zero,
                             size: size
