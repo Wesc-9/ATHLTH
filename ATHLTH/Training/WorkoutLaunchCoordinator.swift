@@ -312,37 +312,79 @@ enum WorkoutLaunchCoordinator {
         settings: AppSettingsStore,
         gear: ProfileGearStore,
         phoneWorkout: IPhoneWorkoutStore,
-        watchConnection: AppleWatchConnectionStore
+        watchConnection: AppleWatchConnectionStore,
+        ghostRace: GhostRaceStore? = nil
     ) async throws {
+        let selectedRoute: TrainingRoute? = {
+            if let route = configuration.route {
+                return route
+            }
+
+            guard
+                let workout = configuration.workout,
+                let routeID = workout.routeID
+            else {
+                return nil
+            }
+
+            return session.savedRoutes.first {
+                $0.id == routeID
+            }
+        }()
+
+        var resolvedAudioCoach =
+            configuration.audioCoach
+
+        if configuration
+            .ghostTargetDurationSeconds != nil,
+           configuration.ghostUpdates != nil {
+            // Ghost owns recurring race cadence. Keep Audio Coach active for
+            // structured-step and critical guidance without duplicate periodic
+            // metric announcements.
+            resolvedAudioCoach
+                .distanceIntervalMeters = nil
+            resolvedAudioCoach
+                .timeIntervalSeconds = nil
+        }
+
+        if let targetDuration =
+                configuration
+                    .ghostTargetDurationSeconds {
+            guard let selectedRoute,
+                  let ghostRace
+            else {
+                throw NSError(
+                    domain: "ATHLTH.RunLaunch",
+                    code: 3,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Choose a route before starting a Ghost run."
+                    ]
+                )
+            }
+
+            try ghostRace.prepareTarget(
+                route: selectedRoute,
+                targetDurationSeconds:
+                    targetDuration
+            )
+        } else {
+            ghostRace?.cancel()
+            watchConnection.clearGhostRace()
+        }
+
+        let structuredWorkout =
+            configuration.workout.map {
+                PlannedWorkoutWatchBuilder
+                    .runningTransfer(
+                        from: $0,
+                        routeAlerts:
+                            configuration
+                                .routeAlerts
+                    )
+            }
+
         if configuration.captureDevice == .iPhone {
-            let selectedRoute: TrainingRoute? = {
-                if let route = configuration.route {
-                    return route
-                }
-
-                guard
-                    let workout = configuration.workout,
-                    let routeID = workout.routeID
-                else {
-                    return nil
-                }
-
-                return session.savedRoutes.first {
-                    $0.id == routeID
-                }
-            }()
-
-            let structuredWorkout =
-                configuration.workout.map {
-                    PlannedWorkoutWatchBuilder
-                        .runningTransfer(
-                            from: $0,
-                            routeAlerts:
-                                settings
-                                    .routeAlertConfiguration
-                        )
-                }
-
             gear.prepareNextWorkoutGear(
                 configuration.gearIDs
             )
@@ -351,12 +393,15 @@ enum WorkoutLaunchCoordinator {
                 route: selectedRoute,
                 title: configuration.title,
                 audioCoach:
-                    configuration.audioCoach,
+                    resolvedAudioCoach,
                 structuredWorkout:
                     structuredWorkout,
                 routeAlerts:
-                    settings
-                        .routeAlertConfiguration
+                    configuration
+                        .routeAlerts,
+                ghostUpdates:
+                    configuration
+                        .ghostUpdates
             )
             return
         }
@@ -372,22 +417,32 @@ enum WorkoutLaunchCoordinator {
             )
         }
 
-        if let route = configuration.route {
-            try watchConnection.sendRoute(route)
-            watchConnection.sendWorkoutRouteSelection(
-                route.id
+        if let selectedRoute {
+            try watchConnection.sendRoute(
+                selectedRoute
             )
-        } else if let workout = configuration.workout,
-                  let routeID = workout.routeID,
-                  let route = session.savedRoutes.first(
-                    where: { $0.id == routeID }
-                  ) {
-            try watchConnection.sendRoute(route)
-            watchConnection.sendWorkoutRouteSelection(
-                route.id
-            )
+            watchConnection
+                .sendWorkoutRouteSelection(
+                    selectedRoute.id
+                )
         } else {
-            watchConnection.sendWorkoutRouteSelection(nil)
+            watchConnection
+                .sendWorkoutRouteSelection(nil)
+        }
+
+        if let ghostRace,
+           let ghostUpdates =
+                configuration.ghostUpdates,
+           configuration
+                .ghostTargetDurationSeconds != nil,
+           let transfer =
+                GhostRaceStartService
+                    .preparedTransfer(
+                        ghostRace: ghostRace,
+                        audio: ghostUpdates
+                    ) {
+            watchConnection
+                .sendGhostRace(transfer)
         }
 
         try await watchConnection
@@ -397,27 +452,27 @@ enum WorkoutLaunchCoordinator {
             configuration.gearIDs
         )
 
-        watchConnection.sendAudioCoachConfiguration(
-            configuration.audioCoach
-        )
+        watchConnection
+            .sendAudioCoachConfiguration(
+                resolvedAudioCoach
+            )
 
-        if let workout = configuration.workout {
-            watchConnection.sendRunningWorkout(
-                PlannedWorkoutWatchBuilder.runningTransfer(
-                    from: workout,
-                    routeAlerts:
-                        settings.routeAlertConfiguration
+        if let structuredWorkout {
+            watchConnection
+                .sendRunningWorkout(
+                    structuredWorkout
                 )
-            )
         } else {
-            watchConnection.sendRunningWorkout(
-                WatchRunningWorkoutTransfer(
-                    title: "",
-                    steps: [],
-                    routeAlerts:
-                        settings.routeAlertConfiguration
+            watchConnection
+                .sendRunningWorkout(
+                    WatchRunningWorkoutTransfer(
+                        title: "",
+                        steps: [],
+                        routeAlerts:
+                            configuration
+                                .routeAlerts
+                    )
                 )
-            )
         }
     }
 
