@@ -885,6 +885,19 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
         )
     }
 
+    static let disabled = WatchGhostRaceAudioConfiguration(
+        enabled: false,
+        distanceIntervalMeters: nil,
+        timeIntervalSeconds: nil,
+        announceLeadChanges: false,
+        leadChangeThresholdMeters: 25,
+        delivery: .haptic,
+        periodicDelivery: .haptic,
+        leadChangeDelivery: .haptic,
+        importantLeadChangeDelivery: .haptic,
+        importantLeadChangeMeters: 50
+    )
+
     static let standard = WatchGhostRaceAudioConfiguration(
         enabled: true,
         distanceIntervalMeters: 1_000,
