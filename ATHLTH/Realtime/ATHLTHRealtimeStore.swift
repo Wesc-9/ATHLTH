@@ -20,6 +20,7 @@ final class ATHLTHRealtimeStore: ObservableObject {
     private var viewerChannel: RealtimeChannelV2?
     private var viewerSubscriptions = Set<RealtimeSubscription>()
 
+    private var currentLiveSource: String?
     private var lastLocationBroadcastAt: Date?
     private var lastMetadataHeartbeatAt: Date?
     private var lastBroadcastLocation: CLLocation?
@@ -180,8 +181,13 @@ final class ATHLTHRealtimeStore: ObservableObject {
         userID: UUID,
         shareLocation: Bool,
         audience: LiveWorkoutAudience,
-        ghostReferenceID: UUID?
+        ghostReferenceID: UUID?,
+        source: String = "watch"
     ) async {
+        if currentLiveSession != nil,
+           currentLiveSource != source {
+            await endLiveSharing()
+        }
         guard shareLocation,
               snapshot.kind == .running ||
                 snapshot.kind == .walking ||
@@ -213,6 +219,7 @@ final class ATHLTHRealtimeStore: ObservableObject {
                         ghostReferenceID
                 )
                 currentLiveSession = session
+                currentLiveSource = source
                 sharingStateText =
                     ghostReferenceID == nil
                         ? "Sharing live workout"
@@ -319,6 +326,64 @@ final class ATHLTHRealtimeStore: ObservableObject {
         }
     }
 
+    func handlePhoneWorkout(
+        _ workout: PhoneWorkout?,
+        userID: UUID,
+        shareLocation: Bool,
+        audience: LiveWorkoutAudience
+    ) async {
+        guard let workout else {
+            if currentLiveSource == "phone" {
+                await endLiveSharing()
+            }
+            return
+        }
+
+        let state: WatchWorkoutMirrorState =
+            workout.resumedAt == nil
+                ? .paused
+                : .running
+        let latestPoint =
+            workout.points.last
+        let now = Date()
+        let snapshot =
+            WatchWorkoutLiveSnapshot(
+                kind:
+                    workout.walking
+                        ? .walking
+                        : .running,
+                state: state,
+                startedAt: workout.start,
+                capturedAt:
+                    latestPoint?.timestamp ??
+                    now,
+                elapsedTime:
+                    workout.elapsed(at: now),
+                heartRate: 0,
+                activeCalories: 0,
+                distanceMeters:
+                    workout.distanceMeters,
+                averageHeartRate: nil,
+                maxHeartRate: nil,
+                routePointCount:
+                    workout.points.count,
+                currentLatitude:
+                    latestPoint?.latitude,
+                currentLongitude:
+                    latestPoint?.longitude,
+                routeProgressPercent: nil
+            )
+
+        await handleMirroredWorkout(
+            snapshot,
+            userID: userID,
+            shareLocation: shareLocation,
+            audience: audience,
+            ghostReferenceID: nil,
+            source: "phone"
+        )
+    }
+
     func endLiveSharing() async {
         onlineSafeResetSenderState()
 
@@ -348,6 +413,7 @@ final class ATHLTHRealtimeStore: ObservableObject {
 
         self.senderChannel = nil
         currentLiveSession = nil
+        currentLiveSource = nil
         sharingStateText = "Live location off"
         await refreshLiveSessions()
     }
