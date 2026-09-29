@@ -14,6 +14,8 @@ enum GhostRaceStartService {
         ownerID: UUID,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore? = nil,
+        captureDevice: WorkoutCaptureDevice = .appleWatch,
         settings: AppSettingsStore
     ) async throws {
         try ghostRace.prepare(
@@ -31,6 +33,8 @@ enum GhostRaceStartService {
             ownerID: ownerID,
             ghostRace: ghostRace,
             watchConnection: watchConnection,
+            phoneWorkout: phoneWorkout,
+            captureDevice: captureDevice,
             settings: settings
         )
     }
@@ -40,6 +44,8 @@ enum GhostRaceStartService {
         ownerID: UUID,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore? = nil,
+        captureDevice: WorkoutCaptureDevice = .appleWatch,
         settings: AppSettingsStore
     ) async throws {
         try ghostRace.prepare(
@@ -51,6 +57,8 @@ enum GhostRaceStartService {
             ownerID: ownerID,
             ghostRace: ghostRace,
             watchConnection: watchConnection,
+            phoneWorkout: phoneWorkout,
+            captureDevice: captureDevice,
             settings: settings
         )
     }
@@ -61,6 +69,8 @@ enum GhostRaceStartService {
         ownerID: UUID,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore? = nil,
+        captureDevice: WorkoutCaptureDevice = .appleWatch,
         settings: AppSettingsStore
     ) async throws {
         try ghostRace.prepareTarget(
@@ -86,6 +96,8 @@ enum GhostRaceStartService {
         ownerID: UUID,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore? = nil,
+        captureDevice: WorkoutCaptureDevice = .appleWatch,
         settings: AppSettingsStore
     ) async throws {
         try await start(
@@ -100,6 +112,8 @@ enum GhostRaceStartService {
             ownerID: ownerID,
             ghostRace: ghostRace,
             watchConnection: watchConnection,
+            phoneWorkout: phoneWorkout,
+            captureDevice: captureDevice,
             settings: settings
         )
     }
@@ -110,6 +124,8 @@ enum GhostRaceStartService {
         ownerID: UUID,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore? = nil,
+        captureDevice: WorkoutCaptureDevice = .appleWatch,
         settings: AppSettingsStore
     ) async throws {
         try await start(
@@ -124,6 +140,8 @@ enum GhostRaceStartService {
             ownerID: ownerID,
             ghostRace: ghostRace,
             watchConnection: watchConnection,
+            phoneWorkout: phoneWorkout,
+            captureDevice: captureDevice,
             settings: settings
         )
     }
@@ -135,6 +153,8 @@ enum GhostRaceStartService {
         ownerID: UUID,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore? = nil,
+        captureDevice: WorkoutCaptureDevice = .appleWatch,
         settings: AppSettingsStore
     ) async throws {
         let detail =
@@ -159,6 +179,8 @@ enum GhostRaceStartService {
             ownerID: ownerID,
             ghostRace: ghostRace,
             watchConnection: watchConnection,
+            phoneWorkout: phoneWorkout,
+            captureDevice: captureDevice,
             settings: settings
         )
     }
@@ -168,6 +190,8 @@ enum GhostRaceStartService {
         route: TrainingRoute? = nil,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore? = nil,
+        captureDevice: WorkoutCaptureDevice = .appleWatch,
         settings: AppSettingsStore
     ) async throws {
         // Live Ghost compares a fresh cloud opponent instead of a fixed
@@ -177,6 +201,65 @@ enum GhostRaceStartService {
         watchConnection.clearGhostRace()
 
         do {
+            if captureDevice == .iPhone {
+                guard let phoneWorkout else {
+                    throw NSError(
+                        domain: "ATHLTH.GhostRace",
+                        code: 20,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "iPhone workout recorder is unavailable."
+                        ]
+                    )
+                }
+
+                guard phoneWorkout.active == nil else {
+                    throw NSError(
+                        domain: "ATHLTH.GhostRace",
+                        code: 21,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "Finish the active iPhone workout before starting Ghost Race."
+                        ]
+                    )
+                }
+
+                var coach =
+                    settings.audioCoachConfiguration(
+                        enabled:
+                            settings
+                                .audioCoachEnabledByDefault,
+                        routeDistanceMeters:
+                            route.map {
+                                max(
+                                    $0.distanceKilometers *
+                                        1_000,
+                                    0
+                                )
+                            }
+                    )
+
+                if settings.ghostRaceAudioEnabled {
+                    coach.distanceIntervalMeters = nil
+                    coach.timeIntervalSeconds = nil
+                }
+
+                phoneWorkout.start(
+                    walking: false,
+                    route: route,
+                    title:
+                        "Live Ghost · \(title)",
+                    audioCoach: coach,
+                    routeAlerts:
+                        settings
+                            .routeAlertConfiguration,
+                    ghostUpdates:
+                        settings
+                            .ghostRaceAudioConfiguration
+                )
+                return
+            }
+
             if let route {
                 try watchConnection.sendRoute(
                     route
@@ -237,6 +320,8 @@ enum GhostRaceStartService {
         ownerID: UUID,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore?,
+        captureDevice: WorkoutCaptureDevice,
         settings: AppSettingsStore
     ) async throws {
         guard let raceRoute =
@@ -252,6 +337,64 @@ enum GhostRaceStartService {
         }
 
         do {
+            var standardAudioCoach =
+                settings.audioCoachConfiguration(
+                    enabled:
+                        settings
+                            .audioCoachEnabledByDefault,
+                    routeDistanceMeters:
+                        raceRoute
+                            .distanceKilometers *
+                            1_000
+                )
+
+            if settings.ghostRaceAudioEnabled {
+                standardAudioCoach
+                    .distanceIntervalMeters = nil
+                standardAudioCoach
+                    .timeIntervalSeconds = nil
+            }
+
+            if captureDevice == .iPhone {
+                guard let phoneWorkout else {
+                    throw NSError(
+                        domain: "ATHLTH.GhostRace",
+                        code: 22,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "iPhone workout recorder is unavailable."
+                        ]
+                    )
+                }
+
+                guard phoneWorkout.active == nil else {
+                    throw NSError(
+                        domain: "ATHLTH.GhostRace",
+                        code: 23,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "Finish the active iPhone workout before starting Ghost Race."
+                        ]
+                    )
+                }
+
+                phoneWorkout.start(
+                    walking: false,
+                    route: raceRoute,
+                    title:
+                        "Ghost Race · \(title)",
+                    audioCoach:
+                        standardAudioCoach,
+                    routeAlerts:
+                        settings
+                            .routeAlertConfiguration,
+                    ghostUpdates:
+                        settings
+                            .ghostRaceAudioConfiguration
+                )
+                return
+            }
+
             try watchConnection.sendRoute(
                 raceRoute
             )
@@ -332,22 +475,8 @@ enum GhostRaceStartService {
                     .running
                 )
 
-            var standardAudioCoach =
-                settings.audioCoachConfiguration(
-                    enabled:
-                        settings
-                            .audioCoachEnabledByDefault,
-                    routeDistanceMeters:
-                        raceRoute
-                            .distanceKilometers *
-                            1_000
-                )
-
-            // Ghost Race has its own cadence. Keep the selected language
-            // available on Watch, but avoid overlapping spoken intervals.
-            if settings.ghostRaceAudioEnabled {
-                standardAudioCoach.enabled = false
-            }
+            // Periodic Ghost status replaces routine coach intervals.
+            // Structured and critical guidance remain available.
 
             watchConnection
                 .sendAudioCoachConfiguration(
