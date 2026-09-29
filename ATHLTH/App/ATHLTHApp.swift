@@ -790,6 +790,26 @@ struct AppRootView: View {
                 )
             }
         }
+        .onReceive(phoneWorkout.$active) { workout in
+            guard appSession.signedIn else {
+                return
+            }
+
+            let userID = appSession.profile.userID
+            let shareLocation =
+                settings.shareLiveWorkoutLocation
+            let audience =
+                settings.liveWorkoutAudience
+
+            Task {
+                await realtime.handlePhoneWorkout(
+                    workout,
+                    userID: userID,
+                    shareLocation: shareLocation,
+                    audience: audience
+                )
+            }
+        }
         .onChange(of: settings.workoutRemindersEnabled) { _, _ in
             Task { await syncPushPreferences() }
         }
