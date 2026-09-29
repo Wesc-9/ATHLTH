@@ -202,9 +202,18 @@ private final class ATHLTHLiveActivityController {
             return
         }
 
-        let liveContext =
-            snapshot.liveSurfaceContext ??
+        let storedLiveContext =
             ATHLTHLiveWorkoutContextStore.load()
+        let snapshotLiveContext =
+            snapshot.liveSurfaceContext
+
+        let liveContext: ATHLTHLiveWorkoutContext
+        if snapshotLiveContext?.challenge != nil ||
+            snapshotLiveContext?.liveShare?.isSharing == true {
+            liveContext = snapshotLiveContext ?? storedLiveContext
+        } else {
+            liveContext = storedLiveContext
+        }
 
         let contentState =
             ATHLTHWorkoutActivityAttributes.ContentState(
