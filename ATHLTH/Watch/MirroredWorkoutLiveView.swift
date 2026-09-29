@@ -178,7 +178,16 @@ struct MirroredWorkoutLiveView: View {
                                 .distanceMeters,
                         ownElapsedSeconds:
                             snapshot
-                                .elapsedTime
+                                .elapsedTime,
+                        ownRouteKey:
+                            snapshot
+                                .routeComparisonID,
+                        ownRouteProgressPercent:
+                            snapshot
+                                .routeProgressPercent,
+                        ownRouteDeviationMeters:
+                            snapshot
+                                .routeDeviationMeters
                     )
 
             ATHLTHCard {
@@ -322,15 +331,21 @@ struct MirroredWorkoutLiveView: View {
 
                         HStack(spacing: 12) {
                             Label(
-                                String(
-                                    format:
-                                        "%.2f km",
-                                    comparison
-                                        .opponentDistanceMeters /
-                                        1_000
-                                ),
+                                comparison
+                                    .isRouteAware
+                                    ? "Route matched"
+                                    : String(
+                                        format:
+                                            "%.2f km",
+                                        comparison
+                                            .opponentDistanceMeters /
+                                            1_000
+                                    ),
                                 systemImage:
-                                    "figure.run"
+                                    comparison
+                                        .isRouteAware
+                                        ? "point.topleft.down.to.point.bottomright.curvepath"
+                                        : "figure.run"
                             )
 
                             Label(
@@ -341,6 +356,25 @@ struct MirroredWorkoutLiveView: View {
                                 systemImage:
                                     "clock"
                             )
+
+                            if comparison
+                                .isRouteAware,
+                               let own =
+                                comparison
+                                    .ownRouteProgressPercent,
+                               let opponent =
+                                comparison
+                                    .opponentRouteProgressPercent {
+                                Text(
+                                    String(
+                                        format:
+                                            "%.1f%% / %.1f%%",
+                                        own,
+                                        opponent
+                                    )
+                                )
+                                .monospacedDigit()
+                            }
                         }
                         .font(.caption)
                         .foregroundStyle(
@@ -760,9 +794,19 @@ struct MirroredWorkoutLiveView: View {
             _ = await realtime
                 .beginLiveWorkout(
                     title:
+                        snapshot.routeTitle ??
                         snapshot.kind.title,
                     activity: activity,
-                    visibility: visibility
+                    visibility: visibility,
+                    routeKey:
+                        snapshot
+                            .routeComparisonID,
+                    routeDistanceMeters:
+                        snapshot
+                            .routeDistanceMeters,
+                    routeTitle:
+                        snapshot
+                            .routeTitle
                 )
         }
 
