@@ -15,6 +15,7 @@ final class ATHLTHRealtimeStore: ObservableObject {
 
     private let client: SupabaseClient
     private var onlineHeartbeatTask: Task<Void, Never>?
+    private var ownOnlineUserID: UUID?
     private var senderChannel: RealtimeChannelV2?
     private var viewerChannel: RealtimeChannelV2?
     private var viewerSubscriptions = Set<RealtimeSubscription>()
@@ -51,6 +52,7 @@ final class ATHLTHRealtimeStore: ObservableObject {
     ) async {
         onlineHeartbeatTask?.cancel()
         onlineHeartbeatTask = nil
+        ownOnlineUserID = userID
 
         guard enabled, appIsActive else {
             await clearOwnOnlinePresence(userID: userID)
@@ -81,6 +83,27 @@ final class ATHLTHRealtimeStore: ObservableObject {
                 await self.refreshOnlinePresence()
             }
         }
+    }
+
+    func stopOnlinePresence() async {
+        onlineHeartbeatTask?.cancel()
+        onlineHeartbeatTask = nil
+
+        if let ownOnlineUserID {
+            await clearOwnOnlinePresence(
+                userID: ownOnlineUserID
+            )
+        }
+
+        ownOnlineUserID = nil
+    }
+
+    func shutdown() async {
+        await stopOnlinePresence()
+        await endLiveSharing()
+        await stopWatching()
+        onlineUserIDs = []
+        activeLiveSessions = []
     }
 
     func refreshOnlinePresence() async {
