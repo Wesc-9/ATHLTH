@@ -444,8 +444,6 @@ struct ATHLTHHomeView: View {
                     ) {
                         onSelectTab(4)
                     }
-
-                    HomeAroundYouSection()
                 }
                 .padding()
                 .frame(maxWidth: 900)
