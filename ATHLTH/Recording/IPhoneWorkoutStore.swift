@@ -1050,6 +1050,48 @@ final class IPhoneWorkoutStore:
             )
     }
 
+    func applyGhostComparison(
+        _ comparison: GhostRaceComparison?,
+        title: String?,
+        configuration:
+            WatchGhostRaceAudioConfiguration?
+    ) {
+        guard var workout = active,
+              !workout.walking
+        else {
+            return
+        }
+
+        if let configuration {
+            workout.ghostAudioConfiguration =
+                configuration
+        }
+
+        guard let comparison else {
+            workout.ghostRaceTitle = nil
+            workout.ghostDistanceDeltaMeters = nil
+            workout.ghostTimeDeltaSeconds = nil
+            active = workout
+            return
+        }
+
+        workout.ghostRaceTitle =
+            title ?? "Ghost"
+        workout.ghostDistanceDeltaMeters =
+            comparison.signedDistanceMeters
+        workout.ghostTimeDeltaSeconds =
+            comparison.signedTimeSeconds
+
+        evaluateGhostUpdates(
+            workout: workout,
+            comparison: comparison
+        )
+
+        active = workout
+        persistActiveCheckpoint()
+        syncLiveActivity()
+    }
+
     private func cachePlannedRouteGeometry(
         _ route: TrainingRoute?
     ) {
@@ -1170,6 +1212,38 @@ final class IPhoneWorkoutStore:
         lastOffRouteAlertAt = nil
         routeWasOff = false
     }
+
+    private func resetGhostRuntime(
+        configuration:
+            WatchGhostRaceAudioConfiguration?
+    ) {
+        lastGhostAnnouncedLeadMeters = nil
+        lastGhostLeadAlertAt = nil
+        lastGhostLeadSign = 0
+
+        if let interval =
+                configuration?
+                    .distanceIntervalMeters,
+           interval > 0 {
+            nextGhostDistanceAnnouncementMeters =
+                interval
+        } else {
+            nextGhostDistanceAnnouncementMeters =
+                nil
+        }
+
+        if let interval =
+                configuration?
+                    .timeIntervalSeconds,
+           interval > 0 {
+            nextGhostTimeAnnouncementSeconds =
+                interval
+        } else {
+            nextGhostTimeAnnouncementSeconds =
+                nil
+        }
+    }
+
 
     private func updatePace(
         workout: inout PhoneWorkout,
