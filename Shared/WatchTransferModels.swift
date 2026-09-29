@@ -659,6 +659,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var routeComparisonID: UUID? = nil
     var routeTitle: String? = nil
     var routeDistanceMeters: Double? = nil
+    var workoutDisplayTitle: String? = nil
 
     // Optional presentation fields for Dynamic Island, Lock Screen and Watch.
     // Defaults keep older mirrored snapshots backwards compatible.
