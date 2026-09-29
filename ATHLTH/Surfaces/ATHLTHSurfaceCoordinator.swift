@@ -231,6 +231,16 @@ private final class ATHLTHLiveActivityController {
                     snapshot.routeDeviationMeters,
                 routeDeviationThresholdMeters:
                     snapshot.routeDeviationThresholdMeters,
+                runningStepTitle:
+                    snapshot.runningStepTitle,
+                runningStepIndex:
+                    snapshot.runningStepIndex,
+                runningStepCount:
+                    snapshot.runningStepCount,
+                runningStepProgress:
+                    snapshot.runningStepProgress,
+                runningNextStepTitle:
+                    snapshot.runningNextStepTitle,
                 heartRateTargetZone:
                     snapshot.heartRateTargetZone,
                 heartRateTargetMinimumBPM:
