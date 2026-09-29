@@ -1,10 +1,24 @@
+import AVFoundation
 import CoreLocation
 import Foundation
 @preconcurrency import HealthKit
+import UIKit
 
 struct PhoneWorkoutPauseInterval: Codable, Equatable {
     let startedAt: Date
     var endedAt: Date?
+}
+
+struct PhoneRouteCompletionSummary: Codable, Hashable {
+    var routeID: UUID
+    var routeTitle: String
+    var routeMatchPercent: Double
+    var averageDeviationMeters: Double
+    var maxDeviationMeters: Double
+    var distanceMeters: Double
+    var durationSeconds: TimeInterval
+    var leaderboardEligible: Bool
+    var personalBest: Bool
 }
 
 private enum IPhoneWorkoutHealthError: LocalizedError {
@@ -56,7 +70,37 @@ struct PhoneWorkout: Codable, Identifiable {
     var plannedRouteTitle: String? = nil
     var plannedRouteDistanceKilometers: Double? = nil
     var plannedRouteCoordinates: [RouteCoordinate]? = nil
+    var plannedRouteSource: String? = nil
     var workoutTitle: String? = nil
+
+    // Shared route-navigation state. All values are optional/defaulted so
+    // workouts from older TestFlight builds continue to decode.
+    var routeProgressPercent: Double? = nil
+    var routeRemainingMeters: Double? = nil
+    var routeDeviationMeters: Double? = nil
+    var routeDistanceToStartMeters: Double? = nil
+    var routeDistanceToFinishMeters: Double? = nil
+    var routeNextBearingDegrees: Double? = nil
+    var currentPaceSecondsPerKilometer: TimeInterval? = nil
+
+    // The same structured running model is used by Apple Watch.
+    var structuredRunningWorkout: WatchRunningWorkoutTransfer? = nil
+    var structuredStepIndex: Int = 0
+    var structuredStepStartElapsedTime: TimeInterval = 0
+    var structuredStepStartDistanceMeters: Double = 0
+    var structuredWorkoutComplete: Bool = false
+
+    var audioCoachConfiguration:
+        WatchAudioCoachConfiguration? = nil
+    var routeAlertConfiguration:
+        WatchRouteAlertConfiguration? = nil
+
+    // Persist the final route analysis with the workout so completion details
+    // survive relaunches without recomputing the full GPS trace.
+    var finalRouteMatchPercent: Double? = nil
+    var finalAverageDeviationMeters: Double? = nil
+    var finalMaxDeviationMeters: Double? = nil
+    var finalLeaderboardEligible: Bool? = nil
     var title: String {
         workoutTitle?.trimmingCharacters(
             in: .whitespacesAndNewlines
@@ -78,11 +122,31 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
     @Published var showingWorkout = false
     @Published private(set) var message: String?
     @Published private(set) var saving = false
+    @Published private(set)
+    var lastRouteCompletion: PhoneRouteCompletionSummary?
     private var accountID: UUID?
     private var pendingWalking: Bool?
     private var pendingRoute: TrainingRoute?
     private var pendingWorkoutTitle: String?
+    private var pendingAudioCoach:
+        WatchAudioCoachConfiguration?
+    private var pendingStructuredWorkout:
+        WatchRunningWorkoutTransfer?
+    private var pendingRouteAlerts:
+        WatchRouteAlertConfiguration?
+
     private var lastLocation: CLLocation?
+    private var plannedRouteLocations: [CLLocation] = []
+    private var plannedRouteCumulativeMeters: [Double] = []
+    private var plannedRouteGeometryMeters: Double = 0
+
+    private let speechSynthesizer =
+        AVSpeechSynthesizer()
+    private var nextDistanceAnnouncementMeters: Double?
+    private var nextTimeAnnouncementSeconds: TimeInterval?
+    private var offRouteStartedAt: Date?
+    private var lastOffRouteAlertAt: Date?
+    private var routeWasOff = false
     private var lastActiveCheckpointWriteAt: Date?
     private let activeCheckpointInterval: TimeInterval = 5
     private let manager = CLLocationManager()
