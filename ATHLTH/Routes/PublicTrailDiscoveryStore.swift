@@ -133,6 +133,21 @@ final class SupabasePublicTrailDiscoveryService {
 
         return response
     }
+    func fetch(
+        id: UUID
+    ) async throws -> PublicTrailRecord? {
+        let rows: [PublicTrailRecord] =
+            try await client
+                .from("public_trails")
+                .select()
+                .eq("id", value: id)
+                .limit(1)
+                .execute()
+                .value
+
+        return rows.first
+    }
+
 }
 
 @MainActor
@@ -289,6 +304,45 @@ final class PublicTrailDiscoveryStore:
                     "Public trails are temporarily unavailable."
             }
             isWarmingCache = false
+        }
+    }
+
+    func trail(
+        id: UUID
+    ) async -> PublicTrailRecord? {
+        if let existing =
+            trails.first(
+                where: {
+                    $0.id == id
+                }
+            ) {
+            return existing
+        }
+
+        do {
+            guard let resolved =
+                    try await service.fetch(
+                        id: id
+                    ),
+                  resolved.isUsable
+            else {
+                return nil
+            }
+
+            if !trails.contains(
+                where: {
+                    $0.id ==
+                        resolved.id
+                }
+            ) {
+                trails.append(resolved)
+            }
+
+            return resolved
+        } catch is CancellationError {
+            return nil
+        } catch {
+            return nil
         }
     }
 
