@@ -7,6 +7,8 @@ struct GhostRaceHubView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeStore
+    @EnvironmentObject private var social: SocialStore
 
     @State private var recentRuns: [WorkoutSummary] = []
     @State private var loading = false
@@ -24,6 +26,7 @@ struct GhostRaceHubView: View {
             LazyVStack(spacing: 18) {
                 hero
                 modeOverview
+                liveRunnersSection
                 audioCoachCard
                 targetGhostSection
                 pastSelfSection
@@ -49,10 +52,20 @@ struct GhostRaceHubView: View {
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await loadRuns()
+            async let runs: Void = loadRuns()
+            async let live: Void =
+                realtime.refreshLiveSessions()
+            async let presence: Void =
+                realtime.refreshOnlinePresence()
+            _ = await (runs, live, presence)
         }
         .refreshable {
-            await loadRuns()
+            async let runs: Void = loadRuns()
+            async let live: Void =
+                realtime.refreshLiveSessions()
+            async let presence: Void =
+                realtime.refreshOnlinePresence()
+            _ = await (runs, live, presence)
         }
         .alert(
             "Ghost Race",
@@ -151,6 +164,220 @@ struct GhostRaceHubView: View {
                 subtitle: "Challenge",
                 icon: "person.2.fill"
             )
+        }
+    }
+
+    @ViewBuilder
+    private var liveRunnersSection: some View {
+        let sessions =
+            realtime.activeLiveSessions
+                .filter {
+                    $0.ownerID !=
+                        session.profile.userID &&
+                    $0.activity == "running"
+                }
+                .prefix(8)
+
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text("LIVE RUNNERS")
+                            .font(
+                                .caption2.weight(
+                                    .bold
+                                )
+                            )
+                            .tracking(1.4)
+                            .foregroundStyle(
+                                ATHLTHTheme.vitality
+                            )
+
+                        Text(
+                            "See approved athletes while they run."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "dot.radiowaves.left.and.right"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+
+                if sessions.isEmpty {
+                    Text(
+                        "No shared live runs are available right now."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+                } else {
+                    ForEach(
+                        Array(sessions)
+                    ) { liveSession in
+                        let athlete =
+                            liveRunnerProfile(
+                                liveSession.ownerID
+                            )
+
+                        NavigationLink {
+                            LiveWorkoutViewerView(
+                                session: liveSession,
+                                athlete: athlete
+                            )
+                        } label: {
+                            HStack(spacing: 11) {
+                                if let athlete {
+                                    SocialAvatar(
+                                        profile: athlete,
+                                        size: 44
+                                    )
+                                    .overlay(
+                                        alignment:
+                                            .bottomTrailing
+                                    ) {
+                                        Circle()
+                                            .fill(
+                                                Color.green
+                                            )
+                                            .frame(
+                                                width: 12,
+                                                height: 12
+                                            )
+                                            .overlay {
+                                                Circle()
+                                                    .stroke(
+                                                        .white,
+                                                        lineWidth: 2
+                                                    )
+                                            }
+                                    }
+                                } else {
+                                    Image(
+                                        systemName:
+                                            "figure.run"
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .vitality
+                                    )
+                                    .frame(
+                                        width: 44,
+                                        height: 44
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .vitalitySoft,
+                                        in: Circle()
+                                    )
+                                }
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        athlete?
+                                            .resolvedName ??
+                                        "ATHLTH athlete"
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+
+                                    Text(
+                                        liveSession
+                                            .isGhostRace
+                                            ? "Ghost Race · live"
+                                            : "Running · live"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+
+                                Spacer()
+
+                                Text("LIVE")
+                                    .font(
+                                        .system(
+                                            size: 9,
+                                            weight: .bold
+                                        )
+                                    )
+                                    .tracking(1)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .vitality
+                                    )
+                                    .padding(
+                                        .horizontal,
+                                        7
+                                    )
+                                    .padding(
+                                        .vertical,
+                                        5
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .vitalitySoft,
+                                        in: Capsule()
+                                    )
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .tertiary
+                                )
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        if liveSession.id !=
+                            sessions.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func liveRunnerProfile(
+        _ userID: UUID
+    ) -> SocialProfileCard? {
+        (
+            social.following +
+            social.followers
+        )
+        .first {
+            $0.userID == userID
         }
     }
 
@@ -803,6 +1030,8 @@ struct GhostRaceHubView: View {
 
 struct GhostRaceLivePanel: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeStore
+    @EnvironmentObject private var session: AppSessionStore
 
     let snapshot: WatchWorkoutLiveSnapshot
 
@@ -850,7 +1079,57 @@ struct GhostRaceLivePanel: View {
                     )
                 }
             }
+            .task(
+                id:
+                    ghostRace.reference?
+                        .sourceWorkoutID
+            ) {
+                while !Task.isCancelled {
+                    await realtime
+                        .refreshLiveSessions()
+
+                    try? await Task.sleep(
+                        for: .seconds(15)
+                    )
+                }
+            }
+            .task(
+                id: livePeerSession?.id
+            ) {
+                if let livePeerSession {
+                    await realtime.watch(
+                        livePeerSession
+                    )
+                } else {
+                    await realtime
+                        .stopWatching()
+                }
+            }
+            .onDisappear {
+                Task {
+                    await realtime.stopWatching()
+                }
+            }
         }
+    }
+
+    private var livePeerSession:
+        LiveWorkoutSessionRecord? {
+        guard let reference =
+                ghostRace.reference
+        else {
+            return nil
+        }
+
+        return realtime
+            .sessions(
+                matchingGhostReferenceID:
+                    reference.sourceWorkoutID
+            )
+            .first {
+                $0.ownerID !=
+                    session.profile.userID
+            }
     }
 
     private func statusCard(
@@ -988,6 +1267,48 @@ struct GhostRaceLivePanel: View {
                                     lineWidth: 2
                                 )
                         }
+                }
+
+                if let livePeerSession,
+                   let livePeer =
+                        realtime
+                            .watchedLocation,
+                   livePeer.sessionID ==
+                        livePeerSession.id {
+                    Annotation(
+                        "Live rival",
+                        coordinate:
+                            livePeer.coordinate
+                    ) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    Color.orange
+                                )
+                                .frame(
+                                    width: 30,
+                                    height: 30
+                                )
+
+                            Image(
+                                systemName:
+                                    "figure.run"
+                            )
+                            .font(
+                                .caption.weight(
+                                    .bold
+                                )
+                            )
+                            .foregroundStyle(.white)
+                        }
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    .white,
+                                    lineWidth: 2
+                                )
+                        }
+                    }
                 }
             }
             .mapStyle(.standard(
