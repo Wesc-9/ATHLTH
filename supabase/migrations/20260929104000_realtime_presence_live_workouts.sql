@@ -244,7 +244,7 @@ returns trigger
 language plpgsql
 security invoker
 set search_path = pg_catalog, public, private
-as $
+as $body$
 begin
   if new.id <> old.id
      or new.owner_id <> old.owner_id
@@ -258,7 +258,7 @@ begin
 
   return new;
 end;
-$;
+$body$;
 
 revoke all on function private.guard_live_workout_session_identity()
   from public, anon;
