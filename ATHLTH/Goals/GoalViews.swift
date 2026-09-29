@@ -841,7 +841,9 @@ struct GoalCreationView: View {
     }
 
     private var identityStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        let imageButtonTitle = goalImageButtonTitle
+
+        return VStack(alignment: .leading, spacing: 18) {
             Text("Make it yours")
                 .font(.title2.bold())
 
@@ -863,7 +865,7 @@ struct GoalCreationView: View {
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 HStack {
                     Image(systemName: "photo.on.rectangle.angled")
-                    Text(goalImageButtonTitle)
+                    Text(imageButtonTitle)
                     Spacer()
                     Image(systemName: "chevron.right")
                 }
