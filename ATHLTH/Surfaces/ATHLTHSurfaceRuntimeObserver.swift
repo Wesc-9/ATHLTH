@@ -227,7 +227,10 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                     comparison
                         .estimatedTimeDeltaSeconds,
                 updatedAt:
-                    comparison.updatedAt
+                    comparison.updatedAt,
+                audio:
+                    settings
+                        .ghostRaceAudioConfiguration
             )
         }()
 
