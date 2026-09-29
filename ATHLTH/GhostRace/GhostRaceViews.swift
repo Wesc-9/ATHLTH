@@ -51,6 +51,8 @@ struct GhostRaceHubView: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var publicTrailDiscovery:
+        PublicTrailDiscoveryStore
 
     @State private var recentRuns: [WorkoutSummary] = []
     @State private var loading = false
@@ -281,7 +283,7 @@ struct GhostRaceHubView: View {
                         .font(.headline)
 
                     Text(
-                        "Choose a runner who is active now. Start your own run and ATHLTH compares your live distance with theirs while you train."
+                        "Choose a runner who is active now. When they share a route, ATHLTH loads the same course and compares your positions along it. If route data is unavailable, Live Ghost safely falls back to distance."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -291,7 +293,7 @@ struct GhostRaceHubView: View {
                     )
 
                     Text(
-                        "Best when both runners are using the same course and start from the same point."
+                        "Route-aware races ignore detours when calculating who is ahead."
                     )
                     .font(.caption2)
                     .foregroundStyle(
@@ -337,6 +339,22 @@ struct GhostRaceHubView: View {
                             .subheadline
                                 .weight(.semibold)
                         )
+
+                        if let routeTitle =
+                                liveSession.routeTitle,
+                           !routeTitle.isEmpty {
+                            Label(
+                                routeTitle,
+                                systemImage:
+                                    "point.topleft.down.to.point.bottomright.curvepath"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .lineLimit(1)
+                        }
                     }
 
                     Spacer()
@@ -751,6 +769,17 @@ struct GhostRaceHubView: View {
             nil
                 ? "Live run"
                 : "Live Ghost Run"
+
+        if let routeTitle =
+                liveSession.routeTitle,
+           !routeTitle.isEmpty {
+            return
+                ownerName +
+                " · " +
+                kind +
+                " · " +
+                routeTitle
+        }
 
         return
             ownerName +
@@ -1289,11 +1318,19 @@ struct GhostRaceHubView: View {
             liveSession
         )
 
+        let sharedRoute =
+            await resolveLiveGhostRoute(
+                liveSession
+            )
+
         do {
             try await GhostRaceStartService
                 .startLive(
                     title:
+                        liveSession.routeTitle ??
                         liveSession.title,
+                    route:
+                        sharedRoute,
                     ghostRace:
                         ghostRace,
                     watchConnection:
@@ -1308,6 +1345,38 @@ struct GhostRaceHubView: View {
             errorMessage =
                 error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func resolveLiveGhostRoute(
+        _ liveSession:
+            ATHLTHLiveWorkoutSession
+    ) async -> TrainingRoute? {
+        guard let routeKey =
+                liveSession.routeKey
+        else {
+            return nil
+        }
+
+        if let saved =
+                session.savedRoutes.first(
+                    where: {
+                        (
+                            $0.sharedSourceRouteID ??
+                            $0.id
+                        ) == routeKey
+                    }
+                ) {
+            return saved
+        }
+
+        if let publicTrail =
+                await publicTrailDiscovery
+                    .trail(id: routeKey) {
+            return publicTrail.trainingRoute
+        }
+
+        return nil
     }
 
     private func loadRuns() async {
