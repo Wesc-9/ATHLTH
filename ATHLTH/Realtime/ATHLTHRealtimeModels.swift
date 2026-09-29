@@ -96,7 +96,7 @@ struct LiveWorkoutLocationMessage: Codable, Hashable, Sendable {
     let ownerID: UUID
     let latitude: Double
     let longitude: Double
-    let capturedAt: Date
+    let capturedAt: TimeInterval
     let elapsedTime: TimeInterval
     let distanceMeters: Double
     let routeProgressPercent: Double?
@@ -123,6 +123,10 @@ struct LiveWorkoutLocationMessage: Codable, Hashable, Sendable {
             latitude: latitude,
             longitude: longitude
         )
+    }
+
+    var capturedDate: Date {
+        Date(timeIntervalSince1970: capturedAt)
     }
 }
 
