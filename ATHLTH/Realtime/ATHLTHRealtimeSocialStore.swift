@@ -49,9 +49,9 @@ struct ATHLTHLiveWorkoutSession: Identifiable, Codable, Hashable {
     let endedAt: Date?
     let createdAt: Date
     let updatedAt: Date?
-    let routeKey: UUID? = nil
-    let routeDistanceMeters: Double? = nil
-    let routeTitle: String? = nil
+    let routeKey: UUID?
+    let routeDistanceMeters: Double?
+    let routeTitle: String?
 
     enum CodingKeys: String, CodingKey {
         case id
