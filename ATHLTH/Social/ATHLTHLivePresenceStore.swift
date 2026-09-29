@@ -376,7 +376,7 @@ final class ATHLTHLivePresenceStore: ObservableObject {
             lastPointPublishedAt = nil
             lastPointLocation = nil
 
-            try? await client
+            _ = try? await client
                 .rpc("prune_live_workout_data")
                 .execute()
 
