@@ -771,6 +771,7 @@ struct AroundYouExploreView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var challenges: ChallengeStore
 
     @ObservedObject var locationStore: HomeLocationStore
@@ -2005,7 +2006,8 @@ struct AroundYouExploreView: View {
                         gear: gear,
                         phoneWorkout: phoneWorkout,
                         watchConnection:
-                            watchConnection
+                            watchConnection,
+                        ghostRace: ghostRace
                     )
 
                 routeActionMessage =
