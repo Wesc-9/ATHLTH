@@ -50,7 +50,22 @@ struct PhoneWorkout: Codable, Identifiable {
     var distanceMeters: Double = 0
     var points: [PhoneRoutePoint] = []
     var healthID: UUID?
-    var title: String { walking ? "iPhone Walk" : "iPhone Run" }
+    // Optional route metadata keeps older TestFlight recordings decodable
+    // while allowing iPhone route runs to use the same selected route as Watch.
+    var plannedRouteID: UUID? = nil
+    var plannedRouteTitle: String? = nil
+    var plannedRouteDistanceKilometers: Double? = nil
+    var plannedRouteCoordinates: [RouteCoordinate]? = nil
+    var workoutTitle: String? = nil
+    var title: String {
+        workoutTitle?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty == false
+            ? workoutTitle!
+            : walking
+                ? "iPhone Walk"
+                : "iPhone Run"
+    }
     func elapsed(at date: Date) -> TimeInterval {
         accumulatedSeconds + (resumedAt.map { max(0, date.timeIntervalSince($0)) } ?? 0)
     }
@@ -65,6 +80,8 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
     @Published private(set) var saving = false
     private var accountID: UUID?
     private var pendingWalking: Bool?
+    private var pendingRoute: TrainingRoute?
+    private var pendingWorkoutTitle: String?
     private var lastLocation: CLLocation?
     private var lastActiveCheckpointWriteAt: Date?
     private let activeCheckpointInterval: TimeInterval = 5
@@ -87,6 +104,8 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         manager.stopUpdatingLocation()
         accountID = userID
         pendingWalking = nil
+        pendingRoute = nil
+        pendingWorkoutTitle = nil
         active = userID.flatMap { AccountLocalStorage.read(PhoneWorkout.self, name: "phoneActive", userID: $0) }
         if var workout = active, workout.resumedAt != nil {
             workout.accumulatedSeconds = workout.elapsed(at: workout.lastCheckpoint)
@@ -112,13 +131,23 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         lastActiveCheckpointWriteAt = nil
     }
 
-    func start(walking: Bool) {
+    func start(
+        walking: Bool,
+        route: TrainingRoute? = nil,
+        title: String? = nil
+    ) {
         guard accountID != nil, !saving else { return }
         showingWorkout = true
         guard active == nil else { return }
         pendingWalking = walking
-        if manager.authorizationStatus == .notDetermined { manager.requestWhenInUseAuthorization() }
-        else { beginIfAuthorized() }
+        pendingRoute = route
+        pendingWorkoutTitle = title
+
+        if manager.authorizationStatus == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+        } else {
+            beginIfAuthorized()
+        }
     }
 
     private func beginIfAuthorized() {
@@ -127,14 +156,26 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
             message = "Allow location access in iPhone Settings to record an outdoor workout."
             return
         }
+        let route = pendingRoute
+        let workoutTitle = pendingWorkoutTitle
         pendingWalking = nil
+        pendingRoute = nil
+        pendingWorkoutTitle = nil
+
         let now = Date()
         active = PhoneWorkout(
             walking: walking,
             start: now,
             resumedAt: now,
             lastCheckpoint: now,
-            pauses: []
+            pauses: [],
+            plannedRouteID: route?.id,
+            plannedRouteTitle: route?.title,
+            plannedRouteDistanceKilometers:
+                route?.distanceKilometers,
+            plannedRouteCoordinates:
+                route?.coordinates,
+            workoutTitle: workoutTitle
         )
         message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
         lastLocation = nil
