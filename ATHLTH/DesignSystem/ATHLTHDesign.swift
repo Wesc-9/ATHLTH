@@ -397,11 +397,23 @@ struct ATHLTHTabHero: View {
                     .allowsHitTesting(false)
                 }
 
+                // Keep the status-bar edge visually clean. The old
+                // top vignette created a dark horizontal band above the hero.
+                // Only the lower edge receives a subtle readability fade.
                 LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.20),
-                        Color.clear,
-                        Color.black.opacity(0.20)
+                    stops: [
+                        .init(
+                            color: Color.clear,
+                            location: 0
+                        ),
+                        .init(
+                            color: Color.clear,
+                            location: 0.58
+                        ),
+                        .init(
+                            color: Color.black.opacity(0.18),
+                            location: 1
+                        )
                     ],
                     startPoint: .top,
                     endPoint: .bottom
