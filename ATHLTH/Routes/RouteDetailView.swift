@@ -1481,8 +1481,7 @@ struct RouteDetailView: View {
                     .controlSize(.large)
                     .disabled(
                         startingGhostAttemptID != nil ||
-                        settings.trainingDeviceProvider != .appleWatch ||
-                        !watchConnection.isReady
+                        phoneWorkout.active != nil
                     )
                 }
 
