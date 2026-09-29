@@ -611,41 +611,22 @@ struct ATHLTHCommunityView: View {
     }
 
     var body: some View {
-        let useImmersiveCommunityHero =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
-        return NavigationStack {
+        NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: Color.purple.opacity(0.42),
-                softTransition: true,
-                immersiveTransition: useImmersiveCommunityHero,
-                scrollFadeTransition: true
+                accent: Color.purple.opacity(0.42)
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
                         imageName: "CommunityHero",
                         title: "Community",
                         subtitle: "Train together. Go further.",
-                        height:
-                            useImmersiveCommunityHero
-                                ? 212
-                                : 190,
+                        height: 236,
                         alignment: .leading,
                         focalOffsetX: 0,
-                        focalOffsetY:
-                            useImmersiveCommunityHero
-                                ? 8
-                                : 18,
-                        titleFontSize:
-                            useImmersiveCommunityHero
-                                ? 30
-                                : 30,
-                        copyWidthFraction:
-                            useImmersiveCommunityHero
-                                ? 0.68
-                                : 0.80,
-                        immersiveCopy: useImmersiveCommunityHero
+                        focalOffsetY: 8,
+                        titleFontSize: 30,
+                        copyWidthFraction: 0.72,
+                        immersiveCopy: false
                     )
 
                     if session.currentRole.canAccessControlCenter {
@@ -721,7 +702,7 @@ struct ATHLTHCommunityView: View {
                     )
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, useImmersiveCommunityHero ? 12 : 16)
+                .padding(.top, 14)
                 .padding(.bottom, 30)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
