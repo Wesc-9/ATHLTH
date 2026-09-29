@@ -1,3 +1,4 @@
+import Foundation
 import MapKit
 import SwiftUI
 
@@ -633,9 +634,13 @@ struct RouteDetailView: View {
             )
         }
 
-        return Array(
-            NSOrderedSet(array: values)
-        ).compactMap { $0 as? String }
+        return values.reduce(into: [String]()) {
+            partialResult,
+            value in
+            if !partialResult.contains(value) {
+                partialResult.append(value)
+            }
+        }
     }
 
     private var premiumMetricDivider: some View {
@@ -1224,12 +1229,12 @@ struct RouteDetailView: View {
                         )
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(
+                    .buttonStyle(.borderedProminent)
+                    .tint(
                         savedCopy == nil
-                            ? .borderedProminent
-                            : .bordered
+                            ? ATHLTHTheme.accent
+                            : ATHLTHTheme.vitality
                     )
-                    .tint(ATHLTHTheme.accent)
                     .controlSize(.large)
                 }
 
