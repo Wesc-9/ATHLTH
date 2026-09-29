@@ -172,7 +172,9 @@ struct GhostRaceHubView: View {
         let sessions =
             realtime.visibleLiveSessions
                 .filter {
-                    $0.activity == "running"
+                    $0.activity == "running" &&
+                    $0.ownerID !=
+                        realtime.currentUserID
                 }
 
         if !sessions.isEmpty {
@@ -190,7 +192,7 @@ struct GhostRaceHubView: View {
                             )
 
                         Text(
-                            "Follow a live runner or open an active friend Ghost Run."
+                            "Watch a visible runner, or use their live distance as a lightweight Ghost while you run."
                         )
                         .font(.caption)
                         .foregroundStyle(
@@ -313,6 +315,69 @@ struct GhostRaceHubView: View {
                             .padding(
                                 .vertical,
                                 8
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            if realtime
+                                .selectedLiveGhostSessionID ==
+                                liveSession.id {
+                                realtime
+                                    .selectLiveGhost(
+                                        nil
+                                    )
+                            } else {
+                                realtime
+                                    .selectLiveGhost(
+                                        liveSession
+                                    )
+                            }
+                        } label: {
+                            HStack {
+                                Label(
+                                    realtime
+                                        .selectedLiveGhostSessionID ==
+                                        liveSession.id
+                                        ? "Live Ghost selected"
+                                        : "Use as Live Ghost",
+                                    systemImage:
+                                        realtime
+                                            .selectedLiveGhostSessionID ==
+                                            liveSession.id
+                                            ? "checkmark.circle.fill"
+                                            : "figure.run.circle"
+                                )
+
+                                Spacer()
+
+                                if realtime
+                                    .selectedLiveGhostSessionID ==
+                                    liveSession.id {
+                                    Text("iPhone")
+                                        .font(.caption2)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                }
+                            }
+                            .font(
+                                .caption.weight(
+                                    .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                realtime
+                                    .selectedLiveGhostSessionID ==
+                                    liveSession.id
+                                    ? ATHLTHTheme
+                                        .vitality
+                                    : ATHLTHTheme
+                                        .accentDeep
+                            )
+                            .padding(
+                                .vertical,
+                                7
                             )
                         }
                         .buttonStyle(.plain)
