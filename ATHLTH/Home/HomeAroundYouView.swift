@@ -1552,7 +1552,25 @@ struct AroundYouExploreView: View {
         route: TrainingRoute,
         profile: SocialProfileCard?
     ) -> some View {
-        if let url = creatorAvatarURL(
+        if isPublicTrailRoute(route) {
+            Circle()
+                .fill(
+                    ATHLTHTheme.vitalitySoft
+                )
+                .overlay {
+                    Image(
+                        systemName: "map.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+        } else if let url = creatorAvatarURL(
             route: route,
             profile: profile
         ) {
@@ -1597,6 +1615,10 @@ struct AroundYouExploreView: View {
         route: TrainingRoute,
         profile: SocialProfileCard?
     ) -> String {
+        if isPublicTrailRoute(route) {
+            return "Public Trail · OpenStreetMap"
+        }
+
         if route.ownerID == session.profile.userID {
             let username = session.profile.username
                 .trimmingCharacters(
@@ -1633,6 +1655,15 @@ struct AroundYouExploreView: View {
         }
 
         return URL(string: value)
+    }
+
+    private func isPublicTrailRoute(
+        _ route: TrainingRoute
+    ) -> Bool {
+        route.routeSource == "openstreetmap" ||
+        route.ownerID ==
+            PublicTrailRecord
+                .publicSourceOwnerID
     }
 
     private func previewLeaderboard(
@@ -1813,6 +1844,26 @@ struct AroundYouExploreView: View {
                         route.coordinates,
                     ownerID: route.ownerID,
                     isMine: true,
+                    trainingRoute: route
+                )
+        }
+
+        for trail in publicTrailDiscovery.trails {
+            let route = trail.trainingRoute
+
+            routesByID[route.id] =
+                AroundYouRouteItem(
+                    id: route.id,
+                    title: route.title,
+                    distanceKilometers:
+                        route.distanceKilometers,
+                    elevationGainMeters:
+                        route.elevationGainMeters,
+                    coordinates:
+                        route.coordinates,
+                    ownerID: route.ownerID,
+                    isMine: false,
+                    isPublicTrail: true,
                     trainingRoute: route
                 )
         }
