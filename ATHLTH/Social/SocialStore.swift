@@ -907,7 +907,8 @@ final class SocialStore: ObservableObject {
     func publishWorkout(
         _ workout: SocialPublishableWorkout,
         visibility: ProfileVisibility,
-        caption: String? = nil
+        caption: String? = nil,
+        routePreview: String? = nil
     ) async -> Bool {
         errorMessage = nil
 
@@ -946,6 +947,12 @@ final class SocialStore: ObservableObject {
 
             if let cleanCaption, !cleanCaption.isEmpty {
                 metadata["caption"] = cleanCaption
+            }
+
+            if let routePreview,
+               !routePreview.isEmpty {
+                metadata["route_preview"] = routePreview
+                metadata["route_preview_version"] = "1"
             }
 
             try await service.publishWorkoutActivity(
