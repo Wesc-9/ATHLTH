@@ -23,6 +23,7 @@ enum SocialHubTab: String, CaseIterable, Identifiable {
 struct ProfileFriendsSection: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     var body: some View {
         ATHLTHCard {
@@ -99,7 +100,10 @@ struct ProfileFriendsSection: View {
                                 FriendProfileView(userID: friend.userID)
                             } label: {
                                 VStack(spacing: 7) {
-                                    SocialAvatar(profile: friend, size: 54)
+                                    ATHLTHOnlineAvatar(
+                                        profile: friend,
+                                        size: 54
+                                    )
 
                                     Text(friend.resolvedName)
                                         .font(.caption.weight(.semibold))
@@ -115,12 +119,17 @@ struct ProfileFriendsSection: View {
                 }
             }
         }
+        .task {
+            await realtime.refreshOnlineUsers()
+            await realtime.refreshVisibleLiveSessions()
+        }
     }
 }
 
 struct SocialHubView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     let initialTab: SocialHubTab
 
@@ -233,12 +242,38 @@ struct SocialHubView: View {
             NewMessageView()
         }
         .task {
-            await social.refresh()
-            await messaging.refresh()
+            async let socialRefresh: Void =
+                social.refresh()
+            async let messageRefresh: Void =
+                messaging.refresh()
+            async let onlineRefresh: Void =
+                realtime.refreshOnlineUsers()
+            async let liveRefresh: Void =
+                realtime.refreshVisibleLiveSessions()
+
+            _ = await (
+                socialRefresh,
+                messageRefresh,
+                onlineRefresh,
+                liveRefresh
+            )
         }
         .refreshable {
-            await social.refresh()
-            await messaging.refresh()
+            async let socialRefresh: Void =
+                social.refresh()
+            async let messageRefresh: Void =
+                messaging.refresh()
+            async let onlineRefresh: Void =
+                realtime.refreshOnlineUsers()
+            async let liveRefresh: Void =
+                realtime.refreshVisibleLiveSessions()
+
+            _ = await (
+                socialRefresh,
+                messageRefresh,
+                onlineRefresh,
+                liveRefresh
+            )
         }
     }
 
@@ -254,6 +289,101 @@ struct SocialHubView: View {
                     } label: {
                         Label("Find", systemImage: "person.badge.plus")
                             .font(.caption.weight(.semibold))
+                    }
+                }
+
+                if !realtime.visibleLiveSessions.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(
+                            "Live now",
+                            systemImage:
+                                "dot.radiowaves.left.and.right"
+                        )
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme.vitality
+                        )
+
+                        ForEach(
+                            realtime.visibleLiveSessions
+                                .prefix(6)
+                        ) { session in
+                            NavigationLink {
+                                ATHLTHLiveWorkoutMapView(
+                                    session: session
+                                )
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(
+                                        systemName:
+                                            session.ghostChallengeID ==
+                                            nil
+                                                ? "figure.run"
+                                                : "flag.checkered"
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme.vitality
+                                    )
+                                    .frame(
+                                        width: 38,
+                                        height: 38
+                                    )
+                                    .background(
+                                        ATHLTHTheme.vitality
+                                            .opacity(0.10),
+                                        in: Circle()
+                                    )
+
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 2
+                                    ) {
+                                        Text(session.title)
+                                            .font(
+                                                .subheadline
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+                                            .foregroundStyle(
+                                                .primary
+                                            )
+
+                                        Text(
+                                            session.ghostChallengeID ==
+                                                nil
+                                                ? "Live workout"
+                                                : "Live Ghost Run"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+
+                                    Spacer()
+
+                                    Image(
+                                        systemName:
+                                            "chevron.right"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+                                .padding(12)
+                                .background(
+                                    Color(
+                                        .secondarySystemGroupedBackground
+                                    ),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 16
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
 
@@ -1593,6 +1723,7 @@ struct SocialPrivacySettingsView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     @State private var draft: SocialPrivacySettings?
     @State private var saving = false
@@ -1608,6 +1739,17 @@ struct SocialPrivacySettingsView: View {
                     }
 
                     Toggle("Allow follow requests", isOn: binding.allowFriendRequests)
+
+                    Toggle(
+                        "Show when I’m online",
+                        isOn: binding.showOnlineStatus
+                    )
+
+                    Text(
+                        "Online status is shown only to people who follow you. It turns off when ATHLTH is no longer active and expires automatically if the app cannot update it."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section("Messages") {
@@ -1624,6 +1766,52 @@ struct SocialPrivacySettingsView: View {
 
                 Section("Shared with allowed viewers") {
                     Toggle("Training now", isOn: binding.shareTrainingPresence)
+
+                    Toggle(
+                        "Share live workout position",
+                        isOn: binding.shareLiveWorkoutLocation
+                    )
+                    .onChange(
+                        of:
+                            binding.wrappedValue
+                                .shareLiveWorkoutLocation
+                    ) { _, enabled in
+                        if !enabled {
+                            draft?
+                                .shareLiveWorkoutHeartRate =
+                                false
+                        }
+                    }
+
+                    if binding.wrappedValue.shareLiveWorkoutLocation {
+                        Picker(
+                            "Live position audience",
+                            selection:
+                                binding.liveLocationVisibility
+                        ) {
+                            Text("Followers")
+                                .tag("followers")
+                            Text("Mutual follows")
+                                .tag("mutuals")
+                        }
+
+                        Toggle(
+                            "Share live heart rate",
+                            isOn:
+                                binding
+                                    .shareLiveWorkoutHeartRate
+                        )
+
+                        Text(
+                            binding.wrappedValue
+                                .shareLiveWorkoutHeartRate
+                                ? "Your current position and current workout heart rate can be shown to the selected live audience. ATHLTH keeps only the latest live point, and it expires after about 90 seconds."
+                                : "Your current position is shared only while a supported outdoor workout is active. Heart rate stays private. ATHLTH keeps only the latest point and it expires after about 90 seconds."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
                     Toggle("Trophy Cabinet", isOn: binding.shareTrophyCabinet)
                     Toggle("Recent activity", isOn: binding.shareRecentActivity)
@@ -1696,6 +1884,26 @@ struct SocialPrivacySettingsView: View {
                 goalStore.goals,
                 enabled: draft.shareGoals
             )
+
+            await realtime.configureOnlinePresence(
+                appIsActive: true,
+                enabled: draft.showOnlineStatus
+            )
+
+            if !draft.shareLiveWorkoutLocation {
+                if realtime.currentSession?
+                    .ghostChallengeID != nil {
+                    // Ghost Race can continue after the athlete stops
+                    // sharing their exact live position.
+                    await realtime
+                        .setCurrentLiveLocationSharing(
+                            false
+                        )
+                } else {
+                    await realtime
+                        .leaveCurrentLiveWorkout()
+                }
+            }
         }
 
         if let visibility = ProfileVisibility(rawValue: draft.profileVisibility) {

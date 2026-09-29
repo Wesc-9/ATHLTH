@@ -7,6 +7,7 @@ struct GhostFriendRaceHubView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     @StateObject private var friendRaces =
         GhostFriendRaceStore()
@@ -139,11 +140,15 @@ struct GhostFriendRaceHubView: View {
         .task {
             await social.refresh()
             await friendRaces.refresh()
+            await realtime.refreshOnlineUsers()
+            await realtime.refreshVisibleLiveSessions()
             await loadRuns()
         }
         .refreshable {
             await social.refresh()
             await friendRaces.refresh()
+            await realtime.refreshOnlineUsers()
+            await realtime.refreshVisibleLiveSessions()
             await loadRuns()
         }
         .alert(
@@ -212,12 +217,28 @@ struct GhostFriendRaceHubView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(
-                        profileName(
-                            challenge.senderID
+                    HStack(spacing: 6) {
+                        Text(
+                            profileName(
+                                challenge.senderID
+                            )
                         )
-                    )
-                    .font(.headline)
+                        .font(.headline)
+
+                        if realtime.isOnline(
+                            challenge.senderID
+                        ) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(
+                                    width: 8,
+                                    height: 8
+                                )
+                                .accessibilityLabel(
+                                    "Online"
+                                )
+                        }
+                    }
 
                     Text(challenge.title)
                         .font(.subheadline)
@@ -280,6 +301,28 @@ struct GhostFriendRaceHubView: View {
                     .buttonStyle(.bordered)
                 }
             } else if challenge.status == .accepted {
+                if let liveSession =
+                    realtime.visibleLiveSessions
+                        .first(
+                            where: {
+                                $0.ghostChallengeID ==
+                                    challenge.id
+                            }
+                        ) {
+                    NavigationLink {
+                        ATHLTHLiveWorkoutMapView(
+                            session: liveSession
+                        )
+                    } label: {
+                        Label(
+                            "Open live Ghost Run",
+                            systemImage:
+                                "location.circle.fill"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                }
+
                 Button {
                     Task {
                         await start(challenge)
@@ -480,6 +523,15 @@ struct GhostFriendRaceHubView: View {
                 settings:
                     settings
             )
+
+            if social.privacy?
+                .shareLiveWorkoutLocation ==
+                true {
+                _ = await realtime
+                    .beginGhostSession(
+                        challenge: challenge
+                    )
+            }
         } catch {
             localError =
                 error.localizedDescription
