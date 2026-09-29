@@ -509,7 +509,7 @@ struct ATHLTHEditProfileView: View {
     private var avatarPreview: some View {
         if let selectedAvatarData,
            let image = UIImage(data: selectedAvatarData) {
-            Image(uiImage: image)
+            SwiftUI.Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
                 .frame(width: 118, height: 118)
