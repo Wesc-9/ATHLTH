@@ -19,6 +19,7 @@ struct ATHLTHApp: App {
     @StateObject private var calendarSync = AppleCalendarSyncStore()
     @StateObject private var challengeStore = ChallengeStore()
     @StateObject private var social = SocialStore()
+    @StateObject private var realtimeSocial = ATHLTHRealtimeSocialStore()
     @StateObject private var messaging = MessagingStore()
     @StateObject private var communityEvents = CommunityEventStore()
     @StateObject private var officialWeeklyChallenges = OfficialWeeklyChallengeStore()
@@ -56,6 +57,7 @@ struct ATHLTHApp: App {
                 .environmentObject(calendarSync)
                 .environmentObject(challengeStore)
                 .environmentObject(social)
+                .environmentObject(realtimeSocial)
                 .environmentObject(messaging)
                 .environmentObject(communityEvents)
                 .environmentObject(officialWeeklyChallenges)
@@ -142,6 +144,7 @@ struct AppRootView: View {
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var officialWeeklyChallenges: OfficialWeeklyChallengeStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtimeSocial: ATHLTHRealtimeSocialStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var communityEvents: CommunityEventStore
     @EnvironmentObject private var communityGroups: CommunityGroupStore
@@ -213,6 +216,17 @@ struct AppRootView: View {
                     gearRefresh,
                     calendarRefresh
                 )
+
+                await realtimeSocial
+                    .configureOnlinePresence(
+                        appIsActive: true,
+                        enabled:
+                            social.privacy?
+                                .showOnlineStatus ??
+                            true
+                    )
+                await realtimeSocial
+                    .refreshVisibleLiveSessions()
             }
 
             if health.needsHealthRefreshRecovery {
@@ -284,6 +298,20 @@ struct AppRootView: View {
             phoneWorkout.checkpoint()
             if phase != .active {
                 strengthWorkout.checkpoint()
+            }
+
+            if appSession.signedIn {
+                Task {
+                    await realtimeSocial
+                        .configureOnlinePresence(
+                            appIsActive:
+                                phase == .active,
+                            enabled:
+                                social.privacy?
+                                    .showOnlineStatus ??
+                                true
+                        )
+                }
             }
 
             if phase != .active,
