@@ -585,6 +585,10 @@ struct ATHLTHHomeView: View {
                 _ = await (communityRefresh, activityRefresh)
             }
             .onAppear {
+                guard !session.previewModeEnabled else {
+                    return
+                }
+
                 let gettingStartedComplete =
                     hasCompletedProfileSetup &&
                     session.activePlan != nil &&
