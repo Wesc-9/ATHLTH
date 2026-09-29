@@ -5,10 +5,32 @@ struct ATHLTHExploreView: View {
 
     var body: some View {
         NavigationStack {
-            AroundYouExploreView(
-                locationStore: locationStore,
-                embeddedInTab: true
-            )
+            ATHLTHPinnedHeroLayout(
+                accent: Color.blue.opacity(0.42)
+            ) {
+                ATHLTHTabHero(
+                    imageName: "RecoveryHero",
+                    title: "Explore",
+                    subtitle:
+                        "Find routes, events and challenges around you.",
+                    height: 236,
+                    alignment: .leading,
+                    focalOffsetX: 0,
+                    focalOffsetY: 8,
+                    titleFontSize: 30,
+                    copyWidthFraction: 0.74,
+                    immersiveCopy: false
+                )
+            } content: {
+                AroundYouExploreView(
+                    locationStore: locationStore,
+                    embeddedInTab: true,
+                    embeddedInHeroLayout: true
+                )
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
         }
     }
 }
