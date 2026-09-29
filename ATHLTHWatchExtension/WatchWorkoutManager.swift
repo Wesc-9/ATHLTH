@@ -93,6 +93,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var structuredStepIndex = 0
     @Published private(set) var strengthSession:
         WatchStrengthSessionSnapshot?
+    @Published private(set) var liveSurfaceConfiguration:
+        ATHLTHLiveWorkoutSurfaceConfiguration =
+            ATHLTHLiveWorkoutPreferencesStore.load()
+    @Published private(set) var liveSurfaceContext:
+        ATHLTHLiveWorkoutContext = .empty
     @Published private(set) var completedResult: WatchWorkoutResult?
     @Published private(set) var errorMessage: String?
 
@@ -372,6 +377,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         publish {
             self.strengthSession = snapshot
+        }
+    }
+
+    func configureLiveSurface(
+        _ configuration: ATHLTHLiveWorkoutSurfaceConfiguration
+    ) {
+        ATHLTHLiveWorkoutPreferencesStore.save(configuration)
+
+        publish {
+            self.liveSurfaceConfiguration = configuration
+        }
+    }
+
+    func configureLiveSurfaceContext(
+        _ context: ATHLTHLiveWorkoutContext
+    ) {
+        publish {
+            self.liveSurfaceContext = context
         }
     }
 
@@ -673,6 +696,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.structuredRunningWorkout = nil
             self.structuredStepIndex = 0
             self.strengthSession = nil
+            self.liveSurfaceContext = .empty
             self.completedResult = nil
             self.errorMessage = nil
         }
@@ -2487,7 +2511,47 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             currentLongitude:
                 latestRoutePoint?.longitude,
             routeProgressPercent:
-                routeProgressPercent
+                routeProgressPercent,
+            currentPaceSecondsPerKilometer:
+                currentPaceSecondsPerKilometer,
+            routeRemainingMeters:
+                routeRemainingMeters,
+            routeDeviationMeters:
+                routeDeviationMeters,
+            routeDeviationThresholdMeters:
+                routeAlertConfiguration.deviationMeters,
+            heartRateTargetZone:
+                targetAlertConfiguration?.heartRateZone,
+            heartRateTargetMinimumBPM:
+                targetAlertConfiguration?
+                    .heartRateMinimumBPM,
+            heartRateTargetMaximumBPM:
+                targetAlertConfiguration?
+                    .heartRateMaximumBPM,
+            heartRateTargetStatus:
+                liveTargetStatus,
+            ghostRaceTitle:
+                ghostRaceTitle,
+            ghostDistanceDeltaMeters:
+                ghostDistanceDeltaMeters,
+            ghostTimeDeltaSeconds:
+                ghostTimeDeltaSeconds,
+            strengthExerciseName:
+                strengthSession?.exerciseName,
+            strengthSetIndex:
+                strengthSession.map { $0.setIndex + 1 },
+            strengthSetCount:
+                strengthSession?.setCount,
+            strengthReps:
+                strengthSession?.draftReps,
+            strengthWeightKilograms:
+                strengthSession?.draftWeightKilograms,
+            strengthRestEndsAt:
+                strengthSession?.restEndsAt,
+            liveSurfaceConfiguration:
+                liveSurfaceConfiguration,
+            liveSurfaceContext:
+                liveSurfaceContext
         )
 
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
