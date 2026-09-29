@@ -175,6 +175,12 @@ struct GhostFriendRaceHubView: View {
         .navigationTitle("Race a Friend")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            if watchConnection.isReady &&
+                settings.trainingDeviceProvider ==
+                    .appleWatch {
+                captureDevice = .appleWatch
+            }
+
             await social.refresh()
             await friendRaces.refresh()
             await realtime.refreshOnlineUsers()
@@ -382,10 +388,15 @@ struct GhostFriendRaceHubView: View {
                 .tint(ATHLTHTheme.vitality)
                 .disabled(
                     startingChallengeID != nil ||
-                    settings
-                        .trainingDeviceProvider !=
-                        .appleWatch ||
-                    !watchConnection.isReady
+                    (
+                        captureDevice == .iPhone
+                            ? phoneWorkout.active != nil
+                            : (
+                                !watchConnection.isReady ||
+                                watchConnection
+                                    .workoutLaunchInProgress
+                            )
+                    )
                 )
             }
         }
