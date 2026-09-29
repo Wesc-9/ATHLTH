@@ -317,10 +317,6 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
             visibleLiveSessions =
                 rows.filter(\.isActive)
-
-            try? await client
-                .rpc("prune_stale_live_workout_state")
-                .execute()
         } catch is CancellationError {
             return
         } catch {
