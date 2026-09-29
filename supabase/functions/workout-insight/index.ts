@@ -11,6 +11,15 @@ type Segment = {
   paceSecondsPerKilometer?: number | null;
 };
 
+type StrengthExercise = {
+  name?: string;
+  completedSets?: number;
+  totalReps?: number | null;
+  volumeKilograms?: number | null;
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
+};
+
 type WorkoutContext = {
   activity?: string;
   durationSeconds?: number;
@@ -27,6 +36,11 @@ type WorkoutContext = {
   averageRunningVerticalOscillationCentimeters?: number | null;
   averageRunningGroundContactTimeMilliseconds?: number | null;
   segments?: Segment[];
+  strengthTotalSets?: number | null;
+  strengthTotalReps?: number | null;
+  strengthTotalVolumeKilograms?: number | null;
+  strengthMuscleFocus?: string[];
+  strengthExercises?: StrengthExercise[];
 };
 
 type RequestBody = {
@@ -285,6 +299,53 @@ function sanitizeContext(input: WorkoutContext | undefined) {
             finiteNumber(segment?.paceSecondsPerKilometer, 60, 7200),
         }))
       : [],
+    strengthTotalSets:
+      finiteNumber(context.strengthTotalSets, 0, 500),
+    strengthTotalReps:
+      finiteNumber(context.strengthTotalReps, 0, 10000),
+    strengthTotalVolumeKilograms:
+      finiteNumber(
+        context.strengthTotalVolumeKilograms,
+        0,
+        10000000,
+      ),
+    strengthMuscleFocus:
+      Array.isArray(context.strengthMuscleFocus)
+        ? context.strengthMuscleFocus
+            .slice(0, 12)
+            .map((value) => String(value).slice(0, 48))
+        : [],
+    strengthExercises:
+      Array.isArray(context.strengthExercises)
+        ? context.strengthExercises
+            .slice(0, 20)
+            .map((exercise) => ({
+              name:
+                String(exercise?.name ?? "").slice(0, 80),
+              completedSets:
+                finiteNumber(exercise?.completedSets, 0, 50) ?? 0,
+              totalReps:
+                finiteNumber(exercise?.totalReps, 0, 2000),
+              volumeKilograms:
+                finiteNumber(
+                  exercise?.volumeKilograms,
+                  0,
+                  1000000,
+                ),
+              primaryMuscles:
+                Array.isArray(exercise?.primaryMuscles)
+                  ? exercise.primaryMuscles
+                      .slice(0, 8)
+                      .map((value) => String(value).slice(0, 48))
+                  : [],
+              secondaryMuscles:
+                Array.isArray(exercise?.secondaryMuscles)
+                  ? exercise.secondaryMuscles
+                      .slice(0, 8)
+                      .map((value) => String(value).slice(0, 48))
+                  : [],
+            }))
+        : [],
   };
 }
 
@@ -346,28 +407,36 @@ const schema = {
 };
 
 const instructions = `
-You are ATHLTH Coach. Write a short post-workout insight for a running or walking workout.
+You are ATHLTH Coach. Write a short post-workout insight for the supplied workout.
 
-Use only the supplied aggregate workout and route-segment data.
-The segment data intentionally contains no GPS coordinates.
+Use only the supplied aggregate workout data. Never invent missing measurements.
 
-Priorities:
+For running or walking:
 - Connect route profile, pace and heart-rate response when the data supports it.
-- Elevation gain/loss and heart-rate or pace changes occurring in the same segment may be described as coinciding, not as proven causation.
+- Elevation gain/loss and heart-rate or pace changes in the same segment may be described as coinciding, not as proven causation.
 - Notice pacing consistency, finishing pattern, heart-rate drift and whether effort changed with terrain.
-- If personal maximum heart rate is supplied, you may use it cautiously to contextualize relative intensity.
 - If route, heart-rate or pace data is missing, do not invent it.
+
+For strength training:
+- Use the supplied completed sets, reps, volume, exercise list and primary/secondary muscle metadata.
+- Describe the session's dominant training focus, distribution across muscle groups, and one concrete feature of the workload when supported.
+- Primary/secondary muscle labels describe exercise involvement; they are not direct measurements of muscle activation. Do not present them as EMG percentages or physiological measurements.
+- Do not claim recovery time, injury risk, hypertrophy, strength gains or fatigue state from one session unless those outcomes are directly supplied (they normally are not).
+- If load/reps/volume are missing, focus on exercise selection and recorded set count instead of inventing values.
+
+General rules:
+- If personal maximum heart rate is supplied, you may use it cautiously to contextualize relative intensity.
 - Do not diagnose health, fatigue, injury, illness or cardiovascular conditions.
 - Consumer wearable data is approximate.
 - Avoid generic praise. Prefer one concrete observation.
 - headline: 3-8 words.
 - summary: 1-2 concise sentences, roughly 25-60 words.
 - Also choose a visualRecipe for the workout card. This is art direction only; the app renders it natively.
-- visualRecipe must reflect the workout without inventing geography. Never infer an exact real-world location.
-- Use mountain/forest/coast/city/track/studio only as abstract visual mood, not as a claim about where the workout happened.
-- Prefer route motif when routePointCount indicates a route is available.
+- visualRecipe must not invent geography or workout facts.
+- For outdoor GPS workouts, prefer route motif when routePointCount indicates a route is available.
+- For strength workouts, prefer studio scene and a pulse or streak motif.
 - Keep the visual style bright, premium, modern, athletic and Scandinavian.
-- Use calm or steady for easier-looking sessions and energetic only when the supplied workout data supports a harder/longer effort.
+- Use calm or steady for easier-looking sessions and energetic only when the supplied workout data supports a harder or larger workload.
 `.trim();
 
 Deno.serve(async (req: Request) => {
