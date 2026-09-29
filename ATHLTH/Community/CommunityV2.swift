@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Community V2
 //
@@ -65,148 +66,221 @@ struct ATHLTHCommunityV2View: View {
     }
 
     var body: some View {
+        let immersive =
+            UIDevice.current.userInterfaceIdiom == .pad ||
+            UIScreen.main.bounds.width >= 390
+
         NavigationStack {
-            ZStack {
-                ATHLTHPremiumCanvas(
-                    accent:
-                        Color.indigo
-                            .opacity(0.20)
-                )
+            ATHLTHPinnedHeroLayout(
+                accent:
+                    Color.indigo
+                        .opacity(0.30),
+                softTransition: true,
+                immersiveTransition:
+                    immersive,
+                scrollFadeTransition: true
+            ) {
+                ZStack(
+                    alignment: .topTrailing
+                ) {
+                    ATHLTHTabHero(
+                        imageName:
+                            "CommunityHero",
+                        title:
+                            "Community",
+                        subtitle:
+                            "Better together. Find your people, show up, and keep moving.",
+                        height:
+                            immersive
+                                ? 232
+                                : 190,
+                        alignment: .center,
+                        focalOffsetX: 0,
+                        focalOffsetY:
+                            immersive
+                                ? 6
+                                : 12,
+                        titleFontSize:
+                            immersive
+                                ? 31
+                                : 30,
+                        copyWidthFraction:
+                            immersive
+                                ? 0.72
+                                : 0.84,
+                        immersiveCopy:
+                            immersive
+                    )
 
-                ScrollView {
-                    LazyVStack(
-                        spacing: 22
-                    ) {
-                        CommunityV2Hero(
-                            clubCount:
-                                groups
-                                    .joinedGroups
-                                    .count,
-                            eventCount:
-                                community
-                                    .upcomingEvents
-                                    .count,
-                            challengeCount:
-                                activeChallenges
-                                    .count,
-                            canManageWeekly:
-                                session
-                                    .currentRole
-                                    .canAccessControlCenter
-                        )
-
-                        if let weekly =
-                            officialChallenges
-                                .activeChallenge ??
-                            officialChallenges
-                                .upcomingChallenges
-                                .first {
-                            OfficialWeeklyChallengeCard(
-                                challenge: weekly,
-                                profiles:
-                                    social
-                                        .visibleProfiles +
-                                    social.friends
+                    if session
+                        .currentRole
+                        .canAccessControlCenter {
+                        NavigationLink {
+                            OfficialWeeklyChallengeAdminListView()
+                        } label: {
+                            Image(
+                                systemName:
+                                    "slider.horizontal.3"
                             )
-                            .padding(
-                                .horizontal,
-                                16
+                            .font(
+                                .system(
+                                    size: 15,
+                                    weight:
+                                        .semibold
+                                )
                             )
+                            .foregroundStyle(
+                                .white
+                            )
+                            .frame(
+                                width: 38,
+                                height: 38
+                            )
+                            .background(
+                                Color.black
+                                    .opacity(0.24),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white
+                                            .opacity(0.30),
+                                        lineWidth:
+                                            0.8
+                                    )
+                            }
                         }
-
-                        CommunityFriendsVsFriendsCard(
-                            currentUserID:
-                                session
-                                    .profile
-                                    .userID,
-                            currentDisplayName:
-                                session
-                                    .profile
-                                    .displayName,
-                            currentAvatarURL:
-                                session
-                                    .profile
-                                    .avatarURL,
-                            friends:
-                                social.friends,
-                            feed:
-                                social.feed,
-                            ownWorkouts:
-                                health.workouts
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            "Manage weekly challenges"
                         )
                         .padding(
-                            .horizontal,
-                            16
-                        )
-
-                        CommunityV2GatewaySection(
-                            clubCount:
-                                groups
-                                    .joinedGroups
-                                    .count,
-                            eventCount:
-                                community
-                                    .upcomingEvents
-                                    .count,
-                            challengeCount:
-                                activeChallenges
-                                    .count
+                            .top,
+                            immersive
+                                ? 58
+                                : 52
                         )
                         .padding(
-                            .horizontal,
+                            .trailing,
                             16
                         )
-
-                        CommunityV2ClubsSection(
-                            clubs:
-                                visibleClubs,
-                            groups: groups
-                        )
-                        .padding(
-                            .horizontal,
-                            16
-                        )
-
-                        CommunityV2EventsSection(
-                            events:
-                                visibleEvents
-                        )
-                        .padding(
-                            .horizontal,
-                            16
-                        )
-
-                        CommunityV2ChallengesSection(
-                            challenges:
-                                visibleChallenges
-                        )
-                        .padding(
-                            .horizontal,
-                            16
-                        )
-
-                        CommunityV2Footer()
-                            .padding(
-                                .horizontal,
-                                16
-                            )
-                            .padding(
-                                .bottom,
-                                28
-                            )
                     }
                 }
-                .scrollIndicators(.hidden)
-                .refreshable {
-                    await refreshCommunity(
-                        force: true
+            } content: {
+                LazyVStack(
+                    spacing: 16
+                ) {
+                    CommunityV2SnapshotCard(
+                        clubCount:
+                            groups
+                                .joinedGroups
+                                .count,
+                        eventCount:
+                            community
+                                .upcomingEvents
+                                .count,
+                        challengeCount:
+                            activeChallenges
+                                .count
                     )
+
+                    if let weekly =
+                        officialChallenges
+                            .activeChallenge ??
+                        officialChallenges
+                            .upcomingChallenges
+                            .first {
+                        OfficialWeeklyChallengeCard(
+                            challenge: weekly,
+                            profiles:
+                                social
+                                    .visibleProfiles +
+                                social.friends
+                        )
+                    }
+
+                    CommunityFriendsVsFriendsCard(
+                        currentUserID:
+                            session
+                                .profile
+                                .userID,
+                        currentDisplayName:
+                            session
+                                .profile
+                                .displayName,
+                        currentAvatarURL:
+                            session
+                                .profile
+                                .avatarURL,
+                        friends:
+                            social.friends,
+                        feed:
+                            social.feed,
+                        ownWorkouts:
+                            health.workouts
+                    )
+
+                    CommunityV2GatewaySection(
+                        clubCount:
+                            groups
+                                .joinedGroups
+                                .count,
+                        eventCount:
+                            community
+                                .upcomingEvents
+                                .count,
+                        challengeCount:
+                            activeChallenges
+                                .count
+                    )
+
+                    CommunityV2ClubsSection(
+                        clubs:
+                            visibleClubs,
+                        groups: groups
+                    )
+
+                    CommunityV2EventsSection(
+                        events:
+                            visibleEvents
+                    )
+
+                    CommunityV2ChallengesSection(
+                        challenges:
+                            visibleChallenges
+                    )
+
+                    CommunityV2Footer()
                 }
+                .padding(
+                    .horizontal,
+                    16
+                )
+                .padding(
+                    .top,
+                    8
+                )
+                .padding(
+                    .bottom,
+                    28
+                )
+                .frame(
+                    maxWidth: 900
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
             }
             .toolbar(
                 .hidden,
                 for: .navigationBar
             )
+            .refreshable {
+                await refreshCommunity(
+                    force: true
+                )
+            }
             .task {
                 await refreshCommunity()
             }
@@ -234,6 +308,95 @@ struct ATHLTHCommunityV2View: View {
                     refreshError ?? ""
                 )
             }
+        }
+    }
+
+    private struct CommunityV2SnapshotCard:
+        View
+    {
+        let clubCount: Int
+        let eventCount: Int
+        let challengeCount: Int
+
+        var body: some View {
+            ATHLTHCard {
+                HStack(spacing: 8) {
+                    snapshotMetric(
+                        value: clubCount,
+                        label: "Clubs",
+                        icon: "person.3.fill"
+                    )
+
+                    Divider()
+                        .frame(height: 34)
+
+                    snapshotMetric(
+                        value: eventCount,
+                        label: "Events",
+                        icon:
+                            "calendar.badge.clock"
+                    )
+
+                    Divider()
+                        .frame(height: 34)
+
+                    snapshotMetric(
+                        value:
+                            challengeCount,
+                        label:
+                            "Challenges",
+                        icon:
+                            "trophy.fill"
+                    )
+                }
+            }
+        }
+
+        private func snapshotMetric(
+            value: Int,
+            label: String,
+            icon: String
+        ) -> some View {
+            HStack(spacing: 8) {
+                Image(
+                    systemName: icon
+                )
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 1
+                ) {
+                    Text("\(value)")
+                        .font(
+                            .headline
+                                .weight(.bold)
+                        )
+                        .monospacedDigit()
+
+                    Text(label)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                }
+
+                Spacer(
+                    minLength: 0
+                )
+            }
+            .frame(
+                maxWidth: .infinity
+            )
         }
     }
 
