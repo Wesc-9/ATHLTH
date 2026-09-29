@@ -1,6 +1,8 @@
+import CryptoKit
 import Foundation
 import Security
 import UIKit
+@preconcurrency import AuthenticationServices
 @preconcurrency import SpotifyiOS
 
 struct SpotifyPlaylistReference: Identifiable, Codable, Hashable {
@@ -9,6 +11,42 @@ struct SpotifyPlaylistReference: Identifiable, Codable, Hashable {
     var uri: String
     var artworkURL: URL?
     var ownerName: String?
+}
+
+private struct SpotifyPKCESession: Codable {
+    var accessToken: String
+    var refreshToken: String?
+    var expiresAt: Date
+
+    var isExpired: Bool {
+        Date() >= expiresAt.addingTimeInterval(-60)
+    }
+}
+
+private struct SpotifyTokenResponse: Decodable {
+    let accessToken: String
+    let tokenType: String
+    let scope: String?
+    let expiresIn: Int
+    let refreshToken: String?
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case tokenType = "token_type"
+        case scope
+        case expiresIn = "expires_in"
+        case refreshToken = "refresh_token"
+    }
+}
+
+private struct SpotifyTokenErrorResponse: Decodable {
+    let error: String
+    let errorDescription: String?
+
+    enum CodingKeys: String, CodingKey {
+        case error
+        case errorDescription = "error_description"
+    }
 }
 
 enum SpotifyConnectionState: Equatable {
@@ -40,8 +78,14 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
     private let keychainService = "com.wesc9.athlth.spotify"
     private let keychainAccount = "spotify-session"
+    private let pkceKeychainAccount = "spotify-pkce-session"
 
     private var pendingPlaybackURI: String?
+    private var pkceSession: SpotifyPKCESession?
+    private var webAuthenticationSession: ASWebAuthenticationSession?
+    private var pkceCodeVerifier: String?
+    private var pkceAuthorizationState: String?
+    private var pkceFallbackAttempted = false
 
     private var clientID: String {
         let value =
@@ -135,6 +179,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
         connectionState = .connecting
         lastErrorMessage = nil
+        pkceFallbackAttempted = false
 
         let scopes: SPTScope = [
             .appRemoteControl,
@@ -154,7 +199,14 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     func disconnect() {
         appRemote?.disconnect()
         sessionManager?.session = nil
+        webAuthenticationSession?.cancel()
+        webAuthenticationSession = nil
+        pkceCodeVerifier = nil
+        pkceAuthorizationState = nil
+        pkceSession = nil
+        pkceFallbackAttempted = false
         deleteStoredSession()
+        deleteStoredPKCESession()
         playlists = []
         activePlaylist = nil
         lastStartedAt = nil
@@ -189,8 +241,12 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         }
 
         if let message = parameters[SPTAppRemoteErrorDescriptionKey] {
-            lastErrorMessage = message
-            connectionState = .error(message)
+            if shouldFallbackToPKCE(message) {
+                beginPKCEAuthorizationIfNeeded()
+            } else {
+                lastErrorMessage = message
+                connectionState = .error(message)
+            }
             return true
         }
 
@@ -203,7 +259,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             return
         }
 
-        guard let token = accessTokenForRequest() else {
+        guard let token = await accessTokenForRequest() else {
             connectionState = .disconnected
             playlists = []
             return
@@ -244,7 +300,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
         guard let appRemote else { return }
 
-        if let token = accessTokenForRequest() {
+        if let token = await accessTokenForRequest() {
             appRemote.connectionParameters.accessToken = token
         }
 
@@ -334,7 +390,40 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         }
     }
 
-    private func accessTokenForRequest() -> String? {
+    private func accessTokenForRequest() async -> String? {
+        if var pkceSession {
+            if pkceSession.isExpired {
+                guard let refreshToken = pkceSession.refreshToken else {
+                    self.pkceSession = nil
+                    deleteStoredPKCESession()
+                    connectionState = .disconnected
+                    return nil
+                }
+
+                do {
+                    let refreshed = try await refreshPKCESession(
+                        refreshToken: refreshToken
+                    )
+                    pkceSession.accessToken = refreshed.accessToken
+                    pkceSession.refreshToken =
+                        refreshed.refreshToken ?? refreshToken
+                    pkceSession.expiresAt = Date().addingTimeInterval(
+                        TimeInterval(refreshed.expiresIn)
+                    )
+                    applyPKCESession(pkceSession, connectRemote: false)
+                } catch {
+                    self.pkceSession = nil
+                    deleteStoredPKCESession()
+                    connectionState = .disconnected
+                    lastErrorMessage =
+                        "Spotify authorization expired. Reconnect Spotify."
+                    return nil
+                }
+            }
+
+            return self.pkceSession?.accessToken
+        }
+
         guard let sessionManager,
               let session = sessionManager.session
         else {
@@ -347,6 +436,275 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         }
 
         return session.accessToken
+    }
+
+    private func beginPKCEAuthorizationIfNeeded() {
+        guard isConfigured,
+              !pkceFallbackAttempted,
+              webAuthenticationSession == nil
+        else {
+            return
+        }
+
+        pkceFallbackAttempted = true
+        connectionState = .connecting
+        lastErrorMessage =
+            "Spotify app authorization failed. Retrying securely…"
+
+        let verifier = Self.makeCodeVerifier()
+        let state = UUID().uuidString
+        pkceCodeVerifier = verifier
+        pkceAuthorizationState = state
+
+        guard let challenge = Self.codeChallenge(for: verifier),
+              let callbackScheme = URL(string: redirectURI)?.scheme
+        else {
+            connectionState = .error("Could not prepare Spotify login.")
+            lastErrorMessage = "Could not prepare Spotify login."
+            return
+        }
+
+        var components = URLComponents(
+            string: "https://accounts.spotify.com/authorize"
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "client_id", value: clientID),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(
+                name: "scope",
+                value: [
+                    "app-remote-control",
+                    "playlist-read-private",
+                    "playlist-read-collaborative",
+                    "user-read-playback-state",
+                    "user-modify-playback-state"
+                ].joined(separator: " ")
+            ),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(name: "state", value: state)
+        ]
+
+        guard let authorizationURL = components?.url else {
+            connectionState = .error("Could not prepare Spotify login.")
+            lastErrorMessage = "Could not prepare Spotify login."
+            return
+        }
+
+        let authSession = ASWebAuthenticationSession(
+            url: authorizationURL,
+            callbackURLScheme: callbackScheme
+        ) { [weak self] callbackURL, error in
+            Task { @MainActor in
+                await self?.completePKCEAuthorization(
+                    callbackURL: callbackURL,
+                    error: error,
+                    verifier: verifier,
+                    expectedState: state
+                )
+            }
+        }
+
+        authSession.presentationContextProvider = self
+        authSession.prefersEphemeralWebBrowserSession = false
+        webAuthenticationSession = authSession
+
+        if !authSession.start() {
+            webAuthenticationSession = nil
+            connectionState = .error("Could not open Spotify login.")
+            lastErrorMessage = "Could not open Spotify login."
+        }
+    }
+
+    private func completePKCEAuthorization(
+        callbackURL: URL?,
+        error: Error?,
+        verifier: String,
+        expectedState: String
+    ) async {
+        defer {
+            webAuthenticationSession = nil
+            pkceCodeVerifier = nil
+            pkceAuthorizationState = nil
+        }
+
+        if let error {
+            let nsError = error as NSError
+            if nsError.domain == ASWebAuthenticationSessionError.errorDomain,
+               nsError.code ==
+                ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                connectionState = .disconnected
+                lastErrorMessage = nil
+            } else {
+                connectionState = .error(error.localizedDescription)
+                lastErrorMessage = error.localizedDescription
+            }
+            return
+        }
+
+        guard let callbackURL,
+              let components = URLComponents(
+                url: callbackURL,
+                resolvingAgainstBaseURL: false
+              )
+        else {
+            connectionState = .error("Spotify returned an invalid callback.")
+            lastErrorMessage = "Spotify returned an invalid callback."
+            return
+        }
+
+        let values = Dictionary(
+            uniqueKeysWithValues:
+                (components.queryItems ?? []).map {
+                    ($0.name, $0.value ?? "")
+                }
+        )
+
+        if let spotifyError = values["error"], !spotifyError.isEmpty {
+            let message =
+                values["error_description"]?.isEmpty == false
+                ? values["error_description"]!
+                : spotifyError
+            connectionState = .error(message)
+            lastErrorMessage = message
+            return
+        }
+
+        guard values["state"] == expectedState,
+              let code = values["code"],
+              !code.isEmpty
+        else {
+            connectionState = .error("Spotify login could not be verified.")
+            lastErrorMessage = "Spotify login could not be verified."
+            return
+        }
+
+        do {
+            let token = try await exchangeAuthorizationCode(
+                code,
+                verifier: verifier
+            )
+            let session = SpotifyPKCESession(
+                accessToken: token.accessToken,
+                refreshToken: token.refreshToken,
+                expiresAt: Date().addingTimeInterval(
+                    TimeInterval(token.expiresIn)
+                )
+            )
+            applyPKCESession(session, connectRemote: true)
+            await refreshPlaylists()
+        } catch {
+            connectionState = .error(error.localizedDescription)
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func exchangeAuthorizationCode(
+        _ code: String,
+        verifier: String
+    ) async throws -> SpotifyTokenResponse {
+        try await requestSpotifyToken([
+            URLQueryItem(name: "grant_type", value: "authorization_code"),
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "client_id", value: clientID),
+            URLQueryItem(name: "code_verifier", value: verifier)
+        ])
+    }
+
+    private func refreshPKCESession(
+        refreshToken: String
+    ) async throws -> SpotifyTokenResponse {
+        try await requestSpotifyToken([
+            URLQueryItem(name: "grant_type", value: "refresh_token"),
+            URLQueryItem(name: "refresh_token", value: refreshToken),
+            URLQueryItem(name: "client_id", value: clientID)
+        ])
+    }
+
+    private func requestSpotifyToken(
+        _ fields: [URLQueryItem]
+    ) async throws -> SpotifyTokenResponse {
+        guard let url = URL(
+            string: "https://accounts.spotify.com/api/token"
+        ) else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+
+        var form = URLComponents()
+        form.queryItems = fields
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(
+            "application/x-www-form-urlencoded",
+            forHTTPHeaderField: "Content-Type"
+        )
+        request.httpBody =
+            form.percentEncodedQuery?.data(using: .utf8)
+
+        let (data, response) =
+            try await URLSession.shared.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+
+        guard (200..<300).contains(http.statusCode) else {
+            if let apiError =
+                try? JSONDecoder().decode(
+                    SpotifyTokenErrorResponse.self,
+                    from: data
+                ) {
+                let message =
+                    apiError.errorDescription ?? apiError.error
+                throw SpotifyPlaybackError.authorizationMessage(message)
+            }
+            throw SpotifyPlaybackError.httpStatus(http.statusCode)
+        }
+
+        return try JSONDecoder().decode(
+            SpotifyTokenResponse.self,
+            from: data
+        )
+    }
+
+    private func shouldFallbackToPKCE(_ message: String) -> Bool {
+        let normalized = message.lowercased()
+        return normalized.contains("unknown_error")
+            || normalized.contains("unknown error")
+            || normalized.contains("no access token")
+    }
+
+    private func shouldFallbackToPKCE(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        let details = [
+            error.localizedDescription,
+            nsError.domain,
+            String(describing: nsError.userInfo)
+        ].joined(separator: " ")
+        return shouldFallbackToPKCE(details)
+    }
+
+    private static func makeCodeVerifier() -> String {
+        var bytes = [UInt8](repeating: 0, count: 48)
+        _ = SecRandomCopyBytes(
+            kSecRandomDefault,
+            bytes.count,
+            &bytes
+        )
+        return Data(bytes).base64URLEncodedString()
+    }
+
+    private static func codeChallenge(
+        for verifier: String
+    ) -> String? {
+        guard let data = verifier.data(using: .utf8) else {
+            return nil
+        }
+        return Data(SHA256.hash(data: data))
+            .base64URLEncodedString()
     }
 
     private func fetchPlaylists(
@@ -422,6 +780,26 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     private func restoreSessionIfAvailable() {
+        if let storedPKCE = readStoredPKCESession() {
+            pkceSession = storedPKCE
+            appRemote?.connectionParameters.accessToken =
+                storedPKCE.accessToken
+
+            if storedPKCE.isExpired {
+                connectionState = .connecting
+                Task {
+                    if await accessTokenForRequest() != nil {
+                        connectionState = .connected
+                        await refreshPlaylists()
+                    }
+                }
+            } else {
+                connectionState = .connected
+                Task { await refreshPlaylists() }
+            }
+            return
+        }
+
         guard let data = readStoredSession(),
               let session =
                 try? NSKeyedUnarchiver.unarchivedObject(
@@ -509,6 +887,86 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         SecItemDelete(query as CFDictionary)
     }
 
+    private func storePKCESession(_ session: SpotifyPKCESession) {
+        guard let data = try? JSONEncoder().encode(session) else {
+            return
+        }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: pkceKeychainAccount
+        ]
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String:
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+
+        let status = SecItemUpdate(
+            query as CFDictionary,
+            attributes as CFDictionary
+        )
+
+        if status == errSecItemNotFound {
+            var item = query
+            attributes.forEach { item[$0.key] = $0.value }
+            SecItemAdd(item as CFDictionary, nil)
+        }
+    }
+
+    private func readStoredPKCESession() -> SpotifyPKCESession? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: pkceKeychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(
+            query as CFDictionary,
+            &item
+        ) == errSecSuccess,
+              let data = item as? Data
+        else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(
+            SpotifyPKCESession.self,
+            from: data
+        )
+    }
+
+    private func deleteStoredPKCESession() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: pkceKeychainAccount
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
+    private func applyPKCESession(
+        _ session: SpotifyPKCESession,
+        connectRemote: Bool
+    ) {
+        pkceSession = session
+        storePKCESession(session)
+        sessionManager?.session = nil
+        deleteStoredSession()
+        appRemote?.connectionParameters.accessToken = session.accessToken
+        connectionState = .connected
+        lastErrorMessage = nil
+
+        if connectRemote {
+            appRemote?.connect()
+        }
+    }
+
     private func applySession(_ session: SPTSession) {
         sessionManager?.session = session
         storeSession(session)
@@ -552,8 +1010,12 @@ extension SpotifyPlaybackStore: SPTSessionManagerDelegate {
         didFailWith error: Error
     ) {
         Task { @MainActor in
-            self.lastErrorMessage = error.localizedDescription
-            self.connectionState = .error(error.localizedDescription)
+            if self.shouldFallbackToPKCE(error) {
+                self.beginPKCEAuthorizationIfNeeded()
+            } else {
+                self.lastErrorMessage = error.localizedDescription
+                self.connectionState = .error(error.localizedDescription)
+            }
         }
     }
 
@@ -637,9 +1099,44 @@ private struct SpotifyPlaylistPage: Decodable {
     let next: String?
 }
 
+extension SpotifyPlaybackStore:
+    ASWebAuthenticationPresentationContextProviding
+{
+    nonisolated func presentationAnchor(
+        for session: ASWebAuthenticationSession
+    ) -> ASPresentationAnchor {
+        MainActor.assumeIsolated {
+            let scenes = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+
+            if let keyWindow = scenes
+                .flatMap(\.windows)
+                .first(where: \.isKeyWindow) {
+                return keyWindow
+            }
+
+            if let window = scenes.first?.windows.first {
+                return window
+            }
+
+            return ASPresentationAnchor()
+        }
+    }
+}
+
+private extension Data {
+    func base64URLEncodedString() -> String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
 private enum SpotifyPlaybackError: LocalizedError {
     case invalidResponse
     case authorizationExpired
+    case authorizationMessage(String)
     case httpStatus(Int)
 
     var errorDescription: String? {
@@ -648,6 +1145,8 @@ private enum SpotifyPlaybackError: LocalizedError {
             return "Spotify returned an invalid response."
         case .authorizationExpired:
             return "Spotify authorization has expired. Reconnect Spotify."
+        case .authorizationMessage(let message):
+            return message
         case .httpStatus(let status):
             return "Spotify request failed (HTTP \(status))."
         }
