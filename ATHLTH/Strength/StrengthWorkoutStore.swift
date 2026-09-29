@@ -595,7 +595,7 @@ final class StrengthWorkoutStore: ObservableObject {
         restSeconds: Int? = nil
     ) {
         guard
-            let workout = activeWorkout,
+            var workout = activeWorkout,
             workout.exercises.indices.contains(currentExerciseIndex),
             workout.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex)
         else {
@@ -666,7 +666,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
     func moveToNextExercise() {
         guard
-            var workout = activeWorkout,
+            let workout = activeWorkout,
             workout.exercises.indices.contains(currentExerciseIndex),
             workout.exercises[currentExerciseIndex].sets.allSatisfy(\.isCompleted),
             hasNextExercise
