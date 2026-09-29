@@ -291,6 +291,58 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    private func ghostAudioConfiguration(
+        from context:
+            ATHLTHLiveGhostAudioContext?
+    ) -> WatchGhostRaceAudioConfiguration? {
+        guard let context else {
+            return nil
+        }
+
+        let periodic =
+            WatchAlertDelivery(
+                rawValue:
+                    context
+                        .periodicDeliveryRawValue
+            ) ?? .voice
+        let lead =
+            WatchAlertDelivery(
+                rawValue:
+                    context
+                        .leadChangeDeliveryRawValue
+            ) ?? .haptic
+        let important =
+            WatchAlertDelivery(
+                rawValue:
+                    context
+                        .importantLeadChangeDeliveryRawValue
+            ) ?? .both
+
+        return WatchGhostRaceAudioConfiguration(
+            enabled: context.enabled,
+            distanceIntervalMeters:
+                context
+                    .distanceIntervalMeters,
+            timeIntervalSeconds:
+                context
+                    .timeIntervalSeconds,
+            announceLeadChanges:
+                context
+                    .announceLeadChanges,
+            leadChangeThresholdMeters:
+                context
+                    .leadChangeThresholdMeters,
+            delivery: periodic,
+            periodicDelivery: periodic,
+            leadChangeDelivery: lead,
+            importantLeadChangeDelivery:
+                important,
+            importantLeadChangeMeters:
+                context
+                    .importantLeadChangeMeters
+        )
+    }
+
     var averagePaceSecondsPerKilometer: TimeInterval? {
         guard distanceMeters >= 100,
               elapsedTime > 0
@@ -442,7 +494,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if previousLiveGhostTitle !=
             liveGhost.title {
             resetGhostAnnouncementThresholds(
-                audio: liveGhost.audio
+                audio:
+                    ghostAudioConfiguration(
+                        from: liveGhost.audio
+                    )
             )
         }
 
@@ -470,7 +525,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         evaluateGhostRaceCoach(
             configuration:
-                liveGhost.audio,
+                ghostAudioConfiguration(
+                    from: liveGhost.audio
+                ),
             userDistance:
                 distanceMeters,
             distanceDelta:
