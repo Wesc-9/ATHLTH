@@ -326,11 +326,8 @@ struct RunQuickStartSheet: View {
     @State private var didLoadAudioCoachDefaults = false
 
     private var canStart: Bool {
-        if captureDevice == .iPhone {
-            return mode == .free
-        }
-
-        guard watchConnected else {
+        if captureDevice == .appleWatch,
+           !watchConnected {
             return false
         }
 
@@ -354,11 +351,9 @@ struct RunQuickStartSheet: View {
                     QuickStartWorkoutDeviceCard(
                         selection: $captureDevice,
                         watchConnected: watchConnected,
-                        iPhoneEnabled: mode == .free,
+                        iPhoneEnabled: true,
                         iPhoneSubtitle:
-                            mode == .free
-                                ? "Keep your iPhone with you to record GPS distance, pace and time."
-                                : "iPhone capture currently supports Free Run. Routes and structured workouts require Apple Watch."
+                            "Record the run with iPhone GPS. Selected routes stay attached to the workout."
                     )
 
                     selectionCard
@@ -408,13 +403,6 @@ struct RunQuickStartSheet: View {
             )
             .navigationTitle("Start Run")
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: mode) { _, newMode in
-                if newMode != .free,
-                   captureDevice == .iPhone,
-                   watchConnected {
-                    captureDevice = .appleWatch
-                }
-            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -736,9 +724,14 @@ struct RunQuickStartSheet: View {
 
     private var startButtonTitle: String {
         if captureDevice == .iPhone {
-            return mode == .free
-                ? "Start on iPhone"
-                : "Apple Watch Required"
+            switch mode {
+            case .free:
+                return "Start Free Run on iPhone"
+            case .route:
+                return "Start Route on iPhone"
+            case .structured:
+                return "Start Workout on iPhone"
+            }
         }
 
         guard watchConnected else {
