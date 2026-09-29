@@ -914,6 +914,8 @@ struct RunQuickStartSheet: View {
         return audioCoachDraft.configuration(
             routeDistanceMeters: routeDistanceMeters
         )
+    }
+
     private var distanceToSelectedRouteStart:
         CLLocationDistance?
     {
@@ -991,8 +993,6 @@ struct RunQuickStartSheet: View {
                     MKLaunchOptionsDirectionsModeWalking
             ]
         )
-    }
-
     }
 
 }
