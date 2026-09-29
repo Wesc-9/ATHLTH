@@ -98,7 +98,7 @@ final class SupabaseAccountService: ObservableObject {
                 .joined(separator: " ")
 
             if !displayName.isEmpty {
-                try? await client.auth.update(
+                _ = try? await client.auth.update(
                     user: UserAttributes(
                         data: [
                             "full_name": .string(displayName),
@@ -109,7 +109,7 @@ final class SupabaseAccountService: ObservableObject {
                 )
 
                 if let userID = currentUserID {
-                    try? await client
+                    _ = try? await client
                         .from("profiles")
                         .update(["display_name": displayName])
                         .eq("id", value: userID)
@@ -432,7 +432,7 @@ final class SupabaseAccountService: ObservableObject {
             .eq("id", value: userID)
             .execute()
 
-        try? await client.auth.update(
+        _ = try? await client.auth.update(
             user: UserAttributes(
                 data: ["full_name": .string(cleanName)]
             )
@@ -459,8 +459,8 @@ final class SupabaseAccountService: ObservableObject {
         try await client.storage
             .from("profile-avatars")
             .upload(
-                path: path,
-                file: jpegData,
+                path,
+                data: jpegData,
                 options: FileOptions(
                     cacheControl: "3600",
                     contentType: "image/jpeg",
