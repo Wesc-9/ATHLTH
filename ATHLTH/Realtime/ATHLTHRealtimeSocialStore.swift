@@ -203,6 +203,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     // latest-position samples while the live map is open.
     @Published private(set) var liveTrails:
         [UUID: [CLLocationCoordinate2D]] = [:]
+    @Published var selectedLiveGhostSessionID: UUID?
     @Published private(set) var isSharingLiveLocation = false
     @Published var errorMessage: String?
 
@@ -334,6 +335,18 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
             visibleLiveSessions =
                 rows.filter(\.isActive)
+
+            if let selectedLiveGhostSessionID,
+               !visibleLiveSessions.contains(
+                    where: {
+                        $0.id ==
+                            selectedLiveGhostSessionID
+                    }
+               ) {
+                self.selectedLiveGhostSessionID =
+                    nil
+                stopWatching()
+            }
         } catch is CancellationError {
             return
         } catch {
@@ -407,7 +420,6 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
             currentSession = session
             isSharingLiveLocation = true
-            startWatching(session)
             return session
         } catch {
             errorMessage = error.localizedDescription
@@ -439,7 +451,6 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
             currentSession = session
             isSharingLiveLocation = true
-            startWatching(session)
             return session
         } catch {
             errorMessage = error.localizedDescription
@@ -588,6 +599,54 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         }
     }
 
+    func selectLiveGhost(
+        _ session: ATHLTHLiveWorkoutSession?
+    ) {
+        guard let session else {
+            selectedLiveGhostSessionID = nil
+            stopWatching()
+            return
+        }
+
+        guard session.activity == "running",
+              session.ownerID != currentUserID
+        else {
+            return
+        }
+
+        selectedLiveGhostSessionID =
+            session.id
+        startWatching(session)
+    }
+
+    func liveGhostDeltaMeters(
+        ownDistanceMeters: Double
+    ) -> Double? {
+        guard let selectedLiveGhostSessionID,
+              let selectedSession =
+                visibleLiveSessions.first(
+                    where: {
+                        $0.id ==
+                            selectedLiveGhostSessionID
+                    }
+                ),
+              let livePoint =
+                liveLocations.first(
+                    where: {
+                        $0.sessionID ==
+                            selectedSession.id &&
+                        $0.userID ==
+                            selectedSession.ownerID
+                    }
+                )
+        else {
+            return nil
+        }
+
+        return ownDistanceMeters -
+            livePoint.distanceMeters
+    }
+
     func startWatching(
         _ session: ATHLTHLiveWorkoutSession
     ) {
@@ -729,6 +788,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
         isSharingLiveLocation = false
         lastPublishedLocationAt = nil
+
+        if selectedLiveGhostSessionID ==
+            session.id {
+            selectedLiveGhostSessionID =
+                nil
+        }
+
         stopWatching(
             keepCurrentSession: false
         )
