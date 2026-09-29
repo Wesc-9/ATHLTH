@@ -9,6 +9,9 @@ struct RouteDetailView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var publicTrailDiscovery:
         PublicTrailDiscoveryStore
 
@@ -32,6 +35,7 @@ struct RouteDetailView: View {
     @State private var similarTrails: [PublicTrailRecord] = []
     @State private var loadingSimilarTrails = false
     @State private var showingSimilarTrails = false
+    @State private var routeToStart: TrainingRoute?
 
     private var currentRoute: TrainingRoute {
         session.savedRoutes.first {
@@ -334,6 +338,18 @@ struct RouteDetailView: View {
                 .medium,
                 .large
             ])
+        }
+        .sheet(item: $routeToStart) { route in
+            RunQuickStartSheet(
+                trainingDeviceProvider:
+                    watchConnection.isReady
+                        ? .appleWatch
+                        : .none,
+                watchConnected: watchConnection.isReady,
+                initialRoute: route
+            ) { configuration in
+                launchRunFromDetails(configuration)
+            }
         }
         .sheet(isPresented: $showingFullLeaderboard) {
             NavigationStack {
@@ -1471,7 +1487,21 @@ struct RouteDetailView: View {
                     )
                 }
 
-                if settings.trainingDeviceProvider == .appleWatch {
+                if isPublicTrail {
+                    Button {
+                        routeToStart = currentRoute
+                    } label: {
+                        Label(
+                            "Start Route",
+                            systemImage: "play.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
+                    .controlSize(.large)
+                } else if settings.trainingDeviceProvider ==
+                    .appleWatch {
                     Button {
                         Task {
                             await startRouteOnWatch()
@@ -1948,6 +1978,46 @@ struct RouteDetailView: View {
 
         session.deleteSavedRoute(currentRoute.id)
         dismiss()
+    }
+
+    private func launchRunFromDetails(
+        _ configuration: RunQuickStartConfiguration
+    ) {
+        Task { @MainActor in
+            await social.beginWorkoutWithFriends(
+                title: configuration.title,
+                kind: .running,
+                friends: configuration.friends,
+                creatorName: session.profile.displayName,
+                creatorUsername: session.profile.username
+            )
+
+            do {
+                try await WorkoutLaunchCoordinator
+                    .startRunQuick(
+                        configuration: configuration,
+                        session: session,
+                        settings: settings,
+                        gear: gear,
+                        phoneWorkout: phoneWorkout,
+                        watchConnection:
+                            watchConnection
+                    )
+
+                watchMessage =
+                    "\(configuration.title) started" +
+                    (
+                        configuration.captureDevice ==
+                            .appleWatch
+                            ? " on Apple Watch."
+                            : " on iPhone."
+                    )
+            } catch {
+                await social.cancelActiveWorkout()
+                watchError =
+                    error.localizedDescription
+            }
+        }
     }
 
     @MainActor
