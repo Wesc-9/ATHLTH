@@ -9,6 +9,9 @@ struct WatchRoutePoint: Codable, Hashable {
 
 struct WatchRouteTransfer: Identifiable, Codable, Hashable {
     let id: UUID
+    // Stable cross-user identity for comparisons. Saved copies of the same
+    // shared/public route keep the original source ID here.
+    var comparisonRouteID: UUID? = nil
     var title: String
     var distanceKilometers: Double
     var elevationGainMeters: Double?
@@ -305,6 +308,12 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var currentLatitude: Double? = nil
     var currentLongitude: Double? = nil
     var routeProgressPercent: Double? = nil
+
+    // Stable route identity lets Live Ghost compare progress along the same
+    // course instead of treating every meter run as equivalent.
+    var routeComparisonID: UUID? = nil
+    var routeTitle: String? = nil
+    var routeDistanceMeters: Double? = nil
 
     // Optional presentation fields for Dynamic Island, Lock Screen and Watch.
     // Defaults keep older mirrored snapshots backwards compatible.
