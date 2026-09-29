@@ -524,21 +524,41 @@ struct IPhoneWorkoutView: View {
                             )
                         }
 
-                        Label(
-                            completion.leaderboardEligible
-                                ? "Eligible for route leaderboard"
-                                : "Route match was below leaderboard requirements",
-                            systemImage:
+                        if let rank =
+                                completion
+                                    .leaderboardRank,
+                           let fieldSize =
+                                completion
+                                    .leaderboardFieldSize {
+                            Label(
+                                "Leaderboard #\(rank) of \(fieldSize)",
+                                systemImage:
+                                    "list.number"
+                            )
+                            .font(
+                                .caption
+                                    .weight(.semibold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.vitality
+                            )
+                        } else {
+                            Label(
                                 completion.leaderboardEligible
-                                    ? "checkmark.seal.fill"
-                                    : "info.circle"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            completion.leaderboardEligible
-                                ? ATHLTHTheme.vitality
-                                : .secondary
-                        )
+                                    ? "Eligible for route leaderboard"
+                                    : "Route match was below leaderboard requirements",
+                                systemImage:
+                                    completion.leaderboardEligible
+                                        ? "checkmark.seal.fill"
+                                        : "info.circle"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                completion.leaderboardEligible
+                                    ? ATHLTHTheme.vitality
+                                    : .secondary
+                            )
+                        }
                     }
                 }
 
