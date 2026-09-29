@@ -2001,7 +2001,8 @@ struct RouteDetailView: View {
                         gear: gear,
                         phoneWorkout: phoneWorkout,
                         watchConnection:
-                            watchConnection
+                            watchConnection,
+                        ghostRace: ghostRace
                     )
 
                 watchMessage =
