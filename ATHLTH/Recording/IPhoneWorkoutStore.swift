@@ -1839,7 +1839,9 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
 
             updateLeaderboardRank(
                 attempts: attempts,
-                userID: userID
+                userID: userID,
+                currentWorkoutID:
+                    healthWorkoutID
             )
         } catch {
             // The workout and Health save are authoritative. Leaderboard
@@ -1849,7 +1851,8 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
 
     private func updateLeaderboardRank(
         attempts: [RouteAttemptRecord],
-        userID: UUID
+        userID: UUID,
+        currentWorkoutID: UUID
     ) {
         let eligible =
             attempts
@@ -1904,6 +1907,22 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                 rank + 1
             completion.leaderboardFieldSize =
                 ordered.count
+
+            let userBest =
+                attempts
+                    .filter {
+                        $0.userID == userID &&
+                        $0.leaderboardEligible
+                    }
+                    .min {
+                        $0.durationSeconds <
+                            $1.durationSeconds
+                    }
+
+            completion.personalBest =
+                userBest?.workoutID ==
+                currentWorkoutID
+
             lastRouteCompletion =
                 completion
         }
