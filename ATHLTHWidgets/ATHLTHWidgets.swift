@@ -876,11 +876,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             }
             return "LIVE"
         case .liveShare:
-            return "LIVE · \(max(
-                context.state.liveContext
-                    .liveShare?.viewerCount ?? 0,
-                0
-            ))"
+            return "LIVE · \(max(context.state.liveContext.liveShare?.viewerCount ?? 0, 0))"
         case .workout:
             if context.state.distanceMeters > 0 {
                 return String(
