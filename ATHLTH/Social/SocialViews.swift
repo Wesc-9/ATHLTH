@@ -706,6 +706,7 @@ private struct SocialActivityCard: View {
 struct FriendProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var livePresence: ATHLTHLivePresenceStore
     @EnvironmentObject private var messaging: MessagingStore
 
     let userID: UUID
@@ -948,6 +949,13 @@ struct FriendProfileView: View {
                         }
 
                         HStack(spacing: 6) {
+                            if livePresence.isOnline(userID) {
+                                relationshipPill(
+                                    "Online",
+                                    systemImage: "circle.fill"
+                                )
+                            }
+
                             if social.isMutualFollow(userID) {
                                 relationshipPill(
                                     "Mutual follow",
