@@ -2849,24 +2849,36 @@ struct ATHLTHTrainView: View {
                 }
             }
             .sheet(item: $pendingRunningTemplate) { workout in
-                QuickWorkoutStartSheet(
-                    kind: .running,
+                RunQuickStartSheet(
                     trainingDeviceProvider:
-                        watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady
-                ) { selectedFriends, gearIDs, audioCoach in
+                        watchConnection.isReady
+                            ? .appleWatch
+                            : .none,
+                    watchConnected:
+                        watchConnection.isReady,
+                    initialWorkout: workout
+                ) { configuration in
                     Task { @MainActor in
-                        await social.beginWorkoutWithFriends(
-                            title: workout.title,
-                            kind: .running,
-                            friends: selectedFriends,
-                            creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username
-                        )
-                        startRunningTemplate(
-                            workout,
-                            gearIDs: gearIDs,
-                            audioCoach: audioCoach
+                        await social
+                            .beginWorkoutWithFriends(
+                                title:
+                                    configuration
+                                        .title,
+                                kind: .running,
+                                friends:
+                                    configuration
+                                        .friends,
+                                creatorName:
+                                    session
+                                        .profile
+                                        .displayName,
+                                creatorUsername:
+                                    session
+                                        .profile
+                                        .username
+                            )
+                        startRunQuickWorkout(
+                            configuration
                         )
                     }
                 }
