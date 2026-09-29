@@ -301,6 +301,7 @@ struct HomeActivitySection: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
 
     @State private var showingPublish = false
@@ -313,17 +314,43 @@ struct HomeActivitySection: View {
     @State private var selectedOutdoorWorkoutID: UUID?
 
     private var ownWorkouts: [SocialPublishableWorkout] {
-        let healthItems = health.workouts.map(SocialPublishableWorkout.init)
+        // Prefer ATHLTH's local strength log when the same workout also
+        // exists in HealthKit. The local log carries exercise/muscle detail
+        // that the generic HealthKit workout summary cannot preserve.
+        let localStrengthItems =
+            strength.workoutHistory
+                .filter(\.isFinished)
+                .map(
+                    SocialPublishableWorkout.init
+                )
+        let localStrengthIDs =
+            Set(
+                localStrengthItems
+                    .map(\.id)
+            )
 
-        let localStrengthItems = strength.workoutHistory
-            .filter {
-                $0.isFinished &&
-                $0.healthMetrics.healthKitWorkoutUUID == nil
-            }
-            .map(SocialPublishableWorkout.init)
+        let healthItems =
+            health.workouts
+                .map(
+                    SocialPublishableWorkout.init
+                )
+                .filter {
+                    !(
+                        $0.activity ==
+                            .strength &&
+                        localStrengthIDs
+                            .contains($0.id)
+                    )
+                }
 
-        return (healthItems + localStrengthItems)
-            .sorted { $0.startDate > $1.startDate }
+        return (
+            healthItems +
+            localStrengthItems
+        )
+        .sorted {
+            $0.startDate >
+            $1.startDate
+        }
     }
 
     private var featuredWorkouts: [SocialPublishableWorkout] {
@@ -447,8 +474,22 @@ struct HomeActivitySection: View {
                     if workout.activity == .strength {
                         HomeActivityStrengthCard(
                             workout: workout,
-                            keyLifts: keyLifts(for: workout),
-                            isPublished: isPublished(workout)
+                            keyLifts:
+                                keyLifts(
+                                    for: workout
+                                ),
+                            muscleSummary:
+                                strengthMuscleSummary(
+                                    for: workout
+                                ),
+                            strengthWorkout:
+                                strengthWorkoutLog(
+                                    for: workout
+                                ),
+                            isPublished:
+                                isPublished(
+                                    workout
+                                )
                         ) {
                             presentPublish(workout)
                         }
@@ -661,10 +702,11 @@ struct HomeActivitySection: View {
     private func keyLifts(for workout: SocialPublishableWorkout) -> [String] {
         guard workout.activity == .strength else { return [] }
 
-        guard let log = strength.workoutHistory.first(where: {
-            $0.id == workout.id ||
-            $0.healthMetrics.healthKitWorkoutUUID == workout.id
-        }) else {
+        guard let log =
+            strengthWorkoutLog(
+                for: workout
+            )
+        else {
             return []
         }
 
@@ -674,6 +716,46 @@ struct HomeActivitySection: View {
                 .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                 .prefix(3)
         )
+    }
+
+    private func strengthWorkoutLog(
+        for workout: SocialPublishableWorkout
+    ) -> StrengthWorkoutLog? {
+        guard workout.activity ==
+            .strength
+        else {
+            return nil
+        }
+
+        return strength
+            .workoutHistory
+            .first {
+                $0.id == workout.id ||
+                $0
+                    .healthMetrics
+                    .healthKitWorkoutUUID ==
+                    workout.id
+            }
+    }
+
+    private func strengthMuscleSummary(
+        for workout: SocialPublishableWorkout
+    ) -> StrengthMuscleSessionSummary {
+        guard let log =
+            strengthWorkoutLog(
+                for: workout
+            )
+        else {
+            return .empty
+        }
+
+        return StrengthMuscleProfileBuilder
+            .make(
+                workout: log,
+                library:
+                    exerciseLibrary
+                        .allExercises
+            )
     }
 
     @MainActor
@@ -3889,6 +3971,8 @@ private struct HomeActivityFlowLines: Shape {
 private struct HomeActivityStrengthCard: View {
     let workout: SocialPublishableWorkout
     let keyLifts: [String]
+    let muscleSummary: StrengthMuscleSessionSummary
+    let strengthWorkout: StrengthWorkoutLog?
     let isPublished: Bool
     let onPost: () -> Void
 
@@ -4028,12 +4112,15 @@ private struct HomeActivityStrengthCard: View {
                     alignment: .leading
                 )
 
-                HomeActivityMuscleArtwork(
-                    muscleGroups: focusAreas
+                StrengthMuscleMapView(
+                    profile:
+                        muscleSummary
+                            .profile,
+                    compact: true
                 )
                 .frame(
-                    width: 118,
-                    height: 148
+                    width: 132,
+                    height: 158
                 )
             }
             .padding(12)
@@ -4099,16 +4186,31 @@ private struct HomeActivityStrengthCard: View {
             }
 
             NavigationLink {
-                WorkoutHistoryDetailView(workout: workout)
+                HomeActivityStrengthDetailView(
+                    workout: workout,
+                    strengthWorkout:
+                        strengthWorkout
+                )
             } label: {
                 HStack {
-                    Text("View workout")
-                        .font(.caption.weight(.semibold))
+                    Text("View muscle & exercise details")
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
                     Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.bold())
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .caption2.bold()
+                    )
                 }
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
             }
             .buttonStyle(.plain)
         }
@@ -4143,10 +4245,34 @@ private struct HomeActivityStrengthCard: View {
     }
 
     private var focusAreas: [String] {
-        Array(
-            (workout.strengthMuscleGroups ?? [])
-                .map { $0.capitalized }
+        let visualFocus =
+            muscleSummary
+                .profile
+                .topActivations
                 .prefix(4)
+                .map {
+                    $0.region.title
+                }
+
+        if !visualFocus.isEmpty {
+            return visualFocus
+        }
+
+        return Array(
+            (
+                workout
+                    .strengthMuscleGroups ??
+                []
+            )
+            .map {
+                $0
+                    .replacingOccurrences(
+                        of: "_",
+                        with: " "
+                    )
+                    .capitalized
+            }
+            .prefix(4)
         )
     }
 
