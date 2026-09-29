@@ -19,6 +19,8 @@ extension TrainingRoute {
     var watchTransfer: WatchRouteTransfer {
         WatchRouteTransfer(
             id: id,
+            comparisonRouteID:
+                sharedSourceRouteID ?? id,
             title: title,
             distanceKilometers: distanceKilometers,
             elevationGainMeters: elevationGainMeters,
