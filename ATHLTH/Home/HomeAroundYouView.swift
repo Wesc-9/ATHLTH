@@ -241,6 +241,51 @@ private enum AroundYouFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private enum ExploreRouteLengthFilter:
+    String,
+    CaseIterable,
+    Identifiable {
+    case any = "Any distance"
+    case under3 = "Under 3 km"
+    case threeToFive = "3–5 km"
+    case fiveToTen = "5–10 km"
+    case tenToTwenty = "10–20 km"
+    case twentyPlus = "20+ km"
+
+    var id: String { rawValue }
+
+    func matches(_ kilometers: Double) -> Bool {
+        switch self {
+        case .any:
+            return true
+        case .under3:
+            return kilometers < 3
+        case .threeToFive:
+            return kilometers >= 3 &&
+                kilometers < 5
+        case .fiveToTen:
+            return kilometers >= 5 &&
+                kilometers < 10
+        case .tenToTwenty:
+            return kilometers >= 10 &&
+                kilometers < 20
+        case .twentyPlus:
+            return kilometers >= 20
+        }
+    }
+}
+
+private enum ExploreRouteSort:
+    String,
+    CaseIterable,
+    Identifiable {
+    case nearest = "Nearest"
+    case shortest = "Shortest"
+    case longest = "Longest"
+
+    var id: String { rawValue }
+}
+
 struct HomeAroundYouSection: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var community: CommunityEventStore
@@ -751,15 +796,85 @@ struct AroundYouExploreView: View {
     @State private var shouldSearchVisibleArea = false
     @State private var isSearchingVisibleArea = false
     @State private var activeSearchCenter: CLLocation?
+    @State private var suppressNextSearchPrompt = false
+    @State private var routeLengthFilter:
+        ExploreRouteLengthFilter = .any
+    @State private var routeSort:
+        ExploreRouteSort = .nearest
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Map filter", selection: $filter) {
-                ForEach(AroundYouFilter.allCases) { option in
-                    Text(option.rawValue).tag(option)
+            HStack(spacing: 10) {
+                Picker("Map filter", selection: $filter) {
+                    ForEach(
+                        AroundYouFilter.allCases
+                    ) { option in
+                        Text(option.rawValue)
+                            .tag(option)
+                    }
                 }
+                .pickerStyle(.segmented)
+
+                Menu {
+                    Picker(
+                        "Distance",
+                        selection: $routeLengthFilter
+                    ) {
+                        ForEach(
+                            ExploreRouteLengthFilter
+                                .allCases
+                        ) { option in
+                            Text(option.rawValue)
+                                .tag(option)
+                        }
+                    }
+
+                    Divider()
+
+                    Picker(
+                        "Sort",
+                        selection: $routeSort
+                    ) {
+                        ForEach(
+                            ExploreRouteSort.allCases
+                        ) { option in
+                            Text(option.rawValue)
+                                .tag(option)
+                        }
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            routeLengthFilter == .any &&
+                            routeSort == .nearest
+                                ? "slider.horizontal.3"
+                                : "slider.horizontal.3.circle.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        routeLengthFilter == .any &&
+                        routeSort == .nearest
+                            ? ATHLTHTheme.accentDeep
+                            : ATHLTHTheme.vitality
+                    )
+                    .frame(width: 42, height: 32)
+                    .background(
+                        Color.primary.opacity(0.045),
+                        in: RoundedRectangle(
+                            cornerRadius: 10,
+                            style: .continuous
+                        )
+                    )
+                }
+                .accessibilityLabel(
+                    "Filter and sort routes"
+                )
             }
-            .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 8)
@@ -934,7 +1049,10 @@ struct AroundYouExploreView: View {
                 ) { context in
                     visibleRegion = context.region
 
-                    if hasSeenInitialCamera {
+                    if suppressNextSearchPrompt {
+                        suppressNextSearchPrompt = false
+                        shouldSearchVisibleArea = false
+                    } else if hasSeenInitialCamera {
                         shouldSearchVisibleArea = true
                     } else {
                         hasSeenInitialCamera = true
@@ -1942,16 +2060,27 @@ struct AroundYouExploreView: View {
 
         let values =
             Array(routesByID.values)
+                .filter {
+                    routeLengthFilter.matches(
+                        $0.distanceKilometers
+                    )
+                }
 
         guard let location =
                 activeSearchCenter ??
                 locationStore.location
         else {
-            return values
+            return values.sorted {
+                routeSort == .longest
+                    ? $0.distanceKilometers >
+                        $1.distanceKilometers
+                    : $0.distanceKilometers <
+                        $1.distanceKilometers
+            }
         }
 
-        return values
-            .compactMap {
+        let candidates =
+            values.compactMap {
                 route ->
                     (
                         AroundYouRouteItem,
@@ -1976,7 +2105,20 @@ struct AroundYouExploreView: View {
 
                 return (route, distance)
             }
-            .sorted { $0.1 < $1.1 }
+
+        return candidates
+            .sorted { lhs, rhs in
+                switch routeSort {
+                case .nearest:
+                    return lhs.1 < rhs.1
+                case .shortest:
+                    return lhs.0.distanceKilometers <
+                        rhs.0.distanceKilometers
+                case .longest:
+                    return lhs.0.distanceKilometers >
+                        rhs.0.distanceKilometers
+                }
+            }
             .map(\.0)
     }
 
@@ -2164,6 +2306,7 @@ struct AroundYouExploreView: View {
         let coordinate = location.coordinate
         activeSearchCenter = location
         shouldSearchVisibleArea = false
+        suppressNextSearchPrompt = true
         hasCenteredOnUser = true
 
         withAnimation(
