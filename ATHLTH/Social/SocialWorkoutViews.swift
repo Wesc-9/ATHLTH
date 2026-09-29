@@ -462,6 +462,8 @@ struct HomeActivitySection: View {
                             isAIInsightLoading:
                                 loadingAIInsightIDs
                                     .contains(workout.id),
+                            useAIVisuals:
+                                activityCenterAIVisualsEnabled,
                             onCoach: { insight in
                                 selectedCoachInsight =
                                     CoachInsightPresentation(
@@ -1060,6 +1062,7 @@ private struct HomeActivityOutdoorCard: View {
     let caption: String?
     let aiInsight: WorkoutAIInsight?
     let isAIInsightLoading: Bool
+    let useAIVisuals: Bool
     let onCoach: (WorkoutAIInsight) -> Void
     let onPost: () -> Void
 
@@ -1117,19 +1120,27 @@ private struct HomeActivityOutdoorCard: View {
             return nil
         }
 
-        return route
-            .filter {
-                $0.altitude.isFinite &&
+        let finite =
+            route.filter {
+                $0.altitude.isFinite
+            }
+        let verticallyAccurate =
+            finite.filter {
                 $0.verticalAccuracy >= 0
             }
-            .max {
-                $0.altitude < $1.altitude
-            }
+        let candidates =
+            verticallyAccurate.isEmpty
+                ? finite
+                : verticallyAccurate
+
+        return candidates.max {
+            $0.altitude < $1.altitude
+        }
     }
 
     private var visualRecipe:
         HomeActivityVisualRecipe {
-        if activityCenterAIVisualsEnabled,
+        if useAIVisuals,
            let recipe =
             aiInsight?.visualRecipe {
             return HomeActivityVisualRecipe(
@@ -1154,7 +1165,7 @@ private struct HomeActivityOutdoorCard: View {
             ZStack(alignment: .topLeading) {
                 mapBackground
 
-                if activityCenterAIVisualsEnabled {
+                if useAIVisuals {
                     HomeActivityScenicWash(
                         recipe: visualRecipe
                     )
@@ -1169,6 +1180,7 @@ private struct HomeActivityOutdoorCard: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 )
+                .opacity(useAIVisuals ? 1 : 0)
 
                 LinearGradient(
                     colors: [
@@ -1179,6 +1191,7 @@ private struct HomeActivityOutdoorCard: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .opacity(useAIVisuals ? 1 : 0)
 
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .top, spacing: 10) {
@@ -1264,8 +1277,11 @@ private struct HomeActivityOutdoorCard: View {
                     Spacer(minLength: 16)
                 }
                 .padding(16)
+                .opacity(useAIVisuals ? 1 : 0)
+                .allowsHitTesting(useAIVisuals)
 
-                if routeCoordinates.count >= 2 {
+                if useAIVisuals &&
+                    routeCoordinates.count >= 2 {
                     VStack {
                         Spacer()
 
@@ -1293,11 +1309,24 @@ private struct HomeActivityOutdoorCard: View {
                     .padding(15)
                     .allowsHitTesting(false)
                 }
+
+                if !useAIVisuals {
+                    premiumMapChrome
+                }
             }
-            .frame(height: 240)
+            .frame(
+                height:
+                    useAIVisuals
+                        ? 240
+                        : 285
+            )
             .clipped()
 
             VStack(spacing: 10) {
+                if !useAIVisuals {
+                    premiumWorkoutHeader
+                }
+
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 0) {
                         metric(
@@ -1346,11 +1375,12 @@ private struct HomeActivityOutdoorCard: View {
                     }
                 }
 
-                Button {
-                    if let aiInsight {
-                        onCoach(aiInsight)
-                    }
-                } label: {
+                if useAIVisuals {
+                    Button {
+                        if let aiInsight {
+                            onCoach(aiInsight)
+                        }
+                    } label: {
                     HStack(spacing: 11) {
                         Image(
                             systemName:
@@ -1444,20 +1474,27 @@ private struct HomeActivityOutdoorCard: View {
                         )
                     )
                 }
-                .buttonStyle(.plain)
-                .disabled(aiInsight == nil)
+                    .buttonStyle(.plain)
+                    .disabled(aiInsight == nil)
+                } else {
+                    premiumRouteLegend
+                }
             }
             .padding(12)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.12, green: 0.17, blue: 0.17).opacity(0.93),
-                        Color(red: 0.18, green: 0.23, blue: 0.22).opacity(0.91)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .background {
+                if useAIVisuals {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.12, green: 0.17, blue: 0.17).opacity(0.93),
+                            Color(red: 0.18, green: 0.23, blue: 0.22).opacity(0.91)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                } else {
+                    Color.white.opacity(0.98)
+                }
+            }
         }
         .background(Color.white.opacity(0.72))
         .clipShape(
@@ -1478,6 +1515,273 @@ private struct HomeActivityOutdoorCard: View {
             radius: 12,
             x: 0,
             y: 6
+        )
+    }
+
+    private var premiumMapChrome: some View {
+        VStack {
+            HStack {
+                Image(
+                    systemName:
+                        "square.3.layers.3d"
+                )
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .frame(width: 38, height: 38)
+                .background(
+                    .ultraThinMaterial,
+                    in: Circle()
+                )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white
+                                .opacity(0.72),
+                            lineWidth: 0.8
+                        )
+                }
+
+                Spacer()
+
+                Menu {
+                    Button {
+                        onPost()
+                    } label: {
+                        Label(
+                            isPublished
+                                ? "Update post"
+                                : "Post workout",
+                            systemImage:
+                                "square.and.arrow.up"
+                        )
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "ellipsis"
+                    )
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .frame(width: 38, height: 38)
+                    .background(
+                        .ultraThinMaterial,
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.white
+                                    .opacity(0.72),
+                                lineWidth: 0.8
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+        }
+        .padding(14)
+    }
+
+    private var premiumWorkoutHeader: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack(spacing: 8) {
+                Label(
+                    activityTitle,
+                    systemImage:
+                        workout.activity.icon
+                )
+                .font(
+                    .caption.weight(
+                        .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+
+                Text("•")
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                Text(
+                    workout.startDate.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                Spacer()
+
+                Text(
+                    isPublished
+                        ? "Published"
+                        : "Completed"
+                )
+                .font(
+                    .caption2.weight(
+                        .semibold
+                    )
+                )
+                .foregroundStyle(
+                    isPublished
+                        ? Color.green
+                        : ATHLTHTheme.mutedText
+                )
+            }
+
+            Text(displayTitle)
+                .font(
+                    .system(
+                        size: 20,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+
+            HStack(
+                alignment: .firstTextBaseline,
+                spacing: 10
+            ) {
+                Text(distanceText)
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                if let ascentText {
+                    Label(
+                        ascentText,
+                        systemImage:
+                            "mountain.2.fill"
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(.horizontal, 4)
+        .padding(.top, 2)
+    }
+
+    private var premiumRouteLegend: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Label(
+                    "Route Ribbon",
+                    systemImage:
+                        "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                .font(
+                    .caption.weight(
+                        .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                Spacer()
+
+                Text("Start → Finish")
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+            }
+
+            LinearGradient(
+                colors: [
+                    Color(
+                        red: 0.05,
+                        green: 0.62,
+                        blue: 0.49
+                    ),
+                    Color(
+                        red: 0.19,
+                        green: 0.78,
+                        blue: 0.45
+                    ),
+                    Color(
+                        red: 0.68,
+                        green: 0.86,
+                        blue: 0.27
+                    ),
+                    Color(
+                        red: 0.96,
+                        green: 0.73,
+                        blue: 0.18
+                    ),
+                    Color(
+                        red: 0.96,
+                        green: 0.45,
+                        blue: 0.12
+                    )
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 8)
+            .clipShape(Capsule())
+        }
+        .padding(
+            .horizontal,
+            12
+        )
+        .padding(
+            .vertical,
+            10
+        )
+        .background(
+            ATHLTHTheme.cardWarm
+                .opacity(0.64),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
         )
     }
 
@@ -1730,17 +2034,29 @@ private struct HomeActivityOutdoorCard: View {
         HStack(spacing: 7) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.90))
+                .foregroundStyle(
+                    useAIVisuals
+                        ? Color.white.opacity(0.90)
+                        : ATHLTHTheme.accentDeep
+                )
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 9.5))
-                    .foregroundStyle(.white.opacity(0.68))
+                    .foregroundStyle(
+                        useAIVisuals
+                            ? Color.white.opacity(0.68)
+                            : ATHLTHTheme.mutedText
+                    )
                     .lineLimit(1)
 
                 Text(value)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(
+                        useAIVisuals
+                            ? Color.white
+                            : ATHLTHTheme.primaryText
+                    )
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
             }
@@ -1751,7 +2067,11 @@ private struct HomeActivityOutdoorCard: View {
 
     private var metricDivider: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.22))
+            .fill(
+                useAIVisuals
+                    ? Color.white.opacity(0.22)
+                    : Color.black.opacity(0.10)
+            )
             .frame(width: 1, height: 34)
     }
 }
