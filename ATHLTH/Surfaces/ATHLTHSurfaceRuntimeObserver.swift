@@ -230,9 +230,43 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                         .estimatedTimeDeltaSeconds,
                 updatedAt:
                     comparison.updatedAt,
-                audio:
-                    settings
-                        .ghostRaceAudioConfiguration
+                audio: {
+                    let configuration =
+                        settings
+                            .ghostRaceAudioConfiguration
+
+                    return ATHLTHLiveGhostAudioContext(
+                        enabled:
+                            configuration.enabled,
+                        distanceIntervalMeters:
+                            configuration
+                                .distanceIntervalMeters,
+                        timeIntervalSeconds:
+                            configuration
+                                .timeIntervalSeconds,
+                        announceLeadChanges:
+                            configuration
+                                .announceLeadChanges,
+                        leadChangeThresholdMeters:
+                            configuration
+                                .leadChangeThresholdMeters,
+                        periodicDeliveryRawValue:
+                            configuration
+                                .resolvedPeriodicDelivery
+                                .rawValue,
+                        leadChangeDeliveryRawValue:
+                            configuration
+                                .resolvedLeadChangeDelivery
+                                .rawValue,
+                        importantLeadChangeDeliveryRawValue:
+                            configuration
+                                .resolvedImportantLeadChangeDelivery
+                                .rawValue,
+                        importantLeadChangeMeters:
+                            configuration
+                                .resolvedImportantLeadChangeMeters
+                    )
+                }()
             )
         }()
 
