@@ -116,6 +116,20 @@ struct ATHLTHLiveWorkoutLocation: Identifiable, Codable, Hashable {
     }
 }
 
+struct ATHLTHLiveGhostComparison: Equatable {
+    let sessionID: UUID
+    let opponentUserID: UUID
+    let opponentDistanceMeters: Double
+    let opponentElapsedSeconds: TimeInterval
+    let signedDistanceMeters: Double
+    let estimatedTimeDeltaSeconds: TimeInterval?
+    let updatedAt: Date
+
+    var userIsAhead: Bool {
+        signedDistanceMeters >= 0
+    }
+}
+
 private struct ATHLTHOnlinePresenceWrite: Encodable {
     let userID: UUID
     let isOnline: Bool
@@ -621,17 +635,25 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         startWatching(session)
     }
 
-    func liveGhostDeltaMeters(
-        ownDistanceMeters: Double
-    ) -> Double? {
-        guard let selectedLiveGhostSessionID,
-              let selectedSession =
-                visibleLiveSessions.first(
-                    where: {
-                        $0.id ==
-                            selectedLiveGhostSessionID
-                    }
-                ),
+    var selectedLiveGhostSession:
+        ATHLTHLiveWorkoutSession? {
+        guard let selectedLiveGhostSessionID
+        else {
+            return nil
+        }
+
+        return visibleLiveSessions.first {
+            $0.id ==
+                selectedLiveGhostSessionID
+        }
+    }
+
+    func liveGhostComparison(
+        ownDistanceMeters: Double,
+        ownElapsedSeconds: TimeInterval
+    ) -> ATHLTHLiveGhostComparison? {
+        guard let selectedSession =
+                selectedLiveGhostSession,
               let livePoint =
                 liveLocations.first(
                     where: {
@@ -645,8 +667,58 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             return nil
         }
 
-        return ownDistanceMeters -
-            livePoint.distanceMeters
+        let distanceDelta =
+            max(ownDistanceMeters, 0) -
+            max(livePoint.distanceMeters, 0)
+
+        let opponentAverageSpeed:
+            Double? = {
+            guard livePoint.elapsedSeconds > 10,
+                  livePoint.distanceMeters > 25
+            else {
+                return nil
+            }
+
+            let speed =
+                livePoint.distanceMeters /
+                livePoint.elapsedSeconds
+
+            return speed.isFinite &&
+                speed > 0.35
+                ? speed
+                : nil
+        }()
+
+        let timeDelta =
+            opponentAverageSpeed.map {
+                distanceDelta / $0
+            }
+
+        return ATHLTHLiveGhostComparison(
+            sessionID: selectedSession.id,
+            opponentUserID:
+                selectedSession.ownerID,
+            opponentDistanceMeters:
+                livePoint.distanceMeters,
+            opponentElapsedSeconds:
+                livePoint.elapsedSeconds,
+            signedDistanceMeters:
+                distanceDelta,
+            estimatedTimeDeltaSeconds:
+                timeDelta,
+            updatedAt:
+                livePoint.updatedAt
+        )
+    }
+
+    func liveGhostDeltaMeters(
+        ownDistanceMeters: Double
+    ) -> Double? {
+        liveGhostComparison(
+            ownDistanceMeters:
+                ownDistanceMeters,
+            ownElapsedSeconds: 0
+        )?.signedDistanceMeters
     }
 
     func startWatching(
