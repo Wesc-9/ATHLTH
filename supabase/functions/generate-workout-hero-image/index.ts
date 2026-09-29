@@ -269,6 +269,59 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  if (!existing) {
+    const utcDayStart =
+      new Date();
+    utcDayStart.setUTCHours(0, 0, 0, 0);
+
+    const { count: userDailyCount } =
+      await admin
+        .from("workout_hero_assets")
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq("user_id", user.id)
+        .gte(
+          "created_at",
+          utcDayStart.toISOString(),
+        );
+
+    if ((userDailyCount ?? 0) >= 6) {
+      return json(
+        {
+          status: "rate_limited",
+          reason:
+            "daily_user_generation_limit",
+        },
+        429,
+      );
+    }
+
+    const { count: globalDailyCount } =
+      await admin
+        .from("workout_hero_assets")
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .gte(
+          "created_at",
+          utcDayStart.toISOString(),
+        );
+
+    if ((globalDailyCount ?? 0) >= 80) {
+      return json(
+        {
+          status: "rate_limited",
+          reason:
+            "daily_service_generation_limit",
+        },
+        429,
+      );
+    }
+  }
+
   const cloudflareAccountID = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const cloudflareToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
 
