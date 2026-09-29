@@ -1,4 +1,5 @@
 import CoreLocation
+import MapKit
 import SwiftUI
 
 struct HomeActivityHeroArtwork: View {
@@ -8,10 +9,16 @@ struct HomeActivityHeroArtwork: View {
 
     var body: some View {
         ZStack {
-            HomeActivityGeneratedHeroArtwork(
-                recipe: recipe,
-                coordinates: coordinates
-            )
+            if coordinates.count >= 2 {
+                HomeActivityRouteRibbonMapArtwork(
+                    coordinates: coordinates
+                )
+            } else {
+                HomeActivityGeneratedHeroArtwork(
+                    recipe: recipe,
+                    coordinates: coordinates
+                )
+            }
 
             if let imageURL {
                 AsyncImage(url: imageURL) { phase in
@@ -92,13 +99,10 @@ struct HomeActivityHeroArtwork: View {
             .stroke(
                 LinearGradient(
                     colors: [
-                        Color(
-                            red: 0.35,
-                            green: 0.96,
-                            blue: 0.68
-                        ),
-                        Color.mint,
-                        Color.cyan
+                        Color(red: 0.08, green: 0.67, blue: 0.47),
+                        Color(red: 0.50, green: 0.84, blue: 0.32),
+                        Color(red: 0.98, green: 0.76, blue: 0.20),
+                        Color(red: 0.96, green: 0.38, blue: 0.20)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -114,7 +118,7 @@ struct HomeActivityHeroArtwork: View {
                 coordinates: coordinates
             )
             .stroke(
-                Color.white.opacity(0.44),
+                Color.white.opacity(0.46),
                 style: StrokeStyle(
                     lineWidth: 2,
                     lineCap: .round,
@@ -123,9 +127,268 @@ struct HomeActivityHeroArtwork: View {
             )
         }
         .shadow(
-            color: Color.mint.opacity(0.30),
-            radius: 10
+            color: Color.black.opacity(0.20),
+            radius: 8,
+            y: 4
         )
+    }
+}
+
+private struct HomeActivityRouteRibbonMapArtwork: View {
+    let coordinates: [CLLocationCoordinate2D]
+
+    private var startCoordinate: CLLocationCoordinate2D {
+        coordinates.first ?? CLLocationCoordinate2D()
+    }
+
+    private var finishCoordinate: CLLocationCoordinate2D {
+        coordinates.last ?? CLLocationCoordinate2D()
+    }
+
+    private var cameraPosition: MapCameraPosition {
+        .camera(
+            MapCamera(
+                centerCoordinate: routeCenter,
+                distance: cameraDistance,
+                heading: routeHeading,
+                pitch: 48
+            )
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            Map(
+                initialPosition: cameraPosition,
+                interactionModes: []
+            ) {
+                MapPolyline(coordinates: coordinates)
+                    .stroke(
+                        Color.black.opacity(0.20),
+                        style: StrokeStyle(
+                            lineWidth: 20,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+
+                MapPolyline(coordinates: coordinates)
+                    .stroke(
+                        Color.white.opacity(0.96),
+                        style: StrokeStyle(
+                            lineWidth: 14,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+
+                MapPolyline(coordinates: coordinates)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.05, green: 0.66, blue: 0.48),
+                                Color(red: 0.39, green: 0.82, blue: 0.40),
+                                Color(red: 0.94, green: 0.80, blue: 0.22),
+                                Color(red: 0.98, green: 0.45, blue: 0.20)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(
+                            lineWidth: 9,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+
+                MapPolyline(coordinates: coordinates)
+                    .stroke(
+                        Color.white.opacity(0.52),
+                        style: StrokeStyle(
+                            lineWidth: 2,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+
+                Annotation(
+                    "Start",
+                    coordinate: startCoordinate,
+                    anchor: .center
+                ) {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 18, height: 18)
+                        .overlay {
+                            Circle()
+                                .fill(
+                                    Color(
+                                        red: 0.05,
+                                        green: 0.66,
+                                        blue: 0.48
+                                    )
+                                )
+                                .padding(4)
+                        }
+                        .shadow(
+                            color: Color.black.opacity(0.20),
+                            radius: 5,
+                            y: 2
+                        )
+                }
+
+                Annotation(
+                    "Finish",
+                    coordinate: finishCoordinate,
+                    anchor: .center
+                ) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 25, height: 25)
+
+                        Image(systemName: "flag.checkered")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.black.opacity(0.84))
+                    }
+                    .shadow(
+                        color: Color.black.opacity(0.22),
+                        radius: 5,
+                        y: 2
+                    )
+                }
+            }
+            .mapStyle(
+                .standard(
+                    elevation: .realistic,
+                    emphasis: .muted,
+                    pointsOfInterest: .excludingAll,
+                    showsTraffic: false
+                )
+            )
+            .saturation(0.82)
+            .contrast(1.03)
+            .brightness(0.035)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.22),
+                    .clear,
+                    Color.white.opacity(0.08)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            LinearGradient(
+                colors: [
+                    .clear,
+                    Color.black.opacity(0.06)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var routeCenter: CLLocationCoordinate2D {
+        let latitudes = coordinates.map(\.latitude)
+        let longitudes = coordinates.map(\.longitude)
+
+        let minLatitude = latitudes.min() ?? 0
+        let maxLatitude = latitudes.max() ?? 0
+        let minLongitude = longitudes.min() ?? 0
+        let maxLongitude = longitudes.max() ?? 0
+
+        return CLLocationCoordinate2D(
+            latitude: (minLatitude + maxLatitude) / 2,
+            longitude: (minLongitude + maxLongitude) / 2
+        )
+    }
+
+    private var cameraDistance: CLLocationDistance {
+        let latitudes = coordinates.map(\.latitude)
+        let longitudes = coordinates.map(\.longitude)
+
+        guard let minLatitude = latitudes.min(),
+              let maxLatitude = latitudes.max(),
+              let minLongitude = longitudes.min(),
+              let maxLongitude = longitudes.max()
+        else {
+            return 2_500
+        }
+
+        let centerLatitude =
+            (minLatitude + maxLatitude) / 2
+
+        let northSouth =
+            CLLocation(
+                latitude: minLatitude,
+                longitude: routeCenter.longitude
+            )
+            .distance(
+                from:
+                    CLLocation(
+                        latitude: maxLatitude,
+                        longitude: routeCenter.longitude
+                    )
+            )
+
+        let eastWest =
+            CLLocation(
+                latitude: centerLatitude,
+                longitude: minLongitude
+            )
+            .distance(
+                from:
+                    CLLocation(
+                        latitude: centerLatitude,
+                        longitude: maxLongitude
+                    )
+            )
+
+        return max(
+            1_300,
+            max(northSouth, eastWest) * 2.25
+        )
+    }
+
+    private var routeHeading: CLLocationDirection {
+        guard coordinates.count >= 2 else {
+            return 0
+        }
+
+        let start = startCoordinate
+        let finish = finishCoordinate
+
+        let startLatitude =
+            start.latitude * .pi / 180
+        let finishLatitude =
+            finish.latitude * .pi / 180
+        let deltaLongitude =
+            (finish.longitude - start.longitude) *
+            .pi / 180
+
+        let y =
+            sin(deltaLongitude) *
+            cos(finishLatitude)
+        let x =
+            cos(startLatitude) *
+            sin(finishLatitude) -
+            sin(startLatitude) *
+            cos(finishLatitude) *
+            cos(deltaLongitude)
+
+        let degrees =
+            atan2(y, x) *
+            180 / .pi
+
+        return (degrees + 360)
+            .truncatingRemainder(
+                dividingBy: 360
+            )
     }
 }
 
