@@ -1106,7 +1106,7 @@ final class IPhoneWorkoutStore:
         distanceDelta: Double,
         timeDelta: TimeInterval,
         configuration:
-            WatchGhostRaceAudioConfiguration
+            WatchGhostRaceAudioConfiguration?
     ) {
         guard var workout = active,
               !workout.walking
@@ -1119,8 +1119,10 @@ final class IPhoneWorkoutStore:
             distanceDelta
         workout.ghostTimeDeltaSeconds =
             timeDelta
-        workout.ghostAudioConfiguration =
-            configuration
+        if let configuration {
+            workout.ghostAudioConfiguration =
+                configuration
+        }
 
         evaluateGhostUpdates(
             workout: workout,
