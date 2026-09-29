@@ -112,6 +112,7 @@ final class ApplePlaceDiscoveryService {
         async let naturePOIs = pointOfInterestSearch(
             region: region,
             categories: [
+                .hiking,
                 .park,
                 .nationalPark,
                 .campground
@@ -119,23 +120,15 @@ final class ApplePlaceDiscoveryService {
             kind: .nature
         )
 
-        async let trailFeatures = naturalFeatureSearch(
-            region: region,
-            query: "hiking trail"
-        )
-
         let gymResults =
             await gyms
         let naturePOIResults =
             await naturePOIs
-        let trailResults =
-            await trailFeatures
 
         let insideRegion =
             (
                 gymResults +
-                naturePOIResults +
-                trailResults
+                naturePOIResults
             )
             .filter {
                 contains(
@@ -173,39 +166,6 @@ final class ApplePlaceDiscoveryService {
                 place(
                     from: $0,
                     kind: kind
-                )
-            }
-        } catch is CancellationError {
-            search.cancel()
-            return []
-        } catch {
-            return []
-        }
-    }
-
-    private func naturalFeatureSearch(
-        region: MKCoordinateRegion,
-        query: String
-    ) async -> [AppleMapPlace] {
-        let request = MKLocalSearch.Request()
-        request.region = region
-        request.naturalLanguageQuery = query
-        request.resultTypes = [
-            .pointOfInterest,
-            .physicalFeature
-        ]
-
-        let search = MKLocalSearch(
-            request: request
-        )
-
-        do {
-            let response = try await search.start()
-
-            return response.mapItems.compactMap {
-                place(
-                    from: $0,
-                    kind: .nature
                 )
             }
         } catch is CancellationError {
