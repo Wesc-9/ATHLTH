@@ -82,6 +82,7 @@ struct ATHLTHLiveWorkoutLocation: Identifiable, Codable, Hashable {
     let horizontalAccuracy: Double?
     let speedMetersPerSecond: Double?
     let courseDegrees: Double?
+    let heartRateBPM: Double?
     let distanceMeters: Double
     let elapsedSeconds: Double
     let updatedAt: Date
@@ -95,6 +96,7 @@ struct ATHLTHLiveWorkoutLocation: Identifiable, Codable, Hashable {
         case horizontalAccuracy = "horizontal_accuracy"
         case speedMetersPerSecond = "speed_meters_per_second"
         case courseDegrees = "course_degrees"
+        case heartRateBPM = "heart_rate_bpm"
         case distanceMeters = "distance_meters"
         case elapsedSeconds = "elapsed_seconds"
         case updatedAt = "updated_at"
@@ -160,6 +162,7 @@ private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
     let horizontalAccuracy: Double?
     let speedMetersPerSecond: Double?
     let courseDegrees: Double?
+    let heartRateBPM: Double?
     let distanceMeters: Double
     let elapsedSeconds: Double
     let updatedAt: Date
@@ -173,6 +176,7 @@ private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
         case horizontalAccuracy = "horizontal_accuracy"
         case speedMetersPerSecond = "speed_meters_per_second"
         case courseDegrees = "course_degrees"
+        case heartRateBPM = "heart_rate_bpm"
         case distanceMeters = "distance_meters"
         case elapsedSeconds = "elapsed_seconds"
         case updatedAt = "updated_at"
@@ -195,6 +199,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     @Published private(set) var visibleLiveSessions: [ATHLTHLiveWorkoutSession] = []
     @Published private(set) var currentSession: ATHLTHLiveWorkoutSession?
     @Published private(set) var liveLocations: [ATHLTHLiveWorkoutLocation] = []
+    // Viewer-only trail. Nothing here is persisted; it is rebuilt from fresh
+    // latest-position samples while the live map is open.
+    @Published private(set) var liveTrails:
+        [UUID: [CLLocationCoordinate2D]] = [:]
     @Published private(set) var isSharingLiveLocation = false
     @Published var errorMessage: String?
 
@@ -433,7 +441,8 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     func publishLocation(
         _ location: CLLocation,
         distanceMeters: Double,
-        elapsedSeconds: TimeInterval
+        elapsedSeconds: TimeInterval,
+        heartRateBPM: Double? = nil
     ) async {
         guard let session = currentSession,
               session.isActive,
@@ -483,6 +492,12 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 location.horizontalAccuracy,
             speedMetersPerSecond: speed,
             courseDegrees: course,
+            heartRateBPM:
+                heartRateBPM.flatMap {
+                    $0.isFinite && $0 > 0
+                        ? $0
+                        : nil
+                },
             distanceMeters:
                 max(distanceMeters, 0),
             elapsedSeconds:
@@ -538,6 +553,11 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             horizontalAccuracy: nil,
             speedMetersPerSecond: nil,
             courseDegrees: nil,
+            heartRateBPM:
+                snapshot.heartRate > 0 &&
+                snapshot.heartRate.isFinite
+                    ? snapshot.heartRate
+                    : nil,
             distanceMeters:
                 max(snapshot.distanceMeters, 0),
             elapsedSeconds:
@@ -563,7 +583,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         _ session: ATHLTHLiveWorkoutSession
     ) {
         watcherTask?.cancel()
-        currentSession = session
+        liveTrails = [:]
+
+        if let currentUserID,
+           session.ownerID == currentUserID ||
+           session.opponentUserID == currentUserID {
+            currentSession = session
+        }
 
         watcherTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -594,10 +620,58 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         watcherTask?.cancel()
         watcherTask = nil
         liveLocations = []
+        liveTrails = [:]
 
         if !keepCurrentSession {
             currentSession = nil
         }
+    }
+
+    func setCurrentLiveLocationSharing(
+        _ enabled: Bool
+    ) async {
+        guard let session = currentSession,
+              session.isActive,
+              let currentUserID,
+              session.ownerID == currentUserID ||
+              session.opponentUserID == currentUserID
+        else {
+            isSharingLiveLocation = false
+            return
+        }
+
+        if enabled {
+            isSharingLiveLocation = true
+            lastPublishedLocationAt = nil
+            return
+        }
+
+        isSharingLiveLocation = false
+        lastPublishedLocationAt = nil
+
+        do {
+            try await client
+                .from("live_workout_locations")
+                .delete()
+                .eq(
+                    "session_id",
+                    value: session.id
+                )
+                .eq(
+                    "user_id",
+                    value: currentUserID
+                )
+                .execute()
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        liveLocations.removeAll {
+            $0.userID == currentUserID
+        }
+        liveTrails[currentUserID] = nil
     }
 
     func leaveCurrentLiveWorkout() async {
@@ -699,12 +773,76 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     .execute()
                     .value
 
-            liveLocations =
+            let fresh =
                 rows.filter(\.isFresh)
+            liveLocations = fresh
+            appendFreshTrailSamples(
+                fresh
+            )
         } catch is CancellationError {
             return
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func appendFreshTrailSamples(
+        _ locations: [ATHLTHLiveWorkoutLocation]
+    ) {
+        let maximumTrailPoints = 120
+        let minimumTrailSpacingMeters = 3.0
+
+        for location in locations {
+            var trail =
+                liveTrails[
+                    location.userID,
+                    default: []
+                ]
+
+            let shouldAppend: Bool
+            if let last = trail.last {
+                let previous =
+                    CLLocation(
+                        latitude:
+                            last.latitude,
+                        longitude:
+                            last.longitude
+                    )
+                let current =
+                    CLLocation(
+                        latitude:
+                            location.latitude,
+                        longitude:
+                            location.longitude
+                    )
+                shouldAppend =
+                    current.distance(
+                        from: previous
+                    ) >=
+                    minimumTrailSpacingMeters
+            } else {
+                shouldAppend = true
+            }
+
+            guard shouldAppend else {
+                continue
+            }
+
+            trail.append(
+                location.coordinate
+            )
+
+            if trail.count >
+                maximumTrailPoints {
+                trail.removeFirst(
+                    trail.count -
+                    maximumTrailPoints
+                )
+            }
+
+            liveTrails[
+                location.userID
+            ] = trail
         }
     }
 }
