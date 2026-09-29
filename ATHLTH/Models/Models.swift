@@ -75,11 +75,11 @@ struct WorkoutAIInsightContext: Codable, Hashable {
     let averageRunningVerticalOscillationCentimeters: Double?
     let averageRunningGroundContactTimeMilliseconds: Double?
     let segments: [WorkoutRouteHealthSegment]
-    let strengthTotalSets: Int? = nil
-    let strengthTotalReps: Int? = nil
-    let strengthTotalVolumeKilograms: Double? = nil
-    let strengthMuscleFocus: [String]? = nil
-    let strengthExercises: [WorkoutStrengthExerciseContext]? = nil
+    var strengthTotalSets: Int? = nil
+    var strengthTotalReps: Int? = nil
+    var strengthTotalVolumeKilograms: Double? = nil
+    var strengthMuscleFocus: [String]? = nil
+    var strengthExercises: [WorkoutStrengthExerciseContext]? = nil
 }
 
 struct WorkoutVisualRecipe: Codable, Hashable {
