@@ -592,24 +592,25 @@ enum StrengthMuscleResolver {
 
         if contains(
             value,
+            "gluteus medius",
+            "gluteus minimus",
+            "glute med",
+            "glute min",
+            "abductor",
+            "tensor fascia",
+            "outer hip"
+        ) {
+            return [.outerHip]
+        }
+
+        if contains(
+            value,
             "gluteus maximus",
             "glute max",
             "glutes",
             "glute "
         ) {
             return [.glutes]
-        }
-
-        if contains(
-            value,
-            "gluteus medius",
-            "gluteus minimus",
-            "glute med",
-            "abductor",
-            "tensor fascia",
-            "outer hip"
-        ) {
-            return [.outerHip]
         }
 
         if contains(
