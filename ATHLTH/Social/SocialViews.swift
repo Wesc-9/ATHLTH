@@ -1771,6 +1771,17 @@ struct SocialPrivacySettingsView: View {
                         "Share live workout position",
                         isOn: binding.shareLiveWorkoutLocation
                     )
+                    .onChange(
+                        of:
+                            binding.wrappedValue
+                                .shareLiveWorkoutLocation
+                    ) { _, enabled in
+                        if !enabled {
+                            draft?
+                                .shareLiveWorkoutHeartRate =
+                                false
+                        }
+                    }
 
                     if binding.wrappedValue.shareLiveWorkoutLocation {
                         Picker(
@@ -1799,18 +1810,6 @@ struct SocialPrivacySettingsView: View {
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    }
-
-                    .onChange(
-                        of:
-                            binding.wrappedValue
-                                .shareLiveWorkoutLocation
-                    ) { _, enabled in
-                        if !enabled {
-                            draft?
-                                .shareLiveWorkoutHeartRate =
-                                false
-                        }
                     }
 
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
