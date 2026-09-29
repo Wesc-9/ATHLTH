@@ -356,6 +356,8 @@ final class AdminControlCenterStore: ObservableObject {
 struct AdminCenterView: View {
     @EnvironmentObject private var session: AppSessionStore
     @StateObject private var store = AdminControlCenterStore()
+    @ObservedObject private var activityVisualSettings =
+        ActivityCenterVisualSettings.shared
 
     var body: some View {
         Group {
@@ -371,6 +373,9 @@ struct AdminCenterView: View {
         }
         .navigationTitle("Control Center")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await activityVisualSettings.refresh()
+        }
     }
 
     private var dashboard: some View {
@@ -531,6 +536,79 @@ struct AdminCenterView: View {
                 AdminSectionCard(title: "System", icon: "gearshape.2.fill") {
                     adminMetricRow("Marketing delivery", value: "Disabled")
                     adminMetricRow("Signed-in role", value: session.currentRole.title)
+
+                    Divider()
+
+                    Toggle(
+                        isOn: Binding(
+                            get: {
+                                activityVisualSettings
+                                    .aiWorkoutHeroEnabled
+                            },
+                            set: { newValue in
+                                Task {
+                                    await activityVisualSettings
+                                        .setAIWorkoutHeroEnabled(
+                                            newValue
+                                        )
+                                }
+                            }
+                        )
+                    ) {
+                        HStack(spacing: 11) {
+                            Image(
+                                systemName:
+                                    activityVisualSettings
+                                        .aiWorkoutHeroEnabled
+                                        ? "sparkles.rectangle.stack.fill"
+                                        : "map.fill"
+                            )
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(
+                                activityVisualSettings
+                                    .aiWorkoutHeroEnabled
+                                    ? Color.purple
+                                    : ATHLTHTheme.accent
+                            )
+                            .frame(width: 28)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("AI Activity visuals")
+                                    .font(.subheadline.weight(.semibold))
+
+                                Text(
+                                    activityVisualSettings
+                                        .aiWorkoutHeroEnabled
+                                        ? "AI hero enabled. Route Ribbon remains layered over the route."
+                                        : "Route Ribbon only. No AI workout hero is requested."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .tint(ATHLTHTheme.accent)
+                    .disabled(
+                        activityVisualSettings.isSaving ||
+                        activityVisualSettings.isLoading
+                    )
+
+                    if activityVisualSettings.isSaving {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Updating Activity Center for everyone…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let errorMessage =
+                        activityVisualSettings.errorMessage {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
 
                     Divider()
 
