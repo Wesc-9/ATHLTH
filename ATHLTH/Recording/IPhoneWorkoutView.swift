@@ -331,7 +331,9 @@ struct IPhoneWorkoutView: View {
                                    route.count >= 2 {
                                     MapPolyline(
                                         coordinates:
-                                            route.map(\.coordinate)
+                                            displayRouteCoordinates(
+                                                route
+                                            )
                                     )
                                     .stroke(
                                         ATHLTHTheme.vitality,
@@ -342,9 +344,9 @@ struct IPhoneWorkoutView: View {
                                 if workout.points.count >= 2 {
                                     MapPolyline(
                                         coordinates:
-                                            workout.points.map {
-                                                $0.location.coordinate
-                                            }
+                                            displayWorkoutCoordinates(
+                                                workout.points
+                                            )
                                     )
                                     .stroke(
                                         ATHLTHTheme.accent,
@@ -586,6 +588,81 @@ struct IPhoneWorkoutView: View {
                 }
             }
         }
+    }
+
+    private func displayRouteCoordinates(
+        _ coordinates: [RouteCoordinate]
+    ) -> [CLLocationCoordinate2D] {
+        let sorted =
+            coordinates.sorted {
+                $0.sequence < $1.sequence
+            }
+
+        guard sorted.count > 800 else {
+            return sorted.map(\.coordinate)
+        }
+
+        let step =
+            max(
+                sorted.count / 800,
+                1
+            )
+        var sampled =
+            stride(
+                from: 0,
+                to: sorted.count,
+                by: step
+            )
+            .map {
+                sorted[$0].coordinate
+            }
+
+        if let last = sorted.last?.coordinate,
+           sampled.last?.latitude !=
+                last.latitude ||
+            sampled.last?.longitude !=
+                last.longitude {
+            sampled.append(last)
+        }
+
+        return sampled
+    }
+
+    private func displayWorkoutCoordinates(
+        _ points: [PhoneRoutePoint]
+    ) -> [CLLocationCoordinate2D] {
+        guard points.count > 600 else {
+            return points.map {
+                $0.location.coordinate
+            }
+        }
+
+        let step =
+            max(
+                points.count / 600,
+                1
+            )
+        var sampled =
+            stride(
+                from: 0,
+                to: points.count,
+                by: step
+            )
+            .map {
+                points[$0]
+                    .location.coordinate
+            }
+
+        if let last =
+            points.last?.location.coordinate,
+           sampled.last?.latitude !=
+                last.latitude ||
+            sampled.last?.longitude !=
+                last.longitude {
+            sampled.append(last)
+        }
+
+        return sampled
     }
 
     private func routeDistanceText(
