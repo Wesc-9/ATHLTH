@@ -801,7 +801,7 @@ struct AroundYouExploreView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    HStack(spacing: 6) {
+                    Menu {
                         Button {
                             withAnimation(.easeInOut(duration: 0.18)) {
                                 trailMode = true
@@ -810,17 +810,11 @@ struct AroundYouExploreView: View {
                                 selectedApplePlace = nil
                             }
                         } label: {
-                            Image(systemName: "mountain.2.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 34, height: 32)
-                                .background(
-                                    ATHLTHTheme.accentDeep,
-                                    in: Capsule()
-                                )
+                            Label(
+                                "Trail Mode",
+                                systemImage: "mountain.2.fill"
+                            )
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Open Trail Mode")
 
                         Button {
                             withAnimation(.easeInOut(duration: 0.18)) {
@@ -830,18 +824,24 @@ struct AroundYouExploreView: View {
                                 selectedTrail = nil
                             }
                         } label: {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 34, height: 32)
-                                .background(
-                                    ATHLTHTheme.premiumGold,
-                                    in: Capsule()
-                                )
+                            Label(
+                                "Places",
+                                systemImage: "mappin.and.ellipse"
+                            )
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Open Places")
+                    } label: {
+                        Image(systemName: "map.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 38, height: 32)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: Capsule()
+                            )
                     }
+                    .accessibilityLabel(
+                        "Explore trails and places"
+                    )
                 }
             }
             .padding(.horizontal, 16)
