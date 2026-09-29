@@ -111,6 +111,9 @@ private struct PublicTrailDiscoveryRequest: Encodable {
 struct PublicTrailDiscoveryResponse: Decodable {
     let trails: [PublicTrailRecord]
     let source: String
+    let isRefreshing: Bool
+    let refreshScheduled: Bool
+    let cacheAgeSeconds: Int?
     let minimumDiscoveryKilometers: Double
     let minimumLeaderboardKilometers: Double
     let attribution: String
@@ -145,6 +148,7 @@ final class PublicTrailDiscoveryService {
 final class PublicTrailDiscoveryStore: ObservableObject {
     @Published private(set) var trails: [PublicTrailRecord] = []
     @Published private(set) var isLoading = false
+    @Published private(set) var isWarmingCache = false
     @Published private(set) var source = "cache"
     @Published var errorMessage: String?
 
@@ -153,6 +157,7 @@ final class PublicTrailDiscoveryStore: ObservableObject {
     private var lastRadiusKilometers: Double = 0
     private var lastRefreshAt: Date?
     private var requestID = UUID()
+    private var warmupRetryTask: Task<Void, Never>?
 
     init(
         service: PublicTrailDiscoveryService =
@@ -166,6 +171,20 @@ final class PublicTrailDiscoveryStore: ObservableObject {
         radiusKilometers: Double,
         force: Bool = false
     ) async {
+        await refreshInternal(
+            center: center,
+            radiusKilometers: radiusKilometers,
+            force: force,
+            warmupAttempt: 0
+        )
+    }
+
+    private func refreshInternal(
+        center: CLLocationCoordinate2D,
+        radiusKilometers: Double,
+        force: Bool,
+        warmupAttempt: Int
+    ) async {
         let normalizedRadius =
             min(max(radiusKilometers, 3), 20)
         let location = CLLocation(
@@ -178,8 +197,7 @@ final class PublicTrailDiscoveryStore: ObservableObject {
            let lastRefreshAt,
            location.distance(from: lastCenter) < 1_500,
            abs(normalizedRadius - lastRadiusKilometers) < 2,
-           Date().timeIntervalSince(lastRefreshAt) < 120,
-           !trails.isEmpty {
+           Date().timeIntervalSince(lastRefreshAt) < 120 {
             return
         }
 
@@ -208,10 +226,26 @@ final class PublicTrailDiscoveryStore: ObservableObject {
                 }
 
             source = response.source
+            isWarmingCache =
+                response.isRefreshing &&
+                trails.isEmpty
+
             lastCenter = location
             lastRadiusKilometers = normalizedRadius
             lastRefreshAt = Date()
             isLoading = false
+
+            if isWarmingCache,
+               warmupAttempt < 3 {
+                scheduleWarmupRetry(
+                    center: center,
+                    radiusKilometers: normalizedRadius,
+                    attempt: warmupAttempt + 1
+                )
+            } else if !isWarmingCache {
+                warmupRetryTask?.cancel()
+                warmupRetryTask = nil
+            }
         } catch is CancellationError {
             guard requestID == newRequestID else {
                 return
@@ -221,8 +255,45 @@ final class PublicTrailDiscoveryStore: ObservableObject {
             guard requestID == newRequestID else {
                 return
             }
-            errorMessage = error.localizedDescription
+
             isLoading = false
+            isWarmingCache = false
+
+            if trails.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func scheduleWarmupRetry(
+        center: CLLocationCoordinate2D,
+        radiusKilometers: Double,
+        attempt: Int
+    ) {
+        warmupRetryTask?.cancel()
+
+        let delaySeconds =
+            min(2 + (attempt * 2), 8)
+
+        warmupRetryTask = Task { [weak self] in
+            try? await Task.sleep(
+                nanoseconds:
+                    UInt64(delaySeconds) *
+                    1_000_000_000
+            )
+
+            guard !Task.isCancelled,
+                  let self
+            else {
+                return
+            }
+
+            await self.refreshInternal(
+                center: center,
+                radiusKilometers: radiusKilometers,
+                force: true,
+                warmupAttempt: attempt
+            )
         }
     }
 
