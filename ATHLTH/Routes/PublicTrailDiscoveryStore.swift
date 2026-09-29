@@ -119,23 +119,26 @@ final class SupabasePublicTrailDiscoveryService {
         radiusKilometers: Double
     ) async throws ->
         PublicTrailDiscoveryResponse {
-        try await client.functions.invoke(
-            "discover-public-trails",
-            options:
-                FunctionInvokeOptions(
-                    body:
-                        PublicTrailDiscoveryRequest(
-                            latitude:
-                                location.coordinate
-                                    .latitude,
-                            longitude:
-                                location.coordinate
-                                    .longitude,
-                            radiusKilometers:
-                                radiusKilometers
+        let response:
+            PublicTrailDiscoveryResponse =
+                try await client.functions.invoke(
+                    "discover-public-trails",
+                    options:
+                        FunctionInvokeOptions(
+                            body: [
+                                "latitude":
+                                    location.coordinate
+                                        .latitude,
+                                "longitude":
+                                    location.coordinate
+                                        .longitude,
+                                "radiusKilometers":
+                                    radiusKilometers
+                            ]
                         )
                 )
-        )
+
+        return response
     }
 }
 
