@@ -2427,6 +2427,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let latestRoutePoint =
             routePoints.last
+        let currentRunningStep =
+            currentStructuredRunningStep
+        let runningStepProgress =
+            currentRunningStep.map {
+                ATHLTHRunningStepEngine.progress(
+                    step: $0,
+                    elapsedTime: elapsedTime,
+                    distanceMeters: distanceMeters,
+                    stepStartElapsedTime:
+                        structuredStepStartElapsedTime,
+                    stepStartDistanceMeters:
+                        structuredStepStartDistanceMeters
+                )
+            }
 
         let snapshot = WatchWorkoutLiveSnapshot(
             kind: kind,
@@ -2468,6 +2482,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 routeDeviationMeters,
             routeDeviationThresholdMeters:
                 routeAlertConfiguration.deviationMeters,
+            runningStepTitle:
+                currentRunningStep?.title,
+            runningStepIndex:
+                currentRunningStep == nil
+                    ? nil
+                    : structuredStepIndex,
+            runningStepCount:
+                structuredRunningWorkout?
+                    .steps.count,
+            runningStepProgress:
+                runningStepProgress,
+            runningNextStepTitle:
+                nextStructuredRunningStep?.title,
             heartRateTargetZone:
                 targetAlertConfiguration?.heartRateZone,
             heartRateTargetMinimumBPM:
