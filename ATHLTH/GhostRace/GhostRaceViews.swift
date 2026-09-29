@@ -7,6 +7,7 @@ struct GhostRaceHubView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var social: SocialStore
 
     @State private var recentRuns: [WorkoutSummary] = []
     @State private var loading = false
@@ -24,6 +25,8 @@ struct GhostRaceHubView: View {
             LazyVStack(spacing: 18) {
                 hero
                 modeOverview
+                liveSharingCard
+                liveNowSection
                 audioCoachCard
                 targetGhostSection
                 pastSelfSection
@@ -50,9 +53,29 @@ struct GhostRaceHubView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await loadRuns()
+            await social.refreshIfStale()
+            await ghostRace
+                .refreshVisibleLiveRunners()
+        }
+        .task {
+            while !Task.isCancelled {
+                await ghostRace
+                    .refreshVisibleLiveRunners()
+
+                do {
+                    try await Task.sleep(
+                        for: .seconds(3)
+                    )
+                } catch {
+                    return
+                }
+            }
         }
         .refreshable {
             await loadRuns()
+            await social.refresh()
+            await ghostRace
+                .refreshVisibleLiveRunners()
         }
         .alert(
             "Ghost Race",
@@ -152,6 +175,236 @@ struct GhostRaceHubView: View {
                 icon: "person.2.fill"
             )
         }
+    }
+
+    private var liveSharingCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            ghostRace.liveSession == nil
+                                ? "location.circle"
+                                : "location.circle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        ghostRace.liveSession == nil
+                            ? ATHLTHTheme.accentDeep
+                            : Color.green
+                    )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Live Ghost location")
+                            .font(.headline)
+
+                        Text(
+                            "Let followers see your current position while this Ghost Race is running."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: {
+                                ghostRace
+                                    .liveSharingEnabledForNextRace
+                            },
+                            set: { enabled in
+                                Task {
+                                    await ghostRace
+                                        .setLiveSharingEnabled(
+                                            enabled
+                                        )
+                                }
+                            }
+                        )
+                    )
+                    .labelsHidden()
+                }
+
+                Text(
+                    "Off by default. ATHLTH only stores the latest point, never a permanent live-location trail, and sharing ends automatically with the race."
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+                if let message =
+                        ghostRace.liveSharingMessage {
+                    Label(
+                        message,
+                        systemImage:
+                            ghostRace.liveSession == nil
+                                ? "lock.fill"
+                                : "dot.radiowaves.left.and.right"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ghostRace.liveSession == nil
+                            ? .secondary
+                            : Color.green
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var liveNowSection: some View {
+        if !ghostRace.visibleLiveRunners.isEmpty {
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Live now")
+                                .font(.headline)
+                            Text(
+                                "Followers who chose to share their Ghost Race position."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text(
+                            "\(ghostRace.visibleLiveRunners.count)"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(Color.green)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(
+                            Color.green.opacity(0.10),
+                            in: Capsule()
+                        )
+                    }
+
+                    ForEach(
+                        ghostRace.visibleLiveRunners
+                            .prefix(6)
+                    ) { runner in
+                        NavigationLink {
+                            GhostLiveSpectatorView(
+                                sessionID:
+                                    runner.session.id
+                            )
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            ATHLTHTheme
+                                                .accentSoft
+                                        )
+                                        .frame(
+                                            width: 42,
+                                            height: 42
+                                        )
+
+                                    Image(
+                                        systemName:
+                                            "figure.run"
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .accentDeep
+                                    )
+
+                                    Circle()
+                                        .fill(
+                                            Color.green
+                                        )
+                                        .frame(
+                                            width: 11,
+                                            height: 11
+                                        )
+                                        .overlay {
+                                            Circle()
+                                                .stroke(
+                                                    Color.white,
+                                                    lineWidth: 2
+                                                )
+                                        }
+                                        .offset(
+                                            x: 15,
+                                            y: 15
+                                        )
+                                }
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        runnerName(
+                                            runner
+                                        )
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(.semibold)
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+
+                                    Text(
+                                        String(
+                                            format:
+                                                "%.2f km · %@",
+                                            runner
+                                                .position
+                                                .distanceMeters /
+                                                1_000,
+                                            clock(
+                                                runner
+                                                    .position
+                                                    .elapsedSeconds
+                                            )
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(.caption.bold())
+                                .foregroundStyle(
+                                    .tertiary
+                                )
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func runnerName(
+        _ runner: GhostLiveRunner
+    ) -> String {
+        social.visibleProfiles
+            .first {
+                $0.userID ==
+                    runner.session.ownerID
+            }?
+            .resolvedName ??
+            "ATHLTH runner"
     }
 
     private var audioCoachCard: some View {
@@ -797,6 +1050,268 @@ struct GhostRaceHubView: View {
             format: "%d:%02d /km",
             seconds / 60,
             seconds % 60
+        )
+    }
+}
+
+struct GhostLiveSpectatorView: View {
+    @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var social: SocialStore
+
+    let sessionID: UUID
+
+    var body: some View {
+        Group {
+            if let runner =
+                    ghostRace.liveRunner(
+                        sessionID: sessionID
+                    ) {
+                ScrollView {
+                    VStack(spacing: 14) {
+                        ATHLTHCard {
+                            Map(
+                                initialPosition:
+                                    .region(
+                                        mapRegion(
+                                            runner
+                                        )
+                                    )
+                            ) {
+                                Annotation(
+                                    runnerName(
+                                        runner
+                                    ),
+                                    coordinate:
+                                        coordinate(
+                                            runner
+                                        )
+                                ) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(
+                                                ATHLTHTheme
+                                                    .accentDeep
+                                            )
+                                            .frame(
+                                                width: 30,
+                                                height: 30
+                                            )
+
+                                        Image(
+                                            systemName:
+                                                "figure.run"
+                                        )
+                                        .font(
+                                            .system(
+                                                size: 14,
+                                                weight: .bold
+                                            )
+                                        )
+                                        .foregroundStyle(
+                                            .white
+                                        )
+
+                                        Circle()
+                                            .fill(
+                                                Color.green
+                                            )
+                                            .frame(
+                                                width: 10,
+                                                height: 10
+                                            )
+                                            .overlay {
+                                                Circle()
+                                                    .stroke(
+                                                        .white,
+                                                        lineWidth: 2
+                                                    )
+                                            }
+                                            .offset(
+                                                x: 12,
+                                                y: 12
+                                            )
+                                    }
+                                }
+                            }
+                            .frame(height: 360)
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius: 20,
+                                    style: .continuous
+                                )
+                            )
+                        }
+
+                        ATHLTHCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(
+                                            runnerName(
+                                                runner
+                                            )
+                                        )
+                                        .font(.title3.bold())
+
+                                        Text(
+                                            runner.session.title
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    Label(
+                                        "LIVE",
+                                        systemImage:
+                                            "dot.radiowaves.left.and.right"
+                                    )
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(
+                                        Color.green
+                                    )
+                                }
+
+                                HStack(spacing: 18) {
+                                    liveMetric(
+                                        title: "Distance",
+                                        value:
+                                            String(
+                                                format:
+                                                    "%.2f km",
+                                                runner
+                                                    .position
+                                                    .distanceMeters /
+                                                    1_000
+                                            )
+                                    )
+
+                                    liveMetric(
+                                        title: "Time",
+                                        value:
+                                            durationText(
+                                                runner
+                                                    .position
+                                                    .elapsedSeconds
+                                            )
+                                    )
+
+                                    if let heartRate =
+                                            runner
+                                                .position
+                                                .heartRateBPM,
+                                       heartRate > 0 {
+                                        liveMetric(
+                                            title: "HR",
+                                            value:
+                                                "\(Int(heartRate.rounded())) bpm"
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    "Updated \(runner.position.updatedAt.formatted(date: .omitted, time: .standard))"
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding()
+                }
+            } else {
+                ContentUnavailableView(
+                    "Runner is no longer live",
+                    systemImage: "location.slash",
+                    description: Text(
+                        "The runner may have finished, stopped sharing, or the last position has expired."
+                    )
+                )
+            }
+        }
+        .navigationTitle("Live Ghost")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            while !Task.isCancelled {
+                await ghostRace
+                    .refreshVisibleLiveRunners()
+
+                do {
+                    try await Task.sleep(
+                        for: .seconds(2)
+                    )
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func coordinate(
+        _ runner: GhostLiveRunner
+    ) -> CLLocationCoordinate2D {
+        CLLocationCoordinate2D(
+            latitude:
+                runner.position.latitude,
+            longitude:
+                runner.position.longitude
+        )
+    }
+
+    private func mapRegion(
+        _ runner: GhostLiveRunner
+    ) -> MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: coordinate(runner),
+            span: MKCoordinateSpan(
+                latitudeDelta: 0.008,
+                longitudeDelta: 0.008
+            )
+        )
+    }
+
+    private func runnerName(
+        _ runner: GhostLiveRunner
+    ) -> String {
+        social.visibleProfiles
+            .first {
+                $0.userID ==
+                    runner.session.ownerID
+            }?
+            .resolvedName ??
+            "ATHLTH runner"
+    }
+
+    private func liveMetric(
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+        }
+    }
+
+    private func durationText(
+        _ seconds: TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(seconds.rounded()),
+                0
+            )
+
+        return String(
+            format: "%d:%02d",
+            total / 60,
+            total % 60
         )
     }
 }
