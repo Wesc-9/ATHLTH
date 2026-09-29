@@ -1154,7 +1154,7 @@ struct AroundYouExploreView: View {
                     if let route = selectedRoute {
                         routePreviewCard(route)
                             .padding(.horizontal, 12)
-                            .padding(.bottom, 54)
+                            .padding(.bottom, 68)
                             .transition(
                                 .move(edge: .bottom)
                                     .combined(with: .opacity)
@@ -1863,6 +1863,9 @@ struct AroundYouExploreView: View {
     ) -> Bool {
         route.routeSource == "openstreetmap" ||
         route.ownerID ==
+            PublicTrailRecord
+                .publicSourceOwnerID ||
+        route.sharedSourceOwnerID ==
             PublicTrailRecord
                 .publicSourceOwnerID
     }
