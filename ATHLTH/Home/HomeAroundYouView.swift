@@ -769,6 +769,8 @@ struct AroundYouExploreView: View {
     @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
     @EnvironmentObject private var publicTrailDiscovery: PublicTrailDiscoveryStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var challenges: ChallengeStore
 
     @ObservedObject var locationStore: HomeLocationStore
@@ -783,6 +785,7 @@ struct AroundYouExploreView: View {
     @State private var routeActionMessage: String?
     @State private var routeActionError: String?
     @State private var startingRoute = false
+    @State private var routeToStart: TrainingRoute?
     @State private var visibleRegion: MKCoordinateRegion?
     @State private var hasSeenInitialCamera = false
     @State private var shouldSearchVisibleArea = false
@@ -1062,20 +1065,14 @@ struct AroundYouExploreView: View {
                         nearestTo: coordinate
                     )
                 }
-                .overlay(alignment: .topLeading) {
+                .overlay(alignment: .bottomLeading) {
                     if !publicTrailDiscovery
                         .trails
                         .isEmpty {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(
                                 systemName: "map.fill"
                             )
-                            Text("Public Trails")
-                            Text("·")
-                            Text(
-                                "\(publicTrailDiscovery.trails.count) loaded"
-                            )
-                            Text("·")
                             Text(
                                 publicTrailDiscovery
                                     .attribution
@@ -1092,16 +1089,16 @@ struct AroundYouExploreView: View {
                                 .primaryText
                                 .opacity(0.72)
                         )
-                        .padding(
-                            .horizontal,
-                            9
-                        )
-                        .frame(height: 28)
+                        .padding(.horizontal, 9)
+                        .frame(height: 26)
                         .background(
                             .ultraThinMaterial,
                             in: Capsule()
                         )
-                        .padding(10)
+                        // Keep OSM attribution immediately above MapKit's
+                        // own map-rights/legal attribution in the lower-left.
+                        .padding(.leading, 10)
+                        .padding(.bottom, 34)
                     }
                 }
                 .overlay(alignment: .top) {
@@ -1157,7 +1154,7 @@ struct AroundYouExploreView: View {
                     if let route = selectedRoute {
                         routePreviewCard(route)
                             .padding(.horizontal, 12)
-                            .padding(.bottom, 12)
+                            .padding(.bottom, 54)
                             .transition(
                                 .move(edge: .bottom)
                                     .combined(with: .opacity)
@@ -1233,6 +1230,18 @@ struct AroundYouExploreView: View {
         .onChange(of: filter) { _, _ in
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedRoute = nil
+            }
+        }
+        .sheet(item: $routeToStart) { route in
+            RunQuickStartSheet(
+                trainingDeviceProvider:
+                    watchConnection.isReady
+                        ? .appleWatch
+                        : .none,
+                watchConnected: watchConnection.isReady,
+                initialRoute: route
+            ) { configuration in
+                launchRunFromExplore(configuration)
             }
         }
         .alert(
@@ -1577,7 +1586,22 @@ struct AroundYouExploreView: View {
                     )
                 }
 
-                if settings.trainingDeviceProvider ==
+                if isPublicTrailRoute(route) {
+                    Button {
+                        routeToStart = route
+                    } label: {
+                        Label(
+                            "Start",
+                            systemImage: "play.fill"
+                        )
+                        .font(
+                            .caption.weight(.semibold)
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .frame(height: 38)
+                    .buttonStyle(.bordered)
+                } else if settings.trainingDeviceProvider ==
                     .appleWatch {
                     Button {
                         Task {
@@ -1955,6 +1979,46 @@ struct AroundYouExploreView: View {
             minutes,
             remainder
         )
+    }
+
+    private func launchRunFromExplore(
+        _ configuration: RunQuickStartConfiguration
+    ) {
+        Task { @MainActor in
+            await social.beginWorkoutWithFriends(
+                title: configuration.title,
+                kind: .running,
+                friends: configuration.friends,
+                creatorName: session.profile.displayName,
+                creatorUsername: session.profile.username
+            )
+
+            do {
+                try await WorkoutLaunchCoordinator
+                    .startRunQuick(
+                        configuration: configuration,
+                        session: session,
+                        settings: settings,
+                        gear: gear,
+                        phoneWorkout: phoneWorkout,
+                        watchConnection:
+                            watchConnection
+                    )
+
+                routeActionMessage =
+                    "\(configuration.title) started" +
+                    (
+                        configuration.captureDevice ==
+                            .appleWatch
+                            ? " on Apple Watch."
+                            : " on iPhone."
+                    )
+            } catch {
+                await social.cancelActiveWorkout()
+                routeActionError =
+                    error.localizedDescription
+            }
+        }
     }
 
     private func startRouteOnWatch(
