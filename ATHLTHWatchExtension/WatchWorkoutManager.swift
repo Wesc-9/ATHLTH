@@ -3003,8 +3003,6 @@ extension WatchWorkoutManager:
 
             self.guidancePriorityGate
                 .voiceDidFinish()
-            self.guidancePriorityGate
-                .voiceDidFinish()
             self.deactivateAudioCoachAudioSession()
         }
     }
@@ -3020,6 +3018,8 @@ extension WatchWorkoutManager:
                 return
             }
 
+            self.guidancePriorityGate
+                .voiceDidFinish()
             self.deactivateAudioCoachAudioSession()
         }
     }
