@@ -65,30 +65,38 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                     return
                 }
 
-                publishSurface()
-                ATHLTHSurfaceCoordinator
-                    .syncLiveActivity(
-                        with:
-                            enrichedWorkoutSnapshot(
-                                workoutMirroring
-                                    .snapshot
-                            )
-                    )
+                if phoneWorkout.active != nil {
+                    syncPhoneWorkoutGuidance()
+                } else {
+                    publishSurface()
+                    ATHLTHSurfaceCoordinator
+                        .syncLiveActivity(
+                            with:
+                                enrichedWorkoutSnapshot(
+                                    workoutMirroring
+                                        .snapshot
+                                )
+                        )
+                }
             }
             .onChange(
                 of:
                     realtime
                         .selectedLiveGhostSessionID
             ) { _, _ in
-                publishSurface()
-                ATHLTHSurfaceCoordinator
-                    .syncLiveActivity(
-                        with:
-                            enrichedWorkoutSnapshot(
-                                workoutMirroring
-                                    .snapshot
-                            )
-                    )
+                if phoneWorkout.active != nil {
+                    syncPhoneWorkoutGuidance()
+                } else {
+                    publishSurface()
+                    ATHLTHSurfaceCoordinator
+                        .syncLiveActivity(
+                            with:
+                                enrichedWorkoutSnapshot(
+                                    workoutMirroring
+                                        .snapshot
+                                )
+                        )
+                }
             }
     }
 
@@ -126,6 +134,41 @@ struct ATHLTHSurfaceRuntimeObserver: View {
             phoneWorkout.applyGhostComparison(
                 comparison,
                 title: reference.title,
+                configuration:
+                    settings
+                        .ghostRaceAudioConfiguration
+            )
+        } else if let selectedSession =
+                    realtime
+                        .selectedLiveGhostSession,
+                  let comparison =
+                    realtime
+                        .liveGhostComparison(
+                            ownDistanceMeters:
+                                snapshot
+                                    .distanceMeters,
+                            ownElapsedSeconds:
+                                snapshot
+                                    .elapsedTime,
+                            ownRouteKey:
+                                snapshot
+                                    .routeComparisonID,
+                            ownRouteProgressPercent:
+                                snapshot
+                                    .routeProgressPercent,
+                            ownRouteDeviationMeters:
+                                snapshot
+                                    .routeDeviationMeters
+                        ) {
+            phoneWorkout.applyLiveGhostUpdate(
+                title:
+                    "Live · \(selectedSession.title)",
+                distanceDelta:
+                    comparison
+                        .signedDistanceMeters,
+                timeDelta:
+                    comparison
+                        .estimatedTimeDeltaSeconds,
                 configuration:
                     settings
                         .ghostRaceAudioConfiguration
