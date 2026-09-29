@@ -16,6 +16,17 @@ private struct ActivityCenterVisualFlagUpdate: Encodable {
     }
 }
 
+private enum ActivityCenterVisualSettingsError: LocalizedError {
+    case updateRejected
+
+    var errorDescription: String? {
+        switch self {
+        case .updateRejected:
+            return "The Activity Center visual setting was not updated. Check admin permissions and try again."
+        }
+    }
+}
+
 @MainActor
 final class ActivityCenterVisualSettings: ObservableObject {
     static let shared = ActivityCenterVisualSettings()
@@ -72,11 +83,19 @@ final class ActivityCenterVisualSettings: ObservableObject {
                 updatedAt: Date()
             )
 
-            try await client
-                .from("app_feature_flags")
-                .update(update)
-                .eq("key", value: flagKey)
-                .execute()
+            let rows: [ActivityCenterVisualFlagRow] =
+                try await client
+                    .from("app_feature_flags")
+                    .update(update)
+                    .eq("key", value: flagKey)
+                    .select("key,enabled")
+                    .execute()
+                    .value
+
+            guard rows.first?.enabled == enabled else {
+                throw ActivityCenterVisualSettingsError
+                    .updateRejected
+            }
 
             errorMessage = nil
         } catch {
