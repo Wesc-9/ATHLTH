@@ -1,6 +1,134 @@
 import CoreLocation
 import SwiftUI
 
+struct HomeActivityHeroArtwork: View {
+    let imageURL: URL?
+    let recipe: WorkoutVisualRecipe
+    let coordinates: [CLLocationCoordinate2D]
+
+    var body: some View {
+        ZStack {
+            HomeActivityGeneratedHeroArtwork(
+                recipe: recipe,
+                coordinates: coordinates
+            )
+
+            if let imageURL {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .transition(.opacity)
+                    case .empty:
+                        Color.clear
+                    case .failure:
+                        Color.clear
+                    @unknown default:
+                        Color.clear
+                    }
+                }
+                .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.16),
+                        .clear,
+                        Color.black.opacity(0.13)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                if coordinates.count >= 2 {
+                    routeRibbon
+                        .padding(
+                            EdgeInsets(
+                                top: 44,
+                                leading: 92,
+                                bottom: 34,
+                                trailing: 22
+                            )
+                        )
+                }
+            }
+        }
+        .animation(
+            .easeInOut(duration: 0.28),
+            value: imageURL
+        )
+    }
+
+    private var routeRibbon: some View {
+        ZStack {
+            HomeActivityNormalizedRouteShape(
+                coordinates: coordinates
+            )
+            .stroke(
+                Color.black.opacity(0.20),
+                style: StrokeStyle(
+                    lineWidth: 18,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+
+            HomeActivityNormalizedRouteShape(
+                coordinates: coordinates
+            )
+            .stroke(
+                Color.white.opacity(0.92),
+                style: StrokeStyle(
+                    lineWidth: 12,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+
+            HomeActivityNormalizedRouteShape(
+                coordinates: coordinates
+            )
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color(
+                            red: 0.35,
+                            green: 0.96,
+                            blue: 0.68
+                        ),
+                        Color.mint,
+                        Color.cyan
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                style: StrokeStyle(
+                    lineWidth: 7,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+
+            HomeActivityNormalizedRouteShape(
+                coordinates: coordinates
+            )
+            .stroke(
+                Color.white.opacity(0.44),
+                style: StrokeStyle(
+                    lineWidth: 2,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+        }
+        .shadow(
+            color: Color.mint.opacity(0.30),
+            radius: 10
+        )
+    }
+}
+
 struct HomeActivityGeneratedHeroArtwork: View {
     let recipe: WorkoutVisualRecipe
     let coordinates: [CLLocationCoordinate2D]
