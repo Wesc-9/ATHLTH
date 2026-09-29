@@ -104,6 +104,7 @@ targets:
           - ATHLTHWidgets.entitlements
           - Info.plist
       - path: Shared/ATHLTHSurfaceSnapshot.swift
+      - path: Shared/ATHLTHLiveWorkoutSurfaceModels.swift
       - path: ATHLTH/Surfaces/ATHLTHWorkoutActivityAttributes.swift
     info:
       path: ATHLTHWidgets/Info.plist
