@@ -23,6 +23,7 @@ enum SocialHubTab: String, CaseIterable, Identifiable {
 struct ProfileFriendsSection: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     var body: some View {
         ATHLTHCard {
@@ -99,7 +100,10 @@ struct ProfileFriendsSection: View {
                                 FriendProfileView(userID: friend.userID)
                             } label: {
                                 VStack(spacing: 7) {
-                                    SocialAvatar(profile: friend, size: 54)
+                                    ATHLTHOnlineAvatar(
+                                        profile: friend,
+                                        size: 54
+                                    )
 
                                     Text(friend.resolvedName)
                                         .font(.caption.weight(.semibold))
@@ -115,12 +119,17 @@ struct ProfileFriendsSection: View {
                 }
             }
         }
+        .task {
+            await realtime.refreshOnlineUsers()
+            await realtime.refreshVisibleLiveSessions()
+        }
     }
 }
 
 struct SocialHubView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     let initialTab: SocialHubTab
 
@@ -233,12 +242,38 @@ struct SocialHubView: View {
             NewMessageView()
         }
         .task {
-            await social.refresh()
-            await messaging.refresh()
+            async let socialRefresh: Void =
+                social.refresh()
+            async let messageRefresh: Void =
+                messaging.refresh()
+            async let onlineRefresh: Void =
+                realtime.refreshOnlineUsers()
+            async let liveRefresh: Void =
+                realtime.refreshVisibleLiveSessions()
+
+            _ = await (
+                socialRefresh,
+                messageRefresh,
+                onlineRefresh,
+                liveRefresh
+            )
         }
         .refreshable {
-            await social.refresh()
-            await messaging.refresh()
+            async let socialRefresh: Void =
+                social.refresh()
+            async let messageRefresh: Void =
+                messaging.refresh()
+            async let onlineRefresh: Void =
+                realtime.refreshOnlineUsers()
+            async let liveRefresh: Void =
+                realtime.refreshVisibleLiveSessions()
+
+            _ = await (
+                socialRefresh,
+                messageRefresh,
+                onlineRefresh,
+                liveRefresh
+            )
         }
     }
 
@@ -254,6 +289,101 @@ struct SocialHubView: View {
                     } label: {
                         Label("Find", systemImage: "person.badge.plus")
                             .font(.caption.weight(.semibold))
+                    }
+                }
+
+                if !realtime.visibleLiveSessions.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(
+                            "Live now",
+                            systemImage:
+                                "dot.radiowaves.left.and.right"
+                        )
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme.vitality
+                        )
+
+                        ForEach(
+                            realtime.visibleLiveSessions
+                                .prefix(6)
+                        ) { session in
+                            NavigationLink {
+                                ATHLTHLiveWorkoutMapView(
+                                    session: session
+                                )
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(
+                                        systemName:
+                                            session.ghostChallengeID ==
+                                            nil
+                                                ? "figure.run"
+                                                : "flag.checkered"
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme.vitality
+                                    )
+                                    .frame(
+                                        width: 38,
+                                        height: 38
+                                    )
+                                    .background(
+                                        ATHLTHTheme.vitality
+                                            .opacity(0.10),
+                                        in: Circle()
+                                    )
+
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 2
+                                    ) {
+                                        Text(session.title)
+                                            .font(
+                                                .subheadline
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+                                            .foregroundStyle(
+                                                .primary
+                                            )
+
+                                        Text(
+                                            session.ghostChallengeID ==
+                                                nil
+                                                ? "Live workout"
+                                                : "Live Ghost Run"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+
+                                    Spacer()
+
+                                    Image(
+                                        systemName:
+                                            "chevron.right"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+                                .padding(12)
+                                .background(
+                                    Color(
+                                        .secondarySystemGroupedBackground
+                                    ),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 16
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
 
