@@ -88,7 +88,7 @@ struct PublicTrailRecord: Codable, Identifiable, Hashable {
             id: id,
             ownerID: ownerID,
             title: name,
-            visibility: .public,
+            visibility: .publicProfile,
             coordinates: coordinates,
             distanceKilometers: distanceKilometers,
             elevationGainMeters: nil,
