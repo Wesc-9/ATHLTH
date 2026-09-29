@@ -76,7 +76,7 @@ struct WorkoutPlaceCompactBadge: View {
             places.resolvedPlace(
                 for: workoutID
             ) {
-            return "Trained at (place.name)"
+            return "Trained at \(place.name)"
         }
 
         return "Training place"
