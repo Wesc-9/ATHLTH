@@ -430,7 +430,11 @@ struct MirroredWorkoutLiveView: View {
 
         await realtime
             .publishMirroredSnapshot(
-                snapshot
+                snapshot,
+                includeHeartRate:
+                    social.privacy?
+                        .shareLiveWorkoutHeartRate ==
+                    true
             )
     }
 
