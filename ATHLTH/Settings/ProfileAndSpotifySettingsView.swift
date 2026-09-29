@@ -1730,6 +1730,30 @@ struct ATHLTHPrivacyCenterView: View {
 
                 Section("What Others Can See") {
                     Toggle(
+                        "Show when I'm online",
+                        isOn: Binding(
+                            get: {
+                                social
+                                    .shareOnlineStatus
+                            },
+                            set: { enabled in
+                                Task {
+                                    await social
+                                        .setShareOnlineStatus(
+                                            enabled
+                                        )
+                                }
+                            }
+                        )
+                    )
+
+                    Text(
+                        "Online status is visible to followers only and is off by default."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    Toggle(
                         "Training now",
                         isOn: binding.shareTrainingPresence
                     )
