@@ -1869,9 +1869,19 @@ struct SocialPrivacySettingsView: View {
                 enabled: draft.showOnlineStatus
             )
 
-            if !draft.shareLiveWorkoutLocation,
-               realtime.currentSession?.ghostChallengeID == nil {
-                await realtime.leaveCurrentLiveWorkout()
+            if !draft.shareLiveWorkoutLocation {
+                if realtime.currentSession?
+                    .ghostChallengeID != nil {
+                    // Ghost Race can continue after the athlete stops
+                    // sharing their exact live position.
+                    await realtime
+                        .setCurrentLiveLocationSharing(
+                            false
+                        )
+                } else {
+                    await realtime
+                        .leaveCurrentLiveWorkout()
+                }
             }
         }
 
