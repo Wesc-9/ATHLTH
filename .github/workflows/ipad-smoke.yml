@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - release/v1.4.3
+      - release/v1.4.4
     paths:
       - ATHLTH/**/*.swift
       - ATHLTH/Assets.xcassets/**
