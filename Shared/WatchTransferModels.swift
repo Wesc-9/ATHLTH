@@ -394,6 +394,128 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     )
 }
 
+enum ATHLTHGuidancePriority:
+    Int,
+    Codable,
+    Comparable,
+    Hashable
+{
+    case routineCoach = 10
+    case ghostPeriodic = 20
+    case ghostImportant = 30
+    case structuredStep = 40
+    case targetCritical = 50
+    case routeCritical = 60
+
+    static func < (
+        lhs: ATHLTHGuidancePriority,
+        rhs: ATHLTHGuidancePriority
+    ) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+
+    var suppressesRoutineAfterDelivery: Bool {
+        self >= .structuredStep
+    }
+}
+
+enum ATHLTHGuidanceDeliveryDecision:
+    Hashable
+{
+    case drop
+    case deliver
+    case interruptAndDeliver
+}
+
+struct ATHLTHGuidancePriorityGate:
+    Hashable
+{
+    private(set) var activeVoicePriority:
+        ATHLTHGuidancePriority?
+    private(set) var suppressRoutineUntil:
+        Date?
+
+    mutating func voiceDecision(
+        for priority: ATHLTHGuidancePriority,
+        isSpeaking: Bool,
+        quietPeriodSeconds: TimeInterval,
+        now: Date = Date()
+    ) -> ATHLTHGuidanceDeliveryDecision {
+        if let suppressRoutineUntil,
+           now < suppressRoutineUntil,
+           priority <= .ghostPeriodic {
+            return .drop
+        }
+
+        if isSpeaking,
+           let activeVoicePriority {
+            guard priority >
+                    activeVoicePriority
+            else {
+                return .drop
+            }
+
+            noteDelivery(
+                priority: priority,
+                quietPeriodSeconds:
+                    quietPeriodSeconds,
+                now: now
+            )
+            return .interruptAndDeliver
+        }
+
+        noteDelivery(
+            priority: priority,
+            quietPeriodSeconds:
+                quietPeriodSeconds,
+            now: now
+        )
+        return .deliver
+    }
+
+    mutating func allowsHaptic(
+        for priority: ATHLTHGuidancePriority,
+        now: Date = Date()
+    ) -> Bool {
+        guard let suppressRoutineUntil,
+              now < suppressRoutineUntil
+        else {
+            return true
+        }
+
+        return priority >
+            .ghostPeriodic
+    }
+
+    mutating func voiceDidFinish() {
+        activeVoicePriority = nil
+    }
+
+    mutating func reset() {
+        activeVoicePriority = nil
+        suppressRoutineUntil = nil
+    }
+
+    private mutating func noteDelivery(
+        priority: ATHLTHGuidancePriority,
+        quietPeriodSeconds: TimeInterval,
+        now: Date
+    ) {
+        activeVoicePriority = priority
+
+        if priority
+            .suppressesRoutineAfterDelivery {
+            suppressRoutineUntil =
+                now.addingTimeInterval(
+                    max(
+                        quietPeriodSeconds,
+                        0
+                    )
+                )
+        }
+    }
+}
+
 enum WatchAlertDelivery: String, Codable, CaseIterable, Hashable, Identifiable {
     case haptic
     case voice
@@ -718,7 +840,31 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
     var timeIntervalSeconds: TimeInterval?
     var announceLeadChanges: Bool
     var leadChangeThresholdMeters: Double
+
+    // Legacy delivery remains encoded for transfers produced by older builds.
+    // New builds separate routine race status from meaningful lead changes.
     var delivery: WatchAlertDelivery
+    var periodicDelivery: WatchAlertDelivery? = nil
+    var leadChangeDelivery: WatchAlertDelivery? = nil
+    var importantLeadChangeMeters: Double? = nil
+
+    var resolvedPeriodicDelivery:
+        WatchAlertDelivery {
+        periodicDelivery ?? delivery
+    }
+
+    var resolvedLeadChangeDelivery:
+        WatchAlertDelivery {
+        leadChangeDelivery ?? delivery
+    }
+
+    var resolvedImportantLeadChangeMeters:
+        Double {
+        max(
+            importantLeadChangeMeters ?? 50,
+            leadChangeThresholdMeters
+        )
+    }
 
     static let standard = WatchGhostRaceAudioConfiguration(
         enabled: true,
@@ -726,7 +872,10 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
         timeIntervalSeconds: nil,
         announceLeadChanges: true,
         leadChangeThresholdMeters: 25,
-        delivery: .voice
+        delivery: .voice,
+        periodicDelivery: .voice,
+        leadChangeDelivery: .haptic,
+        importantLeadChangeMeters: 50
     )
 }
 
