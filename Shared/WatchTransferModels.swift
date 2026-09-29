@@ -858,6 +858,7 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
     var delivery: WatchAlertDelivery
     var periodicDelivery: WatchAlertDelivery? = nil
     var leadChangeDelivery: WatchAlertDelivery? = nil
+    var importantLeadChangeDelivery: WatchAlertDelivery? = nil
     var importantLeadChangeMeters: Double? = nil
 
     var resolvedPeriodicDelivery:
@@ -868,6 +869,12 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
     var resolvedLeadChangeDelivery:
         WatchAlertDelivery {
         leadChangeDelivery ?? delivery
+    }
+
+    var resolvedImportantLeadChangeDelivery:
+        WatchAlertDelivery {
+        importantLeadChangeDelivery ??
+            .both
     }
 
     var resolvedImportantLeadChangeMeters:
@@ -887,6 +894,7 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
         delivery: .voice,
         periodicDelivery: .voice,
         leadChangeDelivery: .haptic,
+        importantLeadChangeDelivery: .both,
         importantLeadChangeMeters: 50
     )
 }
