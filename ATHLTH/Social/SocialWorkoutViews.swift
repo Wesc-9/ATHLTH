@@ -616,12 +616,15 @@ struct HomeActivitySection: View {
             )
         }
         .task(id: detailLoadKey) {
-            // Keep Home responsive: render the workout visual first,
-            // then enrich the card with social state and Coach data.
+            // Keep Home responsive: render workout visuals first, then
+            // enrich them with route, social, Coach and exercise metadata.
+            async let exerciseRefresh: Void =
+                exerciseLibrary.refresh()
             await loadFeaturedWorkoutDetails()
             await social.refreshHomeFeed()
             await loadPublishedActivityRecords()
             await loadWorkoutAIInsights()
+            _ = await exerciseRefresh
         }
     }
 
@@ -4050,8 +4053,15 @@ private struct HomeActivityStrengthCard: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(alignment: .center, spacing: 14) {
-                VStack(alignment: .leading, spacing: 8) {
+            NavigationLink {
+                HomeActivityStrengthDetailView(
+                    workout: workout,
+                    strengthWorkout:
+                        strengthWorkout
+                )
+            } label: {
+                HStack(alignment: .center, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 8) {
                     Text(displayTitle)
                         .font(.system(size: 23, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
@@ -4122,10 +4132,10 @@ private struct HomeActivityStrengthCard: View {
                     width: 132,
                     height: 158
                 )
-            }
-            .padding(12)
-            .background(
-                Color.indigo.opacity(0.035),
+                }
+                .padding(12)
+                .background(
+                    Color.indigo.opacity(0.035),
                 in: RoundedRectangle(
                     cornerRadius: 19,
                     style: .continuous
@@ -4136,11 +4146,13 @@ private struct HomeActivityStrengthCard: View {
                     cornerRadius: 19,
                     style: .continuous
                 )
-                .stroke(
-                    Color.indigo.opacity(0.07),
-                    lineWidth: 0.8
-                )
+                    .stroke(
+                        Color.indigo.opacity(0.07),
+                        lineWidth: 0.8
+                    )
+                }
             }
+            .buttonStyle(.plain)
 
             Divider()
                 .opacity(0.45)
