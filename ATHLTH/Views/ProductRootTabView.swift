@@ -3331,8 +3331,15 @@ struct ATHLTHTrainView: View {
         _ configuration: WalkQuickStartConfiguration
     ) {
         if configuration.captureDevice == .iPhone {
-            gear.prepareNextWorkoutGear(configuration.gearIDs)
-            phoneWorkout.start(walking: true)
+            gear.prepareNextWorkoutGear(
+                configuration.gearIDs
+            )
+            phoneWorkout.start(
+                walking: true,
+                title: "Free Walk",
+                audioCoach:
+                    configuration.audioCoach
+            )
             return
         }
 
