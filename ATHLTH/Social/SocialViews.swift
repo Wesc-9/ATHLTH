@@ -99,7 +99,34 @@ struct ProfileFriendsSection: View {
                                 FriendProfileView(userID: friend.userID)
                             } label: {
                                 VStack(spacing: 7) {
-                                    SocialAvatar(profile: friend, size: 54)
+                                    SocialAvatar(
+                                        profile: friend,
+                                        size: 54
+                                    )
+                                    .overlay(
+                                        alignment:
+                                            .bottomTrailing
+                                    ) {
+                                        if social.isOnline(
+                                            friend.userID
+                                        ) {
+                                            Circle()
+                                                .fill(
+                                                    Color.green
+                                                )
+                                                .frame(
+                                                    width: 13,
+                                                    height: 13
+                                                )
+                                                .overlay {
+                                                    Circle()
+                                                        .stroke(
+                                                            Color.white,
+                                                            lineWidth: 2
+                                                        )
+                                                }
+                                        }
+                                    }
 
                                     Text(friend.resolvedName)
                                         .font(.caption.weight(.semibold))
@@ -235,6 +262,20 @@ struct SocialHubView: View {
         .task {
             await social.refresh()
             await messaging.refresh()
+        }
+        .task {
+            while !Task.isCancelled {
+                await social
+                    .refreshOnlinePresence()
+
+                do {
+                    try await Task.sleep(
+                        for: .seconds(15)
+                    )
+                } catch {
+                    return
+                }
+            }
         }
         .refreshable {
             await social.refresh()
@@ -1608,6 +1649,30 @@ struct SocialPrivacySettingsView: View {
                     }
 
                     Toggle("Allow follow requests", isOn: binding.allowFriendRequests)
+
+                    Toggle(
+                        "Show when I'm online",
+                        isOn: Binding(
+                            get: {
+                                social
+                                    .shareOnlineStatus
+                            },
+                            set: { enabled in
+                                Task {
+                                    await social
+                                        .setShareOnlineStatus(
+                                            enabled
+                                        )
+                                }
+                            }
+                        )
+                    )
+
+                    Text(
+                        "When enabled, followers can see a green online indicator while ATHLTH is active. It is off by default."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section("Messages") {
@@ -1849,6 +1914,8 @@ struct SocialAvatar: View {
 }
 
 private struct SocialProfileRow<Accessory: View>: View {
+    @EnvironmentObject private var social: SocialStore
+
     let profile: SocialProfileCard
     let accessory: Accessory
 
@@ -1862,7 +1929,31 @@ private struct SocialProfileRow<Accessory: View>: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SocialAvatar(profile: profile, size: 48)
+            SocialAvatar(
+                profile: profile,
+                size: 48
+            )
+            .overlay(
+                alignment: .bottomTrailing
+            ) {
+                if social.isOnline(
+                    profile.userID
+                ) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(
+                            width: 12,
+                            height: 12
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                }
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(profile.resolvedName)
