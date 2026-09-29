@@ -394,20 +394,31 @@ struct RunQuickStartSheet: View {
         trainingDeviceProvider: TrainingDeviceProvider,
         watchConnected: Bool,
         initialRoute: TrainingRoute? = nil,
+        initialWorkout:
+            RunningWorkoutTemplate? = nil,
         onStart: @escaping (RunQuickStartConfiguration) -> Void
     ) {
         self.trainingDeviceProvider = trainingDeviceProvider
         self.watchConnected = watchConnected
         self.onStart = onStart
 
+        let initialMode:
+            RunQuickStartMode =
+                initialWorkout != nil
+                    ? .structured
+                    : initialRoute != nil
+                        ? .route
+                        : .free
+
         _mode = State(
-            initialValue:
-                initialRoute == nil
-                    ? .free
-                    : .route
+            initialValue: initialMode
         )
-        _selectedRoute = State(initialValue: initialRoute)
-        _selectedWorkout = State(initialValue: nil)
+        _selectedRoute = State(
+            initialValue: initialRoute
+        )
+        _selectedWorkout = State(
+            initialValue: initialWorkout
+        )
         _captureDevice = State(
             initialValue:
                 watchConnected
