@@ -689,6 +689,7 @@ struct AroundYouExploreView: View {
 
     @ObservedObject var locationStore: HomeLocationStore
     var embeddedInTab: Bool = false
+    var embeddedInHeroLayout: Bool = false
 
     @StateObject private var routeAttempts = RouteAttemptStore()
 
@@ -894,9 +895,25 @@ struct AroundYouExploreView: View {
                     value: selectedRoute?.id
                 )
             }
+            .frame(
+                height:
+                    embeddedInHeroLayout
+                        ? 560
+                        : nil
+            )
         }
-        .background(ATHLTHPremiumCanvas())
-        .navigationTitle(embeddedInTab ? "Explore" : "Around You")
+        .background(
+            embeddedInHeroLayout
+                ? Color.clear
+                : AnyShapeStyle(
+                    ATHLTHPremiumCanvas()
+                )
+        )
+        .navigationTitle(
+            embeddedInHeroLayout
+                ? ""
+                : (embeddedInTab ? "Explore" : "Around You")
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(
             embeddedInTab ? .visible : .hidden,
