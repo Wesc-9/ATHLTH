@@ -19,6 +19,8 @@ final class SocialStore: ObservableObject {
     @Published private(set) var activeWorkoutSession: SocialWorkoutSessionRecord?
     @Published private(set) var activeWorkoutParticipants: [SocialWorkoutParticipantRecord] = []
     @Published private(set) var privacy: SocialPrivacySettings?
+    @Published private(set) var shareOnlineStatus = false
+    @Published private(set) var onlineUserIDs: Set<UUID> = []
     @Published private(set) var isRefreshing = false
     @Published private(set) var isHomeFeedRefreshing = false
     @Published var errorMessage: String?
@@ -27,6 +29,7 @@ final class SocialStore: ObservableObject {
     private var lastHomeFeedRefreshAt: Date?
     private var lastFullRefreshAt: Date?
     private var profileCache: [UUID: SocialFriendProfile] = [:]
+    private let onlinePresenceSessionID = UUID()
     private let activationDate: Date
 
     init() {
@@ -671,6 +674,124 @@ final class SocialStore: ObservableObject {
             )
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func isOnline(_ userID: UUID) -> Bool {
+        onlineUserIDs.contains(userID)
+    }
+
+    func refreshOnlinePresence() async {
+        guard service.currentUserID != nil else {
+            shareOnlineStatus = false
+            onlineUserIDs = []
+            return
+        }
+
+        do {
+            async let preferenceTask =
+                service.loadShareOnlineStatus()
+            async let sessionsTask =
+                service
+                    .loadVisibleOnlinePresenceSessions()
+
+            let (
+                preference,
+                sessions
+            ) = try await (
+                preferenceTask,
+                sessionsTask
+            )
+
+            let cutoff =
+                Date().addingTimeInterval(-90)
+
+            shareOnlineStatus = preference
+            onlineUserIDs = Set(
+                sessions
+                    .filter {
+                        $0.lastSeenAt >= cutoff
+                    }
+                    .map(\.userID)
+            )
+        } catch {
+            // Presence is additive. A missing migration or temporary network
+            // issue must never break the rest of Social/Community.
+        }
+    }
+
+    func setShareOnlineStatus(
+        _ enabled: Bool
+    ) async {
+        let previous = shareOnlineStatus
+        shareOnlineStatus = enabled
+
+        do {
+            try await service
+                .updateShareOnlineStatus(
+                    enabled
+                )
+
+            if enabled {
+                try await service
+                    .touchOnlinePresence(
+                        sessionID:
+                            onlinePresenceSessionID
+                    )
+            } else {
+                try? await service
+                    .clearOnlinePresence(
+                        sessionID:
+                            onlinePresenceSessionID
+                    )
+            }
+
+            await refreshOnlinePresence()
+        } catch {
+            shareOnlineStatus = previous
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
+    func heartbeatOnlinePresence() async {
+        guard shareOnlineStatus else {
+            try? await service
+                .clearOnlinePresence(
+                    sessionID:
+                        onlinePresenceSessionID
+                )
+            return
+        }
+
+        do {
+            try await service
+                .touchOnlinePresence(
+                    sessionID:
+                        onlinePresenceSessionID
+                )
+
+            if let currentUserID {
+                onlineUserIDs.insert(
+                    currentUserID
+                )
+            }
+        } catch {
+            // Heartbeats are best-effort and self-expire server-side.
+        }
+    }
+
+    func markOnlinePresenceOffline() async {
+        try? await service
+            .clearOnlinePresence(
+                sessionID:
+                    onlinePresenceSessionID
+            )
+
+        if let currentUserID {
+            onlineUserIDs.remove(
+                currentUserID
+            )
         }
     }
 
@@ -1471,6 +1592,8 @@ final class SocialStore: ObservableObject {
         activeWorkoutSession = nil
         activeWorkoutParticipants = []
         privacy = nil
+        shareOnlineStatus = false
+        onlineUserIDs = []
         profileCache = [:]
     }
 
