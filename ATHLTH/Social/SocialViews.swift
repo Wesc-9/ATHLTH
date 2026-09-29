@@ -120,6 +120,7 @@ struct ProfileFriendsSection: View {
 
 struct SocialHubView: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeStore
     @EnvironmentObject private var messaging: MessagingStore
 
     let initialTab: SocialHubTab
@@ -233,11 +234,17 @@ struct SocialHubView: View {
             NewMessageView()
         }
         .task {
-            await social.refresh()
+            async let socialRefresh: Void = social.refresh()
+            async let presenceRefresh: Void =
+                realtime.refreshOnlinePresence()
+            _ = await (socialRefresh, presenceRefresh)
             await messaging.refresh()
         }
         .refreshable {
-            await social.refresh()
+            async let socialRefresh: Void = social.refresh()
+            async let presenceRefresh: Void =
+                realtime.refreshOnlinePresence()
+            _ = await (socialRefresh, presenceRefresh)
             await messaging.refresh()
         }
     }
@@ -706,6 +713,7 @@ private struct SocialActivityCard: View {
 struct FriendProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeStore
     @EnvironmentObject private var messaging: MessagingStore
 
     let userID: UUID
@@ -837,10 +845,16 @@ struct FriendProfileView: View {
             }
         }
         .task {
-            await load()
+            async let profileLoad: Void = load()
+            async let presenceRefresh: Void =
+                realtime.refreshOnlinePresence()
+            _ = await (profileLoad, presenceRefresh)
         }
         .refreshable {
-            await load(force: true)
+            async let profileLoad: Void = load(force: true)
+            async let presenceRefresh: Void =
+                realtime.refreshOnlinePresence()
+            _ = await (profileLoad, presenceRefresh)
         }
         .sheet(isPresented: $showingChallenge) {
             if let profile {
@@ -922,6 +936,18 @@ struct FriendProfileView: View {
                         x: 0,
                         y: 5
                     )
+                    .overlay(alignment: .bottomTrailing) {
+                        if realtime.isOnline(userID) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 20, height: 20)
+                                .overlay {
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 3)
+                                }
+                                .accessibilityLabel("Online")
+                        }
+                    }
 
                     VStack(alignment: .leading, spacing: 5) {
                         Text("PROFILE")
@@ -948,6 +974,13 @@ struct FriendProfileView: View {
                         }
 
                         HStack(spacing: 6) {
+                            if realtime.isOnline(userID) {
+                                relationshipPill(
+                                    "Online",
+                                    systemImage: "circle.fill"
+                                )
+                            }
+
                             if social.isMutualFollow(userID) {
                                 relationshipPill(
                                     "Mutual follow",
@@ -1622,6 +1655,35 @@ struct SocialPrivacySettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Live Presence") {
+                    Toggle(
+                        "Show when I'm online",
+                        isOn: binding.shareOnlineStatus
+                    )
+                    Toggle(
+                        "Share live workout location",
+                        isOn: binding.shareLiveWorkoutLocation
+                    )
+
+                    if binding.wrappedValue.shareLiveWorkoutLocation {
+                        Picker(
+                            "Live location audience",
+                            selection: binding.liveWorkoutAudience
+                        ) {
+                            Text("Mutual follows")
+                                .tag(LiveWorkoutAudience.mutuals.rawValue)
+                            Text("Followers")
+                                .tag(LiveWorkoutAudience.followers.rawValue)
+                        }
+                    }
+
+                    Text(
+                        "Exact live GPS is shared only during an active workout and is not retained as a location history."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
                 Section("Shared with allowed viewers") {
                     Toggle("Training now", isOn: binding.shareTrainingPresence)
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
@@ -1702,6 +1764,14 @@ struct SocialPrivacySettingsView: View {
             settings.profileVisibility = visibility
         }
         settings.shareTrainingPresence = draft.shareTrainingPresence
+        settings.shareOnlineStatus = draft.shareOnlineStatus
+        settings.shareLiveWorkoutLocation =
+            draft.shareLiveWorkoutLocation
+        settings.liveWorkoutAudience =
+            LiveWorkoutAudience(
+                rawValue:
+                    draft.liveWorkoutAudience
+            ) ?? .mutuals
 
         saving = false
     }
@@ -1849,6 +1919,8 @@ struct SocialAvatar: View {
 }
 
 private struct SocialProfileRow<Accessory: View>: View {
+    @EnvironmentObject private var realtime: ATHLTHRealtimeStore
+
     let profile: SocialProfileCard
     let accessory: Accessory
 
@@ -1863,6 +1935,17 @@ private struct SocialProfileRow<Accessory: View>: View {
     var body: some View {
         HStack(spacing: 12) {
             SocialAvatar(profile: profile, size: 48)
+                .overlay(alignment: .bottomTrailing) {
+                    if realtime.isOnline(profile.userID) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 13, height: 13)
+                            .overlay {
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 2)
+                            }
+                    }
+                }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(profile.resolvedName)
