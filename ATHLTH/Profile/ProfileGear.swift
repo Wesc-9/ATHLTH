@@ -671,7 +671,7 @@ final class ProfileGearStore: ObservableObject {
                     draft: detailDraft
                 )
             } catch {
-                try? await client
+                _ = try? await client
                     .from("profile_gear")
                     .delete()
                     .eq("id", value: itemID)
@@ -910,7 +910,7 @@ final class ProfileGearStore: ObservableObject {
 
             if item.imageURL != nil {
                 let path = imagePath(userID: userID, itemID: item.id)
-                try? await client.storage
+                _ = try? await client.storage
                     .from("profile-gear")
                     .remove(paths: [path])
             }
@@ -1097,8 +1097,8 @@ final class ProfileGearStore: ObservableObject {
         try await client.storage
             .from("profile-gear")
             .upload(
-                path: path,
-                file: jpegData,
+                path,
+                data: jpegData,
                 options: FileOptions(
                     cacheControl: "3600",
                     contentType: "image/jpeg",
