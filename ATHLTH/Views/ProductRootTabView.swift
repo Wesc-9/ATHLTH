@@ -590,6 +590,14 @@ struct ATHLTHHomeView: View {
                 _ = await (communityRefresh, activityRefresh)
             }
             .task {
+                // Let the Home hierarchy paint before starting refresh work.
+                // The compatibility preview is intentionally data-static so
+                // smoke tests measure rendering rather than backend latency.
+                await Task.yield()
+                guard !session.previewModeEnabled else {
+                    return
+                }
+
                 async let communityRefresh: Void = community.refresh()
                 async let activityRefresh: Void = social.refreshHomeFeed()
 
