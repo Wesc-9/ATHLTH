@@ -485,154 +485,465 @@ private struct ATHLTHLockScreenWidgetView: View {
 }
 
 struct ATHLTHWorkoutLiveActivity: Widget {
+    private typealias Context =
+        ActivityViewContext<ATHLTHWorkoutActivityAttributes>
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(
             for: ATHLTHWorkoutActivityAttributes.self
         ) { context in
-            VStack(
-                alignment: .leading,
-                spacing: 10
-            ) {
-                HStack {
-                    Label(
-                        context.attributes.workoutTitle,
-                        systemImage:
-                            context.attributes.systemImage
-                    )
-                    .font(.headline)
-
-                    Spacer()
-
-                    Text(
-                        context.state.phase.capitalized
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
-                }
-
-                HStack(spacing: 18) {
-                    liveDuration(context)
-
-                    if context.state.distanceMeters > 0 {
-                        metric(
-                            value: String(
-                                format: "%.2f",
-                                context.state
-                                    .distanceMeters /
-                                    1000
-                            ),
-                            label: "KM"
-                        )
-                    }
-
-                    if context.state.heartRate > 0 {
-                        metric(
-                            value:
-                                String(
-                                    Int(
-                                        context.state
-                                            .heartRate
-                                            .rounded()
-                                    )
-                                ),
-                            label: "BPM"
-                        )
-                    }
-                }
-            }
-            .padding()
-            .activityBackgroundTint(
-                Color.black.opacity(0.88)
-            )
-            .activitySystemActionForegroundColor(
-                .white
-            )
-            .foregroundStyle(.white)
+            lockScreenContent(context)
+                .padding()
+                .activityBackgroundTint(
+                    Color.black.opacity(0.90)
+                )
+                .activitySystemActionForegroundColor(
+                    .white
+                )
+                .foregroundStyle(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Label(
-                        context.attributes.workoutTitle,
-                        systemImage:
-                            context.attributes.systemImage
+                        focusTitle(context),
+                        systemImage: focusIcon(context)
                     )
                     .font(.caption.weight(.semibold))
+                    .foregroundStyle(focusTint(context))
+                    .lineLimit(1)
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    if context.state.heartRate > 0 {
-                        Text(
-                            "\(Int(context.state.heartRate.rounded())) bpm"
-                        )
-                        .font(.caption.weight(.semibold))
-                    }
+                    Text(compactValue(context))
+                        .font(.caption.weight(.bold))
+                        .monospacedDigit()
+                        .lineLimit(1)
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
-                    HStack {
-                        liveDuration(context)
-
-                        Spacer()
-
-                        if context.state.distanceMeters > 0 {
-                            Text(
-                                String(
-                                    format: "%.2f km",
-                                    context.state
-                                        .distanceMeters /
-                                        1000
-                                )
-                            )
-                            .monospacedDigit()
-                        }
-                    }
-                    .font(.subheadline.weight(.semibold))
+                    expandedBottom(context)
                 }
             } compactLeading: {
-                Image(
-                    systemName:
-                        context.attributes.systemImage
-                )
-                .foregroundStyle(.green)
+                Image(systemName: focusIcon(context))
+                    .foregroundStyle(focusTint(context))
             } compactTrailing: {
-                if context.state.distanceMeters > 0 {
-                    Text(
-                        String(
-                            format: "%.1f",
-                            context.state
-                                .distanceMeters /
-                                1000
-                        )
-                    )
-                    .font(.caption2.weight(.semibold))
+                Text(compactValue(context))
+                    .font(.caption2.weight(.bold))
                     .monospacedDigit()
-                } else if let startedAt =
-                    context.attributes.startedAt {
-                    Text(
-                        startedAt,
-                        style: .timer
-                    )
-                    .font(.caption2.monospacedDigit())
-                } else {
-                    Text("LIVE")
-                        .font(.caption2.weight(.bold))
-                }
+                    .lineLimit(1)
             } minimal: {
-                Image(
-                    systemName:
-                        context.attributes.systemImage
-                )
-                .foregroundStyle(.green)
+                Image(systemName: focusIcon(context))
+                    .foregroundStyle(focusTint(context))
             }
         }
     }
 
     @ViewBuilder
+    private func lockScreenContent(
+        _ context: Context
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(
+                    focusTitle(context),
+                    systemImage: focusIcon(context)
+                )
+                .font(.headline)
+
+                Spacer()
+
+                Text(context.state.phase.capitalized)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(focusTint(context))
+            }
+
+            expandedBottom(context)
+        }
+    }
+
+    @ViewBuilder
+    private func expandedBottom(
+        _ context: Context
+    ) -> some View {
+        switch focus(context) {
+        case .routeGuardian:
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        isOffRoute(context)
+                            ? routeDeviationText(context)
+                            : routeRemainingText(context)
+                    )
+                    .font(.title3.weight(.bold))
+                    .monospacedDigit()
+
+                    Text(
+                        isOffRoute(context)
+                            ? "Return to route"
+                            : "Remaining"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.66))
+                }
+
+                Spacer()
+
+                if let progress =
+                    context.state.routeProgressPercent {
+                    Text(
+                        "\(Int(min(max(progress, 0), 1) * 100))%"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                }
+            }
+
+        case .zoneLock:
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        context.state.heartRate > 0
+                            ? "\(Int(context.state.heartRate.rounded())) bpm"
+                            : "Heart rate"
+                    )
+                    .font(.title3.weight(.bold))
+                    .monospacedDigit()
+
+                    Text(zoneTargetText(context))
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.66))
+                }
+
+                Spacer()
+
+                Text(
+                    context.state.heartRateTargetStatus ??
+                    "Zone active"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(focusTint(context))
+                .lineLimit(1)
+            }
+
+        case .ghostGap:
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        context.state.ghostDistanceDeltaMeters
+                            .map(ghostDistanceText) ??
+                        context.state.ghostRaceTitle ??
+                        "Ghost"
+                    )
+                    .font(.title3.weight(.bold))
+                    .lineLimit(1)
+
+                    Text("YOU vs GHOST")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.66))
+                }
+
+                Spacer()
+
+                if let delta =
+                    context.state.ghostTimeDeltaSeconds {
+                    Text(ghostTimeText(delta))
+                        .font(.title3.weight(.bold))
+                        .monospacedDigit()
+                }
+            }
+
+        case .liveChallenge:
+            let challenge =
+                context.state.liveContext.challenge
+
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(challenge?.title ?? "Challenge")
+                        .font(.subheadline.weight(.bold))
+                        .lineLimit(1)
+
+                    if let target =
+                        challenge?.targetDistanceMeters,
+                       target > 0 {
+                        Text(
+                            String(
+                                format: "%.1f / %.1f km",
+                                context.state.distanceMeters / 1_000,
+                                target / 1_000
+                            )
+                        )
+                        .font(.title3.weight(.bold))
+                        .monospacedDigit()
+                    }
+                }
+
+                Spacer()
+
+                if let projected =
+                    challenge?.projectedFinishSeconds {
+                    Text(duration(projected))
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                }
+            }
+
+        case .liveShare:
+            let share =
+                context.state.liveContext.liveShare
+
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        "LIVE · \(max(share?.viewerCount ?? 0, 0))"
+                    )
+                    .font(.title3.weight(.bold))
+                    .monospacedDigit()
+
+                    Text(
+                        share?.viewerSummary ??
+                        "Location sharing active"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.66))
+                    .lineLimit(1)
+                }
+
+                Spacer()
+
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+            }
+
+        case .workout:
+            HStack(spacing: 18) {
+                liveDuration(context)
+
+                if context.state.distanceMeters > 0 {
+                    metric(
+                        value: String(
+                            format: "%.2f",
+                            context.state.distanceMeters / 1_000
+                        ),
+                        label: "KM"
+                    )
+                }
+
+                if context.state.heartRate > 0 {
+                    metric(
+                        value:
+                            String(
+                                Int(
+                                    context.state
+                                        .heartRate
+                                        .rounded()
+                                )
+                            ),
+                        label: "BPM"
+                    )
+                }
+            }
+        }
+    }
+
+    private func focus(
+        _ context: Context
+    ) -> ATHLTHLiveWorkoutFocus {
+        ATHLTHLiveWorkoutPriorityResolver.resolve(
+            configuration:
+                context.state.surfaceConfiguration,
+            state: ATHLTHLiveWorkoutPriorityState(
+                hasRoute:
+                    context.state.routeProgressPercent != nil ||
+                    context.state.routeRemainingMeters != nil ||
+                    context.state.routeDeviationMeters != nil,
+                routeDeviationMeters:
+                    context.state.routeDeviationMeters,
+                routeDeviationThresholdMeters:
+                    context.state.routeDeviationThresholdMeters,
+                hasZoneTarget:
+                    context.state.heartRateTargetZone != nil ||
+                    (
+                        context.state
+                            .heartRateTargetMinimumBPM != nil &&
+                        context.state
+                            .heartRateTargetMaximumBPM != nil
+                    ),
+                zoneStatus:
+                    context.state.heartRateTargetStatus,
+                hasGhost:
+                    context.state.ghostRaceTitle != nil,
+                hasChallenge:
+                    context.state.liveContext.challenge != nil,
+                hasLiveShare:
+                    context.state.liveContext
+                        .liveShare?.isSharing == true
+            )
+        )
+    }
+
+    private func focusTitle(
+        _ context: Context
+    ) -> String {
+        switch focus(context) {
+        case .routeGuardian:
+            return isOffRoute(context)
+                ? "Off Route"
+                : "Route Guardian"
+        case .zoneLock:
+            return context.state.heartRateTargetZone
+                .map { "Zone \($0)" } ??
+                "Zone Lock"
+        case .ghostGap:
+            return "Ghost Gap"
+        case .liveChallenge:
+            return "Live Challenge"
+        case .liveShare:
+            return "Live Share"
+        case .workout:
+            return context.attributes.workoutTitle
+        }
+    }
+
+    private func focusIcon(
+        _ context: Context
+    ) -> String {
+        switch focus(context) {
+        case .routeGuardian:
+            return isOffRoute(context)
+                ? "exclamationmark.triangle.fill"
+                : "location.fill"
+        case .zoneLock:
+            return "heart.fill"
+        case .ghostGap:
+            return "figure.run"
+        case .liveChallenge:
+            return "trophy.fill"
+        case .liveShare:
+            return "dot.radiowaves.left.and.right"
+        case .workout:
+            return context.attributes.systemImage
+        }
+    }
+
+    private func focusTint(
+        _ context: Context
+    ) -> Color {
+        switch focus(context) {
+        case .routeGuardian where isOffRoute(context):
+            return .orange
+        case .zoneLock:
+            let status =
+                context.state.heartRateTargetStatus?
+                    .lowercased()
+            return status == nil ||
+                status == "on target" ||
+                status == "in target"
+                ? .green
+                : .orange
+        case .liveShare:
+            return .green
+        default:
+            return .green
+        }
+    }
+
+    private func compactValue(
+        _ context: Context
+    ) -> String {
+        switch focus(context) {
+        case .routeGuardian:
+            return isOffRoute(context)
+                ? routeDeviationText(context)
+                : routeRemainingText(context)
+        case .zoneLock:
+            return context.state.heartRate > 0
+                ? "\(Int(context.state.heartRate.rounded()))"
+                : "Z"
+        case .ghostGap:
+            return context.state.ghostTimeDeltaSeconds
+                .map(ghostTimeText) ?? "GHOST"
+        case .liveChallenge:
+            if let target =
+                context.state.liveContext
+                    .challenge?.targetDistanceMeters,
+               target > 0 {
+                return String(
+                    format: "%.1f/%.1f",
+                    context.state.distanceMeters / 1_000,
+                    target / 1_000
+                )
+            }
+            return "LIVE"
+        case .liveShare:
+            return "LIVE · \(max(
+                context.state.liveContext
+                    .liveShare?.viewerCount ?? 0,
+                0
+            ))"
+        case .workout:
+            if context.state.distanceMeters > 0 {
+                return String(
+                    format: "%.1f",
+                    context.state.distanceMeters / 1_000
+                )
+            }
+
+            return duration(context.state.elapsedTime)
+        }
+    }
+
+    private func isOffRoute(
+        _ context: Context
+    ) -> Bool {
+        guard let deviation =
+                context.state.routeDeviationMeters,
+              let threshold =
+                context.state
+                    .routeDeviationThresholdMeters
+        else {
+            return false
+        }
+
+        return deviation > threshold
+    }
+
+    private func routeDeviationText(
+        _ context: Context
+    ) -> String {
+        distance(
+            context.state.routeDeviationMeters
+        )
+    }
+
+    private func routeRemainingText(
+        _ context: Context
+    ) -> String {
+        distance(
+            context.state.routeRemainingMeters
+        )
+    }
+
+    private func zoneTargetText(
+        _ context: Context
+    ) -> String {
+        if let low =
+                context.state
+                    .heartRateTargetMinimumBPM,
+           let high =
+                context.state
+                    .heartRateTargetMaximumBPM {
+            return "\(Int(low.rounded()))–\(Int(high.rounded())) bpm"
+        }
+
+        return context.state.heartRateTargetZone
+            .map { "Target Z\($0)" } ??
+            "Target heart rate"
+    }
+
+    @ViewBuilder
     private func liveDuration(
-        _ context:
-            ActivityViewContext<
-                ATHLTHWorkoutActivityAttributes
-            >
+        _ context: Context
     ) -> some View {
         if let startedAt =
             context.attributes.startedAt,
@@ -670,10 +981,74 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         }
     }
 
+    private func distance(
+        _ meters: Double?
+    ) -> String {
+        guard let meters,
+              meters.isFinite
+        else {
+            return "—"
+        }
+
+        if meters >= 1_000 {
+            return String(
+                format: "%.1f km",
+                meters / 1_000
+            )
+        }
+
+        return "\(Int(max(meters, 0).rounded())) m"
+    }
+
+    private func ghostDistanceText(
+        _ delta: Double
+    ) -> String {
+        let meters =
+            Int(abs(delta).rounded())
+
+        if meters < 8 {
+            return "Neck and neck"
+        }
+
+        return delta >= 0
+            ? "You +\(meters) m"
+            : "Ghost +\(meters) m"
+    }
+
+    private func ghostTimeText(
+        _ delta: TimeInterval
+    ) -> String {
+        let seconds =
+            Int(abs(delta).rounded())
+        let prefix =
+            delta >= 0 ? "−" : "+"
+
+        if seconds >= 60 {
+            return prefix +
+                String(
+                    format: "%d:%02d",
+                    seconds / 60,
+                    seconds % 60
+                )
+        }
+
+        return prefix + "\(seconds)s"
+    }
+
     private func duration(
         _ seconds: TimeInterval
     ) -> String {
         let total = max(Int(seconds), 0)
+
+        if total >= 3_600 {
+            return String(
+                format: "%d:%02d:%02d",
+                total / 3_600,
+                (total % 3_600) / 60,
+                total % 60
+            )
+        }
+
         return String(
             format: "%d:%02d",
             total / 60,
