@@ -286,12 +286,38 @@ struct RunQuickStartSheet: View {
     let watchConnected: Bool
     let onStart: (RunQuickStartConfiguration) -> Void
 
-    @State private var mode: RunQuickStartMode = .free
+    @State private var mode: RunQuickStartMode
     @State private var selectedRoute: TrainingRoute?
     @State private var selectedWorkout: RunningWorkoutTemplate?
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
-    @State private var captureDevice: WorkoutCaptureDevice = .iPhone
+    @State private var captureDevice: WorkoutCaptureDevice
+
+    init(
+        trainingDeviceProvider: TrainingDeviceProvider,
+        watchConnected: Bool,
+        initialRoute: TrainingRoute? = nil,
+        onStart: @escaping (RunQuickStartConfiguration) -> Void
+    ) {
+        self.trainingDeviceProvider = trainingDeviceProvider
+        self.watchConnected = watchConnected
+        self.onStart = onStart
+
+        _mode = State(
+            initialValue:
+                initialRoute == nil
+                    ? .free
+                    : .route
+        )
+        _selectedRoute = State(initialValue: initialRoute)
+        _selectedWorkout = State(initialValue: nil)
+        _captureDevice = State(
+            initialValue:
+                watchConnected
+                    ? .appleWatch
+                    : .iPhone
+        )
+    }
 
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
