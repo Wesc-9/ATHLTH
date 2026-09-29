@@ -13,28 +13,21 @@ struct ATHLTHInsightsView: View {
     @State private var scenarioFocus: InsightsScenarioFocus = .consistency
 
     var body: some View {
-        let immersive =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.accentDeep.opacity(0.62),
-                softTransition: true,
-                immersiveTransition: immersive,
-                scrollFadeTransition: true
+                accent: ATHLTHTheme.accentDeep.opacity(0.62)
             ) {
                 ATHLTHTabHero(
                     imageName: "ProgressHero",
                     title: "Insights",
                     subtitle: "Understand what is happening, what changed and what it means for your training.",
-                    height: immersive ? 232 : 190,
+                    height: 236,
                     alignment: .leading,
-                    focalOffsetX: immersive ? 4 : 16,
-                    focalOffsetY: immersive ? 6 : 16,
-                    titleFontSize: immersive ? 31 : 30,
-                    copyWidthFraction: immersive ? 0.72 : 0.84,
-                    immersiveCopy: immersive
+                    focalOffsetX: 6,
+                    focalOffsetY: 8,
+                    titleFontSize: 30,
+                    copyWidthFraction: 0.76,
+                    immersiveCopy: false
                 )
             } content: {
                 LazyVStack(spacing: 16) {
