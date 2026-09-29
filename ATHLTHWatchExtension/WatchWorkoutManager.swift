@@ -71,6 +71,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var routeProgressPercent: Double?
     @Published private(set) var routeRemainingMeters: Double?
     @Published private(set) var routeDeviationMeters: Double?
+    @Published private(set) var routeDistanceToStartMeters: Double?
     @Published private(set) var routeAlertConfiguration:
         WatchRouteAlertConfiguration = .standard
     @Published private(set) var targetAlertConfiguration:
@@ -166,6 +167,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     )
                 }
             self.routeDeviationMeters = nil
+            self.routeDistanceToStartMeters = nil
         }
     }
 
@@ -679,6 +681,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.routeProgressPercent = nil
             self.routeRemainingMeters = nil
             self.routeDeviationMeters = nil
+            self.routeDistanceToStartMeters = nil
             self.routeAlertConfiguration = .standard
             self.targetAlertConfiguration = nil
             self.liveTargetStatus = nil
@@ -740,6 +743,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     )
                 }
             self.routeDeviationMeters = nil
+            self.routeDistanceToStartMeters = nil
             self.routeAlertConfiguration = .standard
             self.targetAlertConfiguration = nil
             self.liveTargetStatus = nil
@@ -1470,6 +1474,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 guidance.remainingMeters
             self.routeDeviationMeters =
                 guidance.deviationMeters
+            self.routeDistanceToStartMeters =
+                guidance.distanceToStartMeters
         }
 
         updateGhostRace(
