@@ -1110,6 +1110,23 @@ private struct HomeActivityOutdoorCard: View {
         return nil
     }
 
+    private var highestRoutePoint: CLLocation? {
+        guard let route = detail?.route,
+              route.count >= 2
+        else {
+            return nil
+        }
+
+        return route
+            .filter {
+                $0.altitude.isFinite &&
+                $0.verticalAccuracy >= 0
+            }
+            .max {
+                $0.altitude < $1.altitude
+            }
+    }
+
     private var visualRecipe:
         HomeActivityVisualRecipe {
         if activityCenterAIVisualsEnabled,
@@ -1469,7 +1486,9 @@ private struct HomeActivityOutdoorCard: View {
         if routeCoordinates.count >= 2 || singleLocation != nil {
             HomeActivityRouteArtwork(
                 coordinates: routeCoordinates,
-                singleLocation: singleLocation?.coordinate
+                singleLocation: singleLocation?.coordinate,
+                highestPoint: highestRoutePoint?.coordinate,
+                highestAltitudeMeters: highestRoutePoint?.altitude
             )
         } else {
             ZStack {
@@ -1842,13 +1861,17 @@ private struct WorkoutCoachInsightDetailView: View {
 private struct HomeActivityRouteArtwork: View {
     let coordinates: [CLLocationCoordinate2D]
     let singleLocation: CLLocationCoordinate2D?
+    let highestPoint: CLLocationCoordinate2D?
+    let highestAltitudeMeters: Double?
 
     @State private var image: UIImage?
 
     private var cacheKey: String {
         HomeActivityRouteSnapshotRenderer.cacheKey(
             coordinates: coordinates,
-            singleLocation: singleLocation
+            singleLocation: singleLocation,
+            highestPoint: highestPoint,
+            highestAltitudeMeters: highestAltitudeMeters
         )
     }
 
@@ -1889,7 +1912,9 @@ private struct HomeActivityRouteArtwork: View {
                     .shared
                     .image(
                         coordinates: coordinates,
-                        singleLocation: singleLocation
+                        singleLocation: singleLocation,
+                        highestPoint: highestPoint,
+                        highestAltitudeMeters: highestAltitudeMeters
                     )
 
             guard !Task.isCancelled else {
@@ -1917,7 +1942,9 @@ private final class HomeActivityRouteSnapshotRenderer {
 
     static func cacheKey(
         coordinates: [CLLocationCoordinate2D],
-        singleLocation: CLLocationCoordinate2D?
+        singleLocation: CLLocationCoordinate2D?,
+        highestPoint: CLLocationCoordinate2D?,
+        highestAltitudeMeters: Double?
     ) -> String {
         let points: [CLLocationCoordinate2D]
 
@@ -1932,19 +1959,38 @@ private final class HomeActivityRouteSnapshotRenderer {
             return "activity-route-empty"
         }
 
-        return points.map {
-            String(
-                format: "%.5f,%.5f",
-                $0.latitude,
-                $0.longitude
+        let routeKey =
+            points.map {
+                String(
+                    format: "%.5f,%.5f",
+                    $0.latitude,
+                    $0.longitude
+                )
+            }
+            .joined(separator: "|")
+
+        let highlightKey: String
+        if let highestPoint,
+           let highestAltitudeMeters,
+           highestAltitudeMeters.isFinite {
+            highlightKey = String(
+                format: "|high:%.5f,%.5f,%.0f",
+                highestPoint.latitude,
+                highestPoint.longitude,
+                highestAltitudeMeters
             )
+        } else {
+            highlightKey = "|high:none"
         }
-        .joined(separator: "|")
+
+        return "premium-route-v2|" + routeKey + highlightKey
     }
 
     func image(
         coordinates: [CLLocationCoordinate2D],
-        singleLocation: CLLocationCoordinate2D?
+        singleLocation: CLLocationCoordinate2D?,
+        highestPoint: CLLocationCoordinate2D?,
+        highestAltitudeMeters: Double?
     ) async -> UIImage? {
         guard !Task.isCancelled else {
             return nil
@@ -1952,7 +1998,9 @@ private final class HomeActivityRouteSnapshotRenderer {
 
         let key = Self.cacheKey(
             coordinates: coordinates,
-            singleLocation: singleLocation
+            singleLocation: singleLocation,
+            highestPoint: highestPoint,
+            highestAltitudeMeters: highestAltitudeMeters
         ) as NSString
 
         if let cached = cache.object(
@@ -1974,27 +2022,39 @@ private final class HomeActivityRouteSnapshotRenderer {
             return nil
         }
 
-        let options =
-            MKMapSnapshotter.Options()
-        options.region =
-            Self.region(for: points)
-        options.size =
+        let snapshotSize =
             CGSize(width: 460, height: 285)
-        options.scale = 2
-        options.mapType = .mutedStandard
-        options.pointOfInterestFilter =
-            .excludingAll
-        options.traitCollection =
-            UITraitCollection(
-                userInterfaceStyle: .light
-            )
 
         do {
-            let snapshot =
-                try await MKMapSnapshotter(
-                    options: options
-                )
-                .start()
+            let snapshot: MKMapSnapshotter.Snapshot
+
+            do {
+                let premiumOptions =
+                    Self.premiumSnapshotOptions(
+                        for: points,
+                        size: snapshotSize
+                    )
+
+                snapshot =
+                    try await MKMapSnapshotter(
+                        options: premiumOptions
+                    )
+                    .start()
+            } catch {
+                // Device/MapKit fallback: retain the current lightweight
+                // 2D presentation rather than dropping the workout visual.
+                let fallbackOptions =
+                    Self.fallbackSnapshotOptions(
+                        for: points,
+                        size: snapshotSize
+                    )
+
+                snapshot =
+                    try await MKMapSnapshotter(
+                        options: fallbackOptions
+                    )
+                    .start()
+            }
 
             guard !Task.isCancelled else {
                 return nil
@@ -2008,7 +2068,7 @@ private final class HomeActivityRouteSnapshotRenderer {
 
             let renderer =
                 UIGraphicsImageRenderer(
-                    size: options.size,
+                    size: snapshotSize,
                     format: format
                 )
 
@@ -2017,13 +2077,13 @@ private final class HomeActivityRouteSnapshotRenderer {
                     snapshot.image.draw(
                         in: CGRect(
                             origin: .zero,
-                            size: options.size
+                            size: snapshotSize
                         )
                     )
 
                     let bounds = CGRect(
                         origin: .zero,
-                        size: options.size
+                        size: snapshotSize
                     )
 
                     let overlayColors = [
@@ -2183,6 +2243,23 @@ private final class HomeActivityRouteSnapshotRenderer {
                     routePath.lineWidth = 3
                     routePath.stroke()
 
+                    if let highestPoint,
+                       let highestAltitudeMeters,
+                       highestAltitudeMeters.isFinite,
+                       highestAltitudeMeters > 0 {
+                        let highlightLocation =
+                            snapshot.point(
+                                for: highestPoint
+                            )
+
+                        Self.drawHighestPoint(
+                            at: highlightLocation,
+                            altitudeMeters:
+                                highestAltitudeMeters,
+                            bounds: bounds
+                        )
+                    }
+
                     if let first =
                         points.first {
                         Self.drawEndpoint(
@@ -2197,13 +2274,11 @@ private final class HomeActivityRouteSnapshotRenderer {
 
                     if let last =
                         points.last {
-                        Self.drawEndpoint(
+                        Self.drawFinishEndpoint(
                             at:
                                 snapshot.point(
                                     for: last
-                                ),
-                            fill:
-                                UIColor.systemBlue
+                                )
                         )
                     }
                 }
@@ -2228,6 +2303,209 @@ private final class HomeActivityRouteSnapshotRenderer {
         } catch {
             return nil
         }
+    }
+
+    private static func premiumSnapshotOptions(
+        for points: [CLLocationCoordinate2D],
+        size: CGSize
+    ) -> MKMapSnapshotter.Options {
+        let options = MKMapSnapshotter.Options()
+        options.size = size
+        options.scale = 2
+        options.traitCollection =
+            UITraitCollection(
+                userInterfaceStyle: .light
+            )
+
+        let configuration =
+            MKHybridMapConfiguration(
+                elevationStyle: .realistic
+            )
+        configuration.showsTraffic = false
+        // Keep Apple's geographic labels/terrain context. Workout-specific
+        // callouts are drawn by ATHLTH on top of the snapshot.
+        options.preferredConfiguration =
+            configuration
+
+        options.camera =
+            premiumCamera(
+                for: points
+            )
+
+        return options
+    }
+
+    private static func fallbackSnapshotOptions(
+        for points: [CLLocationCoordinate2D],
+        size: CGSize
+    ) -> MKMapSnapshotter.Options {
+        let options = MKMapSnapshotter.Options()
+        options.region = region(for: points)
+        options.size = size
+        options.scale = 2
+
+        let configuration =
+            MKStandardMapConfiguration(
+                elevationStyle: .flat
+            )
+        configuration.emphasisStyle = .muted
+        configuration.pointOfInterestFilter =
+            .excludingAll
+        configuration.showsTraffic = false
+
+        options.preferredConfiguration =
+            configuration
+        options.traitCollection =
+            UITraitCollection(
+                userInterfaceStyle: .light
+            )
+
+        return options
+    }
+
+    private static func premiumCamera(
+        for points: [CLLocationCoordinate2D]
+    ) -> MKMapCamera {
+        let mapRect =
+            mapRect(for: points)
+        let center =
+            MKMapPoint(
+                x: mapRect.midX,
+                y: mapRect.midY
+            )
+            .coordinate
+
+        let metersPerPoint =
+            MKMetersPerMapPointAtLatitude(
+                center.latitude
+            )
+        let spanMeters =
+            max(
+                mapRect.size.width,
+                mapRect.size.height
+            ) * metersPerPoint
+
+        let camera = MKMapCamera()
+        camera.centerCoordinate = center
+        camera.pitch = 58
+        camera.heading =
+            principalHeading(
+                for: points
+            )
+        camera.altitude =
+            min(
+                max(
+                    spanMeters * 1.72,
+                    1_100
+                ),
+                65_000
+            )
+
+        return camera
+    }
+
+    private static func mapRect(
+        for points: [CLLocationCoordinate2D]
+    ) -> MKMapRect {
+        guard let first = points.first else {
+            return MKMapRect.world
+        }
+
+        var rect = MKMapRect(
+            origin: MKMapPoint(first),
+            size: MKMapSize(width: 0, height: 0)
+        )
+
+        for coordinate in points.dropFirst() {
+            let point = MKMapPoint(coordinate)
+            rect = rect.union(
+                MKMapRect(
+                    x: point.x,
+                    y: point.y,
+                    width: 0,
+                    height: 0
+                )
+            )
+        }
+
+        let minimumDimension = 700.0
+        let width = max(rect.size.width, minimumDimension)
+        let height = max(rect.size.height, minimumDimension)
+        let paddedWidth = width * 1.42
+        let paddedHeight = height * 1.62
+
+        return MKMapRect(
+            x: rect.midX - (paddedWidth / 2),
+            y: rect.midY - (paddedHeight / 2),
+            width: paddedWidth,
+            height: paddedHeight
+        )
+    }
+
+    private static func principalHeading(
+        for points: [CLLocationCoordinate2D]
+    ) -> CLLocationDirection {
+        guard points.count >= 2 else {
+            return 18
+        }
+
+        let mapPoints =
+            sampled(
+                points,
+                maximumCount: 80
+            )
+            .map(MKMapPoint.init)
+
+        let meanX =
+            mapPoints.reduce(0.0) {
+                $0 + $1.x
+            } /
+            Double(mapPoints.count)
+        let meanY =
+            mapPoints.reduce(0.0) {
+                $0 + $1.y
+            } /
+            Double(mapPoints.count)
+
+        var xx = 0.0
+        var yy = 0.0
+        var xy = 0.0
+
+        for point in mapPoints {
+            let dx = point.x - meanX
+            let dy = point.y - meanY
+            xx += dx * dx
+            yy += dy * dy
+            xy += dx * dy
+        }
+
+        let axisAngle =
+            0.5 *
+            atan2(
+                2 * xy,
+                xx - yy
+            )
+
+        let dx = cos(axisAngle)
+        let dy = sin(axisAngle)
+        var heading =
+            atan2(
+                dx,
+                -dy
+            ) *
+            180 /
+            .pi
+
+        heading += 12
+
+        while heading < 0 {
+            heading += 360
+        }
+        while heading >= 360 {
+            heading -= 360
+        }
+
+        return heading
     }
 
     private static func interpolate(
@@ -2255,6 +2533,206 @@ private final class HomeActivityRouteSnapshotRenderer {
             blue: fb + ((tb - fb) * t),
             alpha: fa + ((ta - fa) * t)
         )
+    }
+
+    private static func drawHighestPoint(
+        at point: CGPoint,
+        altitudeMeters: Double,
+        bounds: CGRect
+    ) {
+        guard bounds.insetBy(dx: 10, dy: 10)
+            .contains(point)
+        else {
+            return
+        }
+
+        let dotOuter =
+            CGRect(
+                x: point.x - 6,
+                y: point.y - 6,
+                width: 12,
+                height: 12
+            )
+        UIColor.white.setFill()
+        UIBezierPath(
+            ovalIn: dotOuter
+        )
+        .fill()
+
+        let dotInner =
+            CGRect(
+                x: point.x - 3.5,
+                y: point.y - 3.5,
+                width: 7,
+                height: 7
+            )
+        UIColor(
+            red: 0.96,
+            green: 0.57,
+            blue: 0.12,
+            alpha: 1
+        )
+        .setFill()
+        UIBezierPath(
+            ovalIn: dotInner
+        )
+        .fill()
+
+        let title = "Highest point"
+        let value =
+            "\(Int(altitudeMeters.rounded())) m"
+
+        let paragraph =
+            NSMutableParagraphStyle()
+        paragraph.alignment = .left
+
+        let titleAttributes:
+            [NSAttributedString.Key: Any] = [
+                .font:
+                    UIFont.systemFont(
+                        ofSize: 10,
+                        weight: .semibold
+                    ),
+                .foregroundColor:
+                    UIColor.white
+                        .withAlphaComponent(0.88),
+                .paragraphStyle: paragraph
+            ]
+        let valueAttributes:
+            [NSAttributedString.Key: Any] = [
+                .font:
+                    UIFont.systemFont(
+                        ofSize: 12,
+                        weight: .bold
+                    ),
+                .foregroundColor:
+                    UIColor.white,
+                .paragraphStyle: paragraph
+            ]
+
+        let bubbleSize =
+            CGSize(width: 82, height: 38)
+        var origin =
+            CGPoint(
+                x: point.x + 10,
+                y: point.y - 43
+            )
+
+        if origin.x + bubbleSize.width >
+            bounds.maxX - 8 {
+            origin.x =
+                point.x -
+                bubbleSize.width -
+                10
+        }
+        origin.x =
+            min(
+                max(origin.x, bounds.minX + 8),
+                bounds.maxX -
+                    bubbleSize.width -
+                    8
+            )
+        origin.y =
+            min(
+                max(origin.y, bounds.minY + 8),
+                bounds.maxY -
+                    bubbleSize.height -
+                    8
+            )
+
+        let bubbleRect =
+            CGRect(
+                origin: origin,
+                size: bubbleSize
+            )
+
+        UIColor.black
+            .withAlphaComponent(0.58)
+            .setFill()
+        UIBezierPath(
+            roundedRect: bubbleRect,
+            cornerRadius: 11
+        )
+        .fill()
+
+        (title as NSString).draw(
+            in: CGRect(
+                x: bubbleRect.minX + 9,
+                y: bubbleRect.minY + 6,
+                width: bubbleRect.width - 18,
+                height: 13
+            ),
+            withAttributes:
+                titleAttributes
+        )
+        (value as NSString).draw(
+            in: CGRect(
+                x: bubbleRect.minX + 9,
+                y: bubbleRect.minY + 18,
+                width: bubbleRect.width - 18,
+                height: 16
+            ),
+            withAttributes:
+                valueAttributes
+        )
+    }
+
+    private static func drawFinishEndpoint(
+        at point: CGPoint
+    ) {
+        let outer =
+            CGRect(
+                x: point.x - 9,
+                y: point.y - 9,
+                width: 18,
+                height: 18
+            )
+        UIColor.white.setFill()
+        UIBezierPath(
+            ovalIn: outer
+        )
+        .fill()
+
+        let middle =
+            outer.insetBy(
+                dx: 2,
+                dy: 2
+            )
+        UIColor.black
+            .withAlphaComponent(0.88)
+            .setFill()
+        UIBezierPath(
+            ovalIn: middle
+        )
+        .fill()
+
+        let tile = 4.0
+        for row in 0..<2 {
+            for column in 0..<2 {
+                if (row + column).isMultiple(of: 2) {
+                    let tileRect =
+                        CGRect(
+                            x:
+                                point.x -
+                                tile +
+                                CGFloat(column) *
+                                tile,
+                            y:
+                                point.y -
+                                tile +
+                                CGFloat(row) *
+                                tile,
+                            width: tile,
+                            height: tile
+                        )
+                    UIColor.white.setFill()
+                    UIBezierPath(
+                        rect: tileRect
+                    )
+                    .fill()
+                }
+            }
+        }
     }
 
     private static func drawEndpoint(
