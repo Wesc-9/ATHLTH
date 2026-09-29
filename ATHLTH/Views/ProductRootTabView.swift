@@ -7,6 +7,10 @@ import UniformTypeIdentifiers
 
 struct ProductRootTabView: View {
 
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+
     @State private var selectedTab: Int
 
     init() {
@@ -92,6 +96,36 @@ struct ProductRootTabView: View {
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
         }
+        .task(id: onlinePresenceTaskKey) {
+            guard session.signedIn else {
+                return
+            }
+
+            guard scenePhase == .active else {
+                await social
+                    .markOnlinePresenceOffline()
+                return
+            }
+
+            await social.refreshOnlinePresence()
+
+            while !Task.isCancelled {
+                await social
+                    .heartbeatOnlinePresence()
+
+                do {
+                    try await Task.sleep(
+                        for: .seconds(30)
+                    )
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private var onlinePresenceTaskKey: String {
+        "\(session.signedIn)-\(scenePhase)"
     }
 }
 
