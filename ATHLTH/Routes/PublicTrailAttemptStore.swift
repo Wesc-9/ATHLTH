@@ -90,7 +90,7 @@ private struct PublicTrailAttemptWrite: Encodable {
     }
 }
 
-private struct PublicTrailLeaderboardConfiguration:
+struct PublicTrailLeaderboardConfiguration:
     Decodable
 {
     let id: UUID
