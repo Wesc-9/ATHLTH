@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import MapKit
 import Supabase
 
 struct PublicTrailRecord: Codable, Identifiable, Hashable {
@@ -18,6 +19,20 @@ struct PublicTrailRecord: Codable, Identifiable, Hashable {
     let leaderboardEnabled: Bool
     let athlthVerified: Bool
     let source: String
+    let routeShape: String?
+    let surfaceSummary: String?
+    let difficulty: String?
+    let osmDescription: String?
+    let website: String?
+    let estimatedRunSeconds: TimeInterval?
+    let estimatedWalkSeconds: TimeInterval?
+    let elevationGainMeters: Double?
+    let elevationLossMeters: Double?
+    let minElevationMeters: Double?
+    let maxElevationMeters: Double?
+    let averageGradePercent: Double?
+    let maxGradePercent: Double?
+    let elevationProfile: [Double]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -35,6 +50,20 @@ struct PublicTrailRecord: Codable, Identifiable, Hashable {
         case leaderboardEnabled = "leaderboard_enabled"
         case athlthVerified = "athlth_verified"
         case source
+        case routeShape = "route_shape"
+        case surfaceSummary = "surface_summary"
+        case difficulty
+        case osmDescription = "osm_description"
+        case website
+        case estimatedRunSeconds = "estimated_run_seconds"
+        case estimatedWalkSeconds = "estimated_walk_seconds"
+        case elevationGainMeters = "elevation_gain_meters"
+        case elevationLossMeters = "elevation_loss_meters"
+        case minElevationMeters = "min_elevation_meters"
+        case maxElevationMeters = "max_elevation_meters"
+        case averageGradePercent = "average_grade_percent"
+        case maxGradePercent = "max_grade_percent"
+        case elevationProfile = "elevation_profile"
     }
 
     static let publicSourceOwnerID =
@@ -58,12 +87,12 @@ struct PublicTrailRecord: Codable, Identifiable, Hashable {
             visibility: .publicProfile,
             coordinates: coordinates,
             distanceKilometers: distanceKilometers,
-            elevationGainMeters: nil,
+            elevationGainMeters: elevationGainMeters,
             importedFilename: nil,
             createdAt: Date(timeIntervalSince1970: 0),
             startName: reference,
             endName: nil,
-            expectedTravelTimeSeconds: nil,
+            expectedTravelTimeSeconds: estimatedRunSeconds,
             routeSource: "openstreetmap"
         )
     }
@@ -133,6 +162,32 @@ final class SupabasePublicTrailDiscoveryService {
 
         return response
     }
+    private struct SimilarParams: Encodable {
+        let p_trail_id: UUID
+        let p_limit: Int
+    }
+
+    func similar(
+        to trailID: UUID,
+        limit: Int = 10
+    ) async throws -> [PublicTrailRecord] {
+        let params = SimilarParams(
+            p_trail_id: trailID,
+            p_limit: min(max(limit, 1), 10)
+        )
+
+        let rows: [PublicTrailRecord] =
+            try await client
+                .rpc(
+                    "similar_public_trails",
+                    params: params
+                )
+                .execute()
+                .value
+
+        return rows.filter(\.isUsable)
+    }
+
     func fetch(
         id: UUID
     ) async throws -> PublicTrailRecord? {
@@ -304,6 +359,62 @@ final class PublicTrailDiscoveryStore:
                     "Public trails are temporarily unavailable."
             }
             isWarmingCache = false
+        }
+    }
+
+    func refresh(
+        in region: MKCoordinateRegion,
+        force: Bool = true
+    ) async {
+        guard region.center.latitude.isFinite,
+              region.center.longitude.isFinite,
+              region.span.latitudeDelta.isFinite,
+              region.span.longitudeDelta.isFinite
+        else {
+            return
+        }
+
+        let center = CLLocation(
+            latitude: region.center.latitude,
+            longitude: region.center.longitude
+        )
+        let corner = CLLocation(
+            latitude:
+                region.center.latitude +
+                region.span.latitudeDelta / 2,
+            longitude:
+                region.center.longitude +
+                region.span.longitudeDelta / 2
+        )
+        let radiusKilometers =
+            min(
+                max(
+                    center.distance(from: corner) / 1_000,
+                    3
+                ),
+                20
+            )
+
+        await refresh(
+            near: center,
+            radiusKilometers: radiusKilometers,
+            force: force
+        )
+    }
+
+    func similar(
+        to trailID: UUID,
+        limit: Int = 10
+    ) async -> [PublicTrailRecord] {
+        do {
+            return try await service.similar(
+                to: trailID,
+                limit: limit
+            )
+        } catch is CancellationError {
+            return []
+        } catch {
+            return []
         }
     }
 
