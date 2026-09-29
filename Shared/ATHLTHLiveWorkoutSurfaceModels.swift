@@ -108,15 +108,30 @@ struct ATHLTHLiveShareContext: Codable, Hashable {
     var viewerSummary: String?
 }
 
+struct ATHLTHLiveGhostAudioContext:
+    Codable,
+    Hashable
+{
+    var enabled: Bool
+    var distanceIntervalMeters: Double?
+    var timeIntervalSeconds: TimeInterval?
+    var announceLeadChanges: Bool
+    var leadChangeThresholdMeters: Double
+    var periodicDeliveryRawValue: String
+    var leadChangeDeliveryRawValue: String
+    var importantLeadChangeDeliveryRawValue: String
+    var importantLeadChangeMeters: Double
+}
+
 struct ATHLTHLiveGhostContext: Codable, Hashable {
     var title: String
     var distanceDeltaMeters: Double?
     var estimatedTimeDeltaSeconds: TimeInterval?
     var updatedAt: Date
 
-    // Optional so contexts written by older iPhone/Watch builds still decode.
+    // Platform-neutral so iPhone, Watch and Widget targets can all decode it.
     var audio:
-        WatchGhostRaceAudioConfiguration? = nil
+        ATHLTHLiveGhostAudioContext? = nil
 }
 
 struct ATHLTHLiveWorkoutContext: Codable, Hashable {
