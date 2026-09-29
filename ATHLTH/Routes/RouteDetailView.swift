@@ -10,6 +10,8 @@ struct RouteDetailView: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
 
     @StateObject private var attempts = RouteAttemptStore()
+    @StateObject private var publicTrailAttempts =
+        PublicTrailAttemptStore()
     @StateObject private var discovery = RouteDiscoveryStore()
 
     let route: TrainingRoute
@@ -34,6 +36,42 @@ struct RouteDetailView: View {
         currentRoute.ownerID == session.profile.userID
     }
 
+    private var isPublicTrail: Bool {
+        currentRoute.routeSource == "openstreetmap" ||
+        currentRoute.ownerID ==
+            PublicTrailRecord.publicSourceOwnerID ||
+        currentRoute.sharedSourceOwnerID ==
+            PublicTrailRecord.publicSourceOwnerID
+    }
+
+    private var publicTrailID: UUID {
+        currentRoute.sharedSourceRouteID ??
+            currentRoute.id
+    }
+
+    private var attemptCount: Int {
+        isPublicTrail
+            ? publicTrailAttempts.attempts.count
+            : attempts.attempts.count
+    }
+
+    private var isSyncingAttempts: Bool {
+        isPublicTrail
+            ? publicTrailAttempts.isSyncingHealth
+            : attempts.isSyncingHealth
+    }
+
+    private var attemptErrorMessage: String? {
+        isPublicTrail
+            ? publicTrailAttempts.errorMessage
+            : attempts.errorMessage
+    }
+
+    private var leaderboardAvailable: Bool {
+        !isPublicTrail ||
+            publicTrailAttempts.leaderboardEnabled
+    }
+
     private var savedCopy: TrainingRoute? {
         if isOwner {
             return currentRoute
@@ -45,7 +83,9 @@ struct RouteDetailView: View {
     }
 
     private var leaderboard: [RouteAttemptRecord] {
-        attempts.leaderboard()
+        isPublicTrail
+            ? publicTrailAttempts.leaderboard()
+            : attempts.leaderboard()
     }
 
     private var topThree: [RouteAttemptRecord] {
@@ -53,15 +93,33 @@ struct RouteDetailView: View {
     }
 
     private var ownAttempts: [RouteAttemptRecord] {
-        attempts.attempts(for: session.profile.userID)
+        isPublicTrail
+            ? publicTrailAttempts.attempts(
+                for: session.profile.userID
+            )
+            : attempts.attempts(
+                for: session.profile.userID
+            )
     }
 
     private var ownBest: RouteAttemptRecord? {
-        attempts.bestAttempt(for: session.profile.userID)
+        isPublicTrail
+            ? publicTrailAttempts.bestAttempt(
+                for: session.profile.userID
+            )
+            : attempts.bestAttempt(
+                for: session.profile.userID
+            )
     }
 
     private var ownLatest: RouteAttemptRecord? {
-        attempts.latestAttempt(for: session.profile.userID)
+        isPublicTrail
+            ? publicTrailAttempts.latestAttempt(
+                for: session.profile.userID
+            )
+            : attempts.latestAttempt(
+                for: session.profile.userID
+            )
     }
 
     private var ownRank: Int? {
@@ -215,7 +273,7 @@ struct RouteDetailView: View {
                 get: {
                     watchMessage != nil ||
                     watchError != nil ||
-                    attempts.errorMessage != nil ||
+                    attemptErrorMessage != nil ||
                     discovery.errorMessage != nil
                 },
                 set: { visible in
@@ -223,6 +281,7 @@ struct RouteDetailView: View {
                         watchMessage = nil
                         watchError = nil
                         attempts.errorMessage = nil
+                        publicTrailAttempts.errorMessage = nil
                         discovery.errorMessage = nil
                     }
                 }
@@ -232,7 +291,7 @@ struct RouteDetailView: View {
         } message: {
             Text(
                 watchError ??
-                attempts.errorMessage ??
+                attemptErrorMessage ??
                 discovery.errorMessage ??
                 watchMessage ??
                 ""
@@ -330,7 +389,7 @@ struct RouteDetailView: View {
 
                     metric(
                         title: "Attempts",
-                        value: "\(attempts.attempts.count)",
+                        value: "\(attemptCount)",
                         icon: "arrow.trianglehead.2.clockwise.rotate.90"
                     )
 
@@ -403,7 +462,7 @@ struct RouteDetailView: View {
 
                     Spacer()
 
-                    if attempts.isSyncingHealth {
+                    if isSyncingAttempts {
                         ProgressView()
                             .controlSize(.small)
                     }
@@ -553,9 +612,25 @@ struct RouteDetailView: View {
                     }
                 }
 
-                if topThree.isEmpty {
+                if !leaderboardAvailable {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "trophy")
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+
+                        Text(
+                            "Leaderboard is not enabled for this public trail."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                } else if topThree.isEmpty {
                     Text(
-                        "No qualifying route attempts yet. Be the first to complete at least 85% of the route."
+                        isPublicTrail
+                            ? "No qualifying public trail attempts yet. Complete at least 85% of the trail to set the first time."
+                            : "No qualifying route attempts yet. Be the first to complete at least 85% of the route."
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -981,6 +1056,10 @@ struct RouteDetailView: View {
     }
 
     private var leaderboardSubtitle: String {
+        if isPublicTrail {
+            return "Fastest qualifying times on this public trail."
+        }
+
         switch currentRoute.visibility {
         case .privateOnly:
             return "Only your qualifying attempts are visible."
@@ -994,18 +1073,40 @@ struct RouteDetailView: View {
     private func prepareRouteData(
         forceHealthSync: Bool = false
     ) async {
+        if isPublicTrail {
+            if forceHealthSync ||
+                health.hasRequestedAuthorization {
+                await publicTrailAttempts
+                    .syncHealthAttempts(
+                        for: currentRoute,
+                        trailID: publicTrailID,
+                        userID: session.profile.userID,
+                        health: health
+                    )
+            } else {
+                await publicTrailAttempts.refresh(
+                    trailID: publicTrailID
+                )
+            }
+
+            return
+        }
+
         if isOwner {
             await discovery.publish(currentRoute)
         }
 
-        if forceHealthSync || health.hasRequestedAuthorization {
+        if forceHealthSync ||
+            health.hasRequestedAuthorization {
             await attempts.syncHealthAttempts(
                 for: currentRoute,
                 userID: session.profile.userID,
                 health: health
             )
         } else {
-            await attempts.refresh(routeID: currentRoute.id)
+            await attempts.refresh(
+                routeID: currentRoute.id
+            )
         }
     }
 
