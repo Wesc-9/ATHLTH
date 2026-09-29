@@ -108,7 +108,7 @@ private struct PublicTrailDiscoveryRequest: Encodable {
     let radiusKilometers: Double
 }
 
-private struct PublicTrailDiscoveryResponse: Decodable {
+struct PublicTrailDiscoveryResponse: Decodable {
     let trails: [PublicTrailRecord]
     let source: String
     let minimumDiscoveryKilometers: Double
