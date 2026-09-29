@@ -296,6 +296,8 @@ struct QuickWorkoutStartSheet: View {
 }
 
 struct HomeActivitySection: View {
+    @AppStorage("admin.activityCenterAIVisualsEnabled")
+    private var activityCenterAIVisualsEnabled = false
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -658,7 +660,8 @@ struct HomeActivitySection: View {
 
     @MainActor
     private func loadWorkoutAIInsights() async {
-        guard session.hasPaidAccess,
+        guard activityCenterAIVisualsEnabled,
+              session.hasPaidAccess,
               session.aiHealthDataSharingEnabled
         else {
             workoutAIInsights.removeAll()
@@ -1109,7 +1112,8 @@ private struct HomeActivityOutdoorCard: View {
 
     private var visualRecipe:
         HomeActivityVisualRecipe {
-        if let recipe =
+        if activityCenterAIVisualsEnabled,
+           let recipe =
             aiInsight?.visualRecipe {
             return HomeActivityVisualRecipe(
                 palette: recipe.palette,
@@ -1133,9 +1137,11 @@ private struct HomeActivityOutdoorCard: View {
             ZStack(alignment: .topLeading) {
                 mapBackground
 
-                HomeActivityScenicWash(
-                    recipe: visualRecipe
-                )
+                if activityCenterAIVisualsEnabled {
+                    HomeActivityScenicWash(
+                        recipe: visualRecipe
+                    )
+                }
 
                 LinearGradient(
                     colors: [
@@ -2096,35 +2102,84 @@ private final class HomeActivityRouteSnapshotRenderer {
                         }
                     }
 
+                    // ATHLTH Route Ribbon: a layered, dimensional route
+                    // treatment rendered into the cached snapshot. This keeps
+                    // Activity Center scrolling light while giving every GPS
+                    // run the same premium visual identity.
                     UIColor.black
-                        .withAlphaComponent(0.24)
+                        .withAlphaComponent(0.18)
+                        .setStroke()
+                    routePath.lineWidth = 24
+                    context.cgContext.saveGState()
+                    context.cgContext.setShadow(
+                        offset: CGSize(width: 0, height: 7),
+                        blur: 10,
+                        color: UIColor.black
+                            .withAlphaComponent(0.26)
+                            .cgColor
+                    )
+                    routePath.stroke()
+                    context.cgContext.restoreGState()
+
+                    UIColor.white
+                        .withAlphaComponent(0.96)
                         .setStroke()
                     routePath.lineWidth = 18
                     routePath.stroke()
 
+                    // Paint short route segments separately so the ribbon can
+                    // move through a restrained ATHLTH performance gradient.
+                    let ribbonPalette: [UIColor] = [
+                        UIColor(red: 0.05, green: 0.62, blue: 0.49, alpha: 1),
+                        UIColor(red: 0.19, green: 0.78, blue: 0.45, alpha: 1),
+                        UIColor(red: 0.68, green: 0.86, blue: 0.27, alpha: 1),
+                        UIColor(red: 0.96, green: 0.73, blue: 0.18, alpha: 1),
+                        UIColor(red: 0.96, green: 0.45, blue: 0.12, alpha: 1)
+                    ]
+
+                    let renderedPoints =
+                        points.map {
+                            snapshot.point(for: $0)
+                        }
+
+                    if renderedPoints.count >= 2 {
+                        for index in 1..<renderedPoints.count {
+                            let progress =
+                                CGFloat(index - 1) /
+                                CGFloat(max(renderedPoints.count - 2, 1))
+                            let scaled =
+                                progress *
+                                CGFloat(ribbonPalette.count - 1)
+                            let lower =
+                                min(
+                                    Int(floor(scaled)),
+                                    ribbonPalette.count - 1
+                                )
+                            let upper =
+                                min(lower + 1, ribbonPalette.count - 1)
+                            let mix = scaled - CGFloat(lower)
+
+                            let color =
+                                Self.interpolate(
+                                    ribbonPalette[lower],
+                                    ribbonPalette[upper],
+                                    fraction: mix
+                                )
+
+                            let segment = UIBezierPath()
+                            segment.move(to: renderedPoints[index - 1])
+                            segment.addLine(to: renderedPoints[index])
+                            segment.lineCapStyle = .round
+                            segment.lineJoinStyle = .round
+                            color.setStroke()
+                            segment.lineWidth = 12
+                            segment.stroke()
+                        }
+                    }
+
                     UIColor.white
-                        .withAlphaComponent(0.86)
+                        .withAlphaComponent(0.34)
                         .setStroke()
-                    routePath.lineWidth = 13
-                    routePath.stroke()
-
-                    UIColor(
-                        red: 0.36,
-                        green: 0.96,
-                        blue: 0.68,
-                        alpha: 1
-                    )
-                    .setStroke()
-                    routePath.lineWidth = 8
-                    routePath.stroke()
-
-                    UIColor(
-                        red: 0.70,
-                        green: 1.00,
-                        blue: 0.82,
-                        alpha: 0.72
-                    )
-                    .setStroke()
                     routePath.lineWidth = 3
                     routePath.stroke()
 
@@ -2173,6 +2228,33 @@ private final class HomeActivityRouteSnapshotRenderer {
         } catch {
             return nil
         }
+    }
+
+    private static func interpolate(
+        _ from: UIColor,
+        _ to: UIColor,
+        fraction: CGFloat
+    ) -> UIColor {
+        let t = min(max(fraction, 0), 1)
+
+        var fr: CGFloat = 0
+        var fg: CGFloat = 0
+        var fb: CGFloat = 0
+        var fa: CGFloat = 0
+        var tr: CGFloat = 0
+        var tg: CGFloat = 0
+        var tb: CGFloat = 0
+        var ta: CGFloat = 0
+
+        from.getRed(&fr, green: &fg, blue: &fb, alpha: &fa)
+        to.getRed(&tr, green: &tg, blue: &tb, alpha: &ta)
+
+        return UIColor(
+            red: fr + ((tr - fr) * t),
+            green: fg + ((tg - fg) * t),
+            blue: fb + ((tb - fb) * t),
+            alpha: fa + ((ta - fa) * t)
+        )
     }
 
     private static func drawEndpoint(
