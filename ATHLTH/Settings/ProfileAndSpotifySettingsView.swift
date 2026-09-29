@@ -1086,6 +1086,36 @@ struct ATHLTHPrivacyCenterView: View {
                     .foregroundStyle(.secondary)
                 }
 
+                Section("Live Presence") {
+                    Toggle(
+                        "Show when I'm online",
+                        isOn: binding.shareOnlineStatus
+                    )
+
+                    Toggle(
+                        "Share live workout location",
+                        isOn: binding.shareLiveWorkoutLocation
+                    )
+
+                    if binding.wrappedValue.shareLiveWorkoutLocation {
+                        Picker(
+                            "Live location audience",
+                            selection: binding.liveWorkoutAudience
+                        ) {
+                            Text("Mutual follows")
+                                .tag(LiveWorkoutAudience.mutuals.rawValue)
+                            Text("Followers")
+                                .tag(LiveWorkoutAudience.followers.rawValue)
+                        }
+                    }
+
+                    Text(
+                        "Online status is approximate. Live GPS is shared only while an outdoor workout is active, is protected by your audience setting, and is not stored as a location history in Supabase."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
                 Section("What Others Can See") {
                     Toggle(
                         "Training now",
@@ -1346,6 +1376,12 @@ struct ATHLTHPrivacyCenterView: View {
                     settings.profileVisibility = visibility
                 }
                 settings.shareTrainingPresence = snapshot.shareTrainingPresence
+                settings.shareOnlineStatus = snapshot.shareOnlineStatus
+                settings.shareLiveWorkoutLocation = snapshot.shareLiveWorkoutLocation
+                settings.liveWorkoutAudience =
+                    LiveWorkoutAudience(
+                        rawValue: snapshot.liveWorkoutAudience
+                    ) ?? .mutuals
                 draft = social.privacy ?? snapshot
                 saved = true
                 return
