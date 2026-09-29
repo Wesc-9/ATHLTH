@@ -86,6 +86,8 @@ enum GhostRaceStartService {
             ghostRace: ghostRace,
             watchConnection:
                 watchConnection,
+            phoneWorkout: phoneWorkout,
+            captureDevice: captureDevice,
             settings: settings
         )
     }
@@ -280,21 +282,28 @@ enum GhostRaceStartService {
                     .running
                 )
 
+            var liveCoach =
+                settings.audioCoachConfiguration(
+                    enabled:
+                        settings
+                            .audioCoachEnabledByDefault,
+                    routeDistanceMeters:
+                        route.map {
+                            max(
+                                $0.distanceKilometers *
+                                    1_000,
+                                0
+                            )
+                        }
+                )
+            if settings.ghostRaceAudioEnabled {
+                liveCoach.distanceIntervalMeters = nil
+                liveCoach.timeIntervalSeconds = nil
+            }
+
             watchConnection
                 .sendAudioCoachConfiguration(
-                    settings.audioCoachConfiguration(
-                        enabled:
-                            settings
-                                .audioCoachEnabledByDefault,
-                        routeDistanceMeters:
-                            route.map {
-                                max(
-                                    $0.distanceKilometers *
-                                        1_000,
-                                    0
-                                )
-                            }
-                    )
+                    liveCoach
                 )
 
             watchConnection
