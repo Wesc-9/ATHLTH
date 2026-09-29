@@ -2503,6 +2503,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 latestRoutePoint?.longitude,
             routeProgressPercent:
                 routeProgressPercent,
+            routeComparisonID:
+                plannedRoute?
+                    .comparisonRouteID ??
+                plannedRoute?.id,
+            routeTitle:
+                plannedRoute?.title,
+            routeDistanceMeters:
+                plannedRoute.map {
+                    max(
+                        $0.distanceKilometers *
+                            1_000,
+                        0
+                    )
+                },
             currentPaceSecondsPerKilometer:
                 currentPaceSecondsPerKilometer,
             routeRemainingMeters:
