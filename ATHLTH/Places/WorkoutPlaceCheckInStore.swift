@@ -454,10 +454,19 @@ final class WorkoutPlaceCheckInStore:
                         return nil
                     }
 
+                    let coordinate =
+                        mapItem.placemark.coordinate
+                    let mapLocation =
+                        CLLocation(
+                            latitude:
+                                coordinate.latitude,
+                            longitude:
+                                coordinate.longitude
+                        )
                     let distance =
                         location.distance(
                             from:
-                                mapItem.location
+                                mapLocation
                         )
 
                     guard distance.isFinite,
@@ -472,8 +481,7 @@ final class WorkoutPlaceCheckInStore:
                                 identifier.rawValue,
                             name: name,
                             coordinate:
-                                mapItem.location
-                                    .coordinate,
+                                coordinate,
                             distanceMeters:
                                 distance
                         )
@@ -597,32 +605,41 @@ final class WorkoutPlaceCheckInStore:
                     identifier
             )
 
-        do {
-            let mapItem =
-                try await request.mapItem
+        let mapItem: MKMapItem? =
+            await withCheckedContinuation {
+                continuation in
 
-            guard let name =
-                    mapItem.name?
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        ),
-                  !name.isEmpty
-            else {
-                return nil
+                request.getMapItem {
+                    item,
+                    _ in
+
+                    continuation.resume(
+                        returning: item
+                    )
+                }
             }
 
-            return
-                WorkoutPlacePresentation(
-                    id: placeID,
-                    name: name,
-                    coordinate:
-                        mapItem.location
-                            .coordinate,
-                    distanceMeters: nil
-                )
-        } catch {
+        guard let mapItem,
+              let name =
+                mapItem.name?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+              !name.isEmpty
+        else {
             return nil
         }
+
+        return
+            WorkoutPlacePresentation(
+                id: placeID,
+                name: name,
+                coordinate:
+                    mapItem
+                        .placemark
+                        .coordinate,
+                distanceMeters: nil
+            )
     }
 }
