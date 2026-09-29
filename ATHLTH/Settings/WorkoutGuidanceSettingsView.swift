@@ -183,7 +183,7 @@ struct ATHLTHRouteGuardianSettingsView: View {
                 )
             } footer: {
                 Text(
-                    "Route Guardian is independent from Audio Coach and Ghost. Critical route warnings have the highest guidance priority."
+                    "Route Guardian is independent from Audio Coach and Ghost Updates. Critical route warnings have the highest guidance priority."
                 )
             }
 
