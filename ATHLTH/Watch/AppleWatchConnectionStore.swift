@@ -293,6 +293,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     func sendLiveSurfaceConfiguration(
         _ configuration: ATHLTHLiveWorkoutSurfaceConfiguration
     ) {
+        ATHLTHLiveWorkoutPreferencesStore.save(configuration)
+
         sendWatchPayload(
             configuration,
             kind: .liveSurfaceConfiguration
@@ -302,6 +304,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     func sendLiveSurfaceContext(
         _ context: ATHLTHLiveWorkoutContext
     ) {
+        ATHLTHLiveWorkoutContextStore.save(context)
+
         sendWatchPayload(
             context,
             kind: .liveSurfaceContext
