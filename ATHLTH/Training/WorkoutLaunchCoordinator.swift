@@ -121,6 +121,17 @@ struct PlannedWorkoutWatchBuilder {
         )
     }
 
+    static func runningTransfer(
+        from workout: RunningWorkoutTemplate,
+        routeAlerts: WatchRouteAlertConfiguration
+    ) -> WatchRunningWorkoutTransfer {
+        WatchRunningWorkoutTransfer(
+            title: workout.title,
+            steps: runningSteps(from: workout),
+            routeAlerts: routeAlerts
+        )
+    }
+
     private static func runningSteps(
         from template: RunningWorkoutTemplate
     ) -> [WatchRunningWorkoutStep] {
@@ -291,6 +302,93 @@ enum WorkoutLaunchCoordinator {
             await spotify.startLinkedPlaylist(
                 playlist,
                 settings: settings
+            )
+        }
+    }
+
+    static func startRunQuick(
+        configuration: RunQuickStartConfiguration,
+        session: AppSessionStore,
+        settings: AppSettingsStore,
+        gear: ProfileGearStore,
+        phoneWorkout: IPhoneWorkoutStore,
+        watchConnection: AppleWatchConnectionStore
+    ) async throws {
+        if configuration.captureDevice == .iPhone {
+            guard configuration.mode == .free else {
+                throw NSError(
+                    domain: "ATHLTH.RunLaunch",
+                    code: 1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Route and structured runs currently require Apple Watch."
+                    ]
+                )
+            }
+
+            gear.prepareNextWorkoutGear(
+                configuration.gearIDs
+            )
+            phoneWorkout.start(walking: false)
+            return
+        }
+
+        guard watchConnection.isReady else {
+            throw NSError(
+                domain: "ATHLTH.RunLaunch",
+                code: 2,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Apple Watch is not ready to start this run."
+                ]
+            )
+        }
+
+        if let route = configuration.route {
+            try watchConnection.sendRoute(route)
+            watchConnection.sendWorkoutRouteSelection(
+                route.id
+            )
+        } else if let workout = configuration.workout,
+                  let routeID = workout.routeID,
+                  let route = session.savedRoutes.first(
+                    where: { $0.id == routeID }
+                  ) {
+            try watchConnection.sendRoute(route)
+            watchConnection.sendWorkoutRouteSelection(
+                route.id
+            )
+        } else {
+            watchConnection.sendWorkoutRouteSelection(nil)
+        }
+
+        try await watchConnection
+            .startWorkoutOnWatch(.running)
+
+        gear.prepareNextWorkoutGear(
+            configuration.gearIDs
+        )
+
+        watchConnection.sendAudioCoachConfiguration(
+            configuration.audioCoach
+        )
+
+        if let workout = configuration.workout {
+            watchConnection.sendRunningWorkout(
+                PlannedWorkoutWatchBuilder.runningTransfer(
+                    from: workout,
+                    routeAlerts:
+                        settings.routeAlertConfiguration
+                )
+            )
+        } else {
+            watchConnection.sendRunningWorkout(
+                WatchRunningWorkoutTransfer(
+                    title: "",
+                    steps: [],
+                    routeAlerts:
+                        settings.routeAlertConfiguration
+                )
             )
         }
     }
