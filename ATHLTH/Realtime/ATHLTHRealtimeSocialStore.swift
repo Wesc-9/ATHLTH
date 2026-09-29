@@ -1055,9 +1055,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             return nil
         }
 
-        return value > 1.0001
-            ? value / 100
-            : value
+        return value / 100
     }
 
     private func sanitizedNonNegative(
