@@ -915,6 +915,12 @@ struct AroundYouExploreView: View {
                 : (embeddedInTab ? "Explore" : "Around You")
         )
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(
+            embeddedInHeroLayout
+                ? .hidden
+                : .automatic,
+            for: .navigationBar
+        )
         .toolbar(
             embeddedInTab ? .visible : .hidden,
             for: .tabBar
