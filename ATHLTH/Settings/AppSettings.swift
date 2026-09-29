@@ -320,6 +320,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var ghostRaceAudioLeadChangeMeters: Double { didSet { persist() } }
     @Published var ghostRaceAudioDelivery: WatchAlertDelivery { didSet { persist() } }
     @Published var ghostRaceAudioLeadChangeDelivery: WatchAlertDelivery { didSet { persist() } }
+    @Published var ghostRaceAudioImportantLeadChangeDelivery: WatchAlertDelivery { didSet { persist() } }
     @Published var ghostRaceAudioImportantLeadChangeMeters: Double { didSet { persist() } }
 
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
@@ -581,6 +582,13 @@ final class AppSettingsStore: ObservableObject {
                         "settings.ghostRace.audio.leadChangeDelivery"
                 ) ?? ""
             ) ?? .haptic
+        ghostRaceAudioImportantLeadChangeDelivery =
+            WatchAlertDelivery(
+                rawValue: defaults.string(
+                    forKey:
+                        "settings.ghostRace.audio.importantLeadChangeDelivery"
+                ) ?? ""
+            ) ?? .both
         ghostRaceAudioImportantLeadChangeMeters =
             defaults.object(
                 forKey:
@@ -779,6 +787,11 @@ final class AppSettingsStore: ObservableObject {
                 "settings.ghostRace.audio.leadChangeDelivery"
         )
         defaults.set(
+            ghostRaceAudioImportantLeadChangeDelivery.rawValue,
+            forKey:
+                "settings.ghostRace.audio.importantLeadChangeDelivery"
+        )
+        defaults.set(
             ghostRaceAudioImportantLeadChangeMeters,
             forKey:
                 "settings.ghostRace.audio.importantLeadChangeMeters"
@@ -906,6 +919,8 @@ final class AppSettingsStore: ObservableObject {
                 ghostRaceAudioDelivery,
             leadChangeDelivery:
                 ghostRaceAudioLeadChangeDelivery,
+            importantLeadChangeDelivery:
+                ghostRaceAudioImportantLeadChangeDelivery,
             importantLeadChangeMeters:
                 min(
                     max(
