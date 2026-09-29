@@ -1050,30 +1050,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        let completed: Bool
-
-        switch step.measure {
-        case .time:
-            guard let duration = step.durationSeconds else {
-                return
-            }
-            completed =
-                elapsedTime - structuredStepStartElapsedTime >=
-                duration
-
-        case .distance:
-            guard let distance = step.distanceMeters else {
-                return
-            }
-            completed =
-                distanceMeters - structuredStepStartDistanceMeters >=
-                distance
-
-        case .open:
-            completed = false
+        guard ATHLTHRunningStepEngine
+            .isCompleted(
+                step: step,
+                elapsedTime: elapsedTime,
+                distanceMeters: distanceMeters,
+                stepStartElapsedTime:
+                    structuredStepStartElapsedTime,
+                stepStartDistanceMeters:
+                    structuredStepStartDistanceMeters
+            )
+        else {
+            return
         }
 
-        guard completed else { return }
         advanceStructuredRunningWorkout()
     }
 
@@ -1397,25 +1387,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     )
                 }
 
-        var cumulative: [Double] = [0]
-        cumulative.reserveCapacity(
-            locations.count
-        )
-
-        var total: Double = 0
-
-        for index in 1..<locations.count {
-            total += locations[index]
-                .distance(
-                    from:
-                        locations[index - 1]
+        let geometry =
+            ATHLTHRouteGuidanceEngine
+                .cumulativeGeometry(
+                    locations: locations
                 )
-            cumulative.append(total)
-        }
 
         plannedRouteLocations = locations
-        plannedRouteCumulativeMeters = cumulative
-        plannedRouteGeometryMeters = total
+        plannedRouteCumulativeMeters =
+            geometry.cumulativeMeters
+        plannedRouteGeometryMeters =
+            geometry.totalMeters
     }
 
     private func updateOutdoorMetrics(
@@ -1459,84 +1441,45 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func updateRouteNavigation(
         using location: CLLocation
     ) {
-        guard plannedRouteLocations.count >= 2,
-              plannedRouteCumulativeMeters.count ==
-                plannedRouteLocations.count
+        guard let guidance =
+                ATHLTHRouteGuidanceEngine.state(
+                    location: location,
+                    routeLocations:
+                        plannedRouteLocations,
+                    cumulativeMeters:
+                        plannedRouteCumulativeMeters,
+                    geometryTotalMeters:
+                        plannedRouteGeometryMeters,
+                    advertisedDistanceMeters:
+                        plannedRoute.map {
+                            max(
+                                $0.distanceKilometers *
+                                    1_000,
+                                0
+                            )
+                        }
+                )
         else {
             return
         }
 
-        var nearestIndex = 0
-        var nearestDistance =
-            Double.greatestFiniteMagnitude
-
-        for (
-            index,
-            point
-        ) in plannedRouteLocations.enumerated() {
-            let distance =
-                location.distance(
-                    from: point
-                )
-
-            if distance < nearestDistance {
-                nearestDistance = distance
-                nearestIndex = index
-            }
-        }
-
-        let geometryTotal =
-            max(
-                plannedRouteGeometryMeters,
-                1
-            )
-        let traveledAlongRoute =
-            plannedRouteCumulativeMeters[
-                nearestIndex
-            ]
-        let progress =
-            min(
-                max(
-                    traveledAlongRoute /
-                    geometryTotal,
-                    0
-                ),
-                1
-            )
-        let routeTotal =
-            max(
-                plannedRoute?
-                    .distanceKilometers
-                    ?? 0,
-                0
-            ) * 1_000
-        let effectiveTotal =
-            routeTotal > 0
-                ? routeTotal
-                : geometryTotal
-        let remaining =
-            max(
-                effectiveTotal *
-                    (1 - progress),
-                0
-            )
-
         publish {
             self.routeProgressPercent =
-                progress * 100
+                guidance.progressPercent
             self.routeRemainingMeters =
-                remaining
+                guidance.remainingMeters
             self.routeDeviationMeters =
-                nearestDistance
+                guidance.deviationMeters
         }
 
         updateGhostRace(
             traveledAlongRoute:
-                traveledAlongRoute
+                guidance.traveledAlongRouteMeters
         )
 
         evaluateRouteAlert(
-            deviationMeters: nearestDistance,
+            deviationMeters:
+                guidance.deviationMeters,
             horizontalAccuracy:
                 location.horizontalAccuracy
         )
