@@ -575,10 +575,6 @@ struct ATHLTHCommunityView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var groups: CommunityGroupStore
-    @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
-
-    @State private var showingCreateChallenge = false
-    @State private var challengeTarget: SocialProfileCard?
 
     private var activeChallenges: [ATHLTHChallenge] {
         challenges.visibleChallenges
@@ -598,16 +594,6 @@ struct ATHLTHCommunityView: View {
 
                 return $0.rules.startsAt < $1.rules.startsAt
             }
-    }
-
-    private var featuredChallenge: ATHLTHChallenge? {
-        activeChallenges.first
-    }
-
-    private var featuredRouteChallenge: ATHLTHChallenge? {
-        activeChallenges.first {
-            $0.rules.route != nil
-        }
     }
 
     var body: some View {
@@ -676,10 +662,6 @@ struct ATHLTHCommunityView: View {
                         )
                     }
 
-                    CommunityRouteChallengeShowcaseCard(
-                        challenge: featuredRouteChallenge
-                    )
-
                     CommunityFriendsVsFriendsCard(
                         currentUserID: session.profile.userID,
                         currentDisplayName: session.profile.displayName,
@@ -689,17 +671,9 @@ struct ATHLTHCommunityView: View {
                         ownWorkouts: health.workouts
                     )
 
-                    CommunityShowcaseActionStrip(
-                        onCreateChallenge: {
-                            showingCreateChallenge = true
-                        }
-                    )
+                    CommunityClubPulseCard()
 
-                    CommunityClubActivityShowcaseCard()
-
-                    CommunityPopularRoutesShowcaseCard(
-                        routes: routeDiscovery.routes
-                    )
+                    CommunityYourClubsSection()
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
@@ -713,26 +687,16 @@ struct ATHLTHCommunityView: View {
             .task {
                 await refreshCommunity()
             }
-            .sheet(isPresented: $showingCreateChallenge) {
-                ChallengeCreationView()
-            }
-            .sheet(item: $challengeTarget) { friend in
-                ChallengeCreationView(
-                    preselectedFriends: [friend]
-                )
-            }
             .alert(
                 "Community",
                 isPresented: Binding(
                     get: {
                         community.errorMessage != nil ||
-                        routeDiscovery.errorMessage != nil ||
                         officialChallenges.errorMessage != nil
                     },
                     set: { shown in
                         if !shown {
                             community.errorMessage = nil
-                            routeDiscovery.errorMessage = nil
                             officialChallenges.errorMessage = nil
                         }
                     }
@@ -742,7 +706,6 @@ struct ATHLTHCommunityView: View {
             } message: {
                 Text(
                     community.errorMessage ??
-                    routeDiscovery.errorMessage ??
                     officialChallenges.errorMessage ??
                     ""
                 )
@@ -774,8 +737,6 @@ struct ATHLTHCommunityView: View {
                 )
         async let groupRefresh: Void =
             groups.refresh(force: force)
-        async let routeRefresh: Void =
-            routeDiscovery.refresh(force: force)
         async let officialChallengeRefresh: Void =
             officialChallenges.refresh(force: force)
 
@@ -783,7 +744,6 @@ struct ATHLTHCommunityView: View {
             eventRefresh,
             socialRefresh,
             groupRefresh,
-            routeRefresh,
             officialChallengeRefresh
         )
 
