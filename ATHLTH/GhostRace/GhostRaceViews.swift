@@ -7,6 +7,8 @@ struct GhostRaceHubView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+    @EnvironmentObject private var social: SocialStore
 
     @State private var recentRuns: [WorkoutSummary] = []
     @State private var loading = false
@@ -24,6 +26,7 @@ struct GhostRaceHubView: View {
             LazyVStack(spacing: 18) {
                 hero
                 modeOverview
+                liveNowSection
                 audioCoachCard
                 targetGhostSection
                 pastSelfSection
@@ -49,10 +52,20 @@ struct GhostRaceHubView: View {
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await loadRuns()
+            async let runs: Void =
+                loadRuns()
+            async let live: Void =
+                realtime
+                    .refreshVisibleLiveSessions()
+            _ = await (runs, live)
         }
         .refreshable {
-            await loadRuns()
+            async let runs: Void =
+                loadRuns()
+            async let live: Void =
+                realtime
+                    .refreshVisibleLiveSessions()
+            _ = await (runs, live)
         }
         .alert(
             "Ghost Race",
@@ -152,6 +165,205 @@ struct GhostRaceHubView: View {
                 icon: "person.2.fill"
             )
         }
+    }
+
+    @ViewBuilder
+    private var liveNowSection: some View {
+        let sessions =
+            realtime.visibleLiveSessions
+                .filter {
+                    $0.activity == "running"
+                }
+
+        if !sessions.isEmpty {
+            ATHLTHCard {
+                HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text("Live now")
+                            .font(
+                                .title3.weight(
+                                    .bold
+                                )
+                            )
+
+                        Text(
+                            "Follow a live runner or open an active friend Ghost Run."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "dot.radiowaves.left.and.right"
+                    )
+                    .foregroundStyle(
+                        Color.green
+                    )
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(
+                        Array(
+                            sessions.prefix(6)
+                        )
+                    ) { liveSession in
+                        NavigationLink {
+                            ATHLTHLiveWorkoutMapView(
+                                session:
+                                    liveSession
+                            )
+                        } label: {
+                            HStack(
+                                spacing: 12
+                            ) {
+                                Image(
+                                    systemName:
+                                        liveSession
+                                            .ghostChallengeID ==
+                                            nil
+                                            ? "figure.run.circle.fill"
+                                            : "flag.checkered.circle.fill"
+                                )
+                                .font(
+                                    .system(
+                                        size: 20,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    liveSession
+                                        .ghostChallengeID ==
+                                        nil
+                                        ? ATHLTHTheme
+                                            .vitality
+                                        : ATHLTHTheme
+                                            .premiumGold
+                                )
+                                .frame(
+                                    width: 40,
+                                    height: 40
+                                )
+                                .background(
+                                    Color.primary
+                                        .opacity(
+                                            0.035
+                                        ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                12
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        liveSession
+                                            .title
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                    .lineLimit(1)
+
+                                    Text(
+                                        liveRunnerSubtitle(
+                                            liveSession
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                    .lineLimit(1)
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(
+                                    .caption.bold()
+                                )
+                                .foregroundStyle(
+                                    .tertiary
+                                )
+                            }
+                            .padding(
+                                .vertical,
+                                8
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        if liveSession.id !=
+                            sessions
+                                .prefix(6)
+                                .last?
+                                .id {
+                            Divider()
+                                .padding(
+                                    .leading,
+                                    52
+                                )
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    private func liveRunnerSubtitle(
+        _ liveSession:
+            ATHLTHLiveWorkoutSession
+    ) -> String {
+        let ownerName =
+            social.visibleProfiles
+                .first {
+                    $0.userID ==
+                        liveSession.ownerID
+                }?
+                .resolvedName ??
+            social.following
+                .first {
+                    $0.userID ==
+                        liveSession.ownerID
+                }?
+                .resolvedName ??
+            "ATHLTH athlete"
+
+        let kind =
+            liveSession.ghostChallengeID ==
+            nil
+                ? "Live run"
+                : "Live Ghost Run"
+
+        return
+            ownerName +
+            " · " +
+            kind
     }
 
     private var audioCoachCard: some View {
