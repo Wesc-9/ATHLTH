@@ -2359,32 +2359,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     return
                 }
 
-                builder.finishWorkout {
-                    [weak self] workout, error in
-
-                    Task { @MainActor [weak self] in
-                        guard let self else {
-                            return
-                        }
-
-                        if let error {
-                            self.fail(error)
-                            return
-                        }
-
-                        guard let workout else {
-                            self.fail(
-                                WatchWorkoutError
-                                    .workoutCouldNotSave
-                            )
-                            return
-                        }
-
-                        self.finishRouteIfNeeded(
-                            workout: workout,
-                            endDate: endDate
+                do {
+                    guard let workout =
+                            try await builder.finishWorkout()
+                    else {
+                        self.fail(
+                            WatchWorkoutError
+                                .workoutCouldNotSave
                         )
+                        return
                     }
+
+                    self.finishRouteIfNeeded(
+                        workout: workout,
+                        endDate: endDate
+                    )
+                } catch {
+                    self.fail(error)
                 }
             }
         }
