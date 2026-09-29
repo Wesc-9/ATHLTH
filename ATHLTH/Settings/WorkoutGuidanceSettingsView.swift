@@ -439,9 +439,37 @@ struct ATHLTHGhostUpdatesSettingsView: View {
 struct ATHLTHGuidancePrioritySettingsView: View {
     @EnvironmentObject private var settings:
         AppSettingsStore
+    @EnvironmentObject private var watchConnection:
+        AppleWatchConnectionStore
+
+    @State private var liveConfiguration =
+        ATHLTHLiveWorkoutPreferencesStore
+            .load()
 
     var body: some View {
         Form {
+            Section("Master delivery") {
+                Toggle(
+                    "Haptic alerts",
+                    isOn:
+                        $liveConfiguration
+                            .hapticsEnabled
+                )
+
+                Toggle(
+                    "Voice alerts",
+                    isOn:
+                        $liveConfiguration
+                            .audioAlertsEnabled
+                )
+
+                Text(
+                    "These master switches control Route Guardian, target and Ghost alerts. Routine Audio Coach has its own on/off setting."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             Section("Priority order") {
                 priorityRow(
                     "1",
@@ -498,6 +526,21 @@ struct ATHLTHGuidancePrioritySettingsView: View {
         }
         .navigationTitle("Alert Priority")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            liveConfiguration =
+                ATHLTHLiveWorkoutPreferencesStore
+                    .load()
+        }
+        .onChange(
+            of: liveConfiguration
+        ) { _, configuration in
+            ATHLTHLiveWorkoutPreferencesStore
+                .save(configuration)
+            watchConnection
+                .sendLiveSurfaceConfiguration(
+                    configuration
+                )
+        }
     }
 
     @ViewBuilder
