@@ -163,6 +163,53 @@ enum GhostRaceStartService {
         )
     }
 
+    static func startLive(
+        title: String,
+        ghostRace: GhostRaceStore,
+        watchConnection: AppleWatchConnectionStore,
+        settings: AppSettingsStore
+    ) async throws {
+        // Live Ghost uses the opponent's fresh cloud position instead of a
+        // fixed timing profile. Clear any previously prepared replay/target
+        // ghost before starting the Watch workout.
+        ghostRace.cancel()
+        watchConnection.sendWorkoutRouteSelection(nil)
+        watchConnection.clearGhostRace()
+
+        do {
+            try await watchConnection
+                .startWorkoutOnWatch(
+                    .running
+                )
+
+            watchConnection
+                .sendAudioCoachConfiguration(
+                    settings.audioCoachConfiguration(
+                        enabled:
+                            settings
+                                .audioCoachEnabledByDefault,
+                        routeDistanceMeters: nil
+                    )
+                )
+
+            watchConnection
+                .sendRunningWorkout(
+                    WatchRunningWorkoutTransfer(
+                        title:
+                            "Live Ghost · \(title)",
+                        steps: [],
+                        routeAlerts:
+                            settings
+                                .routeAlertConfiguration
+                    )
+                )
+        } catch {
+            watchConnection
+                .sendWorkoutRouteSelection(nil)
+            throw error
+        }
+    }
+
     private static func launchPrepared(
         title: String,
         ownerID: UUID,
