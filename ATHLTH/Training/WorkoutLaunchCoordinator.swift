@@ -315,21 +315,31 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore
     ) async throws {
         if configuration.captureDevice == .iPhone {
-            guard configuration.mode == .free else {
-                throw NSError(
-                    domain: "ATHLTH.RunLaunch",
-                    code: 1,
-                    userInfo: [
-                        NSLocalizedDescriptionKey:
-                            "Route and structured runs currently require Apple Watch."
-                    ]
-                )
-            }
+            let selectedRoute: TrainingRoute? = {
+                if let route = configuration.route {
+                    return route
+                }
+
+                guard
+                    let workout = configuration.workout,
+                    let routeID = workout.routeID
+                else {
+                    return nil
+                }
+
+                return session.savedRoutes.first {
+                    $0.id == routeID
+                }
+            }()
 
             gear.prepareNextWorkoutGear(
                 configuration.gearIDs
             )
-            phoneWorkout.start(walking: false)
+            phoneWorkout.start(
+                walking: false,
+                route: selectedRoute,
+                title: configuration.title
+            )
             return
         }
 
