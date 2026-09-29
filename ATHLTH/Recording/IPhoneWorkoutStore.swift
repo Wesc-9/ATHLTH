@@ -288,7 +288,9 @@ final class IPhoneWorkoutStore:
         structuredWorkout:
             WatchRunningWorkoutTransfer? = nil,
         routeAlerts:
-            WatchRouteAlertConfiguration? = nil
+            WatchRouteAlertConfiguration? = nil,
+        ghostUpdates:
+            WatchGhostRaceAudioConfiguration? = nil
     ) {
         guard accountID != nil, !saving else { return }
         showingWorkout = true
@@ -300,6 +302,7 @@ final class IPhoneWorkoutStore:
         pendingAudioCoach = audioCoach
         pendingStructuredWorkout = structuredWorkout
         pendingRouteAlerts = routeAlerts
+        pendingGhostAudio = ghostUpdates
 
         if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
@@ -321,6 +324,8 @@ final class IPhoneWorkoutStore:
             pendingStructuredWorkout
         let routeAlerts =
             pendingRouteAlerts ?? .standard
+        let ghostUpdates =
+            pendingGhostAudio
 
         pendingWalking = nil
         pendingRoute = nil
@@ -328,12 +333,18 @@ final class IPhoneWorkoutStore:
         pendingAudioCoach = nil
         pendingStructuredWorkout = nil
         pendingRouteAlerts = nil
+        pendingGhostAudio = nil
 
         cachePlannedRouteGeometry(route)
         resetCoachThresholds(
             configuration: audioCoach
         )
         resetRouteAlertRuntime()
+        resetGhostRuntime(
+            configuration:
+                ghostUpdates
+        )
+        guidancePriorityGate.reset()
 
         let now = Date()
         active = PhoneWorkout(
@@ -364,7 +375,9 @@ final class IPhoneWorkoutStore:
             audioCoachConfiguration:
                 audioCoach,
             routeAlertConfiguration:
-                routeAlerts
+                routeAlerts,
+            ghostAudioConfiguration:
+                ghostUpdates
         )
         message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
         lastLocation = nil
