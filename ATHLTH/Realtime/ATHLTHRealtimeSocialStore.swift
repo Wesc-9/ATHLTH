@@ -258,7 +258,6 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     }
 
                     await self.publishOnline(true)
-                    await self.refreshOnlineUsers()
                 }
             }
         } else {
