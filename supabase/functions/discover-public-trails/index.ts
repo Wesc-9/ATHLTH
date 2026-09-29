@@ -325,6 +325,7 @@ relation
   ["type"="route"]
   ["route"~"^(hiking|foot)$"]
   ["name"]
+  ["network"~"^(lwn|rwn|nwn|iwn)$"]
   (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
 out body geom qt;
 `.trim();
