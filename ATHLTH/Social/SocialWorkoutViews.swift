@@ -462,6 +462,8 @@ struct HomeActivitySection: View {
                             isAIInsightLoading:
                                 loadingAIInsightIDs
                                     .contains(workout.id),
+                            activityCenterAIVisualsEnabled:
+                                activityCenterAIVisualsEnabled,
                             onCoach: { insight in
                                 selectedCoachInsight =
                                     CoachInsightPresentation(
@@ -1060,6 +1062,7 @@ private struct HomeActivityOutdoorCard: View {
     let caption: String?
     let aiInsight: WorkoutAIInsight?
     let isAIInsightLoading: Bool
+    let activityCenterAIVisualsEnabled: Bool
     let onCoach: (WorkoutAIInsight) -> Void
     let onPost: () -> Void
 
