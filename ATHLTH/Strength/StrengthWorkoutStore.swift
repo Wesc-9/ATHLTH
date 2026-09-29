@@ -595,7 +595,7 @@ final class StrengthWorkoutStore: ObservableObject {
         restSeconds: Int? = nil
     ) {
         guard
-            var workout = activeWorkout,
+            let workout = activeWorkout,
             workout.exercises.indices.contains(currentExerciseIndex),
             workout.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex)
         else {
