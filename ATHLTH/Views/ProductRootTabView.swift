@@ -170,16 +170,9 @@ struct ATHLTHHomeView: View {
     private var hasEditedATHLTHProfile = false
 
     var body: some View {
-        let useImmersiveHomeHero =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
-        return NavigationStack {
+        NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.premiumGold.opacity(0.70),
-                softTransition: true,
-                immersiveTransition: useImmersiveHomeHero,
-                scrollFadeTransition: true
+                accent: ATHLTHTheme.premiumGold.opacity(0.70)
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHTabHero(
@@ -189,28 +182,13 @@ struct ATHLTHHomeView: View {
                             session.profile.presence.state == .training
                                 ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
                                 : "Today, training and recovery at a glance.",
-                        height:
-                            useImmersiveHomeHero
-                                ? 242
-                                : 190,
+                        height: 236,
                         alignment: .leading,
-                        focalOffsetX:
-                            useImmersiveHomeHero
-                                ? 10
-                                : 18,
-                        focalOffsetY:
-                            useImmersiveHomeHero
-                                ? 8
-                                : 14,
-                        titleFontSize:
-                            useImmersiveHomeHero
-                                ? 30
-                                : 27,
-                        copyWidthFraction:
-                            useImmersiveHomeHero
-                                ? 0.76
-                                : 0.86,
-                        immersiveCopy: useImmersiveHomeHero
+                        focalOffsetX: 12,
+                        focalOffsetY: 10,
+                        titleFontSize: 30,
+                        copyWidthFraction: 0.78,
+                        immersiveCopy: false
                     )
 
                     HStack(spacing: 8) {
@@ -2703,43 +2681,21 @@ struct ATHLTHTrainView: View {
     @State private var showingStrengthWorkout = false
 
     var body: some View {
-        let useImmersiveTrainHero =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
-        return NavigationStack {
+        NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: Color.green.opacity(0.55),
-                softTransition: true,
-                immersiveTransition: useImmersiveTrainHero,
-                scrollFadeTransition: true
+                accent: Color.green.opacity(0.55)
             ) {
                 ATHLTHTabHero(
                     imageName: "TrainHero",
                     title: "Train",
                     subtitle: "Build a stronger, healthier you.",
-                    height:
-                        useImmersiveTrainHero
-                            ? 232
-                            : 190,
+                    height: 236,
                     alignment: .leading,
-                    focalOffsetX:
-                        useImmersiveTrainHero
-                            ? -10
-                            : -18,
-                    focalOffsetY:
-                        useImmersiveTrainHero
-                            ? 10
-                            : 18,
-                    titleFontSize:
-                        useImmersiveTrainHero
-                            ? 31
-                            : 30,
-                    copyWidthFraction:
-                        useImmersiveTrainHero
-                            ? 0.70
-                            : 0.80,
-                    immersiveCopy: useImmersiveTrainHero
+                    focalOffsetX: -10,
+                    focalOffsetY: 10,
+                    titleFontSize: 30,
+                    copyWidthFraction: 0.74,
+                    immersiveCopy: false
                 )
             } content: {
                 VStack(spacing: 18) {
