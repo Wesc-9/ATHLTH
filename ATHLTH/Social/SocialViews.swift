@@ -1593,6 +1593,7 @@ struct SocialPrivacySettingsView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     @State private var draft: SocialPrivacySettings?
     @State private var saving = false
@@ -1608,6 +1609,17 @@ struct SocialPrivacySettingsView: View {
                     }
 
                     Toggle("Allow follow requests", isOn: binding.allowFriendRequests)
+
+                    Toggle(
+                        "Show when I’m online",
+                        isOn: binding.showOnlineStatus
+                    )
+
+                    Text(
+                        "Online status is shown only to people who follow you. It turns off when ATHLTH is no longer active and expires automatically if the app cannot update it."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section("Messages") {
@@ -1624,6 +1636,31 @@ struct SocialPrivacySettingsView: View {
 
                 Section("Shared with allowed viewers") {
                     Toggle("Training now", isOn: binding.shareTrainingPresence)
+
+                    Toggle(
+                        "Share live workout position",
+                        isOn: binding.shareLiveWorkoutLocation
+                    )
+
+                    if binding.wrappedValue.shareLiveWorkoutLocation {
+                        Picker(
+                            "Live position audience",
+                            selection:
+                                binding.liveLocationVisibility
+                        ) {
+                            Text("Followers")
+                                .tag("followers")
+                            Text("Mutual follows")
+                                .tag("mutuals")
+                        }
+
+                        Text(
+                            "Your current position is shared only while a supported outdoor workout is active. ATHLTH keeps only the latest point and it expires after about 90 seconds."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
                     Toggle("Trophy Cabinet", isOn: binding.shareTrophyCabinet)
                     Toggle("Recent activity", isOn: binding.shareRecentActivity)
@@ -1696,6 +1733,16 @@ struct SocialPrivacySettingsView: View {
                 goalStore.goals,
                 enabled: draft.shareGoals
             )
+
+            await realtime.configureOnlinePresence(
+                appIsActive: true,
+                enabled: draft.showOnlineStatus
+            )
+
+            if !draft.shareLiveWorkoutLocation,
+               realtime.currentSession?.ghostChallengeID == nil {
+                await realtime.leaveCurrentLiveWorkout()
+            }
         }
 
         if let visibility = ProfileVisibility(rawValue: draft.profileVisibility) {
