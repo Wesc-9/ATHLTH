@@ -97,6 +97,11 @@ struct PhoneWorkout: Codable, Identifiable {
         WatchAudioCoachConfiguration? = nil
     var routeAlertConfiguration:
         WatchRouteAlertConfiguration? = nil
+    var ghostAudioConfiguration:
+        WatchGhostRaceAudioConfiguration? = nil
+    var ghostRaceTitle: String? = nil
+    var ghostDistanceDeltaMeters: Double? = nil
+    var ghostTimeDeltaSeconds: TimeInterval? = nil
 
     // Persist the final route analysis with the workout so completion details
     // survive relaunches without recomputing the full GPS trace.
@@ -119,7 +124,12 @@ struct PhoneWorkout: Codable, Identifiable {
 }
 
 @MainActor
-final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDelegate {
+final class IPhoneWorkoutStore:
+    NSObject,
+    ObservableObject,
+    CLLocationManagerDelegate,
+    AVSpeechSynthesizerDelegate
+{
     @Published private(set) var active: PhoneWorkout?
     @Published private(set) var history: [PhoneWorkout] = []
     @Published var showingWorkout = false
@@ -137,6 +147,8 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         WatchRunningWorkoutTransfer?
     private var pendingRouteAlerts:
         WatchRouteAlertConfiguration?
+    private var pendingGhostAudio:
+        WatchGhostRaceAudioConfiguration?
 
     private var lastLocation: CLLocation?
     private var plannedRouteLocations: [CLLocation] = []
@@ -145,11 +157,18 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
 
     private let speechSynthesizer =
         AVSpeechSynthesizer()
+    private var guidancePriorityGate =
+        ATHLTHGuidancePriorityGate()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
+    private var nextGhostDistanceAnnouncementMeters: Double?
+    private var nextGhostTimeAnnouncementSeconds: TimeInterval?
+    private var lastGhostAnnouncedLeadMeters: Double?
+    private var lastGhostLeadAlertAt: Date?
+    private var lastGhostLeadSign = 0
     private var lastActiveCheckpointWriteAt: Date?
     private let activeCheckpointInterval: TimeInterval = 5
     private let manager = CLLocationManager()
@@ -158,6 +177,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
     override init() {
         super.init()
         manager.delegate = self
+        speechSynthesizer.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.distanceFilter = 5
         manager.activityType = .fitness
@@ -176,6 +196,7 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         pendingAudioCoach = nil
         pendingStructuredWorkout = nil
         pendingRouteAlerts = nil
+        pendingGhostAudio = nil
         resetRouteRuntime()
         lastRouteCompletion = nil
         active = userID.flatMap { AccountLocalStorage.read(PhoneWorkout.self, name: "phoneActive", userID: $0) }
