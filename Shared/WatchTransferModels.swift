@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 
 struct WatchRoutePoint: Codable, Hashable {
@@ -5,6 +6,131 @@ struct WatchRoutePoint: Codable, Hashable {
     var longitude: Double
     var altitude: Double?
     var sequence: Int
+}
+
+struct ATHLTHRouteGuidanceState: Codable, Hashable {
+    var progressPercent: Double
+    var remainingMeters: Double
+    var deviationMeters: Double
+    var traveledAlongRouteMeters: Double
+    var distanceToStartMeters: Double
+    var distanceToFinishMeters: Double
+    var nearestRoutePointIndex: Int
+}
+
+enum ATHLTHRouteGuidanceEngine {
+    static func state(
+        location: CLLocation,
+        routeLocations: [CLLocation],
+        cumulativeMeters: [Double],
+        geometryTotalMeters: Double,
+        advertisedDistanceMeters: Double?
+    ) -> ATHLTHRouteGuidanceState? {
+        guard routeLocations.count >= 2,
+              cumulativeMeters.count == routeLocations.count
+        else {
+            return nil
+        }
+
+        var nearestIndex = 0
+        var nearestDistance =
+            Double.greatestFiniteMagnitude
+
+        for (index, point) in
+            routeLocations.enumerated()
+        {
+            let distance =
+                location.distance(from: point)
+
+            if distance < nearestDistance {
+                nearestDistance = distance
+                nearestIndex = index
+            }
+        }
+
+        let geometryTotal =
+            max(geometryTotalMeters, 1)
+        let traveledAlongRoute =
+            cumulativeMeters[nearestIndex]
+        let progress =
+            min(
+                max(
+                    traveledAlongRoute /
+                        geometryTotal,
+                    0
+                ),
+                1
+            )
+        let routeTotal =
+            max(
+                advertisedDistanceMeters ?? 0,
+                0
+            )
+        let effectiveTotal =
+            routeTotal > 0
+                ? routeTotal
+                : geometryTotal
+
+        return ATHLTHRouteGuidanceState(
+            progressPercent:
+                progress * 100,
+            remainingMeters:
+                max(
+                    effectiveTotal *
+                        (1 - progress),
+                    0
+                ),
+            deviationMeters:
+                max(nearestDistance, 0),
+            traveledAlongRouteMeters:
+                max(traveledAlongRoute, 0),
+            distanceToStartMeters:
+                location.distance(
+                    from:
+                        routeLocations[0]
+                ),
+            distanceToFinishMeters:
+                location.distance(
+                    from:
+                        routeLocations[
+                            routeLocations.count - 1
+                        ]
+                ),
+            nearestRoutePointIndex:
+                nearestIndex
+        )
+    }
+
+    static func cumulativeGeometry(
+        locations: [CLLocation]
+    ) -> (
+        cumulativeMeters: [Double],
+        totalMeters: Double
+    ) {
+        guard !locations.isEmpty else {
+            return ([], 0)
+        }
+
+        var cumulative: [Double] = [0]
+        cumulative.reserveCapacity(
+            locations.count
+        )
+
+        var total: Double = 0
+
+        if locations.count >= 2 {
+            for index in 1..<locations.count {
+                total += locations[index]
+                    .distance(
+                        from:
+                            locations[index - 1]
+                    )
+                cumulative.append(total)
+            }
+        }
+
+        return (cumulative, total)
+    }
 }
 
 struct WatchRouteTransfer: Identifiable, Codable, Hashable {
@@ -213,6 +339,98 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
     var intensityText: String?
     var targetPaceMinSecondsPerKilometer: Double? = nil
     var targetPaceMaxSecondsPerKilometer: Double? = nil
+}
+
+enum ATHLTHRunningStepEngine {
+    static func isCompleted(
+        step: WatchRunningWorkoutStep,
+        elapsedTime: TimeInterval,
+        distanceMeters: Double,
+        stepStartElapsedTime: TimeInterval,
+        stepStartDistanceMeters: Double
+    ) -> Bool {
+        switch step.measure {
+        case .time:
+            guard let duration =
+                    step.durationSeconds
+            else {
+                return false
+            }
+
+            return max(
+                elapsedTime -
+                    stepStartElapsedTime,
+                0
+            ) >= duration
+
+        case .distance:
+            guard let target =
+                    step.distanceMeters
+            else {
+                return false
+            }
+
+            return max(
+                distanceMeters -
+                    stepStartDistanceMeters,
+                0
+            ) >= target
+
+        case .open:
+            return false
+        }
+    }
+
+    static func progress(
+        step: WatchRunningWorkoutStep,
+        elapsedTime: TimeInterval,
+        distanceMeters: Double,
+        stepStartElapsedTime: TimeInterval,
+        stepStartDistanceMeters: Double
+    ) -> Double {
+        switch step.measure {
+        case .time:
+            guard let target =
+                    step.durationSeconds,
+                  target > 0
+            else {
+                return 0
+            }
+
+            return min(
+                max(
+                    (
+                        elapsedTime -
+                            stepStartElapsedTime
+                    ) / target,
+                    0
+                ),
+                1
+            )
+
+        case .distance:
+            guard let target =
+                    step.distanceMeters,
+                  target > 0
+            else {
+                return 0
+            }
+
+            return min(
+                max(
+                    (
+                        distanceMeters -
+                            stepStartDistanceMeters
+                    ) / target,
+                    0
+                ),
+                1
+            )
+
+        case .open:
+            return 0
+        }
+    }
 }
 
 struct WatchRunningWorkoutTransfer: Codable, Hashable {
