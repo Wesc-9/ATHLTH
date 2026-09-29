@@ -18,6 +18,133 @@ struct ATHLTHRouteGuidanceState: Codable, Hashable {
     var nearestRoutePointIndex: Int
 }
 
+struct ATHLTHRouteCompletionAnalysis: Codable, Hashable {
+    var routeMatchPercent: Double
+    var averageDeviationMeters: Double
+    var maxDeviationMeters: Double
+    var startDistanceMeters: Double
+    var endDistanceMeters: Double
+
+    var leaderboardEligible: Bool {
+        routeMatchPercent >= 85 &&
+            startDistanceMeters <= 450 &&
+            endDistanceMeters <= 450
+    }
+}
+
+enum ATHLTHRouteCompletionAnalyzer {
+    static func analyze(
+        actualLocations: [CLLocation],
+        referenceLocations: [CLLocation],
+        toleranceMeters: Double = 80
+    ) -> ATHLTHRouteCompletionAnalysis? {
+        guard actualLocations.count >= 2,
+              referenceLocations.count >= 2
+        else {
+            return nil
+        }
+
+        let sampleStep =
+            max(
+                referenceLocations.count / 120,
+                1
+            )
+        let referenceSamples =
+            stride(
+                from: 0,
+                to: referenceLocations.count,
+                by: sampleStep
+            )
+            .map {
+                referenceLocations[$0]
+            }
+
+        guard !referenceSamples.isEmpty else {
+            return nil
+        }
+
+        let nearestDistances =
+            referenceSamples.map { point in
+                actualLocations.lazy
+                    .map {
+                        $0.distance(from: point)
+                    }
+                    .min() ??
+                    .greatestFiniteMagnitude
+            }
+        let finite =
+            nearestDistances.filter(\.isFinite)
+
+        guard !finite.isEmpty else {
+            return nil
+        }
+
+        let matched =
+            nearestDistances.filter {
+                $0 <= toleranceMeters
+            }.count
+        let matchPercent =
+            Double(matched) /
+            Double(referenceSamples.count) *
+            100
+        let average =
+            finite.reduce(0, +) /
+            Double(finite.count)
+        let maximum =
+            finite.max() ?? 0
+
+        let actualStart =
+            actualLocations[0]
+        let actualEnd =
+            actualLocations[
+                actualLocations.count - 1
+            ]
+        let referenceStart =
+            referenceLocations[0]
+        let referenceEnd =
+            referenceLocations[
+                referenceLocations.count - 1
+            ]
+
+        let forwardStart =
+            actualStart.distance(
+                from: referenceStart
+            )
+        let forwardEnd =
+            actualEnd.distance(
+                from: referenceEnd
+            )
+        let reverseStart =
+            actualStart.distance(
+                from: referenceEnd
+            )
+        let reverseEnd =
+            actualEnd.distance(
+                from: referenceStart
+            )
+        let useReverse =
+            reverseStart + reverseEnd <
+            forwardStart + forwardEnd
+
+        return ATHLTHRouteCompletionAnalysis(
+            routeMatchPercent:
+                min(max(matchPercent, 0), 100),
+            averageDeviationMeters:
+                max(average, 0),
+            maxDeviationMeters:
+                max(maximum, 0),
+            startDistanceMeters:
+                useReverse
+                    ? reverseStart
+                    : forwardStart,
+            endDistanceMeters:
+                useReverse
+                    ? reverseEnd
+                    : forwardEnd
+        )
+    }
+}
+
 enum ATHLTHRouteGuidanceEngine {
     static func state(
         location: CLLocation,
