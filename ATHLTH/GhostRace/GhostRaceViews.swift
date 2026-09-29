@@ -48,6 +48,7 @@ struct GhostRaceHubView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @EnvironmentObject private var social: SocialStore
@@ -61,11 +62,18 @@ struct GhostRaceHubView: View {
     @State private var selectedMode:
         GhostRaceHubMode = .live
     @State private var errorMessage: String?
+    @State private var captureDevice:
+        WorkoutCaptureDevice = .iPhone
 
     private var canStartRace: Bool {
-        settings.trainingDeviceProvider == .appleWatch &&
-        watchConnection.isReady &&
-        !watchConnection.workoutLaunchInProgress
+        switch captureDevice {
+        case .iPhone:
+            return phoneWorkout.active == nil
+        case .appleWatch:
+            return watchConnection.isReady &&
+                !watchConnection
+                    .workoutLaunchInProgress
+        }
     }
 
     private var selectedLiveSession:
@@ -100,6 +108,12 @@ struct GhostRaceHubView: View {
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            if watchConnection.isReady &&
+                settings.trainingDeviceProvider ==
+                    .appleWatch {
+                captureDevice = .appleWatch
+            }
+
             async let runs: Void =
                 loadRuns()
             async let live: Void =
@@ -183,9 +197,42 @@ struct GhostRaceHubView: View {
                     )
                 }
 
+                Picker(
+                    "Workout device",
+                    selection:
+                        $captureDevice
+                ) {
+                    Label(
+                        "iPhone",
+                        systemImage: "iphone"
+                    )
+                    .tag(
+                        WorkoutCaptureDevice
+                            .iPhone
+                    )
+
+                    Label(
+                        "Apple Watch",
+                        systemImage: "applewatch"
+                    )
+                    .tag(
+                        WorkoutCaptureDevice
+                            .appleWatch
+                    )
+                }
+                .pickerStyle(.segmented)
+                .onChange(
+                    of: captureDevice
+                ) { _, device in
+                    if device == .appleWatch &&
+                        !watchConnection.isReady {
+                        captureDevice = .iPhone
+                    }
+                }
+
                 if !canStartRace {
                     Label(
-                        watchRequirementText,
+                        deviceRequirementText,
                         systemImage: "exclamationmark.triangle.fill"
                     )
                     .font(.caption)
@@ -788,149 +835,64 @@ struct GhostRaceHubView: View {
     }
 
     private var audioCoachCard: some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Ghost Audio Coach")
-                            .font(.headline)
+        NavigationLink {
+            ATHLTHGhostUpdatesSettingsView()
+        } label: {
+            ATHLTHCard {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            "waveform.and.person.filled"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.vitalitySoft,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 12
+                            )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text("Ghost Updates")
+                            .font(
+                                .headline
+                            )
 
                         Text(
-                            "Hear your lead without looking at the screen."
+                            settings
+                                .ghostRaceAudioEnabled
+                                ? "Race status and lead changes · tap to adjust"
+                                : "Silent · live comparison remains visible"
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .multilineTextAlignment(
+                            .leading
+                        )
                     }
 
                     Spacer()
 
-                    Toggle(
-                        "",
-                        isOn:
-                            $settings
-                                .ghostRaceAudioEnabled
+                    Image(
+                        systemName:
+                            "chevron.right"
                     )
-                    .labelsHidden()
-                }
-
-                if settings.ghostRaceAudioEnabled {
-                    Toggle(
-                        "Announce every distance",
-                        isOn:
-                            $settings
-                                .ghostRaceAudioUseDistance
+                    .foregroundStyle(
+                        .secondary
                     )
-
-                    if settings
-                        .ghostRaceAudioUseDistance {
-                        HStack {
-                            Text("Distance interval")
-                            Spacer()
-                            Picker(
-                                "Distance interval",
-                                selection:
-                                    $settings
-                                        .ghostRaceAudioDistanceIntervalKilometers
-                            ) {
-                                Text("0.5 km")
-                                    .tag(0.5)
-                                Text("1 km")
-                                    .tag(1.0)
-                                Text("2 km")
-                                    .tag(2.0)
-                            }
-                            .pickerStyle(.menu)
-                        }
-                    }
-
-                    Toggle(
-                        "Announce every time interval",
-                        isOn:
-                            $settings
-                                .ghostRaceAudioUseTime
-                    )
-
-                    if settings
-                        .ghostRaceAudioUseTime {
-                        HStack {
-                            Text("Time interval")
-                            Spacer()
-                            Picker(
-                                "Time interval",
-                                selection:
-                                    $settings
-                                        .ghostRaceAudioTimeIntervalMinutes
-                            ) {
-                                Text("2 min")
-                                    .tag(2)
-                                Text("5 min")
-                                    .tag(5)
-                                Text("10 min")
-                                    .tag(10)
-                            }
-                            .pickerStyle(.menu)
-                        }
-                    }
-
-                    Toggle(
-                        "Announce meaningful lead changes",
-                        isOn:
-                            $settings
-                                .ghostRaceAudioAnnounceLeadChanges
-                    )
-
-                    if settings
-                        .ghostRaceAudioAnnounceLeadChanges {
-                        HStack {
-                            Text("Lead-change threshold")
-                            Spacer()
-                            Picker(
-                                "Lead-change threshold",
-                                selection:
-                                    $settings
-                                        .ghostRaceAudioLeadChangeMeters
-                            ) {
-                                Text("15 m")
-                                    .tag(15.0)
-                                Text("25 m")
-                                    .tag(25.0)
-                                Text("50 m")
-                                    .tag(50.0)
-                                Text("100 m")
-                                    .tag(100.0)
-                            }
-                            .pickerStyle(.menu)
-                        }
-                    }
-
-                    HStack {
-                        Text("Delivery")
-                        Spacer()
-                        Picker(
-                            "Delivery",
-                            selection:
-                                $settings
-                                    .ghostRaceAudioDelivery
-                        ) {
-                            ForEach(
-                                WatchAlertDelivery
-                                    .allCases
-                            ) { delivery in
-                                Text(delivery.title)
-                                    .tag(delivery)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-
-                    Text(
-                        "Voice uses your existing Audio Coach language setting. While Ghost Audio Coach is on, its cadence replaces regular spoken workout intervals so the two coaches do not talk over each other. Route alerts still work normally."
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 
     private var targetGhostSection: some View {
@@ -1269,7 +1231,7 @@ struct GhostRaceHubView: View {
         _ workout: WorkoutSummary
     ) async {
         guard canStartRace else {
-            errorMessage = watchRequirementText
+            errorMessage = deviceRequirementText
             return
         }
 
@@ -1290,6 +1252,9 @@ struct GhostRaceHubView: View {
                 ownerID: session.profile.userID,
                 ghostRace: ghostRace,
                 watchConnection: watchConnection,
+                phoneWorkout: phoneWorkout,
+                captureDevice:
+                    captureDevice,
                 settings: settings
             )
         } catch {
@@ -1304,7 +1269,7 @@ struct GhostRaceHubView: View {
     ) async {
         guard canStartRace else {
             errorMessage =
-                watchRequirementText
+                deviceRequirementText
             return
         }
 
@@ -1335,6 +1300,10 @@ struct GhostRaceHubView: View {
                         ghostRace,
                     watchConnection:
                         watchConnection,
+                    phoneWorkout:
+                        phoneWorkout,
+                    captureDevice:
+                        captureDevice,
                     settings:
                         settings
                 )
@@ -1406,20 +1375,26 @@ struct GhostRaceHubView: View {
                 }
     }
 
-    private var watchRequirementText: String {
-        if settings.trainingDeviceProvider != .appleWatch {
-            return "Ghost Race live comparison currently requires Apple Watch."
-        }
+    private var deviceRequirementText: String {
+        switch captureDevice {
+        case .iPhone:
+            if phoneWorkout.active != nil {
+                return "Finish the active iPhone workout before starting Ghost Race."
+            }
+            return "iPhone is ready."
 
-        if !watchConnection.isReady {
-            return "Connect Apple Watch before starting a Ghost Race."
-        }
+        case .appleWatch:
+            if !watchConnection.isReady {
+                return "Connect Apple Watch or choose iPhone."
+            }
 
-        if watchConnection.workoutLaunchInProgress {
-            return "Apple Watch is already preparing a workout."
-        }
+            if watchConnection
+                .workoutLaunchInProgress {
+                return "Apple Watch is already preparing a workout."
+            }
 
-        return "Apple Watch is not ready."
+            return "Apple Watch is ready."
+        }
     }
 
     private func statusChip(
