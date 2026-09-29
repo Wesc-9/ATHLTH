@@ -19,138 +19,51 @@ struct ATHLTHEditProfileView: View {
     @State private var saving = false
     @State private var errorMessage: String?
     @State private var saved = false
+
+    @FocusState private var focusedField: ProfileEditField?
+
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
 
     var body: some View {
-        let photoButtonTitle =
-            selectedAvatarData == nil
-            ? "Choose Photo"
-            : "Change Photo"
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 18) {
+                profileHero
+                publicIdentitySection
+                trainingIdentitySection
+                gearSection
 
-        return Form {
-            Section {
-                VStack(spacing: 14) {
-                    avatarPreview
-
-                    HStack(spacing: 10) {
-                        PhotosPicker(
-                            selection: $selectedPhoto,
-                            matching: .images
-                        ) {
-                            Label(
-                                photoButtonTitle,
-                                systemImage: "photo"
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accent)
-
-                        if session.profile.avatarURL != nil || selectedAvatarData != nil {
-                            Button(role: .destructive) {
-                                Task { await removePhoto() }
-                            } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(saving)
-                        }
-                    }
-
-                    Text("Your photo is shown only where your profile visibility allows it.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                if let errorMessage {
+                    errorBanner(errorMessage)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+
+                privacyFootnote
             }
-
-            Section {
-                TextField("Display name", text: $displayName)
-                    .textContentType(.name)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField("Username", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .textContentType(.username)
-
-                    usernameStatus
-                }
-
-                VStack(alignment: .trailing, spacing: 6) {
-                    TextEditor(text: $bio)
-                        .frame(minHeight: 92)
-                        .scrollContentBackground(.hidden)
-                        .padding(8)
-                        .background(
-                            Color(.secondarySystemGroupedBackground),
-                            in: RoundedRectangle(cornerRadius: 12)
-                        )
-
-                    Text("\(bio.count)/160")
-                        .font(.caption2)
-                        .foregroundStyle(bio.count > 160 ? .red : .secondary)
-                }
-            } header: {
-                Text("Public profile")
-            } footer: {
-                Text("Display name, username, bio and profile photo are social profile data. Health details remain private and are managed separately.")
-            }
-
-            Section("Training Identity") {
-                Picker("Training focus", selection: $selectedTrainingFocus) {
-                    Text("Not set").tag(TrainingFocus?.none)
-                    ForEach(TrainingFocus.allCases) { focus in
-                        Label(focus.title, systemImage: focus.systemImage)
-                            .tag(Optional(focus))
-                    }
-                }
-
-                Text(
-                    selectedTrainingFocus?.subtitle
-                        ?? "Choose the training identity that best describes how you train."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Section("My Gear") {
-                NavigationLink {
-                    ProfileGearManagerView()
-                } label: {
-                    LabeledContent {
-                        Text("\(gear.items.count) saved")
-                            .foregroundStyle(.secondary)
-                    } label: {
-                        Label("Manage gear", systemImage: "backpack.fill")
-                    }
-                }
-
-                Text("Save multiple watches, shoes, headphones and other gear. Pick one item in each category to show on your profile.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 36)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.champagne.opacity(0.26)
+            )
+        )
         .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Task { await saveProfile() }
-                } label: {
-                    if saving {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text("Save")
-                            .fontWeight(.semibold)
-                    }
+                saveToolbarControl
+            }
+
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+
+                Button("Done") {
+                    focusedField = nil
                 }
-                .disabled(!canSave || saving)
-                .accessibilityLabel(saving ? "Saving profile" : "Save profile")
             }
         }
         .onAppear(perform: loadCurrentProfile)
@@ -159,58 +72,631 @@ struct ATHLTHEditProfileView: View {
         }
         .onChange(of: selectedPhoto) { _, newItem in
             guard let newItem else { return }
+
             Task {
-                do {
-                    guard let data = try await newItem.loadTransferable(type: Data.self),
-                          let image = UIImage(data: data),
-                          let jpeg = image.jpegData(compressionQuality: 0.82)
-                    else {
-                        throw ProfileEditingError.invalidImage
-                    }
-                    await MainActor.run {
-                        selectedAvatarData = jpeg
-                    }
-                } catch {
-                    await MainActor.run {
-                        errorMessage = error.localizedDescription
-                    }
-                }
+                await prepareSelectedPhoto(newItem)
             }
         }
         .task(id: username) {
             await checkUsername()
         }
-        .alert(
-            "ATHLTH",
-            isPresented: Binding(
-                get: { errorMessage != nil || saved },
-                set: {
-                    if !$0 {
-                        errorMessage = nil
-                        saved = false
+        .onChange(of: displayName) { _, _ in
+            saved = false
+        }
+        .onChange(of: bio) { _, _ in
+            saved = false
+        }
+        .onChange(of: selectedTrainingFocus) { _, _ in
+            saved = false
+        }
+    }
+
+    private var profileHero: some View {
+        ATHLTHCard {
+            VStack(spacing: 17) {
+                ZStack(alignment: .bottomTrailing) {
+                    avatarPreview
+                        .frame(width: 122, height: 122)
+
+                    PhotosPicker(
+                        selection: $selectedPhoto,
+                        matching: .images
+                    ) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 38, height: 38)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white,
+                                        lineWidth: 3
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Change profile photo")
+                }
+
+                VStack(spacing: 4) {
+                    Text(
+                        displayName.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).isEmpty
+                            ? "Your profile"
+                            : displayName
+                    )
+                    .font(
+                        .system(
+                            size: 23,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .multilineTextAlignment(.center)
+
+                    if !cleanedUsername.isEmpty {
+                        Text("@\(cleanedUsername)")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                     }
                 }
+
+                HStack(spacing: 10) {
+                    PhotosPicker(
+                        selection: $selectedPhoto,
+                        matching: .images
+                    ) {
+                        Label(
+                            hasProfilePhoto
+                                ? "Change photo"
+                                : "Add photo",
+                            systemImage: "photo.on.rectangle"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 13)
+                        .frame(height: 38)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTheme.accentDeep)
+
+                    if hasProfilePhoto {
+                        Button(role: .destructive) {
+                            Task {
+                                await removePhoto()
+                            }
+                        } label: {
+                            Label(
+                                "Remove",
+                                systemImage: "trash"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .frame(height: 38)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(saving)
+                    }
+                }
+
+                HStack(spacing: 7) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Photo visibility follows your profile privacy settings.")
+                }
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var publicIdentitySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(
+                "Public identity",
+                subtitle: "What people see when they open your profile."
             )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? "Profile updated.")
+
+            ATHLTHCard {
+                VStack(spacing: 0) {
+                    profileTextField(
+                        title: "Display name",
+                        icon: "person.text.rectangle",
+                        placeholder: "Your name",
+                        text: $displayName,
+                        contentType: .name,
+                        field: .displayName
+                    )
+
+                    Divider()
+                        .padding(.leading, 46)
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        profileTextField(
+                            title: "Username",
+                            icon: "at",
+                            placeholder: "username",
+                            text: $username,
+                            contentType: .username,
+                            field: .username,
+                            lowercase: true
+                        )
+
+                        usernameStatus
+                            .padding(.leading, 46)
+                            .padding(.bottom, 10)
+                    }
+
+                    Divider()
+                        .padding(.leading, 46)
+
+                    bioEditor
+                }
+            }
+        }
+    }
+
+    private var bioEditor: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 12) {
+                Image(systemName: "text.quote")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 10,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Bio")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text("A short line about you or your training.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+
+                Text("\(bio.count)/160")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(
+                        bio.count > 160
+                            ? Color.red
+                            : ATHLTHTheme.mutedText
+                    )
+            }
+
+            ZStack(alignment: .topLeading) {
+                if bio.isEmpty {
+                    Text("Tell people what you're working toward…")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 13)
+                }
+
+                TextEditor(text: $bio)
+                    .focused($focusedField, equals: .bio)
+                    .font(.subheadline)
+                    .frame(minHeight: 104)
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 5)
+            }
+            .background(
+                ATHLTHTheme.surfaceStone.opacity(0.60),
+                in: RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+                .stroke(
+                    bio.count > 160
+                        ? Color.red.opacity(0.35)
+                        : Color.primary.opacity(0.045),
+                    lineWidth: 1
+                )
+            }
+        }
+        .padding(.top, 13)
+    }
+
+    private var trainingIdentitySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(
+                "Training identity",
+                subtitle: "Choose the focus that best reflects how you train."
+            )
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 10
+            ) {
+                ForEach(TrainingFocus.allCases) { focus in
+                    trainingFocusCard(focus)
+                }
+            }
+
+            if let selectedTrainingFocus {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+
+                    Text(selectedTrainingFocus.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+    }
+
+    private var gearSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(
+                "My gear",
+                subtitle: "Equipment linked to your training and profile."
+            )
+
+            NavigationLink {
+                ProfileGearManagerView()
+            } label: {
+                ATHLTHCard {
+                    HStack(spacing: 13) {
+                        Image(systemName: "backpack.fill")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                ATHLTHTheme.champagneSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 14,
+                                    style: .continuous
+                                )
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Manage gear")
+                                .font(.headline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+
+                            Text(
+                                gear.items.isEmpty
+                                    ? "Add shoes, watches and other equipment."
+                                    : "\(gear.items.count) item\(gear.items.count == 1 ? "" : "s") saved"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var privacyFootnote: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+            Text(
+                "Profile identity and health data stay separate. Visibility is controlled from your profile privacy settings."
+            )
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private var saveToolbarControl: some View {
+        if saving {
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel("Saving profile")
+        } else if saved {
+            Label("Saved", systemImage: "checkmark")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.vitality)
+                .transition(.opacity)
+        } else {
+            Button {
+                focusedField = nil
+                Task {
+                    await saveProfile()
+                }
+            } label: {
+                Text("Save")
+                    .fontWeight(.semibold)
+            }
+            .disabled(
+                !canSave ||
+                !hasUnsavedChanges
+            )
+            .accessibilityLabel("Save profile")
+        }
+    }
+
+    private func sectionLabel(
+        _ title: String,
+        subtitle: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.65)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 3)
+    }
+
+    private func profileTextField(
+        title: String,
+        icon: String,
+        placeholder: String,
+        text: Binding<String>,
+        contentType: UITextContentType?,
+        field: ProfileEditField,
+        lowercase: Bool = false
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 34, height: 34)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                TextField(placeholder, text: text)
+                    .focused($focusedField, equals: field)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .textContentType(contentType)
+                    .textInputAutocapitalization(
+                        lowercase ? .never : .words
+                    )
+                    .autocorrectionDisabled(lowercase)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 12)
+    }
+
+    private func trainingFocusCard(
+        _ focus: TrainingFocus
+    ) -> some View {
+        let selected = selectedTrainingFocus == focus
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                selectedTrainingFocus = focus
+                saved = false
+            }
+
+            UIImpactFeedbackGenerator(
+                style: .light
+            )
+            .impactOccurred()
+        } label: {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack {
+                    Image(systemName: focus.systemImage)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(
+                            selected
+                                ? ATHLTHTheme.vitality
+                                : ATHLTHTheme.accentDeep
+                        )
+                        .frame(width: 40, height: 40)
+                        .background(
+                            selected
+                                ? ATHLTHTheme.vitalitySoft
+                                : ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 12,
+                                style: .continuous
+                            )
+                        )
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            selected
+                                ? "checkmark.circle.fill"
+                                : "circle"
+                    )
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(
+                        selected
+                            ? ATHLTHTheme.vitality
+                            : Color.secondary.opacity(0.55)
+                    )
+                }
+
+                Text(focus.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            .padding(13)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 102,
+                alignment: .topLeading
+            )
+            .background(
+                selected
+                    ? ATHLTHTheme.surfaceSage
+                    : ATHLTHTheme.card,
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    selected
+                        ? ATHLTHTheme.vitality.opacity(0.28)
+                        : Color.primary.opacity(0.05),
+                    lineWidth: selected ? 1.4 : 1
+                )
+            }
+            .shadow(
+                color: Color.black.opacity(
+                    selected ? 0.035 : 0.018
+                ),
+                radius: 8,
+                y: 4
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func errorBanner(
+        _ message: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(
+                systemName:
+                    "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Couldn’t save profile")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            }
+
+            Spacer()
+
+            Button {
+                errorMessage = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(
+            Color.orange.opacity(0.08),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                Color.orange.opacity(0.18),
+                lineWidth: 1
+            )
         }
     }
 
     @ViewBuilder
     private var avatarPreview: some View {
         if let selectedAvatarData,
-           let image = UIImage(data: selectedAvatarData) {
+           let image = UIImage(
+                data: selectedAvatarData
+           ) {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 112, height: 112)
                 .clipShape(Circle())
                 .overlay {
-                    Circle().stroke(ATHLTHTheme.border, lineWidth: 1)
+                    Circle()
+                        .stroke(
+                            Color.white,
+                            lineWidth: 3
+                        )
                 }
-        } else if let avatarURL = session.profile.avatarURL {
+                .shadow(
+                    color: ATHLTHTheme.accentDeep.opacity(0.14),
+                    radius: 12,
+                    y: 5
+                )
+        } else if let avatarURL =
+                    session.profile.avatarURL {
             AsyncImage(url: avatarURL) { phase in
                 switch phase {
                 case .success(let image):
@@ -221,24 +707,49 @@ struct ATHLTHEditProfileView: View {
                     avatarFallback
                 }
             }
-            .frame(width: 112, height: 112)
             .clipShape(Circle())
             .overlay {
-                Circle().stroke(ATHLTHTheme.border, lineWidth: 1)
+                Circle()
+                    .stroke(
+                        Color.white,
+                        lineWidth: 3
+                    )
             }
+            .shadow(
+                color: ATHLTHTheme.accentDeep.opacity(0.14),
+                radius: 12,
+                y: 5
+            )
         } else {
             avatarFallback
-                .frame(width: 112, height: 112)
         }
     }
 
     private var avatarFallback: some View {
         Circle()
-            .fill(ATHLTHTheme.accentSoft)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accentSoft,
+                        ATHLTHTheme.champagneSoft
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .overlay {
                 Image(systemName: "person.fill")
                     .font(.system(size: 46))
-                    .foregroundStyle(ATHLTHTheme.accent)
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+            }
+            .overlay {
+                Circle()
+                    .stroke(
+                        Color.white,
+                        lineWidth: 3
+                    )
             }
     }
 
@@ -246,10 +757,14 @@ struct ATHLTHEditProfileView: View {
     private var usernameStatus: some View {
         let clean = cleanedUsername
 
-        if clean == session.profile.username.lowercased() {
-            Label("Current username", systemImage: "checkmark.circle.fill")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        if clean ==
+            session.profile.username.lowercased() {
+            Label(
+                "Current username",
+                systemImage: "checkmark.circle.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         } else if clean.count < 3 {
             Text("Use at least 3 characters.")
                 .font(.caption)
@@ -258,30 +773,62 @@ struct ATHLTHEditProfileView: View {
             HStack(spacing: 6) {
                 ProgressView()
                     .controlSize(.mini)
+
                 Text("Checking availability…")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
         } else if usernameAvailable == true {
-            Label("Username available", systemImage: "checkmark.circle.fill")
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.accent)
+            Label(
+                "Username available",
+                systemImage: "checkmark.circle.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.vitality)
         } else if usernameAvailable == false {
-            Label("Username unavailable or invalid", systemImage: "xmark.circle.fill")
-                .font(.caption)
-                .foregroundStyle(.red)
+            Label(
+                "Username unavailable or invalid",
+                systemImage: "xmark.circle.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(.red)
         }
     }
 
     private var cleanedUsername: String {
         username
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
             .lowercased()
     }
 
+    private var hasProfilePhoto: Bool {
+        selectedAvatarData != nil ||
+        session.profile.avatarURL != nil
+    }
+
+    private var hasUnsavedChanges: Bool {
+        let cleanName =
+            displayName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        return cleanName != session.profile.displayName ||
+            cleanedUsername != session.profile.username.lowercased() ||
+            bio != session.profile.bio ||
+            selectedTrainingFocus !=
+                session.onboardingProfile?.trainingFocus ||
+            selectedAvatarData != nil
+    }
+
     private var canSave: Bool {
-        let cleanName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let currentUsername = session.profile.username.lowercased()
+        let cleanName =
+            displayName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        let currentUsername =
+            session.profile.username.lowercased()
         let usernameOK =
             cleanedUsername == currentUsername ||
             usernameAvailable == true
@@ -296,14 +843,48 @@ struct ATHLTHEditProfileView: View {
         displayName = session.profile.displayName
         username = session.profile.username
         bio = session.profile.bio
-        selectedTrainingFocus = session.onboardingProfile?.trainingFocus
+        selectedTrainingFocus =
+            session.onboardingProfile?.trainingFocus
         usernameAvailable = nil
+        errorMessage = nil
+        saved = false
+    }
+
+    private func prepareSelectedPhoto(
+        _ item: PhotosPickerItem
+    ) async {
+        do {
+            guard let data =
+                    try await item.loadTransferable(
+                        type: Data.self
+                    ),
+                  let image = UIImage(data: data),
+                  let jpeg =
+                    image.jpegData(
+                        compressionQuality: 0.82
+                    )
+            else {
+                throw ProfileEditingError.invalidImage
+            }
+
+            await MainActor.run {
+                selectedAvatarData = jpeg
+                errorMessage = nil
+                saved = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage =
+                    error.localizedDescription
+            }
+        }
     }
 
     private func checkUsername() async {
         let clean = cleanedUsername
 
-        guard clean != session.profile.username.lowercased(),
+        guard clean !=
+                session.profile.username.lowercased(),
               clean.count >= 3
         else {
             usernameAvailable = nil
@@ -314,79 +895,140 @@ struct ATHLTHEditProfileView: View {
         checkingUsername = true
         usernameAvailable = nil
 
-        try? await Task.sleep(nanoseconds: 450_000_000)
+        try? await Task.sleep(
+            nanoseconds: 450_000_000
+        )
         guard !Task.isCancelled else { return }
 
         do {
-            let available = try await accountService.isUsernameAvailable(clean)
-            guard !Task.isCancelled else { return }
+            let available =
+                try await accountService
+                    .isUsernameAvailable(clean)
+
+            guard !Task.isCancelled else {
+                return
+            }
+
             usernameAvailable = available
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                return
+            }
+
             usernameAvailable = false
         }
 
         checkingUsername = false
     }
 
+    @MainActor
     private func removePhoto() async {
         if selectedAvatarData != nil {
             selectedAvatarData = nil
             selectedPhoto = nil
+            saved = false
             return
         }
 
-        guard session.profile.avatarURL != nil else { return }
+        guard session.profile.avatarURL != nil else {
+            return
+        }
 
         saving = true
         errorMessage = nil
         defer { saving = false }
 
         do {
-            let bootstrap = try await accountService.removeProfileAvatar()
+            let bootstrap =
+                try await accountService
+                    .removeProfileAvatar()
+
             session.applyBackendBootstrap(bootstrap)
+
+            UINotificationFeedbackGenerator()
+                .notificationOccurred(.success)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage =
+                error.localizedDescription
         }
     }
 
+    @MainActor
     private func saveProfile() async {
-        guard canSave else { return }
+        guard canSave,
+              hasUnsavedChanges
+        else {
+            return
+        }
 
         saving = true
+        saved = false
         errorMessage = nil
         defer { saving = false }
 
         do {
-            var avatarURL = session.profile.avatarURL
+            var avatarURL =
+                session.profile.avatarURL
 
             if let selectedAvatarData {
-                avatarURL = try await accountService.uploadProfileAvatar(
-                    jpegData: selectedAvatarData
-                )
+                avatarURL =
+                    try await accountService
+                        .uploadProfileAvatar(
+                            jpegData:
+                                selectedAvatarData
+                        )
             }
 
-            let bootstrap = try await accountService.updateProfile(
-                displayName: displayName,
-                username: cleanedUsername,
-                bio: bio,
-                avatarURL: avatarURL
-            )
+            let bootstrap =
+                try await accountService
+                    .updateProfile(
+                        displayName: displayName,
+                        username: cleanedUsername,
+                        bio: bio,
+                        avatarURL: avatarURL
+                    )
 
             session.applyBackendBootstrap(bootstrap)
 
             if let selectedTrainingFocus {
-                session.setTrainingFocus(selectedTrainingFocus)
-                await social.syncOwnTrainingFocus(selectedTrainingFocus)
+                session.setTrainingFocus(
+                    selectedTrainingFocus
+                )
+
+                await social.syncOwnTrainingFocus(
+                    selectedTrainingFocus
+                )
             }
 
             selectedAvatarData = nil
+            selectedPhoto = nil
             hasEditedATHLTHProfile = true
             saved = true
+
+            UINotificationFeedbackGenerator()
+                .notificationOccurred(.success)
+
+            Task { @MainActor in
+                try? await Task.sleep(
+                    nanoseconds: 1_600_000_000
+                )
+
+                saved = false
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage =
+                error.localizedDescription
+
+            UINotificationFeedbackGenerator()
+                .notificationOccurred(.error)
         }
     }
+}
+
+private enum ProfileEditField: Hashable {
+    case displayName
+    case username
+    case bio
 }
 
 private enum ProfileEditingError: LocalizedError {
