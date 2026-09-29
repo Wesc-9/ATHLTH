@@ -16,6 +16,7 @@ enum ProfileFollowListMode: String, Identifiable {
 
 struct ProfileFollowListView: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeStore
 
     let mode: ProfileFollowListMode
 
@@ -50,6 +51,17 @@ struct ProfileFollowListView: View {
                         } label: {
                             HStack(spacing: 12) {
                                 SocialAvatar(profile: profile, size: 46)
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if realtime.isOnline(profile.userID) {
+                                            Circle()
+                                                .fill(Color.green)
+                                                .frame(width: 13, height: 13)
+                                                .overlay {
+                                                    Circle()
+                                                        .stroke(Color.white, lineWidth: 2)
+                                                }
+                                        }
+                                    }
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(profile.resolvedName)
@@ -85,10 +97,16 @@ struct ProfileFollowListView: View {
         .navigationTitle(mode.title)
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await social.refresh()
+            async let socialRefresh: Void = social.refresh()
+            async let presenceRefresh: Void =
+                realtime.refreshOnlinePresence()
+            _ = await (socialRefresh, presenceRefresh)
         }
         .refreshable {
-            await social.refresh()
+            async let socialRefresh: Void = social.refresh()
+            async let presenceRefresh: Void =
+                realtime.refreshOnlinePresence()
+            _ = await (socialRefresh, presenceRefresh)
         }
     }
 
