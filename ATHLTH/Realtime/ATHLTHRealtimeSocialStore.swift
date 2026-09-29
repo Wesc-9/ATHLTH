@@ -180,6 +180,15 @@ private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
     }
 }
 
+
+private struct BeginGhostLiveSessionParams: Encodable {
+    let challengeID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case challengeID = "p_challenge_id"
+    }
+}
+
 @MainActor
 final class ATHLTHRealtimeSocialStore: ObservableObject {
     @Published private(set) var onlineUserIDs: Set<UUID> = []
@@ -398,108 +407,23 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     func beginGhostSession(
         challenge: GhostFriendRaceChallengeRecord
     ) async -> ATHLTHLiveWorkoutSession? {
-        guard let currentUserID else {
+        guard currentUserID != nil else {
             return nil
         }
 
         do {
-            let existing: [ATHLTHLiveWorkoutSession] =
+            let session: ATHLTHLiveWorkoutSession =
                 try await client
-                    .from("live_workout_sessions")
-                    .select()
-                    .eq(
-                        "ghost_challenge_id",
-                        value: challenge.id
+                    .rpc(
+                        "begin_ghost_live_session",
+                        params:
+                            BeginGhostLiveSessionParams(
+                                challengeID:
+                                    challenge.id
+                            )
                     )
-                    .order(
-                        "started_at",
-                        ascending: false
-                    )
-                    .limit(3)
                     .execute()
                     .value
-
-            if let active =
-                existing.first(where: \.isActive) {
-                currentSession = active
-                isSharingLiveLocation = true
-                startWatching(active)
-                return active
-            }
-
-            let opponentID =
-                challenge.senderID == currentUserID
-                    ? challenge.recipientID
-                    : challenge.senderID
-
-            let now = Date()
-            let id = UUID()
-            let payload =
-                ATHLTHLiveWorkoutSessionInsert(
-                    id: id,
-                    ownerID: currentUserID,
-                    opponentUserID: opponentID,
-                    ghostChallengeID: challenge.id,
-                    activity: "running",
-                    title: challenge.title,
-                    visibility:
-                        ATHLTHLiveWorkoutVisibility
-                            .privateOnly.rawValue,
-                    status: "active",
-                    startedAt: now
-                )
-
-            do {
-                try await client
-                    .from("live_workout_sessions")
-                    .insert(payload)
-                    .execute()
-            } catch {
-                // The opponent may have created the same live Ghost session
-                // at almost the same time. Re-read the unique active row.
-                let raced: [ATHLTHLiveWorkoutSession] =
-                    try await client
-                        .from("live_workout_sessions")
-                        .select()
-                        .eq(
-                            "ghost_challenge_id",
-                            value: challenge.id
-                        )
-                        .order(
-                            "started_at",
-                            ascending: false
-                        )
-                        .limit(3)
-                        .execute()
-                        .value
-
-                if let active =
-                    raced.first(where: \.isActive) {
-                    currentSession = active
-                    isSharingLiveLocation = true
-                    startWatching(active)
-                    return active
-                }
-
-                throw error
-            }
-
-            let session = ATHLTHLiveWorkoutSession(
-                id: id,
-                ownerID: currentUserID,
-                opponentUserID: opponentID,
-                ghostChallengeID: challenge.id,
-                activity: "running",
-                title: challenge.title,
-                visibility:
-                    ATHLTHLiveWorkoutVisibility
-                        .privateOnly.rawValue,
-                status: "active",
-                startedAt: now,
-                endedAt: nil,
-                createdAt: now,
-                updatedAt: now
-            )
 
             currentSession = session
             isSharingLiveLocation = true
