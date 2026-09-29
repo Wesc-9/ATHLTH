@@ -2095,7 +2095,8 @@ struct AroundYouExploreView: View {
                 )
                 .distance(from: location)
 
-                guard distance <= 50_000 else {
+                if !route.isPublicTrail,
+                   distance > 50_000 {
                     return nil
                 }
 
