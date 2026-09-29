@@ -423,21 +423,24 @@ async function loadCachedTrails(
       .select(
         "id,osm_relation_id,name,route_kind,network,reference,operator_name,symbol,coordinates,distance_kilometers,center_latitude,center_longitude,leaderboard_enabled,athlth_verified,source,route_shape,surface_summary,difficulty,osm_description,website,estimated_run_seconds,estimated_walk_seconds,elevation_gain_meters,elevation_loss_meters,min_elevation_meters,max_elevation_meters,average_grade_percent,max_grade_percent,elevation_profile,updated_at",
       )
-      .gte(
-        "center_latitude",
-        bounds.south,
-      )
+      // Return routes whose geometry bounds intersect the searched
+      // viewport. Center-only filtering misses long routes that pass through
+      // the visible map while their midpoint sits outside it.
       .lte(
-        "center_latitude",
+        "min_latitude",
         bounds.north,
       )
       .gte(
-        "center_longitude",
-        bounds.west,
+        "max_latitude",
+        bounds.south,
       )
       .lte(
-        "center_longitude",
+        "min_longitude",
         bounds.east,
+      )
+      .gte(
+        "max_longitude",
+        bounds.west,
       )
       .gte(
         "distance_kilometers",
