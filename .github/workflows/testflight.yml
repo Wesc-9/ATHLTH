@@ -224,6 +224,82 @@ jobs:
             exit 1
           fi
 
+      - name: Verify release debug symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/ATHLTH.xcarchive"
+          IOS_APP="$ARCHIVE/Products/Applications/ATHLTH.app"
+          DSYM_DIR="$ARCHIVE/dSYMs"
+          test -d "$DSYM_DIR"
+
+          ALL_DSYM_UUIDS=$(
+            find "$DSYM_DIR" -type d -name '*.dSYM' -print0 |
+            while IFS= read -r -d '' DSYM; do
+              xcrun dwarfdump --uuid "$DSYM" 2>/dev/null || true
+            done |
+            awk '/UUID:/ { print toupper($2) }' |
+            sort -u
+          )
+
+          require_matching_dsym() {
+            LABEL="$1"
+            BINARY="$2"
+
+            if [ ! -f "$BINARY" ]; then
+              echo "::error::$LABEL binary not found at $BINARY"
+              exit 1
+            fi
+
+            BINARY_UUIDS=$(
+              xcrun dwarfdump --uuid "$BINARY" |
+              awk '/UUID:/ { print toupper($2) }' |
+              sort -u
+            )
+
+            if [ -z "$BINARY_UUIDS" ]; then
+              echo "::error::Could not read UUIDs for $LABEL"
+              exit 1
+            fi
+
+            while IFS= read -r UUID; do
+              if ! printf '%s\n' "$ALL_DSYM_UUIDS" | grep -qx "$UUID"; then
+                echo "::error::Missing matching dSYM for $LABEL UUID $UUID"
+                exit 1
+              fi
+            done <<< "$BINARY_UUIDS"
+
+            echo "$LABEL dSYM UUID coverage verified."
+          }
+
+          require_matching_dsym "ATHLTH iPhone app" "$IOS_APP/ATHLTH"
+          require_matching_dsym "ATHLTH Widget extension" "$IOS_APP/PlugIns/ATHLTHWidgets.appex/ATHLTHWidgets"
+          require_matching_dsym "ATHLTH Watch app" "$IOS_APP/Watch/ATHLTH.app/ATHLTH"
+
+          SPOTIFY_BINARY="$IOS_APP/Frameworks/SpotifyiOS.framework/SpotifyiOS"
+          if [ -f "$SPOTIFY_BINARY" ]; then
+            SPOTIFY_UUIDS=$(
+              xcrun dwarfdump --uuid "$SPOTIFY_BINARY" |
+              awk '/UUID:/ { print toupper($2) }' |
+              sort -u
+            )
+            SPOTIFY_MISSING=0
+
+            while IFS= read -r UUID; do
+              if ! printf '%s\n' "$ALL_DSYM_UUIDS" | grep -qx "$UUID"; then
+                SPOTIFY_MISSING=1
+              fi
+            done <<< "$SPOTIFY_UUIDS"
+
+            if [ "$SPOTIFY_MISSING" -eq 1 ]; then
+              echo "SPOTIFY_VENDOR_DSYM_MISSING=true" >> "$GITHUB_ENV"
+              echo "::notice::SpotifyiOS is a vendor-supplied dynamic framework without a matching vendor dSYM. ATHLTH-owned dSYMs are complete; keep symbol uploads enabled and treat only this Spotify warning as the known upstream exception."
+            else
+              echo "SPOTIFY_VENDOR_DSYM_MISSING=false" >> "$GITHUB_ENV"
+              echo "SpotifyiOS vendor dSYM is present and UUID-matched."
+            fi
+          fi
+
       - name: Seed archive entitlements with ad-hoc signatures
         shell: bash
         run: |
@@ -373,6 +449,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          UPLOAD_LOG="$RUNNER_TEMP/testflight-upload.log"
+
+          set +e
+          set -o pipefail
           xcodebuild \
             -exportArchive \
             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
@@ -381,7 +461,36 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" 2>&1 | tee "$UPLOAD_LOG"
+          XCODE_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$XCODE_STATUS" -ne 0 ]; then
+            echo "::error::TestFlight export/upload failed with exit code $XCODE_STATUS"
+            exit "$XCODE_STATUS"
+          fi
+
+          SYMBOL_WARNINGS="$RUNNER_TEMP/symbol-upload-warnings.txt"
+          grep -F "warning: exportArchive Upload Symbols Failed." "$UPLOAD_LOG" > "$SYMBOL_WARNINGS" || true
+
+          if [ -s "$SYMBOL_WARNINGS" ]; then
+            UNEXPECTED_WARNINGS="$RUNNER_TEMP/unexpected-symbol-upload-warnings.txt"
+            grep -vF "SpotifyiOS.framework" "$SYMBOL_WARNINGS" > "$UNEXPECTED_WARNINGS" || true
+
+            if [ -s "$UNEXPECTED_WARNINGS" ]; then
+              cat "$UNEXPECTED_WARNINGS"
+              echo "::error::Unexpected dSYM upload warning detected. ATHLTH release symbols must remain complete."
+              exit 1
+            fi
+
+            if grep -Fq "SpotifyiOS.framework" "$SYMBOL_WARNINGS"; then
+              if [ "${SPOTIFY_VENDOR_DSYM_MISSING:-false}" != "true" ]; then
+                echo "::error::Spotify dSYM warning appeared unexpectedly even though archive validation found symbol coverage."
+                exit 1
+              fi
+              echo "::notice::Known Spotify vendor dSYM warning observed. ATHLTH iPhone, Widget and Watch dSYMs were UUID-verified before upload."
+            fi
+          fi
 
       - name: Publish GitHub release
         if: success()
