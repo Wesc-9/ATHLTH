@@ -49,6 +49,9 @@ struct ATHLTHLiveWorkoutSession: Identifiable, Codable, Hashable {
     let endedAt: Date?
     let createdAt: Date
     let updatedAt: Date?
+    let routeKey: UUID?
+    let routeDistanceMeters: Double?
+    let routeTitle: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -63,6 +66,9 @@ struct ATHLTHLiveWorkoutSession: Identifiable, Codable, Hashable {
         case endedAt = "ended_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case routeKey = "route_key"
+        case routeDistanceMeters = "route_distance_meters"
+        case routeTitle = "route_title"
     }
 
     var isActive: Bool {
@@ -85,6 +91,8 @@ struct ATHLTHLiveWorkoutLocation: Identifiable, Codable, Hashable {
     let heartRateBPM: Double?
     let distanceMeters: Double
     let elapsedSeconds: Double
+    let routeProgressPercent: Double?
+    let routeDeviationMeters: Double?
     let updatedAt: Date
     let expiresAt: Date
 
@@ -99,6 +107,8 @@ struct ATHLTHLiveWorkoutLocation: Identifiable, Codable, Hashable {
         case heartRateBPM = "heart_rate_bpm"
         case distanceMeters = "distance_meters"
         case elapsedSeconds = "elapsed_seconds"
+        case routeProgressPercent = "route_progress_percent"
+        case routeDeviationMeters = "route_deviation_meters"
         case updatedAt = "updated_at"
         case expiresAt = "expires_at"
     }
@@ -116,6 +126,11 @@ struct ATHLTHLiveWorkoutLocation: Identifiable, Codable, Hashable {
     }
 }
 
+enum ATHLTHLiveGhostComparisonMode: Equatable {
+    case routeAware
+    case distanceFallback
+}
+
 struct ATHLTHLiveGhostComparison: Equatable {
     let sessionID: UUID
     let opponentUserID: UUID
@@ -123,10 +138,19 @@ struct ATHLTHLiveGhostComparison: Equatable {
     let opponentElapsedSeconds: TimeInterval
     let signedDistanceMeters: Double
     let estimatedTimeDeltaSeconds: TimeInterval?
+    let mode: ATHLTHLiveGhostComparisonMode
+    let routeKey: UUID?
+    let ownRouteProgressPercent: Double?
+    let opponentRouteProgressPercent: Double?
+    let opponentRouteDeviationMeters: Double?
     let updatedAt: Date
 
     var userIsAhead: Bool {
         signedDistanceMeters >= 0
+    }
+
+    var isRouteAware: Bool {
+        mode == .routeAware
     }
 }
 
@@ -154,6 +178,9 @@ private struct ATHLTHLiveWorkoutSessionInsert: Encodable {
     let visibility: String
     let status: String
     let startedAt: Date
+    let routeKey: UUID?
+    let routeDistanceMeters: Double?
+    let routeTitle: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -165,6 +192,9 @@ private struct ATHLTHLiveWorkoutSessionInsert: Encodable {
         case visibility
         case status
         case startedAt = "started_at"
+        case routeKey = "route_key"
+        case routeDistanceMeters = "route_distance_meters"
+        case routeTitle = "route_title"
     }
 }
 
@@ -179,6 +209,8 @@ private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
     let heartRateBPM: Double?
     let distanceMeters: Double
     let elapsedSeconds: Double
+    let routeProgressPercent: Double?
+    let routeDeviationMeters: Double?
     let updatedAt: Date
     let expiresAt: Date
 
@@ -193,6 +225,8 @@ private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
         case heartRateBPM = "heart_rate_bpm"
         case distanceMeters = "distance_meters"
         case elapsedSeconds = "elapsed_seconds"
+        case routeProgressPercent = "route_progress_percent"
+        case routeDeviationMeters = "route_deviation_meters"
         case updatedAt = "updated_at"
         case expiresAt = "expires_at"
     }
@@ -372,7 +406,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     func beginLiveWorkout(
         title: String,
         activity: String,
-        visibility: ATHLTHLiveWorkoutVisibility
+        visibility: ATHLTHLiveWorkoutVisibility,
+        routeKey: UUID? = nil,
+        routeDistanceMeters: Double? = nil,
+        routeTitle: String? = nil
     ) async -> ATHLTHLiveWorkoutSession? {
         guard let currentUserID else {
             return nil
@@ -408,7 +445,21 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     : cleanTitle,
             visibility: visibility.rawValue,
             status: "active",
-            startedAt: now
+            startedAt: now,
+            routeKey: routeKey,
+            routeDistanceMeters:
+                routeDistanceMeters.flatMap {
+                    $0.isFinite && $0 > 0
+                        ? $0
+                        : nil
+                },
+            routeTitle:
+                routeTitle?
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    .prefix(160)
+                    .description
         )
 
         do {
@@ -429,7 +480,12 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 startedAt: now,
                 endedAt: nil,
                 createdAt: now,
-                updatedAt: now
+                updatedAt: now,
+                routeKey: payload.routeKey,
+                routeDistanceMeters:
+                    payload.routeDistanceMeters,
+                routeTitle:
+                    payload.routeTitle
             )
 
             currentSession = session
@@ -476,7 +532,9 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         _ location: CLLocation,
         distanceMeters: Double,
         elapsedSeconds: TimeInterval,
-        heartRateBPM: Double? = nil
+        heartRateBPM: Double? = nil,
+        routeProgressPercent: Double? = nil,
+        routeDeviationMeters: Double? = nil
     ) async {
         guard let session = currentSession,
               session.isActive,
@@ -536,6 +594,14 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 max(distanceMeters, 0),
             elapsedSeconds:
                 max(elapsedSeconds, 0),
+            routeProgressPercent:
+                sanitizedRouteProgress(
+                    routeProgressPercent
+                ),
+            routeDeviationMeters:
+                sanitizedNonNegative(
+                    routeDeviationMeters
+                ),
             updatedAt: now,
             expiresAt:
                 now.addingTimeInterval(90)
@@ -598,6 +664,16 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 max(snapshot.distanceMeters, 0),
             elapsedSeconds:
                 max(snapshot.elapsedTime, 0),
+            routeProgressPercent:
+                sanitizedRouteProgress(
+                    snapshot
+                        .routeProgressPercent
+                ),
+            routeDeviationMeters:
+                sanitizedNonNegative(
+                    snapshot
+                        .routeDeviationMeters
+                ),
             updatedAt: now,
             expiresAt:
                 now.addingTimeInterval(90)
@@ -650,7 +726,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
     func liveGhostComparison(
         ownDistanceMeters: Double,
-        ownElapsedSeconds: TimeInterval
+        ownElapsedSeconds: TimeInterval,
+        ownRouteKey: UUID? = nil,
+        ownRouteProgressPercent: Double? = nil,
+        ownRouteDeviationMeters: Double? = nil
     ) -> ATHLTHLiveGhostComparison? {
         guard let selectedSession =
                 selectedLiveGhostSession,
@@ -665,6 +744,95 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 )
         else {
             return nil
+        }
+
+        let ownProgress =
+            normalizedRouteProgress(
+                ownRouteProgressPercent
+            )
+        let opponentProgress =
+            normalizedRouteProgress(
+                livePoint
+                    .routeProgressPercent
+            )
+        let routeDistance =
+            selectedSession
+                .routeDistanceMeters
+        let sameRoute =
+            ownRouteKey != nil &&
+            ownRouteKey ==
+                selectedSession.routeKey
+        let routeAccuracyOK =
+            (ownRouteDeviationMeters ?? 0) <=
+                250 &&
+            (livePoint.routeDeviationMeters ?? 0) <=
+                250
+
+        if sameRoute,
+           routeAccuracyOK,
+           let ownProgress,
+           let opponentProgress,
+           let routeDistance,
+           routeDistance.isFinite,
+           routeDistance >= 250 {
+            let progressDelta =
+                ownProgress -
+                opponentProgress
+            let distanceDelta =
+                progressDelta *
+                routeDistance
+
+            let opponentRouteSpeed:
+                Double? = {
+                guard livePoint
+                        .elapsedSeconds > 10,
+                      opponentProgress > 0.002
+                else {
+                    return nil
+                }
+
+                let speed =
+                    (
+                        opponentProgress *
+                        routeDistance
+                    ) /
+                    livePoint
+                        .elapsedSeconds
+
+                return speed.isFinite &&
+                    speed > 0.35
+                    ? speed
+                    : nil
+            }()
+
+            return ATHLTHLiveGhostComparison(
+                sessionID:
+                    selectedSession.id,
+                opponentUserID:
+                    selectedSession.ownerID,
+                opponentDistanceMeters:
+                    livePoint.distanceMeters,
+                opponentElapsedSeconds:
+                    livePoint.elapsedSeconds,
+                signedDistanceMeters:
+                    distanceDelta,
+                estimatedTimeDeltaSeconds:
+                    opponentRouteSpeed.map {
+                        distanceDelta / $0
+                    },
+                mode: .routeAware,
+                routeKey:
+                    selectedSession.routeKey,
+                ownRouteProgressPercent:
+                    ownProgress * 100,
+                opponentRouteProgressPercent:
+                    opponentProgress * 100,
+                opponentRouteDeviationMeters:
+                    livePoint
+                        .routeDeviationMeters,
+                updatedAt:
+                    livePoint.updatedAt
+            )
         }
 
         let distanceDelta =
@@ -689,11 +857,6 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 : nil
         }()
 
-        let timeDelta =
-            opponentAverageSpeed.map {
-                distanceDelta / $0
-            }
-
         return ATHLTHLiveGhostComparison(
             sessionID: selectedSession.id,
             opponentUserID:
@@ -705,10 +868,68 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             signedDistanceMeters:
                 distanceDelta,
             estimatedTimeDeltaSeconds:
-                timeDelta,
+                opponentAverageSpeed.map {
+                    distanceDelta / $0
+                },
+            mode: .distanceFallback,
+            routeKey:
+                selectedSession.routeKey,
+            ownRouteProgressPercent:
+                ownProgress.map { $0 * 100 },
+            opponentRouteProgressPercent:
+                opponentProgress.map {
+                    $0 * 100
+                },
+            opponentRouteDeviationMeters:
+                livePoint
+                    .routeDeviationMeters,
             updatedAt:
                 livePoint.updatedAt
         )
+    }
+
+    private func sanitizedRouteProgress(
+        _ value: Double?
+    ) -> Double? {
+        guard let value,
+              value.isFinite
+        else {
+            return nil
+        }
+
+        return min(
+            max(value, 0),
+            100
+        )
+    }
+
+    private func normalizedRouteProgress(
+        _ value: Double?
+    ) -> Double? {
+        guard let value =
+                sanitizedRouteProgress(
+                    value
+                )
+        else {
+            return nil
+        }
+
+        return value > 1.0001
+            ? value / 100
+            : value
+    }
+
+    private func sanitizedNonNegative(
+        _ value: Double?
+    ) -> Double? {
+        guard let value,
+              value.isFinite,
+              value >= 0
+        else {
+            return nil
+        }
+
+        return value
     }
 
     func liveGhostDeltaMeters(
