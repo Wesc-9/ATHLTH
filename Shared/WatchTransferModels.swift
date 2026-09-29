@@ -667,6 +667,14 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var routeDeviationMeters: Double? = nil
     var routeDeviationThresholdMeters: Double? = nil
 
+    // Shared structured-running state for iPhone, Apple Watch, Lock Screen
+    // and Dynamic Island. Optional defaults preserve older transfers.
+    var runningStepTitle: String? = nil
+    var runningStepIndex: Int? = nil
+    var runningStepCount: Int? = nil
+    var runningStepProgress: Double? = nil
+    var runningNextStepTitle: String? = nil
+
     var heartRateTargetZone: Int? = nil
     var heartRateTargetMinimumBPM: Double? = nil
     var heartRateTargetMaximumBPM: Double? = nil
