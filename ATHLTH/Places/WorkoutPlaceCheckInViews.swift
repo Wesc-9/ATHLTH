@@ -10,10 +10,9 @@ struct WorkoutPlaceCompactBadge: View {
 
     var body: some View {
         Group {
-            if let record =
-                places.record(
-                    for: workoutID
-                ) {
+            if places.record(
+                for: workoutID
+            ) != nil {
                 HStack(spacing: 7) {
                     Image(
                         systemName:
@@ -23,11 +22,7 @@ struct WorkoutPlaceCompactBadge: View {
                         ATHLTHTheme.vitality
                     )
 
-                    Text(
-                        placeLabel(
-                            record
-                        )
-                    )
+                    Text(placeLabel)
                     .font(
                         .caption.weight(
                             .semibold
@@ -76,10 +71,7 @@ struct WorkoutPlaceCompactBadge: View {
         }
     }
 
-    private func placeLabel(
-        _ record:
-            WorkoutPlaceCheckInRecord
-    ) -> String {
+    private var placeLabel: String {
         if let place =
             places.resolvedPlace(
                 for: workoutID
