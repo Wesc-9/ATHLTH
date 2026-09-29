@@ -25,6 +25,20 @@ struct IPhoneWorkoutView: View {
                             if workout.distanceMeters >= 50 {
                                 LabeledContent("Average pace", value: String(format: "%.1f min/%@", elapsed / 60 / (workout.distanceMeters / (settings.measurementPreference == .metric ? 1000 : 1609.344)), settings.measurementPreference.distanceUnit))
                             }
+
+                            if let delta =
+                                realtime.liveGhostDeltaMeters(
+                                    ownDistanceMeters:
+                                        workout.distanceMeters
+                                ) {
+                                LabeledContent(
+                                    "Live Ghost",
+                                    value:
+                                        liveGhostText(
+                                            delta
+                                        )
+                                )
+                            }
                         }
                         if workout.resumedAt == nil { Button("Resume workout") { recorder.resume() } }
                         else { Button("Pause workout") { recorder.pause() } }
@@ -115,6 +129,24 @@ struct IPhoneWorkoutView: View {
                 }
             }
         }
+    }
+
+    private func liveGhostText(
+        _ meters: Double
+    ) -> String {
+        let amount =
+            Int(
+                abs(meters)
+                    .rounded()
+            )
+
+        if abs(meters) < 5 {
+            return "Side by side"
+        }
+
+        return meters >= 0
+            ? "You +\(amount) m"
+            : "Ghost +\(amount) m"
     }
 
     @MainActor
