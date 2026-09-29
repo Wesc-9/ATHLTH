@@ -567,34 +567,76 @@ struct ATHLTHWorkoutLiveActivity: Widget {
     ) -> some View {
         switch focus(context) {
         case .routeGuardian:
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(
-                        isOffRoute(context)
-                            ? routeDeviationText(context)
-                            : routeRemainingText(context)
-                    )
-                    .font(.title3.weight(.bold))
-                    .monospacedDigit()
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(
+                            isOffRoute(context)
+                                ? routeDeviationText(context)
+                                : routeRemainingText(context)
+                        )
+                        .font(.title3.weight(.bold))
+                        .monospacedDigit()
 
-                    Text(
-                        isOffRoute(context)
-                            ? "Return to route"
-                            : "Remaining"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.66))
+                        Text(
+                            isOffRoute(context)
+                                ? "Return to route"
+                                : "Remaining"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.66))
+                    }
+
+                    Spacer()
+
+                    if let progress =
+                        context.state.routeProgressPercent {
+                        Text(
+                            "\(Int(min(max(progress, 0), 100).rounded()))%"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                    }
                 }
 
-                Spacer()
+                if let step =
+                    context.state.runningStepTitle {
+                    HStack(spacing: 8) {
+                        Image(
+                            systemName:
+                                "figure.run.circle.fill"
+                        )
+                        .foregroundStyle(.green)
 
-                if let progress =
-                    context.state.routeProgressPercent {
-                    Text(
-                        "\(Int(min(max(progress, 0), 1) * 100))%"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(step)
+                                .font(
+                                    .caption
+                                        .weight(.semibold)
+                                )
+                                .lineLimit(1)
+
+                            if let next =
+                                context.state
+                                    .runningNextStepTitle {
+                                Text(
+                                    "Next: \(next)"
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    .white.opacity(0.62)
+                                )
+                                .lineLimit(1)
+                            }
+                        }
+
+                        Spacer()
+
+                        runningStepLabel(context)
+                    }
                 }
             }
 
@@ -716,31 +758,67 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             }
 
         case .workout:
-            HStack(spacing: 18) {
-                liveDuration(context)
+            VStack(alignment: .leading, spacing: 8) {
+                if let step =
+                    context.state.runningStepTitle {
+                    HStack {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(step)
+                                .font(
+                                    .subheadline
+                                        .weight(.bold)
+                                )
+                                .lineLimit(1)
 
-                if context.state.distanceMeters > 0 {
-                    metric(
-                        value: String(
-                            format: "%.2f",
-                            context.state.distanceMeters / 1_000
-                        ),
-                        label: "KM"
-                    )
+                            if let next =
+                                context.state
+                                    .runningNextStepTitle {
+                                Text(
+                                    "Next: \(next)"
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    .white.opacity(0.62)
+                                )
+                                .lineLimit(1)
+                            }
+                        }
+
+                        Spacer()
+
+                        runningStepLabel(context)
+                    }
                 }
 
-                if context.state.heartRate > 0 {
-                    metric(
-                        value:
-                            String(
-                                Int(
-                                    context.state
-                                        .heartRate
-                                        .rounded()
-                                )
+                HStack(spacing: 18) {
+                    liveDuration(context)
+
+                    if context.state.distanceMeters > 0 {
+                        metric(
+                            value: String(
+                                format: "%.2f",
+                                context.state.distanceMeters / 1_000
                             ),
-                        label: "BPM"
-                    )
+                            label: "KM"
+                        )
+                    }
+
+                    if context.state.heartRate > 0 {
+                        metric(
+                            value:
+                                String(
+                                    Int(
+                                        context.state
+                                            .heartRate
+                                            .rounded()
+                                    )
+                                ),
+                            label: "BPM"
+                        )
+                    }
                 }
             }
         }
@@ -886,6 +964,42 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             }
 
             return duration(context.state.elapsedTime)
+        }
+    }
+
+    @ViewBuilder
+    private func runningStepLabel(
+        _ context: Context
+    ) -> some View {
+        VStack(
+            alignment: .trailing,
+            spacing: 2
+        ) {
+            if let index =
+                    context.state.runningStepIndex,
+               let count =
+                    context.state.runningStepCount,
+               count > 0 {
+                Text(
+                    "\(index + 1)/\(count)"
+                )
+                .font(
+                    .caption2.weight(.bold)
+                )
+                .monospacedDigit()
+            }
+
+            if let progress =
+                context.state.runningStepProgress {
+                Text(
+                    "\(Int(min(max(progress, 0), 1) * 100))%"
+                )
+                .font(.caption2)
+                .monospacedDigit()
+                .foregroundStyle(
+                    .white.opacity(0.70)
+                )
+            }
         }
     }
 
