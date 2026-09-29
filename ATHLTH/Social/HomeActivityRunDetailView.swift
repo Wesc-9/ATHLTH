@@ -136,6 +136,10 @@ struct HomeActivityRunDetailView: View {
             VStack(spacing: 16) {
                 summaryCard
 
+                WorkoutPlaceCheckInSection(
+                    workoutID: workout.id
+                )
+
                 mapCard
 
                 routeFactsCard
