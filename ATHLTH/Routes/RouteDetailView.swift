@@ -757,6 +757,39 @@ struct RouteDetailView: View {
                             )
                         }
 
+                        if let descent =
+                            metadata.elevationLossMeters {
+                            trailInfoTile(
+                                title: "Descent",
+                                value:
+                                    "\(Int(descent.rounded())) m",
+                                icon: "arrow.down.right"
+                            )
+                        }
+
+                        if let low =
+                            metadata.minElevationMeters {
+                            trailInfoTile(
+                                title: "Low point",
+                                value:
+                                    "\(Int(low.rounded())) m",
+                                icon: "arrow.down.to.line"
+                            )
+                        }
+
+                        if let averageGrade =
+                            metadata.averageGradePercent {
+                            trailInfoTile(
+                                title: "Avg. grade",
+                                value:
+                                    String(
+                                        format: "%.1f%%",
+                                        averageGrade
+                                    ),
+                                icon: "angle"
+                            )
+                        }
+
                         if let grade =
                             metadata.maxGradePercent {
                             trailInfoTile(
@@ -768,6 +801,38 @@ struct RouteDetailView: View {
                                     ),
                                 icon:
                                     "arrow.up.right"
+                            )
+                        }
+
+                        trailInfoTile(
+                            title: "ATHLTH attempts",
+                            value: "\(attemptCount)",
+                            icon:
+                                "arrow.trianglehead.2.clockwise.rotate.90"
+                        )
+
+                        trailInfoTile(
+                            title: "Leaderboard",
+                            value: "\(leaderboard.count)",
+                            icon: "trophy.fill"
+                        )
+                    }
+
+                    if let profile =
+                        metadata.elevationProfile,
+                       profile.count >= 2 {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 8
+                        ) {
+                            Text("Elevation profile")
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
+
+                            elevationProfileView(
+                                profile
                             )
                         }
                     }
@@ -871,6 +936,93 @@ struct RouteDetailView: View {
                 style: .continuous
             )
         )
+    }
+
+    private func elevationProfileView(
+        _ samples: [Double]
+    ) -> some View {
+        let minimum =
+            samples.min() ?? 0
+        let maximum =
+            samples.max() ?? minimum
+        let range =
+            max(maximum - minimum, 1)
+
+        return GeometryReader { geometry in
+            Path { path in
+                for index in samples.indices {
+                    let progress =
+                        samples.count == 1
+                            ? 0
+                            : Double(index) /
+                                Double(
+                                    samples.count - 1
+                                )
+                    let x =
+                        geometry.size.width *
+                        progress
+                    let normalized =
+                        (samples[index] - minimum) /
+                        range
+                    let y =
+                        geometry.size.height *
+                        (1 - normalized)
+
+                    if index == samples.startIndex {
+                        path.move(
+                            to: CGPoint(
+                                x: x,
+                                y: y
+                            )
+                        )
+                    } else {
+                        path.addLine(
+                            to: CGPoint(
+                                x: x,
+                                y: y
+                            )
+                        )
+                    }
+                }
+            }
+            .stroke(
+                ATHLTHTheme.vitality,
+                style: StrokeStyle(
+                    lineWidth: 3,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+        }
+        .frame(height: 88)
+        .padding(12)
+        .background(
+            ATHLTHTheme.surfaceSage.opacity(0.58),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+        .overlay(alignment: .topLeading) {
+            Text(
+                "\(Int(maximum.rounded())) m"
+            )
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .padding(8)
+        }
+        .overlay(alignment: .bottomLeading) {
+            Text(
+                "\(Int(minimum.rounded())) m"
+            )
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .padding(8)
+        }
     }
 
     private func trailSourceRow(
