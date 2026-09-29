@@ -692,11 +692,14 @@ struct AroundYouExploreView: View {
     var embeddedInHeroLayout: Bool = false
 
     @StateObject private var routeAttempts = RouteAttemptStore()
+    @StateObject private var publicTrails = PublicTrailDiscoveryStore()
 
     @State private var filter: AroundYouFilter = .all
+    @State private var trailMode = false
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var hasCenteredOnUser = false
     @State private var selectedRoute: TrainingRoute?
+    @State private var selectedTrail: PublicTrailRecord?
     @State private var routeActionMessage: String?
     @State private var routeActionError: String?
     @State private var startingRoute = false
@@ -704,12 +707,69 @@ struct AroundYouExploreView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Map filter", selection: $filter) {
-                ForEach(AroundYouFilter.allCases) { option in
-                    Text(option.rawValue).tag(option)
+            HStack(spacing: 10) {
+                if trailMode {
+                    Label(
+                        "Trail Mode",
+                        systemImage: "mountain.2.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    Spacer()
+
+                    if publicTrails.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("\(publicTrails.trails.count) routes")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            trailMode = false
+                            selectedTrail = nil
+                        }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption.bold())
+                            .frame(width: 30, height: 30)
+                            .background(
+                                Color.primary.opacity(0.06),
+                                in: Circle()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close Trail Mode")
+                } else {
+                    Picker("Map filter", selection: $filter) {
+                        ForEach(AroundYouFilter.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            trailMode = true
+                            selectedRoute = nil
+                        }
+                    } label: {
+                        Image(systemName: "mountain.2.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 38, height: 32)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open Trail Mode")
                 }
             }
-            .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
@@ -719,7 +779,32 @@ struct AroundYouExploreView: View {
                         UserAnnotation()
                     }
 
-                    if filter == .all || filter == .routes {
+                    if trailMode {
+                        ForEach(
+                            Array(publicTrails.trails.prefix(18))
+                        ) { trail in
+                            let isSelected =
+                                selectedTrail?.id == trail.id
+
+                            MapPolyline(
+                                coordinates:
+                                    trail.renderCoordinates
+                            )
+                            .stroke(
+                                trail.athlthVerified
+                                    ? ATHLTHTheme.premiumGold
+                                    : ATHLTHTheme.vitality,
+                                style: StrokeStyle(
+                                    lineWidth: isSelected ? 7 : 4.5,
+                                    lineCap: .round,
+                                    lineJoin: .round
+                                )
+                            )
+                        }
+                    }
+
+                    if !trailMode &&
+                        (filter == .all || filter == .routes) {
                         ForEach(nearbyRoutes.prefix(25)) { route in
                             let isSelected =
                                 selectedRoute?.id == route.id
@@ -787,7 +872,8 @@ struct AroundYouExploreView: View {
                         }
                     }
 
-                    if filter == .all || filter == .events {
+                    if !trailMode &&
+                        (filter == .all || filter == .events) {
                         ForEach(nearbyEvents.prefix(30)) { item in
                             if let coordinate =
                                 eventCoordinate(item) {
@@ -804,7 +890,8 @@ struct AroundYouExploreView: View {
                         }
                     }
 
-                    if filter == .all || filter == .challenges {
+                    if !trailMode &&
+                        (filter == .all || filter == .challenges) {
                         ForEach(nearbyChallenges.prefix(30)) { challenge in
                             if let coordinate =
                                 challengeCoordinate(challenge) {
@@ -871,9 +958,16 @@ struct AroundYouExploreView: View {
                         return
                     }
 
-                    selectRoute(
-                        nearestTo: coordinate
-                    )
+                    if trailMode {
+                        selectedTrail =
+                            publicTrails.nearestTrail(
+                                to: coordinate
+                            )
+                    } else {
+                        selectRoute(
+                            nearestTo: coordinate
+                        )
+                    }
                 }
                 .overlay(alignment: .bottom) {
                     if let route = selectedRoute {
@@ -894,6 +988,32 @@ struct AroundYouExploreView: View {
                     ),
                     value: selectedRoute?.id
                 )
+                .onMapCameraChange(
+                    frequency: .onEnd
+                ) { context in
+                    guard trailMode else {
+                        return
+                    }
+
+                    let radius =
+                        min(
+                            max(
+                                context.region.span.latitudeDelta *
+                                    111 / 2,
+                                3
+                            ),
+                            20
+                        )
+
+                    Task {
+                        await publicTrails.refresh(
+                            center:
+                                context.region.center,
+                            radiusKilometers:
+                                radius
+                        )
+                    }
+                }
             }
             .frame(
                 height:
@@ -955,6 +1075,11 @@ struct AroundYouExploreView: View {
         .sheet(isPresented: $showingDiscoveryHub) {
             ExploreDiscoveryHubView()
         }
+        .sheet(item: $selectedTrail) { trail in
+            PublicTrailDetailView(
+                trail: trail
+            )
+        }
         .task {
             async let routesRefresh: Void =
                 routeDiscovery.refresh()
@@ -963,6 +1088,19 @@ struct AroundYouExploreView: View {
             _ = await (
                 routesRefresh,
                 eventsRefresh
+            )
+        }
+        .task(id: trailMode) {
+            guard trailMode,
+                  let location =
+                    locationStore.location
+            else {
+                return
+            }
+
+            await publicTrails.refresh(
+                center: location.coordinate,
+                radiusKilometers: 12
             )
         }
         .task(id: selectedRoute?.id) {
@@ -985,10 +1123,29 @@ struct AroundYouExploreView: View {
             if !hasCenteredOnUser {
                 centerOnUser()
             }
+
+            if trailMode,
+               let location =
+                    locationStore.location {
+                Task {
+                    await publicTrails.refresh(
+                        center: location.coordinate,
+                        radiusKilometers: 12
+                    )
+                }
+            }
         }
         .onChange(of: filter) { _, _ in
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedRoute = nil
+            }
+        }
+        .onChange(of: trailMode) { _, enabled in
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedRoute = nil
+                if !enabled {
+                    selectedTrail = nil
+                }
             }
         }
         .alert(
