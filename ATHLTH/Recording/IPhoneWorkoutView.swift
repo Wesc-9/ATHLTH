@@ -75,11 +75,88 @@ struct IPhoneWorkoutView: View {
                         }
                     }
 
-                    if let last = workout.points.last {
-                        Section("Current GPS position") {
-                            Map(initialPosition: .region(MKCoordinateRegion(center: last.location.coordinate, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)))) {
-                                Marker("Latest position", coordinate: last.location.coordinate)
-                            }.frame(height: 220)
+                    if workout.plannedRouteCoordinates?.count ?? 0 >= 2 ||
+                        workout.points.last != nil {
+                        Section(
+                            workout.plannedRouteTitle == nil
+                                ? "Current GPS position"
+                                : "Route"
+                        ) {
+                            Map(
+                                initialPosition: .region(
+                                    workoutMapRegion(
+                                        for: workout
+                                    )
+                                )
+                            ) {
+                                if let route =
+                                    workout.plannedRouteCoordinates,
+                                   route.count >= 2 {
+                                    MapPolyline(
+                                        coordinates:
+                                            route.map(\.coordinate)
+                                    )
+                                    .stroke(
+                                        ATHLTHTheme.vitality,
+                                        lineWidth: 6
+                                    )
+                                }
+
+                                if workout.points.count >= 2 {
+                                    MapPolyline(
+                                        coordinates:
+                                            workout.points.map {
+                                                $0.location.coordinate
+                                            }
+                                    )
+                                    .stroke(
+                                        ATHLTHTheme.accent,
+                                        lineWidth: 4
+                                    )
+                                }
+
+                                if let last =
+                                    workout.points.last {
+                                    Marker(
+                                        "You",
+                                        coordinate:
+                                            last.location.coordinate
+                                    )
+                                }
+                            }
+                            .frame(height: 260)
+
+                            if let routeTitle =
+                                workout.plannedRouteTitle {
+                                HStack {
+                                    Label(
+                                        routeTitle,
+                                        systemImage:
+                                            "point.topleft.down.to.point.bottomright.curvepath"
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(.semibold)
+                                    )
+
+                                    Spacer()
+
+                                    if let distance =
+                                        workout
+                                            .plannedRouteDistanceKilometers {
+                                        Text(
+                                            settings
+                                                .measurementPreference
+                                                .distance(
+                                                    fromKilometers:
+                                                        distance
+                                                )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -129,6 +206,79 @@ struct IPhoneWorkoutView: View {
                 }
             }
         }
+    }
+
+    private func workoutMapRegion(
+        for workout: PhoneWorkout
+    ) -> MKCoordinateRegion {
+        let routeCoordinates =
+            workout.plannedRouteCoordinates?
+                .map(\.coordinate) ?? []
+        let recordedCoordinates =
+            workout.points.map {
+                $0.location.coordinate
+            }
+        let coordinates =
+            routeCoordinates.isEmpty
+                ? recordedCoordinates
+                : routeCoordinates + recordedCoordinates
+
+        guard let first = coordinates.first else {
+            return MKCoordinateRegion(
+                center:
+                    CLLocationCoordinate2D(
+                        latitude: 0,
+                        longitude: 0
+                    ),
+                span:
+                    MKCoordinateSpan(
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01
+                    )
+            )
+        }
+
+        var minLatitude = first.latitude
+        var maxLatitude = first.latitude
+        var minLongitude = first.longitude
+        var maxLongitude = first.longitude
+
+        for coordinate in coordinates.dropFirst() {
+            minLatitude =
+                min(minLatitude, coordinate.latitude)
+            maxLatitude =
+                max(maxLatitude, coordinate.latitude)
+            minLongitude =
+                min(minLongitude, coordinate.longitude)
+            maxLongitude =
+                max(maxLongitude, coordinate.longitude)
+        }
+
+        let latitudeDelta =
+            max(
+                (maxLatitude - minLatitude) * 1.28,
+                0.008
+            )
+        let longitudeDelta =
+            max(
+                (maxLongitude - minLongitude) * 1.28,
+                0.008
+            )
+
+        return MKCoordinateRegion(
+            center:
+                CLLocationCoordinate2D(
+                    latitude:
+                        (minLatitude + maxLatitude) / 2,
+                    longitude:
+                        (minLongitude + maxLongitude) / 2
+                ),
+            span:
+                MKCoordinateSpan(
+                    latitudeDelta: latitudeDelta,
+                    longitudeDelta: longitudeDelta
+                )
+        )
     }
 
     private func liveGhostText(
