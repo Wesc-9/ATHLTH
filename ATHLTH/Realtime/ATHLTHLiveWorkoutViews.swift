@@ -42,6 +42,34 @@ struct ATHLTHLiveWorkoutMapView: View {
     var body: some View {
         VStack(spacing: 0) {
             Map {
+                ForEach(
+                    Array(
+                        realtime
+                            .liveTrails
+                            .keys
+                    ),
+                    id: \.self
+                ) { userID in
+                    if let coordinates =
+                        realtime.liveTrails[userID],
+                       coordinates.count >= 2 {
+                        MapPolyline(
+                            coordinates:
+                                coordinates
+                        )
+                        .stroke(
+                            trailColor(userID)
+                                .opacity(0.62),
+                            style:
+                                StrokeStyle(
+                                    lineWidth: 5,
+                                    lineCap: .round,
+                                    lineJoin: .round
+                                )
+                        )
+                    }
+                }
+
                 ForEach(realtime.liveLocations) { location in
                     Annotation(
                         displayName(location.userID),
@@ -161,6 +189,20 @@ struct ATHLTHLiveWorkoutMapView: View {
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                        if let heartRate =
+                                location.heartRateBPM,
+                           heartRate > 0 {
+                            Label(
+                                "\(Int(heartRate.rounded())) bpm",
+                                systemImage:
+                                    "heart.fill"
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
                     }
 
                     Spacer()
@@ -170,6 +212,54 @@ struct ATHLTHLiveWorkoutMapView: View {
                     )
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                }
+            }
+
+            if currentUserIsParticipant {
+                Divider()
+
+                HStack(spacing: 12) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text("Share my live position")
+                            .font(
+                                .caption.weight(
+                                    .semibold
+                                )
+                            )
+
+                        Text(
+                            "You can turn this off without stopping the workout."
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    Toggle(
+                        "",
+                        isOn:
+                            Binding(
+                                get: {
+                                    realtime
+                                        .isSharingLiveLocation
+                                },
+                                set: { enabled in
+                                    Task {
+                                        await realtime
+                                            .setCurrentLiveLocationSharing(
+                                                enabled
+                                            )
+                                    }
+                                }
+                            )
+                    )
+                    .labelsHidden()
                 }
             }
 
@@ -206,6 +296,35 @@ struct ATHLTHLiveWorkoutMapView: View {
                 }
             }
         }
+    }
+
+    private var currentUserIsParticipant: Bool {
+        guard let currentUserID =
+                realtime.currentUserID
+        else {
+            return false
+        }
+
+        return session.ownerID ==
+            currentUserID ||
+            session.opponentUserID ==
+            currentUserID
+    }
+
+    private func trailColor(
+        _ userID: UUID
+    ) -> Color {
+        if userID ==
+            realtime.currentUserID {
+            return ATHLTHTheme.vitality
+        }
+
+        if userID ==
+            session.ownerID {
+            return ATHLTHTheme.accent
+        }
+
+        return ATHLTHTheme.premiumGold
     }
 
     private func displayName(
