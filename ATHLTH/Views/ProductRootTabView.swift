@@ -2683,6 +2683,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
 
     @State private var selectedSection = 0
     @State private var watchTransferMessage: String?
