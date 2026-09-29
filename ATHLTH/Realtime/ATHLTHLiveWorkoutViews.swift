@@ -132,9 +132,13 @@ struct ATHLTHLiveWorkoutMapView: View {
             realtime.startWatching(session)
         }
         .onDisappear {
-            // Closing a spectator/live map must never tear down a workout
-            // session the user may still be publishing in the background.
-            realtime.stopWatching()
+            // Keep the lightweight watcher alive only when this session was
+            // explicitly selected as the user's Live Ghost. Ordinary map
+            // viewing stops immediately when the view closes.
+            if realtime.selectedLiveGhostSessionID !=
+                session.id {
+                realtime.stopWatching()
+            }
         }
     }
 
