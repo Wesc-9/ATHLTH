@@ -71,6 +71,43 @@ struct ATHLTHLiveWorkoutSession: Identifiable, Codable, Hashable {
         case routeTitle = "route_title"
     }
 
+    init(
+        id: UUID,
+        ownerID: UUID,
+        opponentUserID: UUID?,
+        ghostChallengeID: UUID?,
+        activity: String,
+        title: String,
+        visibility: String,
+        status: String,
+        startedAt: Date,
+        endedAt: Date?,
+        createdAt: Date,
+        updatedAt: Date?,
+        routeKey: UUID? = nil,
+        routeDistanceMeters: Double? = nil,
+        routeTitle: String? = nil
+    ) {
+        self.id = id
+        self.ownerID = ownerID
+        self.opponentUserID =
+            opponentUserID
+        self.ghostChallengeID =
+            ghostChallengeID
+        self.activity = activity
+        self.title = title
+        self.visibility = visibility
+        self.status = status
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.routeKey = routeKey
+        self.routeDistanceMeters =
+            routeDistanceMeters
+        self.routeTitle = routeTitle
+    }
+
     var isActive: Bool {
         status == "active" || status == "paused"
     }
