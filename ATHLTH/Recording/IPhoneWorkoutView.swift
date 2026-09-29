@@ -115,6 +115,7 @@ struct IPhoneWorkoutView: View {
                 }
             }
         }
+    }
 
     @MainActor
     private func publishLivePointIfNeeded() async {
