@@ -370,9 +370,21 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     // Optional for backwards compatibility with configurations already
     // persisted or queued before music ducking was introduced.
     var duckOtherAudio: Bool? = nil
+    var guidanceQuietPeriodSeconds: TimeInterval? = nil
 
     var shouldDuckOtherAudio: Bool {
         duckOtherAudio ?? true
+    }
+
+    var resolvedGuidanceQuietPeriodSeconds:
+        TimeInterval {
+        min(
+            max(
+                guidanceQuietPeriodSeconds ?? 10,
+                0
+            ),
+            30
+        )
     }
 
     static let disabled = WatchAudioCoachConfiguration(
