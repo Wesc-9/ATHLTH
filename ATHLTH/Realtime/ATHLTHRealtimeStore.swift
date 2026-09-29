@@ -54,13 +54,24 @@ final class ATHLTHRealtimeStore: ObservableObject {
         onlineHeartbeatTask = nil
         ownOnlineUserID = userID
 
-        guard enabled, appIsActive else {
-            await clearOwnOnlinePresence(userID: userID)
-            await refreshOnlinePresence()
+        guard appIsActive else {
+            await clearOwnOnlinePresence(
+                userID: userID
+            )
+            onlineUserIDs = []
             return
         }
 
-        await writeOnlineHeartbeat(userID: userID)
+        if enabled {
+            await writeOnlineHeartbeat(
+                userID: userID
+            )
+        } else {
+            await clearOwnOnlinePresence(
+                userID: userID
+            )
+        }
+
         await refreshOnlinePresence()
 
         onlineHeartbeatTask = Task { [weak self] in
@@ -77,9 +88,12 @@ final class ATHLTHRealtimeStore: ObservableObject {
                     return
                 }
 
-                await self.writeOnlineHeartbeat(
-                    userID: userID
-                )
+                if enabled {
+                    await self.writeOnlineHeartbeat(
+                        userID: userID
+                    )
+                }
+
                 await self.refreshOnlinePresence()
             }
         }
