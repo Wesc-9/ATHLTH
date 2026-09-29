@@ -585,6 +585,61 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         }
     }
 
+    func publishMirroredSnapshot(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) async {
+        guard let session = currentSession,
+              session.isActive,
+              isSharingLiveLocation,
+              let currentUserID,
+              let latitude = snapshot.currentLatitude,
+              let longitude = snapshot.currentLongitude,
+              latitude.isFinite,
+              longitude.isFinite,
+              (-90...90).contains(latitude),
+              (-180...180).contains(longitude)
+        else {
+            return
+        }
+
+        let now = Date()
+        if let lastPublishedLocationAt,
+           now.timeIntervalSince(lastPublishedLocationAt) <
+                minimumLocationPublishInterval {
+            return
+        }
+
+        lastPublishedLocationAt = now
+
+        let payload = ATHLTHLiveWorkoutLocationWrite(
+            sessionID: session.id,
+            userID: currentUserID,
+            latitude: latitude,
+            longitude: longitude,
+            horizontalAccuracy: nil,
+            speedMetersPerSecond: nil,
+            courseDegrees: nil,
+            distanceMeters:
+                max(snapshot.distanceMeters, 0),
+            elapsedSeconds:
+                max(snapshot.elapsedTime, 0),
+            updatedAt: now,
+            expiresAt:
+                now.addingTimeInterval(90)
+        )
+
+        do {
+            try await client
+                .from("live_workout_locations")
+                .upsert(payload)
+                .execute()
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func startWatching(
         _ session: ATHLTHLiveWorkoutSession
     ) {
