@@ -118,6 +118,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastMirrorSnapshotSentAt: Date?
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var coachAudioSessionIsActive = false
+    private var guidancePriorityGate =
+        ATHLTHGuidancePriorityGate()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var structuredStepStartElapsedTime: TimeInterval = 0
@@ -1041,7 +1043,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         if shouldAnnounce {
             WKInterfaceDevice.current().play(.click)
-            speak(metricsAnnouncement)
+            speak(
+                metricsAnnouncement,
+                priority: .routineCoach
+            )
         }
     }
 
@@ -1089,7 +1094,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                             "Structured workout complete. Continue easy or finish your workout when ready.",
                         norwegian:
                             "Den strukturerte økten er fullført. Fortsett rolig eller avslutt økten når du er klar."
-                    )
+                    ),
+                    priority:
+                        .structuredStep
                 )
             }
             return
@@ -1157,7 +1164,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             parts.append(intensity)
         }
 
-        speak(parts.joined(separator: ". "))
+        speak(
+            parts.joined(separator: ". "),
+            priority: .structuredStep
+        )
     }
 
     private func spokenTarget(
@@ -1641,7 +1651,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 timeDelta:
                     timeDelta,
                 delivery:
-                    configuration.delivery
+                    configuration
+                        .resolvedPeriodicDelivery,
+                priority:
+                    .ghostPeriodic
             )
             lastGhostAnnouncedLeadMeters =
                 distanceDelta
@@ -1700,13 +1713,35 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        let previousLead =
+            lastGhostAnnouncedLeadMeters
+        let absoluteLeadChange =
+            previousLead.map {
+                abs(
+                    distanceDelta - $0
+                )
+            } ?? 0
+        let important =
+            signChanged ||
+            absoluteLeadChange >=
+                configuration
+                    .resolvedImportantLeadChangeMeters
+
         announceGhostRaceLead(
             distanceDelta:
                 distanceDelta,
             timeDelta:
                 timeDelta,
             delivery:
-                configuration.delivery
+                important
+                    ? configuration
+                        .resolvedImportantLeadChangeDelivery
+                    : configuration
+                        .resolvedLeadChangeDelivery,
+            priority:
+                important
+                    ? .ghostImportant
+                    : .ghostPeriodic
         )
 
         lastGhostAnnouncedLeadMeters =
@@ -1719,7 +1754,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func announceGhostRaceLead(
         distanceDelta: Double,
         timeDelta: TimeInterval,
-        delivery: WatchAlertDelivery
+        delivery: WatchAlertDelivery,
+        priority: ATHLTHGuidancePriority
     ) {
         let meters =
             abs(distanceDelta)
@@ -1769,7 +1805,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             haptic:
                 distanceDelta >= 0
                     ? .success
-                    : .notification
+                    : .notification,
+            priority: priority
         )
     }
 
@@ -1816,7 +1853,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         norwegian: "Tilbake på ruten",
                         delivery:
                             configuration.delivery,
-                        haptic: .success
+                        haptic: .success,
+                        priority:
+                            .routeCritical
                     )
                 }
             }
@@ -1853,7 +1892,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 spokenDistance(deviationMeters),
             delivery:
                 configuration.delivery,
-            haptic: .directionDown
+            haptic: .directionDown,
+            priority:
+                .routeCritical
         )
     }
 
@@ -1980,7 +2021,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                             "Tilbake i målområdet",
                         delivery:
                             configuration.delivery,
-                        haptic: .success
+                        haptic: .success,
+                        priority:
+                            .targetCritical
                     )
                 }
             }
@@ -2020,7 +2063,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             norwegian: violation.norwegian,
             delivery:
                 configuration.delivery,
-            haptic: .notification
+            haptic: .notification,
+            priority:
+                .targetCritical
         )
     }
 
@@ -2028,9 +2073,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         english: String,
         norwegian: String,
         delivery: WatchAlertDelivery,
-        haptic: WKHapticType
+        haptic: WKHapticType,
+        priority: ATHLTHGuidancePriority
     ) {
-        if delivery.usesHaptics {
+        if delivery.usesHaptics,
+           guidancePriorityGate
+            .allowsHaptic(
+                for: priority
+            ) {
             WKInterfaceDevice.current()
                 .play(haptic)
         }
@@ -2040,7 +2090,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 coachPhrase(
                     english: english,
                     norwegian: norwegian
-                )
+                ),
+                priority: priority
             )
         }
     }
@@ -2205,14 +2256,36 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func speak(
-        _ text: String
+        _ text: String,
+        priority:
+            ATHLTHGuidancePriority =
+                .routineCoach
     ) {
         guard !text.isEmpty else { return }
 
-        if speechSynthesizer.isSpeaking {
+        let decision =
+            guidancePriorityGate
+                .voiceDecision(
+                    for: priority,
+                    isSpeaking:
+                        speechSynthesizer
+                            .isSpeaking,
+                    quietPeriodSeconds:
+                        audioCoachConfiguration
+                            .resolvedGuidanceQuietPeriodSeconds
+                )
+
+        switch decision {
+        case .drop:
+            return
+
+        case .interruptAndDeliver:
             speechSynthesizer.stopSpeaking(
-                at: .word
+                at: .immediate
             )
+
+        case .deliver:
+            break
         }
 
         activateAudioCoachAudioSession()
@@ -2928,6 +3001,10 @@ extension WatchWorkoutManager:
                 return
             }
 
+            self.guidancePriorityGate
+                .voiceDidFinish()
+            self.guidancePriorityGate
+                .voiceDidFinish()
             self.deactivateAudioCoachAudioSession()
         }
     }
