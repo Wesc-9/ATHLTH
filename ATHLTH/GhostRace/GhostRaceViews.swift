@@ -545,6 +545,21 @@ struct GhostRaceHubView: View {
                 .controlSize(.large)
 
                 NavigationLink {
+                    ATHLTHLiveAthletesView()
+                } label: {
+                    Label(
+                        "Live athletes",
+                        systemImage:
+                            "dot.radiowaves.left.and.right"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.accentDeep)
+                .controlSize(.large)
+
+                NavigationLink {
                     ChallengeCreationView()
                 } label: {
                     Label(
