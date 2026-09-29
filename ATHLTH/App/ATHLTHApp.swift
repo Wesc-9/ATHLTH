@@ -181,8 +181,22 @@ struct AppRootView: View {
             }
         }
         .task {
+            // Compatibility preview is a CI-only rendering surface. Do not
+            // compete with the first frame by starting auth, StoreKit or
+            // backend work that the preview neither needs nor can use.
+            if appSession.previewModeEnabled {
+                startupAuthenticationResolved = true
+                await Task.yield()
+                return
+            }
+
             await resolveStartupAuthentication()
             scheduleNotificationPermissionPrimerIfNeeded()
+
+            // Give SwiftUI one render turn after authentication changes the
+            // root surface. This keeps cold launch responsive on small phones
+            // before secondary account/network work begins.
+            await Task.yield()
 
             // Watch availability is discovered independently of workout capture.
             // The user chooses iPhone vs Apple Watch for each workout.
