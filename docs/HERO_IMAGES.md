@@ -1,21 +1,34 @@
-# Replacing the five tab hero images
+# ATHLTH primary tab hero images
 
-Work on `release/v1.4.2`. The recommended upload size is **2400 × 1200 pixels (width × height)** for all five images. Use landscape JPG, sRGB, exported at approximately 90–95% quality. Avoid enlarging a small source image merely to reach this size. Keep the high-resolution original separately.
+ATHLTH 1.4.5 uses the same hero height and scroll behavior on all five primary tabs as the Profile view.
 
-| Tab | Upload path |
+## Current mapping
+
+| Primary tab | Asset |
 | --- | --- |
-| Home | `ATHLTH/Assets.xcassets/HomeHero.imageset/HomeHero.jpg` |
-| Train | `ATHLTH/Assets.xcassets/TrainHero.imageset/TrainHero.jpg` |
-| Progress | `ATHLTH/Assets.xcassets/ProgressHero.imageset/ProgressHero.jpg` |
-| Recovery | `ATHLTH/Assets.xcassets/RecoveryHero.imageset/RecoveryHero.jpg` |
-| Community | `ATHLTH/Assets.xcassets/CommunityHero.imageset/CommunityHero.jpg` |
+| Home | `HomeHero` |
+| Train | `TrainHero` |
+| Insights | `ProgressHero` |
+| Explore | `RecoveryHero` |
+| Community | `CommunityHero` |
 
-On GitHub, open the appropriate folder on `release/v1.4.2`, choose **Add file → Upload files**, upload the JPG using the exact filename above, and commit to this branch. Keep `Contents.json` in each folder. The build and TestFlight workflows automatically connect the uploaded JPG to the image set before compiling. To run a check, use **Actions → Build ATHLTH → Run workflow**, selecting `release/v1.4.2`. An upload alone does not update an already installed app.
+Explore currently reuses the former Recovery artwork because Recovery is no longer a primary tab. A dedicated `ExploreHero` asset can replace it later without changing the layout.
 
-For local Xcode work, drag each JPG into its matching image set in Assets.xcassets, or run `bash scripts/optimize_hero_assets.sh` on macOS before building.
+## Layout baseline
 
-The current tab hero is 214 points tall with a 24-point content overlap. Its width follows the screen. Images use aspect-fill with slight zoom and focal offsets, so no single aspect ratio can display every pixel on every iPhone and iPad. 2:1 is the recommended iPhone composition, not a promise of zero cropping. Keep faces/important details within the central 60% of the image, preferably right of center; leave the left side quiet for app text. Keep the upper area clear of key details for the status bar and the bottom clear for the fade. Do not bake text into the image.
+- Hero height: **236 pt**
+- Scroll behavior: `ATHLTHPinnedHeroLayout` default behavior, matching Profile
+- Sheet overlap: **8 pt**
+- No immersive hero transition
+- No scroll-fade mask
+- Same pinned back-layer behavior as Profile
+- Hero artwork extends behind the top safe area
+- The rounded content sheet scrolls naturally over the hero
 
-The workflows cap tab artwork at 2400 pixels on its longest edge to control decoded image memory. Uploading a 6000-pixel image does not increase the delivered resolution. A sharp 2400 × 1200 image is about 11 MiB when decoded as RGBA, before rendering overhead.
+Do not re-enable `immersiveTransition`, `softTransition`, or `scrollFadeTransition` independently on a primary tab. If the primary-tab hero behavior changes in the future, update all five tabs and Profile together unless a deliberate product decision says otherwise.
 
-Only these five tab images were removed. Profile, onboarding, icons and other artwork are retained. Progress now uses ProgressHero like the other tabs, rather than a code-drawn illustration. Until a replacement is uploaded, the tab displays a neutral gradient with its normal title and subtitle.
+## Artwork guidance
+
+Recommended source size remains **2400 × 1200 px**, landscape JPG, sRGB, approximately 90–95% quality.
+
+Images use aspect-fill, so keep important subjects away from the extreme edges and leave enough quiet space for the title/subtitle. Do not bake text into the artwork.
