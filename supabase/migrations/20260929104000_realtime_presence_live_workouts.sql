@@ -224,10 +224,8 @@ create policy live_workout_sessions_insert_own
   to authenticated
   with check (
     owner_id = (select auth.uid())
-    and (
-      opponent_user_id is null
-      or not private.is_blocked(opponent_user_id)
-    )
+    and opponent_user_id is null
+    and ghost_challenge_id is null
   );
 
 drop policy if exists live_workout_sessions_update_owner
@@ -299,6 +297,14 @@ create policy live_workout_locations_insert_participant
           l.owner_id = (select auth.uid())
           or l.opponent_user_id = (select auth.uid())
         )
+        and coalesce(
+          (
+            select s.share_live_workout_location
+            from public.profile_social_settings s
+            where s.user_id = (select auth.uid())
+          ),
+          false
+        )
     )
   );
 
@@ -319,6 +325,14 @@ create policy live_workout_locations_update_participant
         and (
           l.owner_id = (select auth.uid())
           or l.opponent_user_id = (select auth.uid())
+        )
+        and coalesce(
+          (
+            select s.share_live_workout_location
+            from public.profile_social_settings s
+            where s.user_id = (select auth.uid())
+          ),
+          false
         )
     )
   );
