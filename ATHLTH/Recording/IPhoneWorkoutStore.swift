@@ -195,6 +195,61 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         }
         history = userID.flatMap { AccountLocalStorage.read([PhoneWorkout].self, name: "phoneHistory", userID: $0) } ?? []
         if let active, history.contains(where: { $0.id == active.id }) { self.active = nil }
+
+        if let active {
+            restoreRouteGeometry(
+                from: active
+            )
+            resetCoachThresholds(
+                configuration:
+                    active
+                        .audioCoachConfiguration
+            )
+            resetRouteAlertRuntime()
+        }
+
+        lastRouteCompletion =
+            history.first.flatMap {
+                workout in
+
+                guard let routeID =
+                        workout.plannedRouteID,
+                      let routeTitle =
+                        workout.plannedRouteTitle,
+                      let match =
+                        workout
+                            .finalRouteMatchPercent,
+                      let average =
+                        workout
+                            .finalAverageDeviationMeters,
+                      let maximum =
+                        workout
+                            .finalMaxDeviationMeters
+                else {
+                    return nil
+                }
+
+                return PhoneRouteCompletionSummary(
+                    routeID: routeID,
+                    routeTitle: routeTitle,
+                    routeMatchPercent: match,
+                    averageDeviationMeters:
+                        average,
+                    maxDeviationMeters:
+                        maximum,
+                    distanceMeters:
+                        workout.distanceMeters,
+                    durationSeconds:
+                        workout
+                            .accumulatedSeconds,
+                    leaderboardEligible:
+                        workout
+                            .finalLeaderboardEligible ??
+                        false,
+                    personalBest: false
+                )
+            }
+
         showingWorkout = false
         message = active == nil ? nil : "Recovered workout paused at the last saved checkpoint. Resume when you are ready."
         lastActiveCheckpointWriteAt = nil
