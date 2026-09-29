@@ -36,3 +36,22 @@ revoke all on function public.cleanup_expired_live_workout_state()
   from public, anon;
 grant execute on function public.cleanup_expired_live_workout_state()
   to authenticated;
+
+
+-- Enforce presence expiry in RLS as well as in the client. A crashed app can
+-- leave is_online=true behind, but authorized viewers must not be able to read
+-- that stale row as current presence.
+drop policy if exists social_online_presence_select_allowed
+  on public.social_online_presence;
+create policy social_online_presence_select_allowed
+  on public.social_online_presence
+  for select
+  to authenticated
+  using (
+    user_id = (select auth.uid())
+    or (
+      is_online
+      and updated_at > now() - interval '100 seconds'
+      and private.can_view_online_status(user_id)
+    )
+  );
