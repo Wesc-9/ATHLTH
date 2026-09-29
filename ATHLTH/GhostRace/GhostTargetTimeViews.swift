@@ -230,6 +230,8 @@ struct TargetGhostSetupView: View {
         AppSettingsStore
     @EnvironmentObject private var watchConnection:
         AppleWatchConnectionStore
+    @EnvironmentObject private var phoneWorkout:
+        IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace:
         GhostRaceStore
     @EnvironmentObject private var health:
@@ -247,6 +249,8 @@ struct TargetGhostSetupView: View {
     @State private var starting = false
     @State private var loadingHistory = false
     @State private var errorMessage: String?
+    @State private var captureDevice:
+        WorkoutCaptureDevice = .iPhone
 
     init(
         route: TrainingRoute,
@@ -466,13 +470,20 @@ struct TargetGhostSetupView: View {
     }
 
     private var canStart: Bool {
-        targetDuration != nil &&
-        settings.trainingDeviceProvider ==
-            .appleWatch &&
-        watchConnection.isReady &&
-        !watchConnection
-            .workoutLaunchInProgress &&
-        !starting
+        guard targetDuration != nil,
+              !starting
+        else {
+            return false
+        }
+
+        switch captureDevice {
+        case .iPhone:
+            return phoneWorkout.active == nil
+        case .appleWatch:
+            return watchConnection.isReady &&
+                !watchConnection
+                    .workoutLaunchInProgress
+        }
     }
 
     var body: some View {
@@ -487,20 +498,8 @@ struct TargetGhostSetupView: View {
                     historyCard
                 }
 
+                workoutDeviceCard
                 startButton
-
-                if settings
-                    .trainingDeviceProvider !=
-                    .appleWatch ||
-                    !watchConnection.isReady {
-                    Label(
-                        "Ghost Race currently requires a connected Apple Watch.",
-                        systemImage:
-                            "applewatch.slash"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                }
             }
             .padding()
             .frame(maxWidth: 680)
@@ -517,6 +516,11 @@ struct TargetGhostSetupView: View {
         .navigationTitle("Target Ghost")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: route.id) {
+            if watchConnection.isReady &&
+                settings.trainingDeviceProvider ==
+                    .appleWatch {
+                captureDevice = .appleWatch
+            }
             await loadAttemptHistory()
         }
         .alert(
@@ -897,6 +901,59 @@ struct TargetGhostSetupView: View {
         }
     }
 
+    private var workoutDeviceCard: some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                Text("Workout device")
+                    .font(.headline)
+
+                Picker(
+                    "Workout device",
+                    selection:
+                        $captureDevice
+                ) {
+                    Label(
+                        "iPhone",
+                        systemImage: "iphone"
+                    )
+                    .tag(
+                        WorkoutCaptureDevice
+                            .iPhone
+                    )
+
+                    Label(
+                        "Apple Watch",
+                        systemImage: "applewatch"
+                    )
+                    .tag(
+                        WorkoutCaptureDevice
+                            .appleWatch
+                    )
+                }
+                .pickerStyle(.segmented)
+                .onChange(
+                    of: captureDevice
+                ) { _, device in
+                    if device == .appleWatch &&
+                        !watchConnection.isReady {
+                        captureDevice = .iPhone
+                    }
+                }
+
+                Text(
+                    captureDevice == .iPhone
+                        ? "iPhone records GPS, Route Guardian and Ghost comparison."
+                        : "Apple Watch records the workout and Ghost comparison."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private var startButton: some View {
         Button {
             Task {
@@ -1232,6 +1289,10 @@ struct TargetGhostSetupView: View {
                         ghostRace,
                     watchConnection:
                         watchConnection,
+                    phoneWorkout:
+                        phoneWorkout,
+                    captureDevice:
+                        captureDevice,
                     settings:
                         settings
                 )
