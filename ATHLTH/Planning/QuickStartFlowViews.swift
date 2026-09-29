@@ -56,15 +56,18 @@ private final class QuickStartRouteLocationProbe:
         didUpdateLocations
             locations: [CLLocation]
     ) {
+        let validLocations =
+            locations.filter {
+                $0.horizontalAccuracy >= 0
+            }
+
         guard let location =
-                locations
-                    .filter {
-                        $0.horizontalAccuracy >= 0
-                    }
-                    .min {
+                validLocations.min(
+                    by: {
                         $0.horizontalAccuracy <
                             $1.horizontalAccuracy
                     }
+                )
         else {
             return
         }
