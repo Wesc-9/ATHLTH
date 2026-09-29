@@ -86,13 +86,6 @@ struct PublicTrailRecord: Codable, Identifiable, Hashable {
     }
 }
 
-private struct PublicTrailDiscoveryRequest:
-    Encodable {
-    let latitude: Double
-    let longitude: Double
-    let radiusKilometers: Double
-}
-
 struct PublicTrailDiscoveryResponse:
     Decodable {
     let trails: [PublicTrailRecord]
