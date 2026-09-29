@@ -2155,6 +2155,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         priority: ATHLTHGuidancePriority
     ) {
         if delivery.usesHaptics,
+           liveSurfaceConfiguration
+                .hapticsEnabled,
            guidancePriorityGate
             .allowsHaptic(
                 for: priority
@@ -2163,7 +2165,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 .play(haptic)
         }
 
-        if delivery.usesVoice {
+        if delivery.usesVoice,
+           liveSurfaceConfiguration
+                .audioAlertsEnabled {
             speak(
                 coachPhrase(
                     english: english,
