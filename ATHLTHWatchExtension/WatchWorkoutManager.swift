@@ -2474,6 +2474,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         0
                     )
                 },
+            workoutDisplayTitle:
+                structuredRunningWorkout?.title ??
+                plannedRoute?.title ??
+                kind.title,
             currentPaceSecondsPerKilometer:
                 currentPaceSecondsPerKilometer,
             routeRemainingMeters:
