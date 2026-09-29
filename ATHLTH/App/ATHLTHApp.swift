@@ -19,6 +19,7 @@ struct ATHLTHApp: App {
     @StateObject private var calendarSync = AppleCalendarSyncStore()
     @StateObject private var challengeStore = ChallengeStore()
     @StateObject private var social = SocialStore()
+    @StateObject private var realtime = ATHLTHRealtimeStore()
     @StateObject private var messaging = MessagingStore()
     @StateObject private var communityEvents = CommunityEventStore()
     @StateObject private var officialWeeklyChallenges = OfficialWeeklyChallengeStore()
@@ -56,6 +57,7 @@ struct ATHLTHApp: App {
                 .environmentObject(calendarSync)
                 .environmentObject(challengeStore)
                 .environmentObject(social)
+                .environmentObject(realtime)
                 .environmentObject(messaging)
                 .environmentObject(communityEvents)
                 .environmentObject(officialWeeklyChallenges)
@@ -142,11 +144,14 @@ struct AppRootView: View {
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var officialWeeklyChallenges: OfficialWeeklyChallengeStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var communityEvents: CommunityEventStore
     @EnvironmentObject private var communityGroups: CommunityGroupStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var trophies: TrophyStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
 
     @State private var authCallbackError: String?
     @State private var startupAuthenticationResolved = false
@@ -212,6 +217,12 @@ struct AppRootView: View {
                     messages,
                     gearRefresh,
                     calendarRefresh
+                )
+
+                await realtime.configureOnlinePresence(
+                    userID: appSession.profile.userID,
+                    enabled: settings.shareOnlineStatus,
+                    appIsActive: scenePhase == .active
                 )
             }
 
@@ -293,6 +304,21 @@ struct AppRootView: View {
                     await trainingBackups.backUp(
                         userID: userID
                     )
+                }
+            }
+
+            if appSession.signedIn {
+                let userID = appSession.profile.userID
+                Task {
+                    await realtime.configureOnlinePresence(
+                        userID: userID,
+                        enabled: settings.shareOnlineStatus,
+                        appIsActive: phase == .active
+                    )
+                }
+            } else if phase != .active {
+                Task {
+                    await realtime.stopOnlinePresence()
                 }
             }
 
@@ -712,6 +738,58 @@ struct AppRootView: View {
                 )
             }
         }
+        .onChange(of: settings.shareOnlineStatus) { _, enabled in
+            guard appSession.signedIn else {
+                return
+            }
+
+            let userID = appSession.profile.userID
+            Task {
+                await realtime.configureOnlinePresence(
+                    userID: userID,
+                    enabled: enabled,
+                    appIsActive: scenePhase == .active
+                )
+            }
+        }
+        .onChange(of: settings.shareLiveWorkoutLocation) { _, enabled in
+            guard !enabled else { return }
+
+            Task {
+                await realtime.endLiveSharing()
+            }
+        }
+        .onChange(of: workoutMirroring.snapshot) { _, snapshot in
+            guard appSession.signedIn,
+                  let snapshot
+            else {
+                return
+            }
+
+            ghostRace.update(
+                with: snapshot
+            )
+
+            let userID = appSession.profile.userID
+            let shareLocation =
+                settings.shareLiveWorkoutLocation
+            let audience =
+                settings.liveWorkoutAudience
+            let ghostReferenceID =
+                ghostRace.reference?
+                    .sourceWorkoutID
+
+            Task {
+                await realtime.handleMirroredWorkout(
+                    snapshot,
+                    userID: userID,
+                    shareLocation: shareLocation,
+                    audience: audience,
+                    ghostReferenceID:
+                        ghostReferenceID
+                )
+            }
+        }
         .onChange(of: settings.workoutRemindersEnabled) { _, _ in
             Task { await syncPushPreferences() }
         }
@@ -741,6 +819,19 @@ struct AppRootView: View {
             strengthWorkout.switchAccount(userID)
             exerciseLibrary.switchAccount(userID)
             runningWorkoutLibrary.switchAccount(userID)
+
+            Task {
+                if let userID {
+                    await realtime.configureOnlinePresence(
+                        userID: userID,
+                        enabled: settings.shareOnlineStatus,
+                        appIsActive: scenePhase == .active
+                    )
+                    await realtime.refreshLiveSessions()
+                } else {
+                    await realtime.shutdown()
+                }
+            }
         }
         .task(id: appSession.signedIn ? appSession.profile.userID : nil) {
             guard appSession.signedIn else { return }
@@ -1136,6 +1227,15 @@ struct AppRootView: View {
             }
             settings.shareTrainingPresence =
                 privacy.shareTrainingPresence
+            settings.shareOnlineStatus =
+                privacy.shareOnlineStatus
+            settings.shareLiveWorkoutLocation =
+                privacy.shareLiveWorkoutLocation
+            settings.liveWorkoutAudience =
+                LiveWorkoutAudience(
+                    rawValue:
+                        privacy.liveWorkoutAudience
+                ) ?? .mutuals
         }
 
         if social.privacy?.shareTrainingPresence == true {
@@ -1163,6 +1263,14 @@ struct AppRootView: View {
                 settings.profileVisibility = visibility
             }
             settings.shareTrainingPresence = privacy.shareTrainingPresence
+            settings.shareOnlineStatus = privacy.shareOnlineStatus
+            settings.shareLiveWorkoutLocation =
+                privacy.shareLiveWorkoutLocation
+            settings.liveWorkoutAudience =
+                LiveWorkoutAudience(
+                    rawValue:
+                        privacy.liveWorkoutAudience
+                ) ?? .mutuals
         }
 
         if social.privacy?.shareTrainingPresence == true {
