@@ -300,6 +300,8 @@ struct HomeActivitySection: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
+    @ObservedObject private var activityVisualSettings =
+        ActivityCenterVisualSettings.shared
 
     @State private var showingPublish = false
     @State private var selectedPublishWorkoutID: UUID?
@@ -355,9 +357,17 @@ struct HomeActivitySection: View {
     }
 
     private var detailLoadKey: String {
-        featuredWorkouts
-            .map(\.id.uuidString)
-            .joined(separator: "-")
+        let workoutsKey =
+            featuredWorkouts
+                .map(\.id.uuidString)
+                .joined(separator: "-")
+
+        return workoutsKey +
+            "-ai-" +
+            String(
+                activityVisualSettings
+                    .aiWorkoutHeroEnabled
+            )
     }
 
     var body: some View {
@@ -460,7 +470,10 @@ struct HomeActivitySection: View {
                             heroRecipe:
                                 workoutHeroRecipes[workout.id],
                             heroImageURL:
-                                workoutHeroImageURLs[workout.id],
+                                activityVisualSettings
+                                    .aiWorkoutHeroEnabled
+                                    ? workoutHeroImageURLs[workout.id]
+                                    : nil,
                             aiInsight:
                                 workoutAIInsights[workout.id],
                             isAIInsightLoading:
@@ -546,8 +559,10 @@ struct HomeActivitySection: View {
             )
         }
         .task(id: detailLoadKey) {
-            // Keep Home responsive: render the workout visual first,
-            // then enrich the card with social state and Coach data.
+            // Route Ribbon is the default visual. Refresh the
+            // remote feature flag before optionally enriching it
+            // with the AI-generated hero.
+            await activityVisualSettings.refresh()
             await loadFeaturedWorkoutDetails()
 
             async let heroDirections: Void =
@@ -677,6 +692,14 @@ struct HomeActivitySection: View {
 
     @MainActor
     private func loadWorkoutHeroRecipes() async {
+        guard activityVisualSettings
+            .aiWorkoutHeroEnabled
+        else {
+            workoutHeroRecipes.removeAll()
+            workoutHeroImageURLs.removeAll()
+            return
+        }
+
         let directionService =
             WorkoutHeroAIService()
         let imageService =
@@ -684,6 +707,12 @@ struct HomeActivitySection: View {
 
         for workout in featuredWorkouts
             where isOutdoor(workout.activity) {
+            guard activityVisualSettings
+                .aiWorkoutHeroEnabled
+            else {
+                return
+            }
+
             let detail =
                 workoutDetails[workout.id]
             let route =
@@ -701,6 +730,12 @@ struct HomeActivitySection: View {
                         elevationGainMeters: ascent,
                         routePointCount: route.count
                     )
+
+                guard activityVisualSettings
+                    .aiWorkoutHeroEnabled
+                else {
+                    return
+                }
 
                 if let recipe {
                     workoutHeroRecipes[workout.id] =
@@ -723,14 +758,20 @@ struct HomeActivitySection: View {
                         routePointCount: route.count
                     )
 
+                guard activityVisualSettings
+                    .aiWorkoutHeroEnabled
+                else {
+                    return
+                }
+
                 if let imageURL {
                     workoutHeroImageURLs[workout.id] =
                         imageURL
                 }
             } catch {
-                // Photoreal generation is optional. The cached
-                // local hero remains visible if Cloudflare is
-                // unavailable, unconfigured, or out of quota.
+                // AI generation is optional. Route Ribbon remains
+                // visible if the provider is unavailable,
+                // disabled, unconfigured, or out of quota.
             }
         }
     }
