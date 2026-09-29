@@ -2,6 +2,10 @@
 -- Live GPS remains one mutable latest row per participant; the UI-only trail is
 -- reconstructed in memory and is never persisted.
 
+alter table public.profile_social_settings
+  add column if not exists share_live_workout_heart_rate boolean
+    not null default false;
+
 alter table public.live_workout_locations
   add column if not exists heart_rate_bpm double precision
     check (
@@ -53,5 +57,87 @@ create policy social_online_presence_select_allowed
       is_online
       and updated_at > now() - interval '100 seconds'
       and private.can_view_online_status(user_id)
+    )
+  );
+
+
+-- A client may only attach live heart rate after the athlete separately opted
+-- in. This is enforced server-side in addition to the Swift client guard.
+drop policy if exists live_workout_locations_insert_participant
+  on public.live_workout_locations;
+create policy live_workout_locations_insert_participant
+  on public.live_workout_locations
+  for insert
+  to authenticated
+  with check (
+    user_id = (select auth.uid())
+    and exists (
+      select 1
+      from public.live_workout_sessions l
+      where l.id = session_id
+        and l.status in ('active','paused')
+        and (
+          l.owner_id = (select auth.uid())
+          or l.opponent_user_id = (select auth.uid())
+        )
+        and coalesce(
+          (
+            select settings.share_live_workout_location
+            from public.profile_social_settings settings
+            where settings.user_id = (select auth.uid())
+          ),
+          false
+        )
+    )
+    and (
+      heart_rate_bpm is null
+      or coalesce(
+        (
+          select settings.share_live_workout_heart_rate
+          from public.profile_social_settings settings
+          where settings.user_id = (select auth.uid())
+        ),
+        false
+      )
+    )
+  );
+
+drop policy if exists live_workout_locations_update_participant
+  on public.live_workout_locations;
+create policy live_workout_locations_update_participant
+  on public.live_workout_locations
+  for update
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (
+    user_id = (select auth.uid())
+    and exists (
+      select 1
+      from public.live_workout_sessions l
+      where l.id = session_id
+        and l.status in ('active','paused')
+        and (
+          l.owner_id = (select auth.uid())
+          or l.opponent_user_id = (select auth.uid())
+        )
+        and coalesce(
+          (
+            select settings.share_live_workout_location
+            from public.profile_social_settings settings
+            where settings.user_id = (select auth.uid())
+          ),
+          false
+        )
+    )
+    and (
+      heart_rate_bpm is null
+      or coalesce(
+        (
+          select settings.share_live_workout_heart_rate
+          from public.profile_social_settings settings
+          where settings.user_id = (select auth.uid())
+        ),
+        false
+      )
     )
   );
