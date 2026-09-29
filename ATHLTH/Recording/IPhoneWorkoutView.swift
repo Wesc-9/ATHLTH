@@ -5,6 +5,7 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var livePresence: ATHLTHLivePresenceStore
     @Environment(\.dismiss) private var dismiss
     @State private var confirmFinish = false
 
@@ -22,6 +23,18 @@ struct IPhoneWorkoutView: View {
                             LabeledContent("Distance", value: settings.measurementPreference.distance(fromKilometers: workout.distanceMeters / 1000))
                             if workout.distanceMeters >= 50 {
                                 LabeledContent("Average pace", value: String(format: "%.1f min/%@", elapsed / 60 / (workout.distanceMeters / (settings.measurementPreference == .metric ? 1000 : 1609.344)), settings.measurementPreference.distanceUnit))
+                            }
+
+                            if let delta =
+                                livePresence.liveGhostDeltaMeters(
+                                    ownDistanceMeters:
+                                        workout.distanceMeters
+                                ) {
+                                LabeledContent(
+                                    "Live Ghost",
+                                    value:
+                                        liveGhostText(delta)
+                                )
                             }
                         }
                         if workout.resumedAt == nil { Button("Resume workout") { recorder.resume() } }
@@ -64,5 +77,19 @@ struct IPhoneWorkoutView: View {
                 }
             }
         }
+    }
+
+    private func liveGhostText(
+        _ meters: Double
+    ) -> String {
+        let amount = Int(abs(meters).rounded())
+
+        if abs(meters) < 5 {
+            return "Side by side"
+        }
+
+        return meters >= 0
+            ? "You +\(amount) m"
+            : "Ghost +\(amount) m"
     }
 }
