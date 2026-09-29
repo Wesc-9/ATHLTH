@@ -753,7 +753,10 @@ struct AroundYouExploreView: View {
             .padding(.top, 10)
             .padding(.bottom, 8)
 
-            if publicTrailDiscovery.isLoading &&
+            if (
+                publicTrailDiscovery.isLoading ||
+                publicTrailDiscovery.isWarmingCache
+               ) &&
                publicTrailDiscovery.trails.isEmpty {
                 HStack(spacing: 8) {
                     ProgressView()
@@ -968,6 +971,44 @@ struct AroundYouExploreView: View {
                     selectRoute(
                         nearestTo: coordinate
                     )
+                }
+                .overlay(alignment: .topLeading) {
+                    if !publicTrailDiscovery
+                        .trails
+                        .isEmpty {
+                        HStack(spacing: 6) {
+                            Image(
+                                systemName: "map.fill"
+                            )
+                            Text("Public Trails")
+                            Text("·")
+                            Text(
+                                publicTrailDiscovery
+                                    .attribution
+                            )
+                        }
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                                .opacity(0.72)
+                        )
+                        .padding(
+                            .horizontal,
+                            9
+                        )
+                        .frame(height: 28)
+                        .background(
+                            .ultraThinMaterial,
+                            in: Capsule()
+                        )
+                        .padding(10)
+                    }
                 }
                 .overlay(alignment: .bottom) {
                     if let route = selectedRoute {
