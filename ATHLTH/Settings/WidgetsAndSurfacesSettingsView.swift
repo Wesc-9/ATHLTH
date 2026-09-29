@@ -102,17 +102,17 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 )
 
                 Toggle(
-                    "Live haptics",
+                    "Guidance haptics",
                     isOn: $liveConfiguration.hapticsEnabled
                 )
 
                 Toggle(
-                    "Live audio alerts",
+                    "Guidance voice alerts",
                     isOn: $liveConfiguration.audioAlertsEnabled
                 )
 
                 Text(
-                    "These controls apply to live workout surfaces. Workout Guidance still decides which Audio Coach, Route Guardian and Ghost messages are allowed to interrupt."
+                    "These are the same master alert controls shown under Workout Guidance. They affect Route Guardian, target and Ghost alerts on iPhone and Apple Watch; Audio Coach remains separately configurable."
                 )
                 .font(.caption2)
                 .foregroundStyle(ATHLTHTheme.mutedText)
