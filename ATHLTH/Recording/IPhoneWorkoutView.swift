@@ -163,5 +163,4 @@ struct IPhoneWorkoutView: View {
                 workout.elapsed(at: Date())
         )
     }
-    }
 }
