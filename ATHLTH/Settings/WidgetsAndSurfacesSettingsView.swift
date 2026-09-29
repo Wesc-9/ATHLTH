@@ -101,6 +101,22 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                     isOn: $liveConfiguration.smartPriorityEnabled
                 )
 
+                Toggle(
+                    "Live haptics",
+                    isOn: $liveConfiguration.hapticsEnabled
+                )
+
+                Toggle(
+                    "Live audio alerts",
+                    isOn: $liveConfiguration.audioAlertsEnabled
+                )
+
+                Text(
+                    "These controls apply to live workout surfaces. Workout Guidance still decides which Audio Coach, Route Guardian and Ghost messages are allowed to interrupt."
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
                 Divider()
 
                 ForEach(ATHLTHLiveWorkoutFeature.allCases) { feature in
