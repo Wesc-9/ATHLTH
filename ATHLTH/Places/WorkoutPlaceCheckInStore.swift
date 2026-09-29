@@ -515,13 +515,20 @@ final class WorkoutPlaceCheckInStore:
 
         for placeID in
             frequentPlaceIDs(limit: 4) {
-            var place =
+            var place:
+                WorkoutPlacePresentation?
+
+            if let cached =
                 resolvedPlaces[
                     placeID
-                ] ??
-                await Self.resolve(
-                    placeID: placeID
-                )
+                ] {
+                place = cached
+            } else {
+                place =
+                    await Self.resolve(
+                        placeID: placeID
+                    )
+            }
 
             if let location,
                let existing = place {
