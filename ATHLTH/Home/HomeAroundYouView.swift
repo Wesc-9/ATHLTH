@@ -693,13 +693,17 @@ struct AroundYouExploreView: View {
 
     @StateObject private var routeAttempts = RouteAttemptStore()
     @StateObject private var publicTrails = PublicTrailDiscoveryStore()
+    @StateObject private var applePlaces = ApplePlaceDiscoveryStore()
 
     @State private var filter: AroundYouFilter = .all
     @State private var trailMode = false
+    @State private var placesMode = false
+    @State private var placeFilter: ApplePlaceFilter = .all
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var hasCenteredOnUser = false
     @State private var selectedRoute: TrainingRoute?
     @State private var selectedTrail: PublicTrailRecord?
+    @State private var selectedApplePlace: AppleMapPlace?
     @State private var routeActionMessage: String?
     @State private var routeActionError: String?
     @State private var startingRoute = false
@@ -753,6 +757,42 @@ struct AroundYouExploreView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Close Trail Mode")
+                } else if placesMode {
+                    Picker(
+                        "Places",
+                        selection: $placeFilter
+                    ) {
+                        ForEach(
+                            ApplePlaceFilter.allCases
+                        ) { option in
+                            Text(option.rawValue)
+                                .tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if applePlaces.isLoading &&
+                        applePlaces.places.isEmpty {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            placesMode = false
+                            selectedApplePlace = nil
+                        }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption.bold())
+                            .frame(width: 30, height: 30)
+                            .background(
+                                Color.primary.opacity(0.06),
+                                in: Circle()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close Places")
                 } else {
                     Picker("Map filter", selection: $filter) {
                         ForEach(AroundYouFilter.allCases) { option in
@@ -761,23 +801,47 @@ struct AroundYouExploreView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            trailMode = true
-                            selectedRoute = nil
+                    HStack(spacing: 6) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                trailMode = true
+                                placesMode = false
+                                selectedRoute = nil
+                                selectedApplePlace = nil
+                            }
+                        } label: {
+                            Image(systemName: "mountain.2.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 32)
+                                .background(
+                                    ATHLTHTheme.accentDeep,
+                                    in: Capsule()
+                                )
                         }
-                    } label: {
-                        Image(systemName: "mountain.2.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 38, height: 32)
-                            .background(
-                                ATHLTHTheme.accentDeep,
-                                in: Capsule()
-                            )
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open Trail Mode")
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                placesMode = true
+                                trailMode = false
+                                selectedRoute = nil
+                                selectedTrail = nil
+                            }
+                        } label: {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 32)
+                                .background(
+                                    ATHLTHTheme.premiumGold,
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open Places")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open Trail Mode")
                 }
             }
             .padding(.horizontal, 16)
@@ -813,7 +877,65 @@ struct AroundYouExploreView: View {
                         }
                     }
 
+                    if placesMode {
+                        ForEach(
+                            Array(
+                                applePlaces
+                                    .filtered(by: placeFilter)
+                                    .prefix(16)
+                            )
+                        ) { place in
+                            Annotation(
+                                place.name,
+                                coordinate: place.coordinate
+                            ) {
+                                Button {
+                                    selectedApplePlace = place
+                                } label: {
+                                    Image(
+                                        systemName:
+                                            place.kind.systemImage
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 14,
+                                            weight: .bold
+                                        )
+                                    )
+                                    .foregroundStyle(.white)
+                                    .frame(
+                                        width: 34,
+                                        height: 34
+                                    )
+                                    .background(
+                                        place.kind == .fitnessCenter
+                                            ? ATHLTHTheme.accentDeep
+                                            : ATHLTHTheme.vitality,
+                                        in: Circle()
+                                    )
+                                    .overlay {
+                                        Circle()
+                                            .stroke(
+                                                .white,
+                                                lineWidth: 2
+                                            )
+                                    }
+                                    .shadow(
+                                        color: .black.opacity(0.14),
+                                        radius: 5,
+                                        y: 2
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(
+                                    "Open \(place.name)"
+                                )
+                            }
+                        }
+                    }
+
                     if !trailMode &&
+                        !placesMode &&
                         (filter == .all || filter == .routes) {
                         ForEach(nearbyRoutes.prefix(25)) { route in
                             let isSelected =
@@ -883,6 +1005,7 @@ struct AroundYouExploreView: View {
                     }
 
                     if !trailMode &&
+                        !placesMode &&
                         (filter == .all || filter == .events) {
                         ForEach(nearbyEvents.prefix(30)) { item in
                             if let coordinate =
@@ -901,6 +1024,7 @@ struct AroundYouExploreView: View {
                     }
 
                     if !trailMode &&
+                        !placesMode &&
                         (filter == .all || filter == .challenges) {
                         ForEach(nearbyChallenges.prefix(30)) { challenge in
                             if let coordinate =
@@ -996,6 +1120,8 @@ struct AroundYouExploreView: View {
                             publicTrails.nearestTrail(
                                 to: coordinate
                             )
+                    } else if placesMode {
+                        selectedApplePlace = nil
                     } else {
                         selectRoute(
                             nearestTo: coordinate
@@ -1024,27 +1150,34 @@ struct AroundYouExploreView: View {
                 .onMapCameraChange(
                     frequency: .onEnd
                 ) { context in
-                    guard trailMode else {
-                        return
-                    }
+                    if trailMode {
+                        let radius =
+                            min(
+                                max(
+                                    context.region.span.latitudeDelta *
+                                        111 / 2,
+                                    3
+                                ),
+                                20
+                            )
 
-                    let radius =
-                        min(
-                            max(
-                                context.region.span.latitudeDelta *
-                                    111 / 2,
-                                3
-                            ),
-                            20
-                        )
+                        Task {
+                            await publicTrails.refresh(
+                                center:
+                                    context.region.center,
+                                radiusKilometers:
+                                    radius
+                            )
+                        }
+                    } else if placesMode {
+                        let region =
+                            context.region
 
-                    Task {
-                        await publicTrails.refresh(
-                            center:
-                                context.region.center,
-                            radiusKilometers:
-                                radius
-                        )
+                        Task {
+                            await applePlaces.refresh(
+                                region: region
+                            )
+                        }
                     }
                 }
             }
@@ -1113,6 +1246,12 @@ struct AroundYouExploreView: View {
                 trail: trail
             )
         }
+        .sheet(item: $selectedApplePlace) { place in
+            AppleMapPlaceDetailView(
+                place: place,
+                userLocation: locationStore.location
+            )
+        }
         .task {
             async let routesRefresh: Void =
                 routeDiscovery.refresh()
@@ -1134,6 +1273,25 @@ struct AroundYouExploreView: View {
             await publicTrails.refresh(
                 center: location.coordinate,
                 radiusKilometers: 12
+            )
+        }
+        .task(id: placesMode) {
+            guard placesMode,
+                  let location =
+                    locationStore.location
+            else {
+                return
+            }
+
+            let region =
+                MKCoordinateRegion(
+                    center: location.coordinate,
+                    latitudinalMeters: 14_000,
+                    longitudinalMeters: 14_000
+                )
+
+            await applePlaces.refresh(
+                region: region
             )
         }
         .task(id: selectedRoute?.id) {
@@ -1167,6 +1325,23 @@ struct AroundYouExploreView: View {
                     )
                 }
             }
+
+            if placesMode,
+               let location =
+                    locationStore.location {
+                let region =
+                    MKCoordinateRegion(
+                        center: location.coordinate,
+                        latitudinalMeters: 14_000,
+                        longitudinalMeters: 14_000
+                    )
+
+                Task {
+                    await applePlaces.refresh(
+                        region: region
+                    )
+                }
+            }
         }
         .onChange(of: filter) { _, _ in
             withAnimation(.easeInOut(duration: 0.18)) {
@@ -1176,8 +1351,22 @@ struct AroundYouExploreView: View {
         .onChange(of: trailMode) { _, enabled in
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedRoute = nil
-                if !enabled {
+                if enabled {
+                    placesMode = false
+                    selectedApplePlace = nil
+                } else {
                     selectedTrail = nil
+                }
+            }
+        }
+        .onChange(of: placesMode) { _, enabled in
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedRoute = nil
+                if enabled {
+                    trailMode = false
+                    selectedTrail = nil
+                } else {
+                    selectedApplePlace = nil
                 }
             }
         }
