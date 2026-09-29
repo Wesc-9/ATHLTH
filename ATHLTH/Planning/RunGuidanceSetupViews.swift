@@ -71,6 +71,7 @@ struct GhostQuickStartDraft {
     var enabled = false
     var targetTimeText = ""
     var updatesEnabled = true
+    private var loadedRouteID: UUID?
 
     @MainActor
     mutating func load(
@@ -81,11 +82,19 @@ struct GhostQuickStartDraft {
             settings
                 .ghostRaceAudioEnabled
 
-        guard targetTimeText.isEmpty,
-              let route
+        guard let route else {
+            loadedRouteID = nil
+            targetTimeText = ""
+            enabled = false
+            return
+        }
+
+        guard loadedRouteID != route.id
         else {
             return
         }
+
+        loadedRouteID = route.id
 
         let seconds =
             route
