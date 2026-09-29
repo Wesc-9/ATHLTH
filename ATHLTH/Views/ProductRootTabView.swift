@@ -323,7 +323,7 @@ struct ATHLTHHomeView: View {
                 LazyVStack(spacing: 18) {
                     homeTodayCard
 
-                    HomeActivitySection()
+                    HomeActivityCenterV2()
 
                     HomeGettingStartedCard(
                         hasPlan: session.activePlan != nil,
