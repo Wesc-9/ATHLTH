@@ -1040,7 +1040,7 @@ struct RunQuickStartSheet: View {
 
         if ghostDraft.enabled,
            guidanceRoute != nil {
-            parts.append("Ghost")
+            parts.append("Ghost Updates")
         }
 
         return parts.isEmpty
@@ -1715,7 +1715,7 @@ struct AudioCoachSetupCard: View {
                     }
 
                     Text(
-                        "Choose when Apple Watch speaks and exactly what it tells you."
+                        "Choose when iPhone or Apple Watch speaks and exactly what it tells you."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
