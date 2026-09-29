@@ -50,6 +50,15 @@ struct WorkoutRouteHealthSegment: Codable, Hashable {
     let paceSecondsPerKilometer: Double?
 }
 
+struct WorkoutStrengthExerciseContext: Codable, Hashable {
+    let name: String
+    let completedSets: Int
+    let totalReps: Int?
+    let volumeKilograms: Double?
+    let primaryMuscles: [String]
+    let secondaryMuscles: [String]
+}
+
 struct WorkoutAIInsightContext: Codable, Hashable {
     let activity: String
     let durationSeconds: Double
@@ -66,6 +75,11 @@ struct WorkoutAIInsightContext: Codable, Hashable {
     let averageRunningVerticalOscillationCentimeters: Double?
     let averageRunningGroundContactTimeMilliseconds: Double?
     let segments: [WorkoutRouteHealthSegment]
+    let strengthTotalSets: Int? = nil
+    let strengthTotalReps: Int? = nil
+    let strengthTotalVolumeKilograms: Double? = nil
+    let strengthMuscleFocus: [String]? = nil
+    let strengthExercises: [WorkoutStrengthExerciseContext]? = nil
 }
 
 struct WorkoutVisualRecipe: Codable, Hashable {
