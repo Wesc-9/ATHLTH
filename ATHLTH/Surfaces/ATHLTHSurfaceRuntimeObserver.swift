@@ -11,6 +11,8 @@ struct ATHLTHSurfaceRuntimeObserver: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var realtime:
         ATHLTHRealtimeSocialStore
+    @EnvironmentObject private var watchConnection:
+        AppleWatchConnectionStore
 
     var body: some View {
         Color.clear
@@ -81,6 +83,65 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                     workoutMirroring.snapshot
                 )
         )
+
+        syncLiveGhostWatchContext()
+    }
+
+    private func syncLiveGhostWatchContext() {
+        var context =
+            ATHLTHLiveWorkoutContextStore
+                .load()
+
+        let nextLiveGhost:
+            ATHLTHLiveGhostContext? = {
+            guard ghostRace.reference == nil,
+                  let snapshot =
+                    workoutMirroring.snapshot,
+                  snapshot.kind == .running,
+                  let selectedSession =
+                    realtime
+                        .selectedLiveGhostSession,
+                  let comparison =
+                    realtime
+                        .liveGhostComparison(
+                            ownDistanceMeters:
+                                snapshot
+                                    .distanceMeters,
+                            ownElapsedSeconds:
+                                snapshot
+                                    .elapsedTime
+                        )
+            else {
+                return nil
+            }
+
+            return ATHLTHLiveGhostContext(
+                title:
+                    "Live · \(selectedSession.title)",
+                distanceDeltaMeters:
+                    comparison
+                        .signedDistanceMeters,
+                estimatedTimeDeltaSeconds:
+                    comparison
+                        .estimatedTimeDeltaSeconds,
+                updatedAt:
+                    comparison.updatedAt
+            )
+        }()
+
+        guard context.liveGhost !=
+                nextLiveGhost
+        else {
+            return
+        }
+
+        context.liveGhost =
+            nextLiveGhost
+
+        watchConnection
+            .sendLiveSurfaceContext(
+                context
+            )
     }
 
     private func enrichedWorkoutSnapshot(
