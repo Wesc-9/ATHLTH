@@ -438,6 +438,10 @@ struct HomeAroundYouSection: View {
                 activeSearchCenter = location
             }
 
+            if activeSearchCenter == nil {
+                activeSearchCenter = location
+            }
+
             await publicTrailDiscovery.refresh(
                 near: location
             )
@@ -814,7 +818,7 @@ struct AroundYouExploreView: View {
                     }
 
                     if filter == .all || filter == .routes {
-                        ForEach(nearbyRoutes.prefix(25)) { route in
+                        ForEach(nearbyRoutes.prefix(35)) { route in
                             let isSelected =
                                 selectedRoute?.id == route.id
                             let isDimmed =
@@ -1171,7 +1175,7 @@ struct AroundYouExploreView: View {
         )
 
         let candidate = nearbyRoutes
-            .prefix(25)
+            .prefix(35)
             .compactMap {
                 route ->
                     (TrainingRoute, CLLocationDistance)?
@@ -1415,18 +1419,33 @@ struct AroundYouExploreView: View {
                 if route.ownerID !=
                     session.profile.userID {
                     Button {
-                        if !saved {
+                        if saved {
+                            if let savedRoute =
+                                savedRouteCopy(
+                                    for: route
+                                ) {
+                                session.deleteSavedRoute(
+                                    savedRoute.id
+                                )
+                                routeActionMessage =
+                                    "Route removed from My Routes."
+                            }
+                        } else {
                             session.saveSharedRoute(
                                 route,
-                                sourceOwnerID: route.ownerID,
-                                sourceRouteID: route.id
+                                sourceOwnerID:
+                                    route.ownerID,
+                                sourceRouteID:
+                                    route.id
                             )
                             routeActionMessage =
                                 "Route saved to My Routes."
                         }
                     } label: {
                         Label(
-                            saved ? "Saved" : "Save",
+                            saved
+                                ? "Saved"
+                                : "Save",
                             systemImage:
                                 saved
                                     ? "bookmark.fill"
@@ -1437,7 +1456,11 @@ struct AroundYouExploreView: View {
                         .frame(height: 38)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(saved)
+                    .tint(
+                        saved
+                            ? ATHLTHTheme.vitality
+                            : ATHLTHTheme.accent
+                    )
                 }
 
                 if settings.trainingDeviceProvider ==
@@ -1726,6 +1749,15 @@ struct AroundYouExploreView: View {
         }
 
         return routeAttempts.attempts.count
+    }
+
+    private func savedRouteCopy(
+        for route: TrainingRoute
+    ) -> TrainingRoute? {
+        session.savedRoutes.first {
+            $0.id == route.id ||
+            $0.sharedSourceRouteID == route.id
+        }
     }
 
     private func isRouteSaved(
