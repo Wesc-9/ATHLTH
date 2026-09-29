@@ -197,3 +197,102 @@ extension LiveWorkoutSurfaceTests {
     }
 }
 
+extension LiveWorkoutSurfaceTests {
+    func testGuidancePriorityDropsRoutineDuringQuietPeriod() {
+        var gate = ATHLTHGuidancePriorityGate()
+        let now = Date()
+
+        let critical =
+            gate.voiceDecision(
+                for: .routeCritical,
+                isSpeaking: false,
+                quietPeriodSeconds: 10,
+                now: now
+            )
+        XCTAssertEqual(
+            critical,
+            .deliver
+        )
+
+        gate.voiceDidFinish()
+
+        let routine =
+            gate.voiceDecision(
+                for: .routineCoach,
+                isSpeaking: false,
+                quietPeriodSeconds: 10,
+                now:
+                    now.addingTimeInterval(5)
+            )
+        XCTAssertEqual(
+            routine,
+            .drop
+        )
+
+        let later =
+            gate.voiceDecision(
+                for: .routineCoach,
+                isSpeaking: false,
+                quietPeriodSeconds: 10,
+                now:
+                    now.addingTimeInterval(11)
+            )
+        XCTAssertEqual(
+            later,
+            .deliver
+        )
+    }
+
+    func testGuidancePriorityLetsCriticalInterruptGhost() {
+        var gate = ATHLTHGuidancePriorityGate()
+        let now = Date()
+
+        XCTAssertEqual(
+            gate.voiceDecision(
+                for: .ghostPeriodic,
+                isSpeaking: false,
+                quietPeriodSeconds: 10,
+                now: now
+            ),
+            .deliver
+        )
+
+        XCTAssertEqual(
+            gate.voiceDecision(
+                for: .routeCritical,
+                isSpeaking: true,
+                quietPeriodSeconds: 10,
+                now:
+                    now.addingTimeInterval(1)
+            ),
+            .interruptAndDeliver
+        )
+    }
+
+    func testGuidancePriorityDoesNotLetGhostInterruptRouteGuardian() {
+        var gate = ATHLTHGuidancePriorityGate()
+        let now = Date()
+
+        XCTAssertEqual(
+            gate.voiceDecision(
+                for: .routeCritical,
+                isSpeaking: false,
+                quietPeriodSeconds: 10,
+                now: now
+            ),
+            .deliver
+        )
+
+        XCTAssertEqual(
+            gate.voiceDecision(
+                for: .ghostImportant,
+                isSpeaking: true,
+                quietPeriodSeconds: 10,
+                now:
+                    now.addingTimeInterval(1)
+            ),
+            .drop
+        )
+    }
+}
+
