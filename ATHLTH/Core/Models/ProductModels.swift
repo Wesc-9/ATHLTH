@@ -286,6 +286,9 @@ struct ExerciseSnapshot: Codable, Hashable {
     var name: String
     var instructions: [String]
     var primaryMuscles: [String]
+    // Optional for backwards compatibility with workout logs created
+    // before secondary-muscle metadata was preserved in snapshots.
+    var secondaryMuscles: [String]? = nil
     var equipment: [String]
     var imageURL: URL?
     var videoURL: URL? = nil
@@ -309,6 +312,7 @@ struct Exercise: Identifiable, Codable, Hashable {
             name: name,
             instructions: instructions,
             primaryMuscles: primaryMuscles,
+            secondaryMuscles: secondaryMuscles,
             equipment: equipment,
             imageURL: imageURL,
             videoURL: videoURL
