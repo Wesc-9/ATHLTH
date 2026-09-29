@@ -1453,8 +1453,7 @@ struct RouteDetailView: View {
                     .controlSize(.large)
                     .disabled(
                         startingGhostAttemptID != nil ||
-                        settings.trainingDeviceProvider != .appleWatch ||
-                        !watchConnection.isReady
+                        phoneWorkout.active != nil
                     )
                 }
 
@@ -2025,11 +2024,18 @@ struct RouteDetailView: View {
     private func startGhostRace(
         attempt: RouteAttemptRecord
     ) async {
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady
-        else {
+        let captureDevice:
+            WorkoutCaptureDevice =
+                settings.trainingDeviceProvider ==
+                    .appleWatch &&
+                watchConnection.isReady
+                    ? .appleWatch
+                    : .iPhone
+
+        if captureDevice == .iPhone,
+           phoneWorkout.active != nil {
             watchError =
-                "Connect Apple Watch before starting a Ghost Race."
+                "Finish the active iPhone workout before starting Ghost Race."
             return
         }
 
@@ -2046,6 +2052,9 @@ struct RouteDetailView: View {
                 ownerID: session.profile.userID,
                 ghostRace: ghostRace,
                 watchConnection: watchConnection,
+                phoneWorkout: phoneWorkout,
+                captureDevice:
+                    captureDevice,
                 settings: settings
             )
         } catch {
