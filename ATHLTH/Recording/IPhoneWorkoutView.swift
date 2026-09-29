@@ -9,6 +9,9 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.dismiss) private var dismiss
     @State private var confirmFinish = false
+    @State private var followMe = true
+    @State private var routeCamera:
+        MapCameraPosition = .automatic
 
     var body: some View {
         NavigationStack {
@@ -48,6 +51,244 @@ struct IPhoneWorkoutView: View {
                         .disabled(recorder.saving)
                     }
 
+                    if workout.plannedRouteTitle != nil {
+                        Section("Route Guardian") {
+                            HStack {
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        workout
+                                            .plannedRouteTitle ??
+                                        "Route"
+                                    )
+                                    .font(
+                                        .headline
+                                    )
+
+                                    if let remaining =
+                                        workout
+                                            .routeRemainingMeters {
+                                        Text(
+                                            routeDistanceText(
+                                                remaining
+                                            ) +
+                                            " remaining"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+                                }
+
+                                Spacer()
+
+                                if let progress =
+                                    workout
+                                        .routeProgressPercent {
+                                    Text(
+                                        "\(Int(progress.rounded()))%"
+                                    )
+                                    .font(
+                                        .title3
+                                            .weight(.bold)
+                                    )
+                                    .monospacedDigit()
+                                    .foregroundStyle(
+                                        ATHLTHTheme.vitality
+                                    )
+                                }
+                            }
+
+                            if let progress =
+                                workout
+                                    .routeProgressPercent {
+                                ProgressView(
+                                    value:
+                                        min(
+                                            max(
+                                                progress,
+                                                0
+                                            ),
+                                            100
+                                        ),
+                                    total: 100
+                                )
+                                .tint(
+                                    ATHLTHTheme.vitality
+                                )
+                            }
+
+                            if let deviation =
+                                workout
+                                    .routeDeviationMeters {
+                                let threshold =
+                                    workout
+                                        .routeAlertConfiguration?
+                                        .deviationMeters ??
+                                    80
+                                Label(
+                                    deviation > threshold
+                                        ? "\(Int(deviation.rounded())) m off route"
+                                        : "On route",
+                                    systemImage:
+                                        deviation > threshold
+                                            ? "exclamationmark.triangle.fill"
+                                            : "location.fill"
+                                )
+                                .foregroundStyle(
+                                    deviation > threshold
+                                        ? .orange
+                                        : ATHLTHTheme
+                                            .vitality
+                                )
+                            }
+
+                            if let bearing =
+                                workout
+                                    .routeNextBearingDegrees {
+                                HStack {
+                                    Image(
+                                        systemName:
+                                            "location.north.fill"
+                                    )
+                                    .rotationEffect(
+                                        .degrees(
+                                            bearing
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme.vitality
+                                    )
+
+                                    Text(
+                                        "Next route segment"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+                            }
+
+                            if let toStart =
+                                workout
+                                    .routeDistanceToStartMeters,
+                               toStart > 250,
+                               (
+                                    workout
+                                        .routeProgressPercent ??
+                                    0
+                               ) < 3 {
+                                Button {
+                                    openDirectionsToStart(
+                                        workout
+                                    )
+                                } label: {
+                                    Label(
+                                        routeDistanceText(
+                                            toStart
+                                        ) +
+                                        " to start · Directions",
+                                        systemImage:
+                                            "arrow.triangle.turn.up.right.diamond.fill"
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if let step =
+                        recorder.currentStructuredStep {
+                        Section("Workout step") {
+                            TimelineView(
+                                .periodic(
+                                    from: .now,
+                                    by: 1
+                                )
+                            ) { context in
+                                let progress =
+                                    recorder
+                                        .currentStructuredStepProgress(
+                                            at:
+                                                context.date
+                                        )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 8
+                                ) {
+                                    HStack {
+                                        Text(step.title)
+                                            .font(
+                                                .headline
+                                            )
+
+                                        Spacer()
+
+                                        if let active =
+                                            recorder.active,
+                                           let plan =
+                                            active
+                                                .structuredRunningWorkout {
+                                            Text(
+                                                "Step \(active.structuredStepIndex + 1) / \(plan.steps.count)"
+                                            )
+                                            .font(
+                                                .caption
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                        }
+                                    }
+
+                                    ProgressView(
+                                        value: progress
+                                    )
+                                    .tint(
+                                        ATHLTHTheme.accent
+                                    )
+
+                                    Text(
+                                        structuredRemainingText(
+                                            step: step,
+                                            workout:
+                                                workout,
+                                            date:
+                                                context.date
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+
+                                    if let next =
+                                        recorder
+                                            .nextStructuredStep {
+                                        Label(
+                                            "Next: \(next.title)",
+                                            systemImage:
+                                                "arrow.right.circle.fill"
+                                        )
+                                        .font(
+                                            .caption
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if let liveSession = realtime.currentSession,
                        realtime.isSharingLiveLocation {
                         Section("Live") {
@@ -83,11 +324,7 @@ struct IPhoneWorkoutView: View {
                                 : "Route"
                         ) {
                             Map(
-                                initialPosition: .region(
-                                    workoutMapRegion(
-                                        for: workout
-                                    )
-                                )
+                                position: $routeCamera
                             ) {
                                 if let route =
                                     workout.plannedRouteCoordinates,
@@ -124,7 +361,99 @@ struct IPhoneWorkoutView: View {
                                     )
                                 }
                             }
-                            .frame(height: 260)
+                            .frame(height: 300)
+                            .mapControls {
+                                MapCompass()
+                                MapScaleView()
+                            }
+                            .onAppear {
+                                routeCamera =
+                                    .region(
+                                        workoutMapRegion(
+                                            for: workout
+                                        )
+                                    )
+                            }
+                            .onChange(
+                                of:
+                                    recorder
+                                        .active?
+                                        .points
+                                        .count
+                            ) { _, _ in
+                                guard followMe,
+                                      let last =
+                                        recorder
+                                            .active?
+                                            .points
+                                            .last
+                                else {
+                                    return
+                                }
+
+                                routeCamera =
+                                    .region(
+                                        followRegion(
+                                            around:
+                                                last
+                                                    .location
+                                                    .coordinate
+                                        )
+                                    )
+                            }
+
+                            HStack {
+                                Button {
+                                    followMe.toggle()
+
+                                    if followMe,
+                                       let last =
+                                        recorder
+                                            .active?
+                                            .points
+                                            .last {
+                                        routeCamera =
+                                            .region(
+                                                followRegion(
+                                                    around:
+                                                        last
+                                                            .location
+                                                            .coordinate
+                                                )
+                                            )
+                                    }
+                                } label: {
+                                    Label(
+                                        followMe
+                                            ? "Following"
+                                            : "Follow me",
+                                        systemImage:
+                                            followMe
+                                                ? "location.fill"
+                                                : "location"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+
+                                Spacer()
+
+                                Button {
+                                    routeCamera =
+                                        .region(
+                                            workoutMapRegion(
+                                                for: workout
+                                            )
+                                        )
+                                    followMe = false
+                                } label: {
+                                    Label(
+                                        "Show route",
+                                        systemImage:
+                                            "map"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                            }
 
                             if let routeTitle =
                                 workout.plannedRouteTitle {
@@ -160,6 +489,57 @@ struct IPhoneWorkoutView: View {
                         }
                     }
                 }
+                if let completion =
+                    recorder.lastRouteCompletion {
+                    Section("Route complete") {
+                        HStack {
+                            completionMetric(
+                                title: "MATCH",
+                                value:
+                                    "\(Int(completion.routeMatchPercent.rounded()))%"
+                            )
+                            completionMetric(
+                                title: "AVG DEV.",
+                                value:
+                                    "\(Int(completion.averageDeviationMeters.rounded())) m"
+                            )
+                            completionMetric(
+                                title: "MAX DEV.",
+                                value:
+                                    "\(Int(completion.maxDeviationMeters.rounded())) m"
+                            )
+                        }
+
+                        if completion.personalBest {
+                            Label(
+                                "New personal best",
+                                systemImage:
+                                    "trophy.fill"
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .premiumGold
+                            )
+                        }
+
+                        Label(
+                            completion.leaderboardEligible
+                                ? "Eligible for route leaderboard"
+                                : "Route match was below leaderboard requirements",
+                            systemImage:
+                                completion.leaderboardEligible
+                                    ? "checkmark.seal.fill"
+                                    : "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            completion.leaderboardEligible
+                                ? ATHLTHTheme.vitality
+                                : .secondary
+                        )
+                    }
+                }
+
                 if let message = recorder.message { Section { Text(message).font(.footnote) } }
                 Section("Saved iPhone workouts") {
                     ForEach(recorder.history.prefix(20)) { workout in
@@ -206,6 +586,146 @@ struct IPhoneWorkoutView: View {
                 }
             }
         }
+    }
+
+    private func routeDistanceText(
+        _ meters: Double
+    ) -> String {
+        if meters >= 1_000 {
+            return String(
+                format: "%.1f km",
+                meters / 1_000
+            )
+        }
+
+        return "\(Int(meters.rounded())) m"
+    }
+
+    private func structuredRemainingText(
+        step: WatchRunningWorkoutStep,
+        workout: PhoneWorkout,
+        date: Date
+    ) -> String {
+        switch step.measure {
+        case .time:
+            guard let target =
+                step.durationSeconds
+            else {
+                return "Open step"
+            }
+
+            let used =
+                max(
+                    workout.elapsed(at: date) -
+                        workout
+                            .structuredStepStartElapsedTime,
+                    0
+                )
+            let remaining =
+                max(target - used, 0)
+
+            return
+                "\(Int(remaining.rounded())) sec remaining"
+
+        case .distance:
+            guard let target =
+                step.distanceMeters
+            else {
+                return "Open step"
+            }
+
+            let used =
+                max(
+                    workout.distanceMeters -
+                        workout
+                            .structuredStepStartDistanceMeters,
+                    0
+                )
+
+            return routeDistanceText(
+                max(target - used, 0)
+            ) + " remaining"
+
+        case .open:
+            return "Open step · advance by finishing the workout"
+        }
+    }
+
+    private func followRegion(
+        around coordinate:
+            CLLocationCoordinate2D
+    ) -> MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: coordinate,
+            span:
+                MKCoordinateSpan(
+                    latitudeDelta: 0.008,
+                    longitudeDelta: 0.008
+                )
+        )
+    }
+
+    private func openDirectionsToStart(
+        _ workout: PhoneWorkout
+    ) {
+        guard let first =
+                workout
+                    .plannedRouteCoordinates?
+                    .min(
+                        by: {
+                            $0.sequence <
+                                $1.sequence
+                        }
+                    )
+        else {
+            return
+        }
+
+        let item =
+            MKMapItem(
+                placemark:
+                    MKPlacemark(
+                        coordinate:
+                            CLLocationCoordinate2D(
+                                latitude:
+                                    first.latitude,
+                                longitude:
+                                    first.longitude
+                            )
+                    )
+            )
+
+        item.name =
+            (workout.plannedRouteTitle ??
+                "Route") +
+            " · Start"
+
+        item.openInMaps(
+            launchOptions: [
+                MKLaunchOptionsDirectionsModeKey:
+                    MKLaunchOptionsDirectionsModeWalking
+            ]
+        )
+    }
+
+    @ViewBuilder
+    private func completionMetric(
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(
+                    .subheadline
+                        .weight(.bold)
+                )
+                .monospacedDigit()
+
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func workoutMapRegion(
