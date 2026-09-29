@@ -2363,26 +2363,55 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workout: HKWorkout,
         endDate: Date
     ) {
-        let start = startedAt ?? workout.startDate
+        let start =
+            startedAt ?? workout.startDate
+        let routeCompletion =
+            routeCompletionAnalysis()
+
         let result = WatchWorkoutResult(
             id: UUID(),
             kind: kind,
             healthKitWorkoutUUID: workout.uuid,
             startedAt: start,
             endedAt: endDate,
-            duration: max(workout.duration, elapsedTime),
+            duration:
+                max(
+                    workout.duration,
+                    elapsedTime
+                ),
             activeCalories: activeCalories,
             distanceMeters: distanceMeters,
-            averageHeartRate: averageHeartRate,
+            averageHeartRate:
+                averageHeartRate,
             maxHeartRate: maxHeartRate,
-            routePointCount: routePoints.count
+            routePointCount:
+                routePoints.count,
+            routeMatchPercent:
+                routeCompletion?
+                    .routeMatchPercent,
+            routeAverageDeviationMeters:
+                routeCompletion?
+                    .averageDeviationMeters,
+            routeMaxDeviationMeters:
+                routeCompletion?
+                    .maxDeviationMeters,
+            routeLeaderboardEligible:
+                routeCompletion?
+                    .leaderboardEligible,
+            routeComparisonID:
+                plannedRoute?
+                    .comparisonRouteID ??
+                plannedRoute?.id,
+            routeTitle:
+                plannedRoute?.title
         )
 
         sendToPhone(result)
 
         publish {
             self.completedResult = result
-            self.elapsedTime = result.duration
+            self.elapsedTime =
+                result.duration
             self.state = .completed
         }
 
@@ -2395,12 +2424,54 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
 
             if self.mirroringActive,
-               let workoutSession = self.workoutSession {
+               let workoutSession =
+                    self.workoutSession {
                 try? await workoutSession
                     .stopMirroringToCompanionDevice()
                 self.mirroringActive = false
             }
         }
+    }
+
+    private func routeCompletionAnalysis()
+        -> ATHLTHRouteCompletionAnalysis?
+    {
+        guard let route = plannedRoute,
+              route.points.count >= 2,
+              routePoints.count >= 2
+        else {
+            return nil
+        }
+
+        let actual =
+            routePoints
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocation(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+        let reference =
+            route.points
+                .sorted {
+                    $0.sequence < $1.sequence
+                }
+                .map {
+                    CLLocation(
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+
+        return ATHLTHRouteCompletionAnalyzer
+            .analyze(
+                actualLocations: actual,
+                referenceLocations:
+                    reference
+            )
     }
 
     private func sendToPhone(_ result: WatchWorkoutResult) {
