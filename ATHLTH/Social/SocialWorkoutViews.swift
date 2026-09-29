@@ -4618,19 +4618,42 @@ struct WorkoutPublishView: View {
     }
 
     private var workouts: [SocialPublishableWorkout] {
-        let healthItems = health.workouts.map(SocialPublishableWorkout.init)
+        let localStrengthItems =
+            strength.workoutHistory
+                .filter(\.isFinished)
+                .map(
+                    SocialPublishableWorkout.init
+                )
+        let localStrengthIDs =
+            Set(
+                localStrengthItems
+                    .map(\.id)
+            )
 
-        let localStrengthItems = strength.workoutHistory
-            .filter {
-                $0.isFinished &&
-                $0.healthMetrics.healthKitWorkoutUUID == nil
-            }
-            .map(SocialPublishableWorkout.init)
+        let healthItems =
+            health.workouts
+                .map(
+                    SocialPublishableWorkout.init
+                )
+                .filter {
+                    !(
+                        $0.activity ==
+                            .strength &&
+                        localStrengthIDs
+                            .contains($0.id)
+                    )
+                }
 
         return Array(
-            (healthItems + localStrengthItems)
-                .sorted { $0.startDate > $1.startDate }
-                .prefix(60)
+            (
+                healthItems +
+                localStrengthItems
+            )
+            .sorted {
+                $0.startDate >
+                $1.startDate
+            }
+            .prefix(60)
         )
     }
 
