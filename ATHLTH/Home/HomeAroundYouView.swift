@@ -144,6 +144,7 @@ private struct AroundYouRouteItem: Identifiable {
     let coordinates: [RouteCoordinate]
     let ownerID: UUID
     let isMine: Bool
+    let isPublicTrail: Bool
     let trainingRoute: TrainingRoute
     let centerCoordinate: CLLocationCoordinate2D?
     let renderCoordinates: [CLLocationCoordinate2D]
@@ -157,6 +158,7 @@ private struct AroundYouRouteItem: Identifiable {
         coordinates: [RouteCoordinate],
         ownerID: UUID,
         isMine: Bool,
+        isPublicTrail: Bool = false,
         trainingRoute: TrainingRoute
     ) {
         self.id = id
@@ -166,6 +168,7 @@ private struct AroundYouRouteItem: Identifiable {
         self.coordinates = coordinates
         self.ownerID = ownerID
         self.isMine = isMine
+        self.isPublicTrail = isPublicTrail
         self.trainingRoute = trainingRoute
 
         if coordinates.isEmpty {
@@ -243,6 +246,7 @@ struct HomeAroundYouSection: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
+    @EnvironmentObject private var publicTrailDiscovery: PublicTrailDiscoveryStore
 
     @StateObject private var locationStore = HomeLocationStore()
     @State private var mapSnapshot: UIImage?
@@ -416,10 +420,25 @@ struct HomeAroundYouSection: View {
         .task {
             locationStore.start()
             await routeDiscovery.refresh()
+
+            if let location = locationStore.location {
+                await publicTrailDiscovery.refresh(
+                    near: location
+                )
+            }
+
             await refreshSnapshot()
         }
-        .onChange(of: locationStore.location?.timestamp) { _, _ in
-            Task { await refreshSnapshot() }
+        .task(id: locationStore.location?.timestamp) {
+            guard let location = locationStore.location
+            else {
+                return
+            }
+
+            await publicTrailDiscovery.refresh(
+                near: location
+            )
+            await refreshSnapshot(force: true)
         }
         .onChange(of: routeDiscovery.routes.count) { _, _ in
             Task { await refreshSnapshot(force: true) }
@@ -466,6 +485,26 @@ struct HomeAroundYouSection: View {
                 coordinates: route.coordinates,
                 ownerID: route.ownerID,
                 isMine: true,
+                trainingRoute: route
+            )
+        }
+
+        for trail in publicTrailDiscovery.trails {
+            let route = trail.trainingRoute
+
+            routesByID[route.id] = AroundYouRouteItem(
+                id: route.id,
+                title: route.title,
+                distanceKilometers:
+                    route.distanceKilometers,
+                elevationGainMeters:
+                    route.elevationGainMeters,
+                coordinates:
+                    route.coordinates,
+                ownerID:
+                    route.ownerID,
+                isMine: false,
+                isPublicTrail: true,
                 trainingRoute: route
             )
         }
@@ -684,6 +723,7 @@ struct AroundYouExploreView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var routeDiscovery: RouteDiscoveryStore
+    @EnvironmentObject private var publicTrailDiscovery: PublicTrailDiscoveryStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var challenges: ChallengeStore
 
@@ -940,6 +980,16 @@ struct AroundYouExploreView: View {
             _ = await (
                 routesRefresh,
                 eventsRefresh
+            )
+        }
+        .task(id: locationStore.location?.timestamp) {
+            guard let location = locationStore.location
+            else {
+                return
+            }
+
+            await publicTrailDiscovery.refresh(
+                near: location
             )
         }
         .task(id: selectedRoute?.id) {
