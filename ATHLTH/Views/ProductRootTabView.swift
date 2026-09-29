@@ -166,8 +166,11 @@ struct ATHLTHHomeView: View {
     @State private var homeDirectStartInProgress = false
     @State private var homeWatchTransferMessage: String?
     @State private var homeWatchTransferError: String?
+    @State private var showingGettingStartedPopup = false
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
+    @AppStorage("homeGettingStartedPopupShownV1")
+    private var homeGettingStartedPopupShown = false
 
     var body: some View {
         NavigationStack {
@@ -325,12 +328,6 @@ struct ATHLTHHomeView: View {
 
                     HomeActivityCenterV2()
 
-                    HomeGettingStartedCard(
-                        hasPlan: session.activePlan != nil,
-                        hasGoal: !goalStore.activeGoals.isEmpty,
-                        hasEditedProfile: hasCompletedProfileSetup
-                    )
-
                     if let goal = homeActiveGoal {
                         homeActiveGoalCard(goal)
                     }
@@ -453,12 +450,25 @@ struct ATHLTHHomeView: View {
                     ) {
                         onSelectTab(4)
                     }
-
-                    HomeAroundYouSection()
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
+            }
+            .sheet(
+                isPresented:
+                    $showingGettingStartedPopup
+            ) {
+                HomeGettingStartedPopupView(
+                    hasPlan:
+                        session.activePlan != nil,
+                    hasGoal:
+                        !goalStore.activeGoals.isEmpty,
+                    hasEditedProfile:
+                        hasCompletedProfileSetup
+                )
             }
             .sheet(isPresented: $showingGlobalSearch) {
                 ATHLTHGlobalSearchView()
@@ -575,6 +585,27 @@ struct ATHLTHHomeView: View {
                 }
 
                 _ = await (communityRefresh, activityRefresh)
+            }
+            .onAppear {
+                let gettingStartedComplete =
+                    hasCompletedProfileSetup &&
+                    session.activePlan != nil &&
+                    !goalStore.activeGoals.isEmpty
+
+                guard !homeGettingStartedPopupShown,
+                      !gettingStartedComplete
+                else {
+                    return
+                }
+
+                homeGettingStartedPopupShown = true
+
+                Task { @MainActor in
+                    try? await Task.sleep(
+                        for: .milliseconds(450)
+                    )
+                    showingGettingStartedPopup = true
+                }
             }
             .task {
                 // Let the Home hierarchy paint before starting refresh work.
@@ -2754,7 +2785,9 @@ struct ATHLTHTrainView: View {
                         todayContent
                     }
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
