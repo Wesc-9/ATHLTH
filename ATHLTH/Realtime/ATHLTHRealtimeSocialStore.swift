@@ -314,6 +314,15 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         }
 
         do {
+            // Best-effort physical cleanup for crashed/stale live sessions.
+            // RLS already hides expired rows; this keeps retained coordinates
+            // bounded without adding a background polling loop.
+            try? await client
+                .rpc(
+                    "cleanup_expired_live_workout_state"
+                )
+                .execute()
+
             let rows: [ATHLTHLiveWorkoutSession] =
                 try await client
                     .from("live_workout_sessions")
