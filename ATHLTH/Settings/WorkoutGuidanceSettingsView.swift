@@ -404,6 +404,21 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                             Text("150 m")
                                 .tag(150.0)
                         }
+
+                        Picker(
+                            "Important delivery",
+                            selection:
+                                $settings
+                                    .ghostRaceAudioImportantLeadChangeDelivery
+                        ) {
+                            ForEach(
+                                WatchAlertDelivery
+                                    .allCases
+                            ) { delivery in
+                                Text(delivery.title)
+                                    .tag(delivery)
+                            }
+                        }
                     }
                 }
 
