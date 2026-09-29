@@ -101,14 +101,17 @@ final class ApplePlaceDiscoveryService {
             query: "hiking trail"
         )
 
-        let combined = await (
-            gyms +
-            naturePOIs +
-            trailFeatures
-        )
+        let gymResults =
+            await gyms
+        let naturePOIResults =
+            await naturePOIs
+        let trailResults =
+            await trailFeatures
 
         return deduplicated(
-            combined,
+            gymResults +
+            naturePOIResults +
+            trailResults,
             center: region.center
         )
     }
