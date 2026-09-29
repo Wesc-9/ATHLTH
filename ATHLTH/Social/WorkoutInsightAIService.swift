@@ -118,6 +118,63 @@ final class WorkoutInsightAIService {
             )
         }
 
+        parts.append(
+            context.strengthTotalSets
+                .map(String.init) ??
+                "-"
+        )
+        parts.append(
+            context.strengthTotalReps
+                .map(String.init) ??
+                "-"
+        )
+        parts.append(
+            rounded(
+                context
+                    .strengthTotalVolumeKilograms
+            )
+        )
+
+        for muscle in
+            context.strengthMuscleFocus ??
+            [] {
+            parts.append(muscle)
+        }
+
+        for exercise in
+            context.strengthExercises ??
+            [] {
+            parts.append(exercise.name)
+            parts.append(
+                String(
+                    exercise.completedSets
+                )
+            )
+            parts.append(
+                exercise.totalReps
+                    .map(String.init) ??
+                    "-"
+            )
+            parts.append(
+                rounded(
+                    exercise
+                        .volumeKilograms
+                )
+            )
+            parts.append(
+                exercise.primaryMuscles
+                    .joined(
+                        separator: ","
+                    )
+            )
+            parts.append(
+                exercise.secondaryMuscles
+                    .joined(
+                        separator: ","
+                    )
+            )
+        }
+
         return parts.joined(
             separator: "|"
         )
