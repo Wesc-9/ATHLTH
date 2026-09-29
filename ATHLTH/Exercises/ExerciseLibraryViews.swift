@@ -167,6 +167,40 @@ struct ExerciseLibraryView: View {
                                 .padding(8)
                             }
                         }
+
+                        if selectedSection == .library,
+                           let attributionURL =
+                                URL(
+                                    string:
+                                        "https://repdb.co"
+                                ) {
+                            Link(
+                                destination:
+                                    attributionURL
+                            ) {
+                                HStack(
+                                    spacing: 5
+                                ) {
+                                    Text(
+                                        "Exercise data by RepDB"
+                                    )
+                                    Image(
+                                        systemName:
+                                            "arrow.up.right"
+                                    )
+                                }
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
+                            .padding(.top, 8)
+                            .padding(
+                                .bottom,
+                                4
+                            )
+                        }
                     }
                     .padding()
                 }
