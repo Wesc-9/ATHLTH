@@ -19,20 +19,20 @@ struct PublicTrailRecord: Codable, Identifiable, Hashable {
     let leaderboardEnabled: Bool
     let athlthVerified: Bool
     let source: String
-    let routeShape: String?
-    let surfaceSummary: String?
-    let difficulty: String?
-    let osmDescription: String?
-    let website: String?
-    let estimatedRunSeconds: TimeInterval?
-    let estimatedWalkSeconds: TimeInterval?
-    let elevationGainMeters: Double?
-    let elevationLossMeters: Double?
-    let minElevationMeters: Double?
-    let maxElevationMeters: Double?
-    let averageGradePercent: Double?
-    let maxGradePercent: Double?
-    let elevationProfile: [Double]?
+    var routeShape: String? = nil
+    var surfaceSummary: String? = nil
+    var difficulty: String? = nil
+    var osmDescription: String? = nil
+    var website: String? = nil
+    var estimatedRunSeconds: TimeInterval? = nil
+    var estimatedWalkSeconds: TimeInterval? = nil
+    var elevationGainMeters: Double? = nil
+    var elevationLossMeters: Double? = nil
+    var minElevationMeters: Double? = nil
+    var maxElevationMeters: Double? = nil
+    var averageGradePercent: Double? = nil
+    var maxGradePercent: Double? = nil
+    var elevationProfile: [Double]? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
