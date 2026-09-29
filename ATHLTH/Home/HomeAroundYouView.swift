@@ -902,13 +902,13 @@ struct AroundYouExploreView: View {
                         : nil
             )
         }
-        .background(
-            embeddedInHeroLayout
-                ? Color.clear
-                : AnyShapeStyle(
-                    ATHLTHPremiumCanvas()
-                )
-        )
+        .background {
+            if embeddedInHeroLayout {
+                Color.clear
+            } else {
+                ATHLTHPremiumCanvas()
+            }
+        }
         .navigationTitle(
             embeddedInHeroLayout
                 ? ""
