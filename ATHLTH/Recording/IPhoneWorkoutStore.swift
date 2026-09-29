@@ -230,6 +230,12 @@ final class IPhoneWorkoutStore:
                         .audioCoachConfiguration
             )
             resetRouteAlertRuntime()
+            resetGhostRuntime(
+                configuration:
+                    active
+                        .ghostAudioConfiguration
+            )
+            guidancePriorityGate.reset()
         }
 
         lastRouteCompletion =
@@ -1206,6 +1212,10 @@ final class IPhoneWorkoutStore:
         nextDistanceAnnouncementMeters = nil
         nextTimeAnnouncementSeconds = nil
         resetRouteAlertRuntime()
+        resetGhostRuntime(
+            configuration: nil
+        )
+        guidancePriorityGate.reset()
         speechSynthesizer.stopSpeaking(
             at: .immediate
         )
