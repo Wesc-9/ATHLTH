@@ -310,6 +310,7 @@ struct HomeActivitySection: View {
     @State private var loadingAIInsightIDs: Set<UUID> = []
     @State private var publishedActivities: [UUID: SocialActivityRecord] = [:]
     @State private var selectedCoachInsight: CoachInsightPresentation?
+    @State private var selectedOutdoorWorkoutID: UUID?
 
     private var ownWorkouts: [SocialPublishableWorkout] {
         let healthItems = health.workouts.map(SocialPublishableWorkout.init)
@@ -464,6 +465,10 @@ struct HomeActivitySection: View {
                                     .contains(workout.id),
                             useAIVisuals:
                                 activityCenterAIVisualsEnabled,
+                            onOpen: {
+                                selectedOutdoorWorkoutID =
+                                    workout.id
+                            },
                             onCoach: { insight in
                                 selectedCoachInsight =
                                     CoachInsightPresentation(
@@ -529,6 +534,32 @@ struct HomeActivitySection: View {
             WorkoutCoachInsightDetailView(
                 presentation: presentation
             )
+        }
+        .navigationDestination(
+            item: $selectedOutdoorWorkoutID
+        ) { workoutID in
+            if let workout =
+                featuredWorkouts.first(
+                    where: {
+                        $0.id == workoutID
+                    }
+                ) {
+                HomeActivityRunDetailView(
+                    workout: workout,
+                    initialDetail:
+                        workoutDetails[workoutID],
+                    initialAIInsight:
+                        workoutAIInsights[workoutID]
+                )
+            } else {
+                ContentUnavailableView(
+                    "Workout unavailable",
+                    systemImage: "figure.run.circle",
+                    description: Text(
+                        "The workout could not be opened."
+                    )
+                )
+            }
         }
         .sheet(
             isPresented: $showingPublish,
@@ -662,8 +693,7 @@ struct HomeActivitySection: View {
 
     @MainActor
     private func loadWorkoutAIInsights() async {
-        guard activityCenterAIVisualsEnabled,
-              session.hasPaidAccess,
+        guard session.hasPaidAccess,
               session.aiHealthDataSharingEnabled
         else {
             workoutAIInsights.removeAll()
@@ -1063,6 +1093,7 @@ private struct HomeActivityOutdoorCard: View {
     let aiInsight: WorkoutAIInsight?
     let isAIInsightLoading: Bool
     let useAIVisuals: Bool
+    let onOpen: () -> Void
     let onCoach: (WorkoutAIInsight) -> Void
     let onPost: () -> Void
 
@@ -1163,7 +1194,13 @@ private struct HomeActivityOutdoorCard: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .topLeading) {
-                mapBackground
+                Button(action: onOpen) {
+                    mapBackground
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "View workout route details"
+                )
 
                 if useAIVisuals {
                     HomeActivityScenicWash(
@@ -1708,7 +1745,8 @@ private struct HomeActivityOutdoorCard: View {
     }
 
     private var premiumRouteLegend: some View {
-        VStack(spacing: 8) {
+        Button(action: onOpen) {
+            VStack(spacing: 8) {
             HStack {
                 Label(
                     "Route Ribbon",
@@ -1775,13 +1813,18 @@ private struct HomeActivityOutdoorCard: View {
             .vertical,
             10
         )
-        .background(
-            ATHLTHTheme.cardWarm
-                .opacity(0.64),
-            in: RoundedRectangle(
-                cornerRadius: 14,
-                style: .continuous
+            .background(
+                ATHLTHTheme.cardWarm
+                    .opacity(0.64),
+                in: RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
             )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "View pace-colored route details"
         )
     }
 
