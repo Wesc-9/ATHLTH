@@ -714,9 +714,11 @@ struct IPhoneWorkoutView: View {
             let used =
                 max(
                     workout.elapsed(at: date) -
-                        workout
-                            .structuredStepStartElapsedTime ??
-                        0,
+                        (
+                            workout
+                                .structuredStepStartElapsedTime ??
+                            0
+                        ),
                     0
                 )
             let remaining =
@@ -735,9 +737,11 @@ struct IPhoneWorkoutView: View {
             let used =
                 max(
                     workout.distanceMeters -
-                        workout
-                            .structuredStepStartDistanceMeters ??
-                        0,
+                        (
+                            workout
+                                .structuredStepStartDistanceMeters ??
+                            0
+                        ),
                     0
                 )
 
