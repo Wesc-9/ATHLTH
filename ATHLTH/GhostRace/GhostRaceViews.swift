@@ -1,6 +1,48 @@
 import MapKit
 import SwiftUI
 
+private enum GhostRaceHubMode:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case live
+    case past
+    case target
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .live: return "Live"
+        case .past: return "Past runs"
+        case .target: return "Target"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .live:
+            return "Race someone now"
+        case .past:
+            return "Race a previous run"
+        case .target:
+            return "Choose your finish time"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .live:
+            return "dot.radiowaves.left.and.right"
+        case .past:
+            return "clock.arrow.circlepath"
+        case .target:
+            return "timer.circle.fill"
+        }
+    }
+}
+
 struct GhostRaceHubView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
@@ -13,6 +55,9 @@ struct GhostRaceHubView: View {
     @State private var recentRuns: [WorkoutSummary] = []
     @State private var loading = false
     @State private var startingWorkoutID: UUID?
+    @State private var liveStartingSessionID: UUID?
+    @State private var selectedMode:
+        GhostRaceHubMode = .live
     @State private var errorMessage: String?
 
     private var canStartRace: Bool {
@@ -21,17 +66,18 @@ struct GhostRaceHubView: View {
         !watchConnection.workoutLaunchInProgress
     }
 
+    private var selectedLiveSession:
+        ATHLTHLiveWorkoutSession? {
+        realtime.selectedLiveGhostSession
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 18) {
                 hero
                 modeOverview
-                liveNowSection
+                modeContent
                 audioCoachCard
-                targetGhostSection
-                pastSelfSection
-                routeSection
-                friendSection
             }
             .padding()
             .padding(.bottom, 36)
@@ -89,12 +135,12 @@ struct GhostRaceHubView: View {
             VStack(alignment: .leading, spacing: 15) {
                 HStack {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("RACE YOURSELF")
+                        Text("GHOST RACE")
                             .font(.caption2.weight(.bold))
                             .tracking(2)
                             .foregroundStyle(ATHLTHTheme.vitality)
 
-                        Text("Same roads. A faster you.")
+                        Text("One race. Three ways to chase.")
                             .font(.system(
                                 size: 30,
                                 weight: .bold,
@@ -111,7 +157,7 @@ struct GhostRaceHubView: View {
                 }
 
                 Text(
-                    "Turn a previous outdoor run into a live ghost. ATHLTH follows your position on the same route and shows who is ahead while you run."
+                    "Race someone live, chase one of your own previous runs, or create a target ghost for the exact finish time you want."
                 )
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -119,16 +165,19 @@ struct GhostRaceHubView: View {
 
                 HStack(spacing: 8) {
                     statusChip(
-                        title: "Live GPS",
-                        icon: "location.fill"
+                        title: "Live",
+                        icon:
+                            "dot.radiowaves.left.and.right"
                     )
                     statusChip(
-                        title: "Watch",
-                        icon: "applewatch"
+                        title: "Replay",
+                        icon:
+                            "clock.arrow.circlepath"
                     )
                     statusChip(
-                        title: "Past self",
-                        icon: "clock.arrow.circlepath"
+                        title: "Target",
+                        icon:
+                            "timer.circle.fill"
                     )
                 }
 
@@ -146,25 +195,303 @@ struct GhostRaceHubView: View {
     }
 
     private var modeOverview: some View {
-        HStack(spacing: 10) {
-            modeTile(
-                title: "Past self",
-                subtitle: "Replay a run",
-                icon: "person.fill.viewfinder"
-            )
-
-            modeTile(
-                title: "Target time",
-                subtitle: "Set finish goal",
-                icon: "timer.circle.fill"
-            )
-
-            modeTile(
-                title: "Friends",
-                subtitle: "Challenge",
-                icon: "person.2.fill"
-            )
+        HStack(spacing: 9) {
+            ForEach(
+                GhostRaceHubMode.allCases
+            ) { mode in
+                Button {
+                    withAnimation(
+                        .easeInOut(
+                            duration: 0.20
+                        )
+                    ) {
+                        selectedMode = mode
+                    }
+                } label: {
+                    modeTile(
+                        mode,
+                        selected:
+                            selectedMode == mode
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
+    }
+
+    @ViewBuilder
+    private var modeContent: some View {
+        switch selectedMode {
+        case .live:
+            liveModeIntro
+
+            if let selectedLiveSession {
+                selectedLiveGhostCard(
+                    selectedLiveSession
+                )
+            }
+
+            liveNowSection
+
+            liveFriendEntry
+
+        case .past:
+            pastSelfSection
+            routeSection
+            friendSection
+
+        case .target:
+            targetGhostSection
+        }
+    }
+
+    private var liveModeIntro: some View {
+        ATHLTHCard {
+            HStack(
+                alignment: .top,
+                spacing: 13
+            ) {
+                Image(
+                    systemName:
+                        "dot.radiowaves.left.and.right"
+                )
+                .font(.title2)
+                .foregroundStyle(
+                    Color.green
+                )
+                .frame(
+                    width: 48,
+                    height: 48
+                )
+                .background(
+                    Color.green
+                        .opacity(0.10),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    Text("Live Ghost")
+                        .font(.headline)
+
+                    Text(
+                        "Choose a runner who is active now. Start your own run and ATHLTH compares your live distance with theirs while you train."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+
+                    Text(
+                        "Best when both runners are using the same course and start from the same point."
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+            }
+        }
+    }
+
+    private func selectedLiveGhostCard(
+        _ liveSession:
+            ATHLTHLiveWorkoutSession
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 13
+            ) {
+                HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text("READY TO RACE")
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .tracking(1.4)
+                            .foregroundStyle(
+                                ATHLTHTheme.vitality
+                            )
+
+                        Text(
+                            liveRunnerSubtitle(
+                                liveSession
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                    }
+
+                    Spacer()
+
+                    Button {
+                        realtime.selectLiveGhost(
+                            nil
+                        )
+                    } label: {
+                        Image(
+                            systemName: "xmark"
+                        )
+                        .font(
+                            .caption
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .frame(
+                            width: 30,
+                            height: 30
+                        )
+                        .background(
+                            Color.primary
+                                .opacity(0.04),
+                            in: Circle()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button {
+                    Task {
+                        await startLiveGhost(
+                            liveSession
+                        )
+                    }
+                } label: {
+                    if liveStartingSessionID ==
+                        liveSession.id {
+                        ProgressView()
+                            .frame(
+                                maxWidth:
+                                    .infinity
+                            )
+                    } else {
+                        Label(
+                            "Start Live Ghost",
+                            systemImage:
+                                "figure.run"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                    }
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.vitality
+                )
+                .controlSize(.large)
+                .disabled(
+                    !canStartRace ||
+                    liveStartingSessionID !=
+                        nil
+                )
+
+                NavigationLink {
+                    ATHLTHLiveWorkoutMapView(
+                        session:
+                            liveSession
+                    )
+                } label: {
+                    Label(
+                        "Preview live runner",
+                        systemImage:
+                            "map.fill"
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+            }
+        }
+    }
+
+    private var liveFriendEntry: some View {
+        ATHLTHCard {
+            HStack(spacing: 12) {
+                Image(
+                    systemName:
+                        "person.2.wave.2.fill"
+                )
+                .font(.title3)
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(
+                    width: 42,
+                    height: 42
+                )
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text("Race a friend")
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+
+                    Text(
+                        "Use an existing friend Ghost challenge when you want a shared head-to-head session."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                NavigationLink {
+                    GhostFriendRaceHubView()
+                } label: {
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(.caption.bold())
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -941,6 +1268,48 @@ struct GhostRaceHubView: View {
         }
     }
 
+    @MainActor
+    private func startLiveGhost(
+        _ liveSession:
+            ATHLTHLiveWorkoutSession
+    ) async {
+        guard canStartRace else {
+            errorMessage =
+                watchRequirementText
+            return
+        }
+
+        liveStartingSessionID =
+            liveSession.id
+        defer {
+            liveStartingSessionID = nil
+        }
+
+        realtime.selectLiveGhost(
+            liveSession
+        )
+
+        do {
+            try await GhostRaceStartService
+                .startLive(
+                    title:
+                        liveSession.title,
+                    ghostRace:
+                        ghostRace,
+                    watchConnection:
+                        watchConnection,
+                    settings:
+                        settings
+                )
+        } catch {
+            realtime.selectLiveGhost(
+                nil
+            )
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
     private func loadRuns() async {
         loading = true
         defer {
@@ -1000,32 +1369,54 @@ struct GhostRaceHubView: View {
     }
 
     private func modeTile(
-        title: String,
-        subtitle: String,
-        icon: String
+        _ mode: GhostRaceHubMode,
+        selected: Bool
     ) -> some View {
         VStack(spacing: 7) {
-            Image(systemName: icon)
-                .font(.headline)
-                .foregroundStyle(ATHLTHTheme.vitality)
+            Image(
+                systemName: mode.icon
+            )
+            .font(.headline)
 
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(mode.title)
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
 
-            Text(subtitle)
+            Text(mode.subtitle)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
         }
+        .foregroundStyle(
+            selected
+                ? Color.white
+                : ATHLTHTheme.primaryText
+        )
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(
-            ATHLTHTheme.card,
+            selected
+                ? ATHLTHTheme.vitality
+                : ATHLTHTheme.card,
             in: RoundedRectangle(
                 cornerRadius: 17,
                 style: .continuous
             )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                selected
+                    ? Color.clear
+                    : ATHLTHTheme.border,
+                lineWidth: 0.8
+            )
+        }
     }
 
     private func clock(
