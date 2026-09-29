@@ -170,6 +170,11 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         pendingWalking = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
+        pendingAudioCoach = nil
+        pendingStructuredWorkout = nil
+        pendingRouteAlerts = nil
+        resetRouteRuntime()
+        lastRouteCompletion = nil
         active = userID.flatMap { AccountLocalStorage.read(PhoneWorkout.self, name: "phoneActive", userID: $0) }
         if var workout = active, workout.resumedAt != nil {
             workout.accumulatedSeconds = workout.elapsed(at: workout.lastCheckpoint)
@@ -198,14 +203,24 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
     func start(
         walking: Bool,
         route: TrainingRoute? = nil,
-        title: String? = nil
+        title: String? = nil,
+        audioCoach:
+            WatchAudioCoachConfiguration? = nil,
+        structuredWorkout:
+            WatchRunningWorkoutTransfer? = nil,
+        routeAlerts:
+            WatchRouteAlertConfiguration? = nil
     ) {
         guard accountID != nil, !saving else { return }
         showingWorkout = true
         guard active == nil else { return }
+
         pendingWalking = walking
         pendingRoute = route
         pendingWorkoutTitle = title
+        pendingAudioCoach = audioCoach
+        pendingStructuredWorkout = structuredWorkout
+        pendingRouteAlerts = routeAlerts
 
         if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
@@ -222,9 +237,24 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
         }
         let route = pendingRoute
         let workoutTitle = pendingWorkoutTitle
+        let audioCoach = pendingAudioCoach
+        let structuredWorkout =
+            pendingStructuredWorkout
+        let routeAlerts =
+            pendingRouteAlerts ?? .standard
+
         pendingWalking = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
+        pendingAudioCoach = nil
+        pendingStructuredWorkout = nil
+        pendingRouteAlerts = nil
+
+        cachePlannedRouteGeometry(route)
+        resetCoachThresholds(
+            configuration: audioCoach
+        )
+        resetRouteAlertRuntime()
 
         let now = Date()
         active = PhoneWorkout(
@@ -239,13 +269,30 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                 route?.distanceKilometers,
             plannedRouteCoordinates:
                 route?.coordinates,
-            workoutTitle: workoutTitle
+            plannedRouteSource:
+                route?.routeSource,
+            workoutTitle: workoutTitle,
+            structuredRunningWorkout:
+                structuredWorkout,
+            structuredStepIndex: 0,
+            structuredStepStartElapsedTime: 0,
+            structuredStepStartDistanceMeters: 0,
+            structuredWorkoutComplete:
+                structuredWorkout?.steps.isEmpty ?? true,
+            audioCoachConfiguration:
+                audioCoach,
+            routeAlertConfiguration:
+                routeAlerts
         )
         message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
         lastLocation = nil
         manager.allowsBackgroundLocationUpdates = true
         manager.startUpdatingLocation()
         persistActiveCheckpoint(force: true)
+        syncLiveActivity()
+        announceStructuredStepIfNeeded(
+            prefix: "Starting"
+        )
     }
 
     func pause() {
