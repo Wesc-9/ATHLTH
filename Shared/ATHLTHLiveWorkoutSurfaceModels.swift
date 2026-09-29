@@ -113,6 +113,10 @@ struct ATHLTHLiveGhostContext: Codable, Hashable {
     var distanceDeltaMeters: Double?
     var estimatedTimeDeltaSeconds: TimeInterval?
     var updatedAt: Date
+
+    // Optional so contexts written by older iPhone/Watch builds still decode.
+    var audio:
+        WatchGhostRaceAudioConfiguration? = nil
 }
 
 struct ATHLTHLiveWorkoutContext: Codable, Hashable {
