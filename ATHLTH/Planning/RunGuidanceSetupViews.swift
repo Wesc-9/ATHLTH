@@ -72,6 +72,7 @@ struct GhostQuickStartDraft {
     var targetTimeText = ""
     var updatesEnabled = true
 
+    @MainActor
     mutating func load(
         route: TrainingRoute?,
         settings: AppSettingsStore
