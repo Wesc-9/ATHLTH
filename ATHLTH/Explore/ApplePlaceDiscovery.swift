@@ -108,10 +108,21 @@ final class ApplePlaceDiscoveryService {
         let trailResults =
             await trailFeatures
 
+        let insideRegion =
+            (
+                gymResults +
+                naturePOIResults +
+                trailResults
+            )
+            .filter {
+                contains(
+                    $0.coordinate,
+                    in: region
+                )
+            }
+
         return deduplicated(
-            gymResults +
-            naturePOIResults +
-            trailResults,
+            insideRegion,
             center: region.center
         )
     }
@@ -231,6 +242,25 @@ final class ApplePlaceDiscoveryService {
             kind: kind,
             mapItem: item
         )
+    }
+
+    private func contains(
+        _ coordinate: CLLocationCoordinate2D,
+        in region: MKCoordinateRegion
+    ) -> Bool {
+        let halfLatitude =
+            region.span.latitudeDelta / 2
+        let halfLongitude =
+            region.span.longitudeDelta / 2
+
+        return coordinate.latitude >=
+            region.center.latitude - halfLatitude &&
+            coordinate.latitude <=
+            region.center.latitude + halfLatitude &&
+            coordinate.longitude >=
+            region.center.longitude - halfLongitude &&
+            coordinate.longitude <=
+            region.center.longitude + halfLongitude
     }
 
     private func deduplicated(
