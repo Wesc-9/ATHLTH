@@ -258,19 +258,18 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
         // This deliberately opens/wakes Spotify on iPhone. The Watch app does
         // not run this code and never blocks workout start waiting for Spotify.
-        appRemote.authorizeAndPlayURI(playlist.uri) { [weak self] installed in
-            Task { @MainActor in
-                guard let self else { return }
+        let installed =
+            await appRemote.authorizeAndPlayURI(
+                playlist.uri
+            )
 
-                if installed {
-                    self.activePlaylist = playlist
-                    self.lastStartedAt = Date()
-                } else {
-                    self.lastErrorMessage =
-                        "Spotify is not installed on this iPhone."
-                    self.pendingPlaybackURI = nil
-                }
-            }
+        if installed {
+            activePlaylist = playlist
+            lastStartedAt = Date()
+        } else {
+            lastErrorMessage =
+                "Spotify is not installed on this iPhone."
+            pendingPlaybackURI = nil
         }
     }
 
