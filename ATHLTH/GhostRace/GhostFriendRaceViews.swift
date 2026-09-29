@@ -6,6 +6,7 @@ struct GhostFriendRaceHubView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
@@ -19,9 +20,45 @@ struct GhostFriendRaceHubView: View {
     @State private var sending = false
     @State private var startingChallengeID: UUID?
     @State private var localError: String?
+    @State private var captureDevice:
+        WorkoutCaptureDevice = .iPhone
 
     var body: some View {
         List {
+            Section("Workout device") {
+                Picker(
+                    "Record with",
+                    selection:
+                        $captureDevice
+                ) {
+                    Label(
+                        "iPhone",
+                        systemImage: "iphone"
+                    )
+                    .tag(
+                        WorkoutCaptureDevice
+                            .iPhone
+                    )
+
+                    Label(
+                        "Apple Watch",
+                        systemImage: "applewatch"
+                    )
+                    .tag(
+                        WorkoutCaptureDevice
+                            .appleWatch
+                    )
+                }
+                .pickerStyle(.segmented)
+                .onChange(
+                    of: captureDevice
+                ) { _, device in
+                    if device == .appleWatch &&
+                        !watchConnection.isReady {
+                        captureDevice = .iPhone
+                    }
+                }
+            }
             Section {
                 privacyCard
             }
@@ -494,14 +531,22 @@ struct GhostFriendRaceHubView: View {
             return
         }
 
-        guard settings
-            .trainingDeviceProvider ==
-                .appleWatch,
-              watchConnection.isReady
-        else {
-            localError =
-                "Connect Apple Watch before starting a friend Ghost Race."
-            return
+        switch captureDevice {
+        case .iPhone:
+            guard phoneWorkout.active == nil
+            else {
+                localError =
+                    "Finish the active iPhone workout before starting a friend Ghost Race."
+                return
+            }
+
+        case .appleWatch:
+            guard watchConnection.isReady
+            else {
+                localError =
+                    "Connect Apple Watch or choose iPhone before starting a friend Ghost Race."
+                return
+            }
         }
 
         startingChallengeID =
@@ -520,6 +565,10 @@ struct GhostFriendRaceHubView: View {
                     ghostRace,
                 watchConnection:
                     watchConnection,
+                phoneWorkout:
+                    phoneWorkout,
+                captureDevice:
+                    captureDevice,
                 settings:
                     settings
             )
