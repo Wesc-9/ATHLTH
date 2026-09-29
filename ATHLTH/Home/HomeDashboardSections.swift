@@ -229,6 +229,276 @@ struct HomeThisWeekCard: View {
     }
 }
 
+struct HomeGettingStartedPopupView: View {
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let hasPlan: Bool
+    let hasGoal: Bool
+    let hasEditedProfile: Bool
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 6
+                    ) {
+                        Text("GETTING STARTED")
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .tracking(2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .premiumGold
+                            )
+
+                        Text(
+                            "Make ATHLTH yours"
+                        )
+                        .font(
+                            .system(
+                                size: 28,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+
+                        Text(
+                            "A few quick steps help ATHLTH tailor training, goals and your profile. You can always change these later."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                    }
+                    .padding(.bottom, 4)
+
+                    gettingStartedDestination(
+                        eyebrow: "PROFILE",
+                        title: "Edit your profile",
+                        detail:
+                            "Add your training identity, photo and bio.",
+                        icon:
+                            "person.crop.circle.badge.pencil",
+                        tint:
+                            ATHLTHTheme.accent,
+                        complete:
+                            hasEditedProfile
+                    ) {
+                        ATHLTHEditProfileView()
+                    }
+
+                    gettingStartedDestination(
+                        eyebrow:
+                            "TRAINING PLAN",
+                        title:
+                            "Build your training plan",
+                        detail:
+                            "Organize your week and plan workouts ahead.",
+                        icon:
+                            "calendar.badge.clock",
+                        tint:
+                            ATHLTHTheme.accentDeep,
+                        complete:
+                            hasPlan
+                    ) {
+                        AdvancedPlannerView()
+                    }
+
+                    gettingStartedDestination(
+                        eyebrow: "GOALS",
+                        title:
+                            "Set your first goal",
+                        detail:
+                            "Set a target and let ATHLTH track your progress.",
+                        icon: "target",
+                        tint: .green,
+                        complete: hasGoal
+                    ) {
+                        GoalCreationView()
+                    }
+
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Continue to ATHLTH")
+                            .font(
+                                .headline
+                            )
+                            .frame(
+                                maxWidth:
+                                    .infinity
+                            )
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .controlSize(.large)
+                    .tint(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                    .padding(.top, 4)
+                }
+                .padding(20)
+                .frame(
+                    maxWidth: 620
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+            }
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.20)
+                )
+            )
+            .navigationTitle(
+                "Welcome"
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([
+            .medium,
+            .large
+        ])
+        .presentationDragIndicator(
+            .visible
+        )
+    }
+
+    private func gettingStartedDestination<
+        Destination: View
+    >(
+        eyebrow: String,
+        title: String,
+        detail: String,
+        icon: String,
+        tint: Color,
+        complete: Bool,
+        @ViewBuilder destination:
+            () -> Destination
+    ) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            ATHLTHCard {
+                HStack(spacing: 14) {
+                    Image(
+                        systemName: icon
+                    )
+                    .font(
+                        .system(
+                            size: 20,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(tint)
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        tint.opacity(0.10),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius:
+                                    15,
+                                style:
+                                    .continuous
+                            )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(eyebrow)
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight:
+                                        .bold
+                                )
+                            )
+                            .tracking(1.2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+
+                        Text(title)
+                            .font(.headline)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                            .multilineTextAlignment(
+                                .leading
+                            )
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            complete
+                                ? "checkmark.circle.fill"
+                                : "chevron.right.circle.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 21,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        complete
+                            ? ATHLTHTheme
+                                .vitality
+                            : tint
+                    )
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct HomeGettingStartedCard: View {
     let hasPlan: Bool
     let hasGoal: Bool
