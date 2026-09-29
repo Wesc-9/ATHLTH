@@ -168,7 +168,16 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                                 .distanceMeters,
                         ownElapsedSeconds:
                             snapshot
-                                .elapsedTime
+                                .elapsedTime,
+                        ownRouteKey:
+                            snapshot
+                                .routeComparisonID,
+                        ownRouteProgressPercent:
+                            snapshot
+                                .routeProgressPercent,
+                        ownRouteDeviationMeters:
+                            snapshot
+                                .routeDeviationMeters
                     )
         else {
             return snapshot
