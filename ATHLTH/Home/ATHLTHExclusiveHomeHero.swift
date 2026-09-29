@@ -114,7 +114,7 @@ struct ATHLTHExclusiveHomeHeroLayout<Hero: View, Content: View>: View {
     private let hero: Hero
     private let content: Content
 
-    private let overlap: CGFloat = 18
+    private let overlap: CGFloat = 22
     private let sheetRadius: CGFloat = 28
 
     private var usesTabletContentWidth: Bool {
