@@ -201,6 +201,9 @@ final class SupabaseSocialService: Sendable {
             runningPRsVisibility: settings.runningPRsVisibility,
             strengthPRsVisibility: settings.strengthPRsVisibility,
             shareTrainingPresence: settings.shareTrainingPresence,
+            shareOnlineStatus: settings.shareOnlineStatus,
+            shareLiveWorkoutLocation: settings.shareLiveWorkoutLocation,
+            liveWorkoutAudience: settings.liveWorkoutAudience,
             sharePerformanceStats: settings.sharePerformanceStats,
             shareTrophyCabinet: settings.shareTrophyCabinet,
             shareGoals: settings.shareGoals,
@@ -952,6 +955,9 @@ private struct SocialPrivacyUpdate: Encodable {
     let runningPRsVisibility: String
     let strengthPRsVisibility: String
     let shareTrainingPresence: Bool
+    let shareOnlineStatus: Bool
+    let shareLiveWorkoutLocation: Bool
+    let liveWorkoutAudience: String
     let sharePerformanceStats: Bool
     let shareTrophyCabinet: Bool
     let shareGoals: Bool
@@ -977,6 +983,9 @@ private struct SocialPrivacyUpdate: Encodable {
         case runningPRsVisibility = "running_prs_visibility"
         case strengthPRsVisibility = "strength_prs_visibility"
         case shareTrainingPresence = "share_training_presence"
+        case shareOnlineStatus = "share_online_status"
+        case shareLiveWorkoutLocation = "share_live_workout_location"
+        case liveWorkoutAudience = "live_workout_audience"
         case sharePerformanceStats = "share_performance_stats"
         case shareTrophyCabinet = "share_trophy_cabinet"
         case shareGoals = "share_goals"
