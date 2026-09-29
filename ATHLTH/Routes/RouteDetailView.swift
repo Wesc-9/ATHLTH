@@ -8,6 +8,8 @@ struct RouteDetailView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var publicTrailDiscovery:
+        PublicTrailDiscoveryStore
 
     @StateObject private var attempts = RouteAttemptStore()
     @StateObject private var publicTrailAttempts =
@@ -25,6 +27,10 @@ struct RouteDetailView: View {
     @State private var startingRoute = false
     @State private var startingGhostAttemptID: UUID?
     @State private var showingTargetGhost = false
+    @State private var publicTrailMetadata: PublicTrailRecord?
+    @State private var similarTrails: [PublicTrailRecord] = []
+    @State private var loadingSimilarTrails = false
+    @State private var showingSimilarTrails = false
 
     private var currentRoute: TrainingRoute {
         session.savedRoutes.first {
@@ -137,6 +143,10 @@ struct RouteDetailView: View {
             LazyVStack(spacing: 16) {
                 mapCard
                 overviewCard
+
+                if isPublicTrail {
+                    trailIntelligenceCard
+                }
 
                 if isOwner {
                     privacyCard
@@ -253,6 +263,77 @@ struct RouteDetailView: View {
                 )
             }
         }
+        .sheet(
+            isPresented:
+                $showingSimilarTrails
+        ) {
+            NavigationStack {
+                List(similarTrails) { trail in
+                    NavigationLink {
+                        RouteDetailView(
+                            route: trail.trainingRoute
+                        )
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(
+                                systemName: "map.fill"
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.vitality
+                            )
+                            .frame(width: 34, height: 34)
+                            .background(
+                                ATHLTHTheme.vitalitySoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 10,
+                                    style: .continuous
+                                )
+                            )
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+                                Text(trail.name)
+                                    .font(
+                                        .subheadline
+                                            .weight(.semibold)
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+
+                                Text(
+                                    similarTrailSubtitle(
+                                        trail
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .navigationTitle("Similar Routes")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(
+                        placement: .topBarTrailing
+                    ) {
+                        Button("Done") {
+                            showingSimilarTrails = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([
+                .medium,
+                .large
+            ])
+        }
         .sheet(isPresented: $showingFullLeaderboard) {
             NavigationStack {
                 fullLeaderboard
@@ -345,61 +426,468 @@ struct RouteDetailView: View {
 
     private var overviewCard: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(currentRoute.title)
-                            .font(.title2.weight(.bold))
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 8) {
+                    if isPublicTrail {
+                        Label(
+                            "PUBLIC TRAIL",
+                            systemImage: "map.fill"
+                        )
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(
+                            ATHLTHTheme.vitalitySoft,
+                            in: Capsule()
+                        )
+                    }
 
-                        if let start = currentRoute.startName,
-                           let end = currentRoute.endName {
-                            Text("\(start) → \(end)")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
+                    if publicTrailMetadata?.athlthVerified == true {
+                        Label(
+                            "ATHLTH VERIFIED",
+                            systemImage: "checkmark.seal.fill"
+                        )
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(
+                            ATHLTHTheme.premiumGoldSoft,
+                            in: Capsule()
+                        )
                     }
 
                     Spacer()
 
-                    visibilityBadge(currentRoute.visibility)
+                    if !isPublicTrail {
+                        visibilityBadge(currentRoute.visibility)
+                    }
                 }
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.adaptive(minimum: 130), spacing: 10)
-                    ],
-                    spacing: 10
-                ) {
-                    metric(
-                        title: "Distance",
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(currentRoute.title)
+                        .font(.title.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let start = currentRoute.startName,
+                       let end = currentRoute.endName {
+                        Text("\(start) → \(end)")
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    } else if let description =
+                                publicTrailMetadata?.osmDescription,
+                              !description.isEmpty {
+                        Text(description)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(3)
+                    }
+                }
+
+                HStack(spacing: 0) {
+                    premiumRouteMetric(
                         value: String(
-                            format: "%.2f km",
+                            format: "%.1f km",
                             currentRoute.distanceKilometers
                         ),
+                        label: "Distance",
                         icon: "figure.run"
                     )
 
-                    metric(
-                        title: "Elevation",
-                        value: currentRoute.elevationGainMeters.map {
-                            "\(Int($0.rounded())) m"
-                        } ?? "—",
+                    premiumMetricDivider
+
+                    premiumRouteMetric(
+                        value:
+                            resolvedElevationGain.map {
+                                "\(Int($0.rounded())) m"
+                            } ?? "—",
+                        label: "Ascent",
                         icon: "mountain.2.fill"
                     )
 
-                    metric(
-                        title: "Attempts",
-                        value: "\(attemptCount)",
-                        icon: "arrow.trianglehead.2.clockwise.rotate.90"
+                    premiumMetricDivider
+
+                    premiumRouteMetric(
+                        value:
+                            publicTrailMetadata?.routeShape ??
+                            "Route",
+                        label: "Type",
+                        icon: "point.topleft.down.to.point.bottomright.curvepath"
                     )
 
-                    metric(
-                        title: "Leaderboard",
-                        value: "\(leaderboard.count)",
-                        icon: "trophy.fill"
-                    )
+                    if let runSeconds =
+                        publicTrailMetadata?.estimatedRunSeconds {
+                        premiumMetricDivider
+
+                        premiumRouteMetric(
+                            value:
+                                compactDuration(runSeconds),
+                            label: "Est. run",
+                            icon: "clock.fill"
+                        )
+                    }
+                }
+
+                let characteristics =
+                    trailCharacteristics
+                if !characteristics.isEmpty {
+                    ScrollView(
+                        .horizontal,
+                        showsIndicators: false
+                    ) {
+                        HStack(spacing: 7) {
+                            ForEach(
+                                characteristics,
+                                id: \.self
+                            ) { value in
+                                Text(value)
+                                    .font(
+                                        .caption2
+                                            .weight(.semibold)
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .accentDeep
+                                    )
+                                    .padding(
+                                        .horizontal,
+                                        10
+                                    )
+                                    .frame(height: 28)
+                                    .background(
+                                        Color.white
+                                            .opacity(0.62),
+                                        in: Capsule()
+                                    )
+                            }
+                        }
+                    }
                 }
             }
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: ATHLTHTheme.cornerRadius,
+                style: .continuous
+            )
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.premiumGold.opacity(0.24),
+                        ATHLTHTheme.vitality.opacity(0.16),
+                        Color.white.opacity(0.72)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+        }
+    }
+
+    private var resolvedElevationGain: Double? {
+        publicTrailMetadata?.elevationGainMeters ??
+            currentRoute.elevationGainMeters
+    }
+
+    private var trailCharacteristics: [String] {
+        guard let metadata = publicTrailMetadata else {
+            return []
+        }
+
+        var values: [String] = []
+
+        if let shape = metadata.routeShape,
+           !shape.isEmpty {
+            values.append(shape)
+        }
+
+        if let surface = metadata.surfaceSummary,
+           !surface.isEmpty {
+            values.append(surface)
+        }
+
+        if let difficulty = metadata.difficulty,
+           !difficulty.isEmpty {
+            values.append(difficulty)
+        }
+
+        if !metadata.routeKind.isEmpty {
+            values.append(
+                metadata.routeKind
+                    .replacingOccurrences(
+                        of: "_",
+                        with: " "
+                    )
+                    .capitalized
+            )
+        }
+
+        if let network = metadata.network,
+           !network.isEmpty {
+            values.append(
+                networkLabel(network)
+            )
+        }
+
+        return Array(
+            NSOrderedSet(array: values)
+        ).compactMap { $0 as? String }
+    }
+
+    private var premiumMetricDivider: some View {
+        Rectangle()
+            .fill(ATHLTHTheme.divider)
+            .frame(width: 1, height: 46)
+            .padding(.horizontal, 8)
+    }
+
+    private func premiumRouteMetric(
+        value: String,
+        label: String,
+        icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.vitality)
+
+                Text(value)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var trailIntelligenceCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 15) {
+                ATHLTHSectionHeader(
+                    title: "Trail intelligence",
+                    actionTitle:
+                        publicTrailMetadata?.athlthVerified == true
+                            ? "VERIFIED"
+                            : "OPEN DATA"
+                )
+
+                if let metadata = publicTrailMetadata {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(
+                                .adaptive(
+                                    minimum: 135
+                                ),
+                                spacing: 10
+                            )
+                        ],
+                        spacing: 10
+                    ) {
+                        trailInfoTile(
+                            title: "Route type",
+                            value:
+                                metadata.routeShape ??
+                                "Unknown",
+                            icon:
+                                "point.topleft.down.to.point.bottomright.curvepath"
+                        )
+
+                        trailInfoTile(
+                            title: "Run estimate",
+                            value:
+                                metadata
+                                    .estimatedRunSeconds
+                                    .map(compactDuration) ??
+                                "—",
+                            icon: "figure.run"
+                        )
+
+                        trailInfoTile(
+                            title: "Walk estimate",
+                            value:
+                                metadata
+                                    .estimatedWalkSeconds
+                                    .map(compactDuration) ??
+                                "—",
+                            icon: "figure.walk"
+                        )
+
+                        if let surface =
+                            metadata.surfaceSummary,
+                           !surface.isEmpty {
+                            trailInfoTile(
+                                title: "Surface",
+                                value: surface,
+                                icon: "leaf.fill"
+                            )
+                        }
+
+                        if let difficulty =
+                            metadata.difficulty,
+                           !difficulty.isEmpty {
+                            trailInfoTile(
+                                title: "Difficulty",
+                                value: difficulty,
+                                icon: "chart.bar.fill"
+                            )
+                        }
+
+                        if let high =
+                            metadata.maxElevationMeters {
+                            trailInfoTile(
+                                title: "High point",
+                                value:
+                                    "\(Int(high.rounded())) m",
+                                icon: "mountain.2"
+                            )
+                        }
+
+                        if let grade =
+                            metadata.maxGradePercent {
+                            trailInfoTile(
+                                title: "Max grade",
+                                value:
+                                    String(
+                                        format: "%.0f%%",
+                                        grade
+                                    ),
+                                icon:
+                                    "arrow.up.right"
+                            )
+                        }
+                    }
+
+                    if metadata.reference != nil ||
+                        metadata.operatorName != nil ||
+                        metadata.symbol != nil {
+                        Divider()
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 8
+                        ) {
+                            if let reference =
+                                metadata.reference,
+                               !reference.isEmpty {
+                                trailSourceRow(
+                                    title: "Route",
+                                    value: reference,
+                                    icon: "number"
+                                )
+                            }
+
+                            if let symbol =
+                                metadata.symbol,
+                               !symbol.isEmpty {
+                                trailSourceRow(
+                                    title: "Marking",
+                                    value: symbol,
+                                    icon: "signpost.right.fill"
+                                )
+                            }
+
+                            if let operatorName =
+                                metadata.operatorName,
+                               !operatorName.isEmpty {
+                                trailSourceRow(
+                                    title: "Maintained by",
+                                    value: operatorName,
+                                    icon: "building.2.fill"
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        "Route geometry and trail metadata: OpenStreetMap contributors."
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                } else {
+                    HStack(spacing: 9) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading trail details…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func trailInfoTile(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.vitality)
+                .frame(width: 32, height: 32)
+                .background(
+                    ATHLTHTheme.vitalitySoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(
+            ATHLTHTheme.surfaceSage.opacity(0.62),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
+    }
+
+    private func trailSourceRow(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .foregroundStyle(ATHLTHTheme.vitality)
+                .frame(width: 22)
+
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Spacer()
+
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .multilineTextAlignment(.trailing)
         }
     }
 
@@ -705,24 +1193,67 @@ struct RouteDetailView: View {
     private var actionsCard: some View {
         ATHLTHCard {
             VStack(spacing: 10) {
-                if !isOwner && savedCopy == nil {
+                if !isOwner {
                     Button {
-                        session.saveSharedRoute(
-                            currentRoute,
-                            sourceOwnerID: currentRoute.ownerID,
-                            sourceRouteID: currentRoute.id
-                        )
-                        watchMessage = "Route saved to My Routes."
+                        if let savedCopy {
+                            session.deleteSavedRoute(
+                                savedCopy.id
+                            )
+                            watchMessage =
+                                "Route removed from My Routes."
+                        } else {
+                            session.saveSharedRoute(
+                                currentRoute,
+                                sourceOwnerID:
+                                    currentRoute.ownerID,
+                                sourceRouteID:
+                                    currentRoute.id
+                            )
+                            watchMessage =
+                                "Route saved to My Routes."
+                        }
                     } label: {
                         Label(
-                            "Save Route",
-                            systemImage: "bookmark.fill"
+                            savedCopy == nil
+                                ? "Save Route"
+                                : "Saved · Remove",
+                            systemImage:
+                                savedCopy == nil
+                                    ? "bookmark"
+                                    : "bookmark.fill"
                         )
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(
+                        savedCopy == nil
+                            ? .borderedProminent
+                            : .bordered
+                    )
                     .tint(ATHLTHTheme.accent)
                     .controlSize(.large)
+                }
+
+                if isPublicTrail {
+                    Button {
+                        Task {
+                            await loadSimilarTrails()
+                        }
+                    } label: {
+                        if loadingSimilarTrails {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            Label(
+                                "Show 10 Similar Routes",
+                                systemImage:
+                                    "square.stack.3d.up.fill"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .disabled(loadingSimilarTrails)
                 }
 
                 if let best = ownBest {
@@ -1074,6 +1605,11 @@ struct RouteDetailView: View {
         forceHealthSync: Bool = false
     ) async {
         if isPublicTrail {
+            publicTrailMetadata =
+                await publicTrailDiscovery.trail(
+                    id: publicTrailID
+                )
+
             if forceHealthSync ||
                 health.hasRequestedAuthorization {
                 await publicTrailAttempts
@@ -1107,6 +1643,91 @@ struct RouteDetailView: View {
             await attempts.refresh(
                 routeID: currentRoute.id
             )
+        }
+    }
+
+    @MainActor
+    private func loadSimilarTrails() async {
+        loadingSimilarTrails = true
+        defer {
+            loadingSimilarTrails = false
+        }
+
+        similarTrails =
+            await publicTrailDiscovery.similar(
+                to: publicTrailID,
+                limit: 10
+            )
+
+        showingSimilarTrails = true
+    }
+
+    private func similarTrailSubtitle(
+        _ trail: PublicTrailRecord
+    ) -> String {
+        var parts = [
+            String(
+                format: "%.1f km",
+                trail.distanceKilometers
+            )
+        ]
+
+        if let shape = trail.routeShape,
+           !shape.isEmpty {
+            parts.append(shape)
+        }
+
+        if let difficulty = trail.difficulty,
+           !difficulty.isEmpty {
+            parts.append(difficulty)
+        }
+
+        if let network = trail.network,
+           !network.isEmpty {
+            parts.append(networkLabel(network))
+        }
+
+        return parts.joined(separator: " · ")
+    }
+
+    private func compactDuration(
+        _ seconds: TimeInterval
+    ) -> String {
+        let totalMinutes =
+            max(
+                Int(
+                    (seconds / 60)
+                        .rounded()
+                ),
+                1
+            )
+
+        if totalMinutes < 60 {
+            return "\(totalMinutes) min"
+        }
+
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+
+        return minutes == 0
+            ? "\(hours) h"
+            : "\(hours) h \(minutes) min"
+    }
+
+    private func networkLabel(
+        _ network: String
+    ) -> String {
+        switch network.lowercased() {
+        case "lwn":
+            return "Local network"
+        case "rwn":
+            return "Regional network"
+        case "nwn":
+            return "National network"
+        case "iwn":
+            return "International network"
+        default:
+            return network.uppercased()
         }
     }
 
