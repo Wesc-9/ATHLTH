@@ -807,13 +807,33 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
                 : nil
 
         var muscleGroups: [String] = []
-        for rawGroup in performedExercises.flatMap({ $0.exercise.primaryMuscles }) {
-            let group = rawGroup.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !group.isEmpty else { continue }
+        let recordedMuscles =
+            performedExercises.flatMap {
+                $0.exercise.primaryMuscles +
+                (
+                    $0.exercise
+                        .secondaryMuscles ??
+                    []
+                )
+            }
 
-            if !muscleGroups.contains(where: {
-                $0.caseInsensitiveCompare(group) == .orderedSame
-            }) {
+        for rawGroup in recordedMuscles {
+            let group =
+                rawGroup.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            guard !group.isEmpty else {
+                continue
+            }
+
+            if !muscleGroups.contains(
+                where: {
+                    $0.caseInsensitiveCompare(
+                        group
+                    ) ==
+                    .orderedSame
+                }
+            ) {
                 muscleGroups.append(group)
             }
         }
