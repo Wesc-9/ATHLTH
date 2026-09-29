@@ -1834,6 +1834,8 @@ final class IPhoneWorkoutStore: NSObject, ObservableObject, CLLocationManagerDel
                     workout
                         .plannedRouteDistanceKilometers
                         .map { $0 * 1_000 },
+                workoutDisplayTitle:
+                    workout.title,
                 currentPaceSecondsPerKilometer:
                     workout
                         .currentPaceSecondsPerKilometer,
