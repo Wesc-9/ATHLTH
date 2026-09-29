@@ -315,7 +315,7 @@ final class ATHLTHLivePresenceStore: ObservableObject {
                             "captured_at",
                             ascending: false
                         )
-                        .limit(240)
+                        .limit(1)
                         .execute()
                         .value
 
@@ -487,6 +487,46 @@ final class ATHLTHLivePresenceStore: ObservableObject {
         ownLiveSessionID = nil
         lastPointPublishedAt = nil
         lastPointLocation = nil
+    }
+
+    func refreshPoints(
+        for sessionID: UUID,
+        limit: Int = 240
+    ) async {
+        guard currentUserID != nil else {
+            return
+        }
+
+        do {
+            let points:
+                [ATHLTHLiveWorkoutPoint] =
+                try await client
+                    .from("live_workout_points")
+                    .select()
+                    .eq(
+                        "session_id",
+                        value: sessionID
+                    )
+                    .order(
+                        "captured_at",
+                        ascending: false
+                    )
+                    .limit(
+                        min(
+                            max(limit, 1),
+                            400
+                        )
+                    )
+                    .execute()
+                    .value
+
+            pointsBySession[sessionID] =
+                points.sorted {
+                    $0.capturedAt < $1.capturedAt
+                }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func latestPoint(
