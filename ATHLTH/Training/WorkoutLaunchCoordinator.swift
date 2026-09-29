@@ -332,13 +332,31 @@ enum WorkoutLaunchCoordinator {
                 }
             }()
 
+            let structuredWorkout =
+                configuration.workout.map {
+                    PlannedWorkoutWatchBuilder
+                        .runningTransfer(
+                            from: $0,
+                            routeAlerts:
+                                settings
+                                    .routeAlertConfiguration
+                        )
+                }
+
             gear.prepareNextWorkoutGear(
                 configuration.gearIDs
             )
             phoneWorkout.start(
                 walking: false,
                 route: selectedRoute,
-                title: configuration.title
+                title: configuration.title,
+                audioCoach:
+                    configuration.audioCoach,
+                structuredWorkout:
+                    structuredWorkout,
+                routeAlerts:
+                    settings
+                        .routeAlertConfiguration
             )
             return
         }
