@@ -21,6 +21,14 @@ struct MirroredWorkoutLiveView: View {
                             .environmentObject(
                                 ghostRace
                             )
+                        } else if snapshot.kind ==
+                                    .running,
+                                  realtime
+                                    .selectedLiveGhostSessionID !=
+                                    nil {
+                            liveGhostRaceCard(
+                                snapshot
+                            )
                         }
 
                         timer(snapshot)
@@ -152,6 +160,336 @@ struct MirroredWorkoutLiveView: View {
         ) {
             await syncLivePosition()
         }
+    }
+
+    @ViewBuilder
+    private func liveGhostRaceCard(
+        _ snapshot:
+            WatchWorkoutLiveSnapshot
+    ) -> some View {
+        if let session =
+                realtime
+                    .selectedLiveGhostSession {
+            let comparison =
+                realtime
+                    .liveGhostComparison(
+                        ownDistanceMeters:
+                            snapshot
+                                .distanceMeters,
+                        ownElapsedSeconds:
+                            snapshot
+                                .elapsedTime
+                    )
+
+            ATHLTHCard {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    HStack {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text("LIVE GHOST")
+                                .font(
+                                    .caption2
+                                        .weight(.bold)
+                                )
+                                .tracking(1.5)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .vitality
+                                )
+
+                            Text(
+                                liveGhostOpponentName(
+                                    session
+                                )
+                            )
+                            .font(
+                                .headline
+                            )
+                        }
+
+                        Spacer()
+
+                        Circle()
+                            .fill(
+                                Color.green
+                            )
+                            .frame(
+                                width: 9,
+                                height: 9
+                            )
+
+                        Text("LIVE")
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                Color.green
+                            )
+                    }
+
+                    if let comparison {
+                        HStack(
+                            alignment: .firstTextBaseline
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+                                Text(
+                                    comparison
+                                        .userIsAhead
+                                        ? "YOU ARE AHEAD"
+                                        : "GHOST IS AHEAD"
+                                )
+                                .font(
+                                    .caption
+                                        .weight(.semibold)
+                                )
+                                .foregroundStyle(
+                                    comparison
+                                        .userIsAhead
+                                        ? ATHLTHTheme
+                                            .vitality
+                                        : Color.orange
+                                )
+
+                                Text(
+                                    signedDistanceText(
+                                        comparison
+                                            .signedDistanceMeters
+                                    )
+                                )
+                                .font(
+                                    .system(
+                                        size: 34,
+                                        weight: .bold,
+                                        design:
+                                            .rounded
+                                    )
+                                )
+                                .monospacedDigit()
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                            }
+
+                            Spacer()
+
+                            if let seconds =
+                                comparison
+                                    .estimatedTimeDeltaSeconds {
+                                VStack(
+                                    alignment: .trailing,
+                                    spacing: 3
+                                ) {
+                                    Text("EST. GAP")
+                                        .font(
+                                            .caption2
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+
+                                    Text(
+                                        signedTimeText(
+                                            seconds
+                                        )
+                                    )
+                                    .font(
+                                        .title3
+                                            .weight(.bold)
+                                            .monospacedDigit()
+                                    )
+
+                                    Text("approx.")
+                                        .font(.caption2)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                }
+                            }
+                        }
+
+                        HStack(spacing: 12) {
+                            Label(
+                                String(
+                                    format:
+                                        "%.2f km",
+                                    comparison
+                                        .opponentDistanceMeters /
+                                        1_000
+                                ),
+                                systemImage:
+                                    "figure.run"
+                            )
+
+                            Label(
+                                liveGhostFreshness(
+                                    comparison
+                                        .updatedAt
+                                ),
+                                systemImage:
+                                    "clock"
+                            )
+                        }
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    } else {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .controlSize(.small)
+
+                            Text(
+                                "Waiting for the runner's next live position…"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+                    }
+
+                    HStack(spacing: 12) {
+                        NavigationLink {
+                            ATHLTHLiveWorkoutMapView(
+                                session: session
+                            )
+                        } label: {
+                            Label(
+                                "Live map",
+                                systemImage:
+                                    "map.fill"
+                            )
+                            .font(
+                                .caption
+                                    .weight(.semibold)
+                            )
+                            .frame(
+                                maxWidth:
+                                    .infinity
+                            )
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button {
+                            realtime
+                                .selectLiveGhost(
+                                    nil
+                                )
+                        } label: {
+                            Label(
+                                "Stop Ghost",
+                                systemImage:
+                                    "xmark.circle"
+                            )
+                            .font(
+                                .caption
+                                    .weight(.semibold)
+                            )
+                            .frame(
+                                maxWidth:
+                                    .infinity
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
+    }
+
+    private func liveGhostOpponentName(
+        _ session:
+            ATHLTHLiveWorkoutSession
+    ) -> String {
+        social.visibleProfiles
+            .first {
+                $0.userID ==
+                    session.ownerID
+            }?
+            .resolvedName ??
+        social.following
+            .first {
+                $0.userID ==
+                    session.ownerID
+            }?
+            .resolvedName ??
+        session.title
+    }
+
+    private func signedDistanceText(
+        _ meters: Double
+    ) -> String {
+        let prefix =
+            meters >= 0 ? "+" : "−"
+        return String(
+            format:
+                "%@%.0f m",
+            prefix,
+            abs(meters)
+        )
+    }
+
+    private func signedTimeText(
+        _ seconds: TimeInterval
+    ) -> String {
+        let prefix =
+            seconds >= 0 ? "+" : "−"
+        let absolute =
+            abs(seconds)
+
+        if absolute >= 60 {
+            let total =
+                Int(
+                    absolute.rounded()
+                )
+            return String(
+                format:
+                    "%@%d:%02d",
+                prefix,
+                total / 60,
+                total % 60
+            )
+        }
+
+        return String(
+            format:
+                "%@%.0f s",
+            prefix,
+            absolute
+        )
+    }
+
+    private func liveGhostFreshness(
+        _ date: Date
+    ) -> String {
+        let seconds =
+            max(
+                Int(
+                    Date()
+                        .timeIntervalSince(
+                            date
+                        )
+                        .rounded()
+                ),
+                0
+            )
+
+        return seconds < 5
+            ? "Now"
+            : "\(seconds)s ago"
     }
 
     @ViewBuilder
