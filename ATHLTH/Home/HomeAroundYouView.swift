@@ -237,7 +237,6 @@ private enum AroundYouFilter: String, CaseIterable, Identifiable {
     case all = "All"
     case routes = "Routes"
     case events = "Events"
-    case challenges = "Challenges"
 
     var id: String { rawValue }
 }
@@ -433,6 +432,10 @@ struct HomeAroundYouSection: View {
             guard let location = locationStore.location
             else {
                 return
+            }
+
+            if activeSearchCenter == nil {
+                activeSearchCenter = location
             }
 
             await publicTrailDiscovery.refresh(
@@ -739,7 +742,11 @@ struct AroundYouExploreView: View {
     @State private var routeActionMessage: String?
     @State private var routeActionError: String?
     @State private var startingRoute = false
-    @State private var showingDiscoveryHub = false
+    @State private var visibleRegion: MKCoordinateRegion?
+    @State private var hasSeenInitialCamera = false
+    @State private var shouldSearchVisibleArea = false
+    @State private var isSearchingVisibleArea = false
+    @State private var activeSearchCenter: CLLocation?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -810,26 +817,33 @@ struct AroundYouExploreView: View {
                         ForEach(nearbyRoutes.prefix(25)) { route in
                             let isSelected =
                                 selectedRoute?.id == route.id
+                            let isDimmed =
+                                selectedRoute != nil &&
+                                !isSelected
 
                             MapPolyline(
                                 coordinates:
                                     route.renderCoordinates
                             )
                             .stroke(
-                                route.isMine
-                                    ? ATHLTHTheme.premiumGold
-                                    : route.isPublicTrail
-                                        ? ATHLTHTheme.vitality
-                                        : ATHLTHTheme.accent,
+                                isDimmed
+                                    ? Color.secondary.opacity(0.28)
+                                    : route.isMine
+                                        ? ATHLTHTheme.premiumGold
+                                        : route.isPublicTrail
+                                            ? ATHLTHTheme.vitality
+                                            : ATHLTHTheme.accent,
                                 lineWidth: isSelected
-                                    ? 7
-                                    : (
-                                        route.isMine
-                                            ? 5
-                                            : route.isPublicTrail
-                                                ? 4.5
-                                                : 4
-                                    )
+                                    ? 8
+                                    : isDimmed
+                                        ? 2.5
+                                        : (
+                                            route.isMine
+                                                ? 5
+                                                : route.isPublicTrail
+                                                    ? 4.5
+                                                    : 4
+                                        )
                             )
 
                             if let center = route.centerCoordinate {
@@ -876,6 +890,7 @@ struct AroundYouExploreView: View {
                                         )
                                     }
                                     .buttonStyle(.plain)
+                                    .opacity(isDimmed ? 0.34 : 1)
                                     .accessibilityLabel(
                                         "Preview \(route.title)"
                                     )
@@ -901,56 +916,6 @@ struct AroundYouExploreView: View {
                         }
                     }
 
-                    if filter == .all || filter == .challenges {
-                        ForEach(nearbyChallenges.prefix(30)) { challenge in
-                            if let coordinate =
-                                challengeCoordinate(challenge) {
-                                Annotation(
-                                    challenge.title,
-                                    coordinate: coordinate
-                                ) {
-                                    NavigationLink {
-                                        ChallengeDetailView(
-                                            challengeID: challenge.id
-                                        )
-                                    } label: {
-                                        Image(
-                                            systemName:
-                                                challenge.sport.systemImage
-                                        )
-                                        .font(
-                                            .system(
-                                                size: 16,
-                                                weight: .bold
-                                            )
-                                        )
-                                        .foregroundStyle(.white)
-                                        .frame(width: 34, height: 34)
-                                        .background(
-                                            ATHLTHTheme.vitality,
-                                            in: Circle()
-                                        )
-                                        .overlay {
-                                            Circle()
-                                                .stroke(
-                                                    .white,
-                                                    lineWidth: 2
-                                                )
-                                        }
-                                        .shadow(
-                                            color: .black.opacity(0.14),
-                                            radius: 5,
-                                            y: 2
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel(
-                                        "Open challenge \(challenge.title)"
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
                 .mapStyle(
                     .standard(elevation: .realistic)
@@ -959,6 +924,17 @@ struct AroundYouExploreView: View {
                     MapCompass()
                     MapScaleView()
                     MapUserLocationButton()
+                }
+                .onMapCameraChange(
+                    frequency: .onEnd
+                ) { context in
+                    visibleRegion = context.region
+
+                    if hasSeenInitialCamera {
+                        shouldSearchVisibleArea = true
+                    } else {
+                        hasSeenInitialCamera = true
+                    }
                 }
                 .onTapGesture { point in
                     guard let coordinate = proxy.convert(
@@ -981,6 +957,10 @@ struct AroundYouExploreView: View {
                                 systemName: "map.fill"
                             )
                             Text("Public Trails")
+                            Text("·")
+                            Text(
+                                "\(publicTrailDiscovery.trails.count) loaded"
+                            )
                             Text("·")
                             Text(
                                 publicTrailDiscovery
@@ -1008,6 +988,55 @@ struct AroundYouExploreView: View {
                             in: Capsule()
                         )
                         .padding(10)
+                    }
+                }
+                .overlay(alignment: .top) {
+                    if shouldSearchVisibleArea,
+                       visibleRegion != nil {
+                        Button {
+                            Task {
+                                await searchVisibleArea()
+                            }
+                        } label: {
+                            HStack(spacing: 7) {
+                                if isSearchingVisibleArea {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(
+                                        systemName:
+                                            "magnifyingglass"
+                                    )
+                                }
+
+                                Text("Search this area")
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                            .padding(.horizontal, 14)
+                            .frame(height: 38)
+                            .background(
+                                .ultraThinMaterial,
+                                in: Capsule()
+                            )
+                            .overlay {
+                                Capsule()
+                                    .stroke(
+                                        Color.white.opacity(0.72),
+                                        lineWidth: 1
+                                    )
+                            }
+                            .shadow(
+                                color: .black.opacity(0.12),
+                                radius: 10,
+                                y: 4
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSearchingVisibleArea)
+                        .padding(.top, 12)
                     }
                 }
                 .overlay(alignment: .bottom) {
@@ -1038,36 +1067,6 @@ struct AroundYouExploreView: View {
             embeddedInTab ? .visible : .hidden,
             for: .tabBar
         )
-        .toolbar {
-            if embeddedInTab {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showingDiscoveryHub = true
-                    } label: {
-                        Image(systemName: "sparkles")
-                    }
-                    .accessibilityLabel(
-                        "Discover clubs, challenges and public activity"
-                    )
-                }
-            }
-
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    hasCenteredOnUser = false
-                    locationStore.refresh()
-                    centerOnUser()
-                } label: {
-                    Image(systemName: "location.fill")
-                }
-                .accessibilityLabel(
-                    "Center on my location"
-                )
-            }
-        }
-        .sheet(isPresented: $showingDiscoveryHub) {
-            ExploreDiscoveryHubView()
-        }
         .task {
             async let routesRefresh: Void =
                 routeDiscovery.refresh()
@@ -1913,6 +1912,7 @@ struct AroundYouExploreView: View {
             Array(routesByID.values)
 
         guard let location =
+                activeSearchCenter ??
                 locationStore.location
         else {
             return values
@@ -1959,6 +1959,7 @@ struct AroundYouExploreView: View {
             }
 
         guard let location =
+                activeSearchCenter ??
                 locationStore.location
         else {
             return candidates
@@ -2093,13 +2094,44 @@ struct AroundYouExploreView: View {
         )
     }
 
+    @MainActor
+    private func searchVisibleArea() async {
+        guard let visibleRegion else {
+            return
+        }
+
+        isSearchingVisibleArea = true
+        defer {
+            isSearchingVisibleArea = false
+        }
+
+        activeSearchCenter = CLLocation(
+            latitude: visibleRegion.center.latitude,
+            longitude: visibleRegion.center.longitude
+        )
+
+        withAnimation(.easeInOut(duration: 0.16)) {
+            selectedRoute = nil
+        }
+
+        await publicTrailDiscovery.refresh(
+            in: visibleRegion,
+            force: true
+        )
+
+        shouldSearchVisibleArea = false
+    }
+
     private func centerOnUser() {
-        guard let coordinate =
-                locationStore.location?.coordinate
+        guard let location =
+                locationStore.location
         else {
             return
         }
 
+        let coordinate = location.coordinate
+        activeSearchCenter = location
+        shouldSearchVisibleArea = false
         hasCenteredOnUser = true
 
         withAnimation(
