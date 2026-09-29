@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct ATHLTHWidgetsAndSurfacesSettingsView: View {
+    @EnvironmentObject private var watchConnection:
+        AppleWatchConnectionStore
+
+    @State private var liveConfiguration =
+        ATHLTHLiveWorkoutPreferencesStore.load()
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -17,6 +23,8 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     intro
 
+                    liveWorkoutSettings
+
                     ForEach(ATHLTHExternalSurface.allCases) { surface in
                         surfaceCard(surface)
                     }
@@ -32,6 +40,106 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
         }
         .navigationTitle("Widgets & Surfaces")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            liveConfiguration =
+                ATHLTHLiveWorkoutPreferencesStore.load()
+        }
+        .onChange(of: liveConfiguration) { _, configuration in
+            ATHLTHLiveWorkoutPreferencesStore.save(
+                configuration
+            )
+            watchConnection.sendLiveSurfaceConfiguration(
+                configuration
+            )
+        }
+    }
+
+    private var liveWorkoutSettings: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "waveform.path.ecg.rectangle")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .frame(width: 42, height: 42)
+                        .background(
+                            ATHLTHTheme.vitalitySoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Live Workout Display")
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(
+                            "Choose what ATHLTH can surface during an active workout. Smart Priority automatically shows the most useful signal right now."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Divider()
+
+                Toggle(
+                    "Dynamic Island & Live Activity",
+                    isOn: $liveConfiguration.dynamicIslandEnabled
+                )
+
+                Toggle(
+                    "Apple Watch Live Info",
+                    isOn: $liveConfiguration.watchEnabled
+                )
+
+                Toggle(
+                    "Smart Priority",
+                    isOn: $liveConfiguration.smartPriorityEnabled
+                )
+
+                Divider()
+
+                ForEach(ATHLTHLiveWorkoutFeature.allCases) { feature in
+                    Toggle(
+                        isOn: featureBinding(feature)
+                    ) {
+                        Label(
+                            feature.title,
+                            systemImage: feature.systemImage
+                        )
+                    }
+
+                    Text(feature.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.leading, 28)
+
+                    if feature != ATHLTHLiveWorkoutFeature.allCases.last {
+                        Divider()
+                    }
+                }
+            }
+        }
+    }
+
+    private func featureBinding(
+        _ feature: ATHLTHLiveWorkoutFeature
+    ) -> Binding<Bool> {
+        Binding(
+            get: {
+                liveConfiguration.isEnabled(feature)
+            },
+            set: { enabled in
+                liveConfiguration.setEnabled(
+                    enabled,
+                    for: feature
+                )
+            }
+        )
     }
 
     private var intro: some View {
