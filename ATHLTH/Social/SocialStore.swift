@@ -756,11 +756,6 @@ final class SocialStore: ObservableObject {
 
     func heartbeatOnlinePresence() async {
         guard shareOnlineStatus else {
-            try? await service
-                .clearOnlinePresence(
-                    sessionID:
-                        onlinePresenceSessionID
-                )
             return
         }
 
