@@ -479,14 +479,6 @@ struct HomeAroundYouSection: View {
                 return
             }
 
-            if activeSearchCenter == nil {
-                activeSearchCenter = location
-            }
-
-            if activeSearchCenter == nil {
-                activeSearchCenter = location
-            }
-
             await publicTrailDiscovery.refresh(
                 near: location
             )
