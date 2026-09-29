@@ -329,32 +329,55 @@ relation
 out body geom qt;
 `.trim();
 
-    const overpassURL =
-      Deno.env.get("OVERPASS_API_URL") ??
-      "https://overpass-api.de/api/interpreter";
+    const configuredOverpassURL =
+      Deno.env.get("OVERPASS_API_URL");
+    const overpassURLs =
+      configuredOverpassURL
+        ? [configuredOverpassURL]
+        : [
+            "https://overpass.private.coffee/api/interpreter",
+            "https://overpass-api.de/api/interpreter",
+          ];
 
     try {
-      const response = await fetch(overpassURL, {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/x-www-form-urlencoded; charset=UTF-8",
-          "Accept": "application/json",
-          "User-Agent":
-            "ATHLTH/1.4.5 public-trail-discovery",
-        },
-        body:
-          "data=" +
-          encodeURIComponent(query),
-      });
+      let payload: any = null;
+      let lastFailure = "No Overpass endpoint succeeded.";
 
-      if (!response.ok) {
-        throw new Error(
-          `Overpass returned ${response.status}`,
-        );
+      for (const overpassURL of overpassURLs) {
+        try {
+          const response = await fetch(overpassURL, {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/x-www-form-urlencoded",
+              "Accept": "application/json",
+              "User-Agent":
+                "ATHLTH/1.4.5 public-trail-discovery",
+            },
+            body:
+              "data=" +
+              encodeURIComponent(query),
+          });
+
+          if (!response.ok) {
+            lastFailure =
+              `${overpassURL} returned ${response.status}`;
+            continue;
+          }
+
+          payload = await response.json();
+          break;
+        } catch (error) {
+          lastFailure =
+            error instanceof Error
+              ? error.message
+              : String(error);
+        }
       }
 
-      const payload = await response.json();
+      if (!payload) {
+        throw new Error(lastFailure);
+      }
       const relations: OSMRelation[] =
         Array.isArray(payload?.elements)
           ? payload.elements.filter(
