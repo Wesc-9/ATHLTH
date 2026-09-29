@@ -169,18 +169,6 @@ enum ATHLTHSurfaceCoordinator {
         }
     }
 
-    private func endExistingActivities() async {
-        let activities =
-            Activity<ATHLTHWorkoutActivityAttributes>
-                .activities
-
-        for activity in activities {
-            await activity.end(
-                nil,
-                dismissalPolicy: .immediate
-            )
-        }
-    }
 }
 
 @MainActor
@@ -328,6 +316,19 @@ private final class ATHLTHLiveActivityController {
                     )
                 )
             }
+        }
+    }
+
+    private func endExistingActivities() async {
+        let activities =
+            Activity<ATHLTHWorkoutActivityAttributes>
+                .activities
+
+        for activity in activities {
+            await activity.end(
+                nil,
+                dismissalPolicy: .immediate
+            )
         }
     }
 }
