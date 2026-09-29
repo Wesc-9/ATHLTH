@@ -3,6 +3,8 @@ import SwiftUI
 struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var mirroring: WorkoutMirroringStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     var body: some View {
         NavigationStack {
@@ -51,6 +53,46 @@ struct MirroredWorkoutLiveView: View {
                                     icon: "location.fill"
                                 )
                             }
+                        }
+
+                        if let liveSession =
+                            realtime.currentSession,
+                           realtime.isSharingLiveLocation {
+                            NavigationLink {
+                                ATHLTHLiveWorkoutMapView(
+                                    session: liveSession
+                                )
+                            } label: {
+                                ATHLTHCard {
+                                    HStack {
+                                        Label(
+                                            liveSession.ghostChallengeID ==
+                                                nil
+                                                ? "Live position"
+                                                : "Live Ghost Run",
+                                            systemImage:
+                                                "location.circle.fill"
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+
+                                        Spacer()
+
+                                        Image(
+                                            systemName:
+                                                "chevron.right"
+                                        )
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
 
                         ATHLTHCard {
@@ -104,6 +146,12 @@ struct MirroredWorkoutLiveView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .interactiveDismissDisabled(mirroring.hasActiveMirroredWorkout)
+        .task(
+            id: mirroring.snapshot?
+                .capturedAt
+        ) {
+            await syncLivePosition()
+        }
     }
 
     @ViewBuilder
@@ -319,4 +367,71 @@ struct MirroredWorkoutLiveView: View {
             return .red
         }
     }
+    @MainActor
+    private func syncLivePosition() async {
+        guard let snapshot =
+                mirroring.snapshot
+        else {
+            return
+        }
+
+        if snapshot.state == .completed ||
+            snapshot.state == .failed {
+            if realtime.currentSession != nil {
+                await realtime
+                    .leaveCurrentLiveWorkout()
+            }
+            return
+        }
+
+        guard snapshot.state == .running ||
+                snapshot.state == .paused
+        else {
+            return
+        }
+
+        if realtime.currentSession == nil {
+            guard ghostRace.reference == nil,
+                  social.privacy?
+                    .shareLiveWorkoutLocation ==
+                    true
+            else {
+                return
+            }
+
+            let activity: String
+            switch snapshot.kind {
+            case .walking:
+                activity = "walking"
+            case .cycling:
+                activity = "cycling"
+            case .running:
+                activity = "running"
+            default:
+                return
+            }
+
+            let visibility =
+                ATHLTHLiveWorkoutVisibility(
+                    rawValue:
+                        social.privacy?
+                            .liveLocationVisibility ??
+                        "followers"
+                ) ?? .followers
+
+            _ = await realtime
+                .beginLiveWorkout(
+                    title:
+                        snapshot.kind.title,
+                    activity: activity,
+                    visibility: visibility
+                )
+        }
+
+        await realtime
+            .publishMirroredSnapshot(
+                snapshot
+            )
+    }
+
 }
