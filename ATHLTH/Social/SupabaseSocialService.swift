@@ -219,6 +219,88 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
+    func loadShareOnlineStatus() async throws -> Bool {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        let rows: [OnlinePresencePreferenceRow] =
+            try await client
+                .from("profile_social_settings")
+                .select()
+                .eq("user_id", value: currentUserID)
+                .limit(1)
+                .execute()
+                .value
+
+        return rows.first?.shareOnlineStatus ?? false
+    }
+
+    func updateShareOnlineStatus(
+        _ enabled: Bool
+    ) async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        try await client
+            .from("profile_social_settings")
+            .update(
+                OnlinePresencePreferenceUpdate(
+                    shareOnlineStatus: enabled,
+                    updatedAt: Date()
+                )
+            )
+            .eq("user_id", value: currentUserID)
+            .execute()
+    }
+
+    func touchOnlinePresence(
+        sessionID: UUID
+    ) async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        try await client
+            .from("user_online_presence_sessions")
+            .upsert(
+                OnlinePresenceSessionWrite(
+                    userID: currentUserID,
+                    sessionID: sessionID,
+                    lastSeenAt: Date()
+                )
+            )
+            .execute()
+    }
+
+    func clearOnlinePresence(
+        sessionID: UUID
+    ) async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        try await client
+            .from("user_online_presence_sessions")
+            .delete()
+            .eq("user_id", value: currentUserID)
+            .eq("session_id", value: sessionID)
+            .execute()
+    }
+
+    func loadVisibleOnlinePresenceSessions()
+        async throws -> [OnlinePresenceSessionRecord]
+    {
+        try await client
+            .from("user_online_presence_sessions")
+            .select()
+            .order("last_seen_at", ascending: false)
+            .limit(500)
+            .execute()
+            .value
+    }
+
     func blockUser(_ userID: UUID) async throws {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
@@ -934,6 +1016,36 @@ private struct FriendRequestInsert: Encodable {
         case senderID = "sender_id"
         case recipientID = "recipient_id"
         case message
+    }
+}
+
+private struct OnlinePresencePreferenceRow: Decodable {
+    let shareOnlineStatus: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case shareOnlineStatus = "share_online_status"
+    }
+}
+
+private struct OnlinePresencePreferenceUpdate: Encodable {
+    let shareOnlineStatus: Bool
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case shareOnlineStatus = "share_online_status"
+        case updatedAt = "updated_at"
+    }
+}
+
+private struct OnlinePresenceSessionWrite: Encodable {
+    let userID: UUID
+    let sessionID: UUID
+    let lastSeenAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case sessionID = "session_id"
+        case lastSeenAt = "last_seen_at"
     }
 }
 
