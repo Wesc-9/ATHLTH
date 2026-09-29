@@ -135,8 +135,9 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                 comparison,
                 title: reference.title,
                 configuration:
-                    settings
-                        .ghostRaceAudioConfiguration
+                    phoneWorkout
+                        .active?
+                        .ghostAudioConfiguration
             )
         } else if let selectedSession =
                     realtime
@@ -170,8 +171,9 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                     comparison
                         .estimatedTimeDeltaSeconds,
                 configuration:
-                    settings
-                        .ghostRaceAudioConfiguration
+                    phoneWorkout
+                        .active?
+                        .ghostAudioConfiguration
             )
         }
 
