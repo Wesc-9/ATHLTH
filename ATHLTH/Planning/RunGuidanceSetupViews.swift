@@ -237,9 +237,12 @@ struct RunGuidanceSetupView: View {
     }
 }
 
-private struct PerWorkoutAudioCoachView:
+struct PerWorkoutAudioCoachView:
     View
 {
+    @EnvironmentObject private var session:
+        AppSessionStore
+
     @Binding var draft:
         AudioCoachDraft
     let showRouteOptions: Bool
@@ -247,13 +250,21 @@ private struct PerWorkoutAudioCoachView:
 
     var body: some View {
         ScrollView {
-            AudioCoachSetupCard(
-                draft: $draft,
-                showRouteOptions:
-                    showRouteOptions,
-                showStructuredOptions:
-                    showStructuredOptions
-            )
+            ATHLTHPlusFeatureGate(
+                feature: .audioCoach,
+                title:
+                    "Audio Coach · ATHLTH+",
+                message:
+                    "Spoken workout guidance is available with ATHLTH+ on iPhone and Apple Watch."
+            ) {
+                AudioCoachSetupCard(
+                    draft: $draft,
+                    showRouteOptions:
+                        showRouteOptions,
+                    showStructuredOptions:
+                        showStructuredOptions
+                )
+            }
             .padding()
         }
         .background(
