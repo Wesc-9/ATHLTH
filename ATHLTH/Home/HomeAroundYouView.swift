@@ -718,7 +718,17 @@ struct AroundYouExploreView: View {
 
                     Spacer()
 
-                    if publicTrails.isLoading {
+                    if publicTrails.isWarmingCache {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.mini)
+
+                            Text("Preparing trails…")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    } else if publicTrails.isLoading &&
+                                publicTrails.trails.isEmpty {
                         ProgressView()
                             .controlSize(.small)
                     } else {
@@ -781,7 +791,7 @@ struct AroundYouExploreView: View {
 
                     if trailMode {
                         ForEach(
-                            Array(publicTrails.trails.prefix(18))
+                            Array(publicTrails.trails.prefix(12))
                         ) { trail in
                             let isSelected =
                                 selectedTrail?.id == trail.id
