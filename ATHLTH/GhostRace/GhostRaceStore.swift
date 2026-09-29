@@ -119,8 +119,15 @@ final class GhostRaceStore: ObservableObject {
     @Published private(set) var comparison: GhostRaceComparison?
     @Published private(set) var result: GhostRaceResult?
     @Published var errorMessage: String?
+    @Published var liveSharingEnabledForNextRace = false
+    @Published private(set) var liveSession: GhostLiveSessionRecord?
+    @Published private(set) var visibleLiveRunners: [GhostLiveRunner] = []
+    @Published var liveSharingMessage: String?
 
+    private let liveService = SupabaseGhostLiveService()
     private var lastMatchedIndex: Int?
+    private var lastLivePublishAt: Date?
+    private var endingLiveSessionID: UUID?
 
     var isPrepared: Bool {
         reference != nil
@@ -384,6 +391,10 @@ final class GhostRaceStore: ObservableObject {
     }
 
     func cancel() {
+        scheduleLiveEnd(
+            status: "cancelled"
+        )
+
         reference = nil
         comparison = nil
         result = nil
@@ -393,6 +404,65 @@ final class GhostRaceStore: ObservableObject {
 
     func dismissResult() {
         cancel()
+    }
+
+    func beginLiveSharingIfNeeded(
+        title: String
+    ) async {
+        guard liveSharingEnabledForNextRace,
+              liveSession == nil,
+              let reference
+        else {
+            return
+        }
+
+        do {
+            liveSession =
+                try await liveService
+                    .beginSession(
+                        title:
+                            title.isEmpty
+                                ? reference.title
+                                : title,
+                        sourceReferenceID:
+                            reference
+                                .sourceWorkoutID
+                    )
+
+            lastLivePublishAt = nil
+            endingLiveSessionID = nil
+            liveSharingMessage =
+                "Live location is on for this Ghost Race."
+        } catch {
+            liveSharingMessage =
+                "Ghost Race started, but live sharing could not be enabled: \(error.localizedDescription)"
+        }
+    }
+
+    func refreshVisibleLiveRunners() async {
+        do {
+            let currentUserID =
+                liveService.currentUserID
+
+            visibleLiveRunners =
+                try await liveService
+                    .loadVisibleRunners()
+                    .filter {
+                        $0.session.ownerID !=
+                            currentUserID
+                    }
+        } catch {
+            // Live discovery is additive. Never block Ghost Race if the
+            // backend is unavailable or the migration has not deployed yet.
+        }
+    }
+
+    func liveRunner(
+        sessionID: UUID
+    ) -> GhostLiveRunner? {
+        visibleLiveRunners.first {
+            $0.session.id == sessionID
+        }
     }
 
     func update(
@@ -405,6 +475,10 @@ final class GhostRaceStore: ObservableObject {
         }
 
         if snapshot.state == .failed {
+            scheduleLiveEnd(
+                status: "failed"
+            )
+
             result = GhostRaceResult(
                 sourceWorkoutID:
                     reference.sourceWorkoutID,
@@ -432,6 +506,9 @@ final class GhostRaceStore: ObservableObject {
                     snapshot: snapshot,
                     reference: reference
                 )
+                scheduleLiveEnd(
+                    status: "completed"
+                )
             }
             return
         }
@@ -439,6 +516,10 @@ final class GhostRaceStore: ObservableObject {
         let currentLocation = CLLocation(
             latitude: latitude,
             longitude: longitude
+        )
+
+        scheduleLivePublish(
+            snapshot
         )
 
         guard let matchedIndex =
@@ -518,6 +599,91 @@ final class GhostRaceStore: ObservableObject {
                 snapshot: snapshot,
                 reference: reference
             )
+            scheduleLiveEnd(
+                status: "completed"
+            )
+        }
+    }
+
+    private func scheduleLivePublish(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        guard let liveSession,
+              let latitude =
+                snapshot.currentLatitude,
+              let longitude =
+                snapshot.currentLongitude
+        else {
+            return
+        }
+
+        let now = Date()
+
+        if let lastLivePublishAt,
+           now.timeIntervalSince(
+                lastLivePublishAt
+           ) < 2 {
+            return
+        }
+
+        self.lastLivePublishAt = now
+
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                try await self.liveService
+                    .publish(
+                        sessionID:
+                            liveSession.id,
+                        latitude: latitude,
+                        longitude: longitude,
+                        elapsedSeconds:
+                            snapshot.elapsedTime,
+                        distanceMeters:
+                            snapshot.distanceMeters,
+                        heartRateBPM:
+                            snapshot.heartRate
+                    )
+            } catch {
+                // A live-location write must never interrupt the workout.
+            }
+        }
+    }
+
+    private func scheduleLiveEnd(
+        status: String
+    ) {
+        guard let liveSession,
+              endingLiveSessionID !=
+                liveSession.id
+        else {
+            return
+        }
+
+        endingLiveSessionID =
+            liveSession.id
+        self.liveSession = nil
+        lastLivePublishAt = nil
+        liveSharingEnabledForNextRace =
+            false
+
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            try? await self.liveService
+                .finishSession(
+                    id: liveSession.id,
+                    status: status
+                )
+
+            await self
+                .refreshVisibleLiveRunners()
+            self.endingLiveSessionID = nil
         }
     }
 
