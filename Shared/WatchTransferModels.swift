@@ -623,6 +623,15 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var averageHeartRate: Double?
     var maxHeartRate: Double?
     var routePointCount: Int
+
+    // Optional route-completion fields keep older Watch/iPhone transfers
+    // decodable while giving both devices the same route-quality summary.
+    var routeMatchPercent: Double? = nil
+    var routeAverageDeviationMeters: Double? = nil
+    var routeMaxDeviationMeters: Double? = nil
+    var routeLeaderboardEligible: Bool? = nil
+    var routeComparisonID: UUID? = nil
+    var routeTitle: String? = nil
 }
 
 enum WatchWorkoutMirrorState: String, Codable, Hashable {
