@@ -209,7 +209,7 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
             runningPRsVisibility: "private",
             strengthPRsVisibility: "private",
             shareTrainingPresence: false,
-            showOnlineStatus: true,
+            showOnlineStatus: false,
             shareLiveWorkoutLocation: false,
             shareLiveWorkoutHeartRate: false,
             liveLocationVisibility: "followers",
