@@ -77,6 +77,10 @@ struct HomeActivityCenterV2: View {
 
             if let workout = latestWorkout {
                 workoutCard(workout)
+
+                WorkoutPlaceCompactBadge(
+                    workoutID: workout.id
+                )
             } else {
                 emptyState
             }
