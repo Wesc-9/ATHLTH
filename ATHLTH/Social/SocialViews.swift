@@ -1784,11 +1784,33 @@ struct SocialPrivacySettingsView: View {
                                 .tag("mutuals")
                         }
 
+                        Toggle(
+                            "Share live heart rate",
+                            isOn:
+                                binding
+                                    .shareLiveWorkoutHeartRate
+                        )
+
                         Text(
-                            "Your current position is shared only while a supported outdoor workout is active. ATHLTH keeps only the latest point and it expires after about 90 seconds."
+                            binding.wrappedValue
+                                .shareLiveWorkoutHeartRate
+                                ? "Your current position and current workout heart rate can be shown to the selected live audience. ATHLTH keeps only the latest live point, and it expires after about 90 seconds."
+                                : "Your current position is shared only while a supported outdoor workout is active. Heart rate stays private. ATHLTH keeps only the latest point and it expires after about 90 seconds."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    }
+
+                    .onChange(
+                        of:
+                            binding.wrappedValue
+                                .shareLiveWorkoutLocation
+                    ) { _, enabled in
+                        if !enabled {
+                            draft?
+                                .shareLiveWorkoutHeartRate =
+                                false
+                        }
                     }
 
                     Toggle("Performance Stats", isOn: binding.sharePerformanceStats)
