@@ -3625,81 +3625,206 @@ private struct HomeActivityGenericWorkoutCard: View {
 private struct HomeActivityCommunityCard: View {
     let item: SocialFeedItem
 
+    private var routeCoordinates: [CLLocationCoordinate2D] {
+        guard let encoded =
+                item.activity.metadata?["route_preview"],
+              !encoded.isEmpty
+        else {
+            return []
+        }
+
+        return encoded
+            .split(separator: ";")
+            .compactMap { point in
+                let parts =
+                    point.split(separator: ",")
+
+                guard parts.count == 2,
+                      let latitude =
+                        Double(parts[0]),
+                      let longitude =
+                        Double(parts[1])
+                else {
+                    return nil
+                }
+
+                let coordinate =
+                    CLLocationCoordinate2D(
+                        latitude: latitude,
+                        longitude: longitude
+                    )
+
+                return CLLocationCoordinate2DIsValid(
+                    coordinate
+                )
+                    ? coordinate
+                    : nil
+            }
+    }
+
+    private var routeRecipe: WorkoutVisualRecipe {
+        WorkoutVisualRecipe(
+            palette: "forest",
+            scene: "mountain",
+            light: "daylight",
+            motif: "route",
+            energy: "steady",
+            variant: 0
+        )
+    }
+
     var body: some View {
         ATHLTHCard {
-            HStack(alignment: .top, spacing: 11) {
-                NavigationLink {
-                    FriendProfileView(userID: item.actor.userID)
-                } label: {
-                    SocialAvatar(profile: item.actor, size: 42)
-                }
-                .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 11) {
+                    NavigationLink {
+                        FriendProfileView(
+                            userID: item.actor.userID
+                        )
+                    } label: {
+                        SocialAvatar(
+                            profile: item.actor,
+                            size: 42
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 5) {
-                        Text(item.actor.resolvedName)
-                            .font(.subheadline.weight(.semibold))
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        HStack(spacing: 5) {
+                            Text(item.actor.resolvedName)
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
 
-                        Text("·")
-                            .foregroundStyle(.secondary)
+                            Text("·")
+                                .foregroundStyle(.secondary)
 
-                        Text(item.activity.createdAt, style: .relative)
+                            Text(
+                                item.activity.createdAt,
+                                style: .relative
+                            )
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                    }
+                        }
 
-                    Text(item.activity.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    if let subtitle = item.activity.subtitle {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let caption = item.activity.metadata?["caption"],
-                       !caption.isEmpty {
-                        Text(caption)
-                            .font(.caption)
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText.opacity(0.80)
+                        Text(item.activity.title)
+                            .font(
+                                .subheadline
+                                    .weight(.semibold)
                             )
-                            .lineLimit(2)
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
                     }
 
-                    let reactionCount = item.reactions.count
-                    if reactionCount > 0 {
-                        Text(
-                            "🔥 \(reactionCount) reaction\(reactionCount == 1 ? "" : "s")"
+                    Spacer()
+
+                    Image(systemName: activityIcon)
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .semibold
+                            )
                         )
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    }
+                        .foregroundStyle(
+                            ATHLTHTheme.accent
+                        )
+                        .frame(width: 34, height: 34)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: Circle()
+                        )
                 }
 
-                Spacer()
-
-                Image(systemName: activityIcon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 34, height: 34)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: Circle()
+                if routeCoordinates.count >= 2 {
+                    HomeActivityHeroArtwork(
+                        imageURL: nil,
+                        recipe: routeRecipe,
+                        coordinates: routeCoordinates
                     )
+                    .frame(height: 220)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                        .stroke(
+                            Color.black.opacity(0.06),
+                            lineWidth: 0.8
+                        )
+                    }
+                    .accessibilityLabel(
+                        "Shared Route Ribbon map"
+                    )
+                }
+
+                if let subtitle = item.activity.subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let caption =
+                        item.activity.metadata?["caption"],
+                   !caption.isEmpty {
+                    Text(caption)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                                .opacity(0.80)
+                        )
+                        .lineLimit(3)
+                }
+
+                let reactionCount = item.reactions.count
+                if reactionCount > 0 {
+                    Text(
+                        "🔥 \(reactionCount) reaction\(reactionCount == 1 ? "" : "s")"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
             }
         }
     }
 
     private var activityIcon: String {
+        if item.activity.kind == "workout" {
+            switch item.activity.metadata?["kind"] {
+            case WorkoutActivity.strength.rawValue:
+                return "figure.strengthtraining.traditional"
+            case WorkoutActivity.walking.rawValue:
+                return "figure.walk"
+            case WorkoutActivity.cycling.rawValue:
+                return "bicycle"
+            case WorkoutActivity.hiking.rawValue:
+                return "figure.hiking"
+            default:
+                return "figure.run"
+            }
+        }
+
         switch item.activity.kind {
-        case "workout": return "figure.run"
-        case "trophy": return "trophy.fill"
-        case "goal": return "target"
-        case "challenge": return "person.2.fill"
-        case "personal_record": return "bolt.fill"
-        default: return "sparkles"
+        case "trophy":
+            return "trophy.fill"
+        case "goal":
+            return "target"
+        case "challenge":
+            return "person.2.fill"
+        case "personal_record":
+            return "bolt.fill"
+        default:
+            return "sparkles"
         }
     }
 }
@@ -3718,6 +3843,8 @@ struct WorkoutPublishView: View {
     @State private var caption = ""
     @State private var publishing = false
     @State private var selectedAlreadyPublished = false
+    @State private var routeLocations: [CLLocation] = []
+    @State private var shareRoutePreview = false
     @State private var successMessage: String?
 
     init(initialWorkoutID: UUID? = nil) {
@@ -3832,6 +3959,22 @@ struct WorkoutPublishView: View {
                             }
                         }
 
+                        if routeLocations.count >= 2 &&
+                            isRouteActivity(workout.activity) {
+                            Toggle(
+                                "Show route in Activity Center",
+                                isOn: $shareRoutePreview
+                            )
+
+                            Text(
+                                settings.hideRouteStartAndEnd
+                                    ? "Route Ribbon will be shared with the start and finish trimmed for privacy."
+                                    : "Route Ribbon will use the recorded GPS route in the Activity Center."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
                         if selectedAlreadyPublished {
                             Label(
                                 "This workout is already published.",
@@ -3888,8 +4031,24 @@ struct WorkoutPublishView: View {
                     selectedAlreadyPublished = false
                     caption = ""
                     visibility = settings.defaultActivityVisibility
+                    routeLocations = []
+                    shareRoutePreview = false
                     return
                 }
+
+                let detail =
+                    await health.workoutDetail(
+                        for: selectedWorkoutID
+                    )
+                routeLocations =
+                    detail.route
+                        .filter {
+                            $0.horizontalAccuracy >= 0 &&
+                            $0.horizontalAccuracy <= 65
+                        }
+                        .sorted {
+                            $0.timestamp < $1.timestamp
+                        }
 
                 if let activity = await social.workoutActivity(
                     for: selectedWorkoutID
@@ -3901,10 +4060,14 @@ struct WorkoutPublishView: View {
                             rawValue: activity.visibility
                         ) ??
                         settings.defaultActivityVisibility
+                    shareRoutePreview =
+                        activity.metadata?["route_preview"]?
+                            .isEmpty == false
                 } else {
                     selectedAlreadyPublished = false
                     caption = ""
                     visibility = settings.defaultActivityVisibility
+                    shareRoutePreview = false
                 }
             }
         }
@@ -3920,7 +4083,11 @@ struct WorkoutPublishView: View {
         let success = await social.publishWorkout(
             workout,
             visibility: visibility,
-            caption: caption
+            caption: caption,
+            routePreview:
+                shareRoutePreview
+                    ? encodedRoutePreview()
+                    : nil
         )
 
         if success {
@@ -3934,4 +4101,143 @@ struct WorkoutPublishView: View {
             dismiss()
         }
     }
+
+    private func isRouteActivity(
+        _ activity: WorkoutActivity
+    ) -> Bool {
+        switch activity {
+        case .running, .walking, .cycling, .hiking:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func encodedRoutePreview() -> String? {
+        guard routeLocations.count >= 2 else {
+            return nil
+        }
+
+        let privacySafeRoute: [CLLocation]
+        if settings.hideRouteStartAndEnd {
+            privacySafeRoute =
+                trimRouteEndpoints(
+                    routeLocations,
+                    distanceMeters: 200
+                )
+        } else {
+            privacySafeRoute = routeLocations
+        }
+
+        guard privacySafeRoute.count >= 2 else {
+            return nil
+        }
+
+        let sampled =
+            sampledRoute(
+                privacySafeRoute,
+                maximumCount: 90
+            )
+
+        return sampled
+            .map {
+                String(
+                    format: "%.5f,%.5f",
+                    $0.coordinate.latitude,
+                    $0.coordinate.longitude
+                )
+            }
+            .joined(separator: ";")
+    }
+
+    private func trimRouteEndpoints(
+        _ route: [CLLocation],
+        distanceMeters: CLLocationDistance
+    ) -> [CLLocation] {
+        guard route.count >= 3 else {
+            return []
+        }
+
+        var startIndex = 0
+        var travelledFromStart = 0.0
+
+        for index in 1..<route.count {
+            travelledFromStart +=
+                route[index].distance(
+                    from: route[index - 1]
+                )
+
+            if travelledFromStart >=
+                distanceMeters {
+                startIndex = index
+                break
+            }
+        }
+
+        var endIndex = route.count - 1
+        var travelledFromEnd = 0.0
+
+        for index in stride(
+            from: route.count - 2,
+            through: 0,
+            by: -1
+        ) {
+            travelledFromEnd +=
+                route[index].distance(
+                    from: route[index + 1]
+                )
+
+            if travelledFromEnd >=
+                distanceMeters {
+                endIndex = index
+                break
+            }
+        }
+
+        guard travelledFromStart >=
+                distanceMeters,
+              travelledFromEnd >=
+                distanceMeters,
+              startIndex < endIndex
+        else {
+            return []
+        }
+
+        return Array(
+            route[startIndex...endIndex]
+        )
+    }
+
+    private func sampledRoute(
+        _ route: [CLLocation],
+        maximumCount: Int
+    ) -> [CLLocation] {
+        guard route.count > maximumCount,
+              maximumCount > 2
+        else {
+            return route
+        }
+
+        let lastIndex = route.count - 1
+        let step =
+            Double(lastIndex) /
+            Double(maximumCount - 1)
+
+        return (0..<maximumCount).map {
+            index in
+            route[
+                min(
+                    Int(
+                        (
+                            Double(index) *
+                            step
+                        )
+                        .rounded()
+                    ),
+                    lastIndex
+                )
+            ]
+        }
+    }
+
 }
