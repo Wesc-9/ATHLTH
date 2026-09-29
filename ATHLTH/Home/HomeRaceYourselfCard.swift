@@ -1,7 +1,7 @@
 import CoreLocation
 import SwiftUI
 
-private struct HomeRaceYourselfPreview: Equatable {
+private struct HomeRaceYourselfPreview {
     let workoutID: UUID
     let startedAt: Date
     let duration: TimeInterval
