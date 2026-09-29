@@ -85,12 +85,11 @@ struct AppleMapPlace: Identifiable, Sendable {
 
     @MainActor
     func openInMaps() {
+        let placemark = MKPlacemark(
+            coordinate: coordinate
+        )
         let item = MKMapItem(
-            location: CLLocation(
-                latitude: latitude,
-                longitude: longitude
-            ),
-            address: nil
+            placemark: placemark
         )
         item.name = name
         item.openInMaps(
