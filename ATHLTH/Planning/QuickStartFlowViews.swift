@@ -225,6 +225,9 @@ struct RunQuickStartConfiguration {
     let workout: RunningWorkoutTemplate?
     let captureDevice: WorkoutCaptureDevice
     let audioCoach: WatchAudioCoachConfiguration
+    let routeAlerts: WatchRouteAlertConfiguration
+    let ghostTargetDurationSeconds: TimeInterval?
+    let ghostUpdates: WatchGhostRaceAudioConfiguration?
     let friends: [SocialProfileCard]
     let gearIDs: Set<UUID>
 
@@ -408,7 +411,12 @@ struct RunQuickStartSheet: View {
     @State private var showingRunningLibrary = false
 
     @State private var audioCoachDraft = AudioCoachDraft()
+    @State private var routeGuardianDraft =
+        RouteGuardianDraft()
+    @State private var ghostDraft =
+        GhostQuickStartDraft()
     @State private var didLoadAudioCoachDefaults = false
+    @State private var didLoadGuidanceDefaults = false
 
     private var canStart: Bool {
         if captureDevice == .appleWatch,
@@ -448,21 +456,85 @@ struct RunQuickStartSheet: View {
                         activity: .running
                     )
 
-                    ATHLTHPlusFeatureGate(
-                        feature: .audioCoach,
-                        title: "Audio Coach · ATHLTH+",
-                        message:
-                            "Choose spoken pace, time, route progress and workout-step updates on iPhone or Apple Watch."
-                    ) {
-                        AudioCoachSetupCard(
-                            draft: $audioCoachDraft,
-                            showRouteOptions:
-                                mode == .route ||
-                                selectedWorkout?.routeID != nil,
-                            showStructuredOptions:
+                    NavigationLink {
+                        RunGuidanceSetupView(
+                            audioCoach:
+                                $audioCoachDraft,
+                            routeGuardian:
+                                $routeGuardianDraft,
+                            ghost:
+                                $ghostDraft,
+                            route:
+                                guidanceRoute,
+                            structuredWorkout:
                                 mode == .structured
+                                    ? selectedWorkout
+                                    : nil
                         )
+                    } label: {
+                        ATHLTHCard {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "waveform.and.mic"
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .premiumGold
+                                )
+                                .frame(
+                                    width: 40,
+                                    height: 40
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .premiumGoldSoft,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                12
+                                        )
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        "Guidance & Alerts"
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+
+                                    Text(
+                                        guidanceSummary
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                    .multilineTextAlignment(
+                                        .leading
+                                    )
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                        }
                     }
+                    .buttonStyle(.plain)
                     ATHLTHCard {
                         WorkoutFriendPicker(
                             selectedFriendIDs: $selectedFriendIDs
@@ -521,6 +593,17 @@ struct RunQuickStartSheet: View {
                     didLoadAudioCoachDefaults = true
                 }
 
+                if !didLoadGuidanceDefaults {
+                    routeGuardianDraft.load(
+                        from: settings
+                    )
+                    ghostDraft.load(
+                        route: guidanceRoute,
+                        settings: settings
+                    )
+                    didLoadGuidanceDefaults = true
+                }
+
                 if social.friends.isEmpty {
                     await social.refresh()
                 }
@@ -542,6 +625,18 @@ struct RunQuickStartSheet: View {
                 of: selectedRoute?.id
             ) { _, _ in
                 routeLocationProbe.refresh()
+                ghostDraft.load(
+                    route: guidanceRoute,
+                    settings: settings
+                )
+            }
+            .onChange(
+                of: selectedWorkout?.id
+            ) { _, _ in
+                ghostDraft.load(
+                    route: guidanceRoute,
+                    settings: settings
+                )
             }
         }
     }
@@ -849,6 +944,18 @@ struct RunQuickStartSheet: View {
                     workout: selectedWorkout,
                     captureDevice: captureDevice,
                     audioCoach: audioCoachConfiguration,
+                    routeAlerts:
+                        routeGuardianDraft
+                            .configuration,
+                    ghostTargetDurationSeconds:
+                        ghostDraft
+                            .targetDuration,
+                    ghostUpdates:
+                        ghostDraft.enabled &&
+                        ghostDraft.updatesEnabled
+                            ? settings
+                                .ghostRaceAudioConfiguration
+                            : nil,
                     friends: friends,
                     gearIDs: selectedGearIDs
                 )
@@ -889,6 +996,49 @@ struct RunQuickStartSheet: View {
         case .route: return "Start Route on Watch"
         case .structured: return "Start Workout on Watch"
         }
+    }
+
+    private var guidanceRoute:
+        TrainingRoute?
+    {
+        if mode == .route {
+            return selectedRoute
+        }
+
+        guard mode == .structured,
+              let routeID =
+                selectedWorkout?.routeID
+        else {
+            return nil
+        }
+
+        return session.savedRoutes.first {
+            $0.id == routeID
+        }
+    }
+
+    private var guidanceSummary: String {
+        var parts: [String] = []
+
+        if audioCoachDraft.enabled {
+            parts.append("Audio Coach")
+        }
+
+        if routeGuardianDraft.enabled,
+           guidanceRoute != nil {
+            parts.append("Route Guardian")
+        }
+
+        if ghostDraft.enabled,
+           guidanceRoute != nil {
+            parts.append("Ghost")
+        }
+
+        return parts.isEmpty
+            ? "Tap to configure this workout"
+            : parts.joined(
+                separator: " · "
+            )
     }
 
     private var audioCoachConfiguration:
