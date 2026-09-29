@@ -214,6 +214,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             ? .outdoor
             : .indoor
 
+        // Queue the current display preferences before the Watch workout
+        // starts. Delivery is independent of the workout launch itself.
+        sendLiveSurfaceConfiguration(
+            ATHLTHLiveWorkoutPreferencesStore.load()
+        )
+        sendLiveSurfaceContext(
+            ATHLTHLiveWorkoutContextStore.load()
+        )
+
         do {
             try await healthStore.startWatchApp(toHandle: configuration)
         } catch {
@@ -278,6 +287,24 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         sendWatchPayload(
             ghost,
             kind: .ghostRace
+        )
+    }
+
+    func sendLiveSurfaceConfiguration(
+        _ configuration: ATHLTHLiveWorkoutSurfaceConfiguration
+    ) {
+        sendWatchPayload(
+            configuration,
+            kind: .liveSurfaceConfiguration
+        )
+    }
+
+    func sendLiveSurfaceContext(
+        _ context: ATHLTHLiveWorkoutContext
+    ) {
+        sendWatchPayload(
+            context,
+            kind: .liveSurfaceContext
         )
     }
 
