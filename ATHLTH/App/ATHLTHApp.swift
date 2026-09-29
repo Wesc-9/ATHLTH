@@ -19,6 +19,7 @@ struct ATHLTHApp: App {
     @StateObject private var calendarSync = AppleCalendarSyncStore()
     @StateObject private var challengeStore = ChallengeStore()
     @StateObject private var social = SocialStore()
+    @StateObject private var livePresence = ATHLTHLivePresenceStore()
     @StateObject private var messaging = MessagingStore()
     @StateObject private var communityEvents = CommunityEventStore()
     @StateObject private var officialWeeklyChallenges = OfficialWeeklyChallengeStore()
@@ -56,6 +57,7 @@ struct ATHLTHApp: App {
                 .environmentObject(calendarSync)
                 .environmentObject(challengeStore)
                 .environmentObject(social)
+                .environmentObject(livePresence)
                 .environmentObject(messaging)
                 .environmentObject(communityEvents)
                 .environmentObject(officialWeeklyChallenges)
@@ -142,6 +144,7 @@ struct AppRootView: View {
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var officialWeeklyChallenges: OfficialWeeklyChallengeStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var livePresence: ATHLTHLivePresenceStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var communityEvents: CommunityEventStore
     @EnvironmentObject private var communityGroups: CommunityGroupStore
@@ -284,6 +287,10 @@ struct AppRootView: View {
             phoneWorkout.checkpoint()
             if phase != .active {
                 strengthWorkout.checkpoint()
+
+                Task {
+                    await livePresence.deactivate()
+                }
             }
 
             if phase != .active,
@@ -301,6 +308,20 @@ struct AppRootView: View {
             // Refresh Watch availability whenever the app becomes active.
             // This is connection state, not a global workout-device choice.
             watchConnection.connect()
+
+            Task {
+                let privacy = social.privacy
+                await livePresence.configure(
+                    showOnlineStatus:
+                        privacy?.showOnlineStatus
+                            ?? false,
+                    shareLiveLocation:
+                        privacy?
+                            .shareLiveWorkoutLocation
+                            ?? false
+                )
+                await livePresence.activate()
+            }
 
             let now = Date()
             if let lastFullLifecycleRefreshAt,
@@ -728,19 +749,127 @@ struct AppRootView: View {
             Task { await syncPushPreferences() }
         }
         .onChange(of: social.privacy) { _, privacy in
-            guard appSession.signedIn, privacy != nil else { return }
+            guard appSession.signedIn,
+                  let privacy
+            else {
+                return
+            }
 
             Task {
+                await livePresence.configure(
+                    showOnlineStatus:
+                        privacy.showOnlineStatus
+                            ?? false,
+                    shareLiveLocation:
+                        privacy
+                            .shareLiveWorkoutLocation
+                            ?? false
+                )
+
+                if scenePhase == .active {
+                    await livePresence.activate()
+                }
+
                 await syncSocialOwnedData()
             }
         }
         .onChange(of: appSession.signedIn ? appSession.profile.userID : nil, initial: true) { _, userID in
             phoneWorkout.switchAccount(userID)
+
+            Task {
+                await livePresence.reset()
+                if userID != nil,
+                   scenePhase == .active {
+                    let privacy = social.privacy
+                    await livePresence.configure(
+                        showOnlineStatus:
+                            privacy?.showOnlineStatus
+                                ?? false,
+                        shareLiveLocation:
+                            privacy?
+                                .shareLiveWorkoutLocation
+                                ?? false
+                    )
+                    await livePresence.activate()
+                }
+            }
+
             trainingBackups.switchAccount(userID)
             goals.switchAccount(userID)
             strengthWorkout.switchAccount(userID)
             exerciseLibrary.switchAccount(userID)
             runningWorkoutLibrary.switchAccount(userID)
+        }
+        .onChange(
+            of: phoneWorkout.active?.id
+        ) { oldID, newID in
+            Task {
+                if oldID != nil,
+                   newID == nil {
+                    await livePresence
+                        .finishOwnLiveWorkout()
+                    return
+                }
+
+                guard let active =
+                        phoneWorkout.active,
+                      active.resumedAt != nil
+                else {
+                    return
+                }
+
+                _ = await livePresence
+                    .startOwnLiveWorkout(
+                        workoutID: active.id,
+                        walking: active.walking,
+                        title: active.title
+                    )
+            }
+        }
+        .onChange(
+            of: phoneWorkout.active?.resumedAt
+        ) { _, resumedAt in
+            guard resumedAt != nil,
+                  let active =
+                    phoneWorkout.active,
+                  livePresence
+                    .ownLiveSessionID == nil
+            else {
+                return
+            }
+
+            Task {
+                _ = await livePresence
+                    .startOwnLiveWorkout(
+                        workoutID: active.id,
+                        walking: active.walking,
+                        title: active.title
+                    )
+            }
+        }
+        .onChange(
+            of: phoneWorkout.active?.points.count
+        ) { _, _ in
+            guard let active =
+                    phoneWorkout.active,
+                  let point =
+                    active.points.last
+            else {
+                return
+            }
+
+            Task {
+                await livePresence
+                    .publishOwnLivePoint(
+                        location: point.location,
+                        distanceMeters:
+                            active.distanceMeters,
+                        elapsedSeconds:
+                            active.elapsed(
+                                at: Date()
+                            )
+                    )
+            }
         }
         .task(id: appSession.signedIn ? appSession.profile.userID : nil) {
             guard appSession.signedIn else { return }
