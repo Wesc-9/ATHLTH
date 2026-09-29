@@ -93,7 +93,7 @@ private struct PublicTrailDiscoveryRequest:
     let radiusKilometers: Double
 }
 
-private struct PublicTrailDiscoveryResponse:
+struct PublicTrailDiscoveryResponse:
     Decodable {
     let trails: [PublicTrailRecord]
     let source: String
