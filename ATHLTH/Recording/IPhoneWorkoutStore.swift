@@ -2468,6 +2468,83 @@ final class IPhoneWorkoutStore:
         )
     }
 
+    func currentLiveSnapshot()
+        -> WatchWorkoutLiveSnapshot?
+    {
+        guard let workout = active else {
+            return nil
+        }
+
+        let latest =
+            workout.points.last
+
+        return WatchWorkoutLiveSnapshot(
+            kind:
+                workout.walking
+                    ? .walking
+                    : .running,
+            state:
+                workout.resumedAt == nil
+                    ? .paused
+                    : .running,
+            startedAt: workout.start,
+            capturedAt: Date(),
+            elapsedTime:
+                workout.elapsed(at: Date()),
+            heartRate: 0,
+            activeCalories: 0,
+            distanceMeters:
+                workout.distanceMeters,
+            averageHeartRate: nil,
+            maxHeartRate: nil,
+            routePointCount:
+                workout.points.count,
+            currentLatitude:
+                latest?.latitude,
+            currentLongitude:
+                latest?.longitude,
+            routeProgressPercent:
+                workout.routeProgressPercent,
+            routeComparisonID:
+                workout
+                    .plannedComparisonRouteID ??
+                workout.plannedRouteID,
+            routeTitle:
+                workout.plannedRouteTitle,
+            routeDistanceMeters:
+                workout
+                    .plannedRouteDistanceKilometers
+                    .map { $0 * 1_000 },
+            workoutDisplayTitle:
+                workout.title,
+            currentPaceSecondsPerKilometer:
+                workout
+                    .currentPaceSecondsPerKilometer,
+            routeRemainingMeters:
+                workout.routeRemainingMeters,
+            routeDeviationMeters:
+                workout.routeDeviationMeters,
+            routeDeviationThresholdMeters:
+                workout
+                    .routeAlertConfiguration?
+                    .deviationMeters,
+            ghostRaceTitle:
+                workout.ghostRaceTitle,
+            ghostDistanceDeltaMeters:
+                workout
+                    .ghostDistanceDeltaMeters,
+            ghostTimeDeltaSeconds:
+                workout
+                    .ghostTimeDeltaSeconds,
+            liveSurfaceConfiguration:
+                ATHLTHLiveWorkoutPreferencesStore
+                    .load(),
+            liveSurfaceContext:
+                ATHLTHLiveWorkoutContextStore
+                    .load()
+        )
+    }
+
     private func syncLiveActivity() {
         guard let workout = active else {
             return
@@ -2606,6 +2683,14 @@ final class IPhoneWorkoutStore:
                     runningStepProgress,
                 runningNextStepTitle:
                     nextStepTitle,
+                ghostRaceTitle:
+                    workout.ghostRaceTitle,
+                ghostDistanceDeltaMeters:
+                    workout
+                        .ghostDistanceDeltaMeters,
+                ghostTimeDeltaSeconds:
+                    workout
+                        .ghostTimeDeltaSeconds,
                 liveSurfaceConfiguration:
                     ATHLTHLiveWorkoutPreferencesStore
                         .load(),
