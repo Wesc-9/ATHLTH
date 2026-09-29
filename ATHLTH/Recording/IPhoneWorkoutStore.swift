@@ -1084,7 +1084,42 @@ final class IPhoneWorkoutStore:
 
         evaluateGhostUpdates(
             workout: workout,
-            comparison: comparison
+            distanceDelta:
+                comparison.signedDistanceMeters,
+            timeDelta:
+                comparison.signedTimeSeconds
+        )
+
+        active = workout
+        persistActiveCheckpoint()
+        syncLiveActivity()
+    }
+
+    func applyLiveGhostUpdate(
+        title: String,
+        distanceDelta: Double,
+        timeDelta: TimeInterval,
+        configuration:
+            WatchGhostRaceAudioConfiguration
+    ) {
+        guard var workout = active,
+              !workout.walking
+        else {
+            return
+        }
+
+        workout.ghostRaceTitle = title
+        workout.ghostDistanceDeltaMeters =
+            distanceDelta
+        workout.ghostTimeDeltaSeconds =
+            timeDelta
+        workout.ghostAudioConfiguration =
+            configuration
+
+        evaluateGhostUpdates(
+            workout: workout,
+            distanceDelta: distanceDelta,
+            timeDelta: timeDelta
         )
 
         active = workout
@@ -1383,7 +1418,8 @@ final class IPhoneWorkoutStore:
 
     private func evaluateGhostUpdates(
         workout: PhoneWorkout,
-        comparison: GhostRaceComparison
+        distanceDelta: Double,
+        timeDelta: TimeInterval
     ) {
         guard let configuration =
                 workout.ghostAudioConfiguration,
@@ -1428,11 +1464,6 @@ final class IPhoneWorkoutStore:
             nextGhostTimeAnnouncementSeconds =
                 updatedNext
         }
-
-        let distanceDelta =
-            comparison.signedDistanceMeters
-        let timeDelta =
-            comparison.signedTimeSeconds
 
         if periodic {
             deliverGhostUpdate(
