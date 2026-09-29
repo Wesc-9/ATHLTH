@@ -230,19 +230,46 @@ create policy live_workout_sessions_insert_own
     )
   );
 
+drop policy if exists live_workout_sessions_update_owner
+  on public.live_workout_sessions;
 drop policy if exists live_workout_sessions_update_participant
   on public.live_workout_sessions;
-create policy live_workout_sessions_update_participant
+create policy live_workout_sessions_update_owner
   on public.live_workout_sessions
   for update
   to authenticated
-  using (
-    owner_id = (select auth.uid())
-    or opponent_user_id = (select auth.uid())
-  )
-  with check (
-    owner_id = owner_id
-  );
+  using (owner_id = (select auth.uid()))
+  with check (owner_id = (select auth.uid()));
+
+create or replace function private.guard_live_workout_session_identity()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog, public, private
+as $
+begin
+  if new.id <> old.id
+     or new.owner_id <> old.owner_id
+     or new.opponent_user_id is distinct from old.opponent_user_id
+     or new.ghost_challenge_id is distinct from old.ghost_challenge_id
+     or new.activity <> old.activity
+     or new.started_at <> old.started_at
+     or new.created_at <> old.created_at then
+    raise exception 'Live workout session identity fields are immutable';
+  end if;
+
+  return new;
+end;
+$;
+
+revoke all on function private.guard_live_workout_session_identity()
+  from public, anon;
+
+drop trigger if exists live_workout_sessions_guard_identity
+  on public.live_workout_sessions;
+create trigger live_workout_sessions_guard_identity
+before update on public.live_workout_sessions
+for each row execute function private.guard_live_workout_session_identity();
 
 drop policy if exists live_workout_locations_select_allowed
   on public.live_workout_locations;
