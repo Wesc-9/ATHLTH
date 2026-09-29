@@ -309,6 +309,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachAnnounceRemainingStepTime: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceRemainingStepDistance: Bool { didSet { persist() } }
     @Published var audioCoachDuckOtherAudio: Bool { didSet { persist() } }
+    @Published var guidanceQuietPeriodSeconds: Int { didSet { persist() } }
 
     @Published var ghostRaceAudioEnabled: Bool { didSet { persist() } }
     @Published var ghostRaceAudioDistanceIntervalKilometers: Double { didSet { persist() } }
@@ -318,6 +319,8 @@ final class AppSettingsStore: ObservableObject {
     @Published var ghostRaceAudioAnnounceLeadChanges: Bool { didSet { persist() } }
     @Published var ghostRaceAudioLeadChangeMeters: Double { didSet { persist() } }
     @Published var ghostRaceAudioDelivery: WatchAlertDelivery { didSet { persist() } }
+    @Published var ghostRaceAudioLeadChangeDelivery: WatchAlertDelivery { didSet { persist() } }
+    @Published var ghostRaceAudioImportantLeadChangeMeters: Double { didSet { persist() } }
 
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
@@ -532,6 +535,10 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.audioCoach.duckOtherAudio"
             ) as? Bool ?? true
+        guidanceQuietPeriodSeconds =
+            defaults.object(
+                forKey: "settings.guidance.quietPeriodSeconds"
+            ) as? Int ?? 10
 
         ghostRaceAudioEnabled =
             defaults.object(
@@ -567,6 +574,18 @@ final class AppSettingsStore: ObservableObject {
                     forKey: "settings.ghostRace.audio.delivery"
                 ) ?? ""
             ) ?? .voice
+        ghostRaceAudioLeadChangeDelivery =
+            WatchAlertDelivery(
+                rawValue: defaults.string(
+                    forKey:
+                        "settings.ghostRace.audio.leadChangeDelivery"
+                ) ?? ""
+            ) ?? .haptic
+        ghostRaceAudioImportantLeadChangeMeters =
+            defaults.object(
+                forKey:
+                    "settings.ghostRace.audio.importantLeadChangeMeters"
+            ) as? Double ?? 50
 
         workoutRemindersEnabled = defaults.object(forKey: "settings.workoutReminders") as? Bool ?? true
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
@@ -717,6 +736,10 @@ final class AppSettingsStore: ObservableObject {
             audioCoachDuckOtherAudio,
             forKey: "settings.audioCoach.duckOtherAudio"
         )
+        defaults.set(
+            guidanceQuietPeriodSeconds,
+            forKey: "settings.guidance.quietPeriodSeconds"
+        )
 
         defaults.set(
             ghostRaceAudioEnabled,
@@ -749,6 +772,16 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(
             ghostRaceAudioDelivery.rawValue,
             forKey: "settings.ghostRace.audio.delivery"
+        )
+        defaults.set(
+            ghostRaceAudioLeadChangeDelivery.rawValue,
+            forKey:
+                "settings.ghostRace.audio.leadChangeDelivery"
+        )
+        defaults.set(
+            ghostRaceAudioImportantLeadChangeMeters,
+            forKey:
+                "settings.ghostRace.audio.importantLeadChangeMeters"
         )
 
         defaults.set(workoutRemindersEnabled, forKey: "settings.workoutReminders")
@@ -858,7 +891,19 @@ final class AppSettingsStore: ObservableObject {
                     250
                 ),
             delivery:
-                ghostRaceAudioDelivery
+                ghostRaceAudioDelivery,
+            periodicDelivery:
+                ghostRaceAudioDelivery,
+            leadChangeDelivery:
+                ghostRaceAudioLeadChangeDelivery,
+            importantLeadChangeMeters:
+                min(
+                    max(
+                        ghostRaceAudioImportantLeadChangeMeters,
+                        ghostRaceAudioLeadChangeMeters
+                    ),
+                    500
+                )
         )
     }
 
