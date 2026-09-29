@@ -19,6 +19,8 @@ struct PhoneRouteCompletionSummary: Codable, Hashable {
     var durationSeconds: TimeInterval
     var leaderboardEligible: Bool
     var personalBest: Bool
+    var leaderboardRank: Int? = nil
+    var leaderboardFieldSize: Int? = nil
 }
 
 private enum IPhoneWorkoutHealthError: LocalizedError {
