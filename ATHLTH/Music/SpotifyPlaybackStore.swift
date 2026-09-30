@@ -215,6 +215,39 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         beginPKCEAuthorizationIfNeeded()
     }
 
+    func applicationDidBecomeActive() {
+        guard let appRemote,
+              !appRemote.isConnected,
+              pendingPlaybackURI != nil ||
+                activePlaylist != nil
+        else {
+            return
+        }
+
+        Task {
+            guard let token =
+                    await accessTokenForRequest()
+            else {
+                return
+            }
+
+            appRemote
+                .connectionParameters
+                .accessToken = token
+            appRemote.connect()
+        }
+    }
+
+    func applicationWillResignActive() {
+        guard let appRemote,
+              appRemote.isConnected
+        else {
+            return
+        }
+
+        appRemote.disconnect()
+    }
+
     func disconnect() {
         appRemote?.disconnect()
         sessionManager?.session = nil
