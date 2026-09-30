@@ -1636,3 +1636,99 @@ struct WorkoutTemplateBuilderView: View {
     }
 }
 
+
+struct SavedWorkoutPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+
+    let onSelect: (PlannedSession) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if session.savedWorkoutTemplates.isEmpty {
+                    ContentUnavailableView(
+                        "No saved workouts",
+                        systemImage: "rectangle.stack",
+                        description: Text(
+                            "Save or create a workout in Library first."
+                        )
+                    )
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(
+                        session.savedWorkoutTemplates
+                    ) { workout in
+                        Button {
+                            onSelect(workout)
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        workout.isStructuredWorkout
+                                            ? "rectangle.stack.fill"
+                                            : workout.kind.systemImage
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accent
+                                )
+                                .frame(width: 34, height: 34)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 10,
+                                        style: .continuous
+                                    )
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(workout.title)
+                                        .font(
+                                            .subheadline
+                                                .weight(.semibold)
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme.primaryText
+                                        )
+
+                                    Text(
+                                        workout.isStructuredWorkout
+                                            ? "\(workout.resolvedWorkoutBlocks.count) blocks · \(workout.workoutCategory?.capitalized ?? "Workout")"
+                                            : workout.kind.title
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName: "chevron.right"
+                                )
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("My Workouts")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
