@@ -39,11 +39,6 @@ struct ATHLTHCommunityV3View: View {
             }
     }
 
-    private var weeklyChallenge: OfficialWeeklyChallenge? {
-        officialChallenges.activeChallenge ??
-        officialChallenges.upcomingChallenges.first
-    }
-
     private var pulseSummary: String {
         if !social.friends.isEmpty && !activeChallenges.isEmpty {
             return "Your circle is moving. Keep the week competitive."
@@ -147,7 +142,9 @@ struct ATHLTHCommunityV3View: View {
                     "A shared target gives the community something concrete to chase."
             )
 
-            if let weeklyChallenge {
+            if let weeklyChallenge =
+                officialChallenges.activeChallenge ??
+                officialChallenges.upcomingChallenges.first {
                 OfficialWeeklyChallengeCard(
                     challenge: weeklyChallenge,
                     profiles:
