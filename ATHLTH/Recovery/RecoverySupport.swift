@@ -16,6 +16,35 @@ struct RecoveryTrendDay: Identifiable, Equatable {
 struct RecoveryTrainingLoadSummary: Equatable {
     let acuteMinutes: Double
     let chronicWeeklyAverageMinutes: Double?
+    let strengthMinutes: Double
+    let runningMinutes: Double
+    let walkingMinutes: Double
+    let otherMinutes: Double
+    let latestStrengthAt: Date?
+    let latestRunningAt: Date?
+    let latestWalkingAt: Date?
+
+    init(
+        acuteMinutes: Double,
+        chronicWeeklyAverageMinutes: Double?,
+        strengthMinutes: Double = 0,
+        runningMinutes: Double = 0,
+        walkingMinutes: Double = 0,
+        otherMinutes: Double = 0,
+        latestStrengthAt: Date? = nil,
+        latestRunningAt: Date? = nil,
+        latestWalkingAt: Date? = nil
+    ) {
+        self.acuteMinutes = acuteMinutes
+        self.chronicWeeklyAverageMinutes = chronicWeeklyAverageMinutes
+        self.strengthMinutes = strengthMinutes
+        self.runningMinutes = runningMinutes
+        self.walkingMinutes = walkingMinutes
+        self.otherMinutes = otherMinutes
+        self.latestStrengthAt = latestStrengthAt
+        self.latestRunningAt = latestRunningAt
+        self.latestWalkingAt = latestWalkingAt
+    }
 
     var ratio: Double? {
         guard let chronicWeeklyAverageMinutes,
@@ -24,6 +53,14 @@ struct RecoveryTrainingLoadSummary: Equatable {
         }
 
         return acuteMinutes / chronicWeeklyAverageMinutes
+    }
+
+    var movementMinutes: Double {
+        runningMinutes + walkingMinutes
+    }
+
+    var hasStrengthRunOrWalk: Bool {
+        strengthMinutes > 0 || runningMinutes > 0 || walkingMinutes > 0
     }
 
     var title: String {
@@ -267,8 +304,28 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
     let muscleGroup: String
     let lastTrainedAt: Date?
     let completedSets: Int
+    let runningMinutes: Double
+    let walkingMinutes: Double
     let estimatedRecoveryHours: Double
     let soreness: RecoverySorenessLevel
+
+    init(
+        muscleGroup: String,
+        lastTrainedAt: Date?,
+        completedSets: Int,
+        runningMinutes: Double = 0,
+        walkingMinutes: Double = 0,
+        estimatedRecoveryHours: Double,
+        soreness: RecoverySorenessLevel
+    ) {
+        self.muscleGroup = muscleGroup
+        self.lastTrainedAt = lastTrainedAt
+        self.completedSets = completedSets
+        self.runningMinutes = runningMinutes
+        self.walkingMinutes = walkingMinutes
+        self.estimatedRecoveryHours = estimatedRecoveryHours
+        self.soreness = soreness
+    }
 
     var progress: Double {
         guard let lastTrainedAt else {
@@ -284,6 +341,39 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
             max(hours / max(estimatedRecoveryHours, 1), 0),
             1
         )
+    }
+
+    var loadScore: Double {
+        let strengthLoad = min(Double(completedSets) / 12, 1)
+        let movementLoad = min((runningMinutes + walkingMinutes) / 90, 1)
+        return min(max((strengthLoad * 0.72) + (movementLoad * 0.72), 0), 1)
+    }
+
+    var loadTitle: String {
+        switch loadScore {
+        case 0.67...:
+            return "High load"
+        case 0.34..<0.67:
+            return "Moderate"
+        default:
+            return "Light"
+        }
+    }
+
+    var sourceSummary: String {
+        var sources: [String] = []
+
+        if completedSets > 0 {
+            sources.append("Strength")
+        }
+        if runningMinutes >= 1 {
+            sources.append("Run")
+        }
+        if walkingMinutes >= 1 {
+            sources.append("Walk")
+        }
+
+        return sources.isEmpty ? "Check-in" : sources.joined(separator: " + ")
     }
 
     var statusTitle: String {
@@ -310,14 +400,17 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
 enum MuscleRecoveryEngine {
     static func statuses(
         history: [StrengthWorkoutLog],
-        soreness: RecoverySorenessStore
+        soreness: RecoverySorenessStore,
+        activityLoad: RecoveryTrainingLoadSummary = RecoveryTrendSnapshot.empty.trainingLoad
     ) -> [MuscleRecoveryStatus] {
         let now = Date()
-        let cutoff = now.addingTimeInterval(-5 * 86_400)
+        let cutoff = now.addingTimeInterval(-7 * 86_400)
 
         struct Accumulator {
             var lastTrainedAt: Date?
             var completedSets = 0
+            var runningMinutes: Double = 0
+            var walkingMinutes: Double = 0
         }
 
         var values: [String: Accumulator] = [:]
@@ -338,6 +431,7 @@ enum MuscleRecoveryEngine {
                         normalizedMuscleGroup
                     )
                 )
+
                 for group in primary {
                     var item = values[group] ?? Accumulator()
                     item.completedSets += completedSets
@@ -348,9 +442,64 @@ enum MuscleRecoveryEngine {
 
                     values[group] = item
                 }
-
             }
         }
+
+        func addMovement(
+            group: String,
+            runningMinutes: Double = 0,
+            walkingMinutes: Double = 0,
+            date: Date?
+        ) {
+            guard runningMinutes > 0 || walkingMinutes > 0 else {
+                return
+            }
+
+            var item = values[group] ?? Accumulator()
+            item.runningMinutes += runningMinutes
+            item.walkingMinutes += walkingMinutes
+
+            if let date,
+               item.lastTrainedAt.map({ date > $0 }) ?? true {
+                item.lastTrainedAt = date
+            }
+
+            values[group] = item
+        }
+
+        let run = activityLoad.runningMinutes
+        let walk = activityLoad.walkingMinutes
+
+        addMovement(
+            group: "Quads",
+            runningMinutes: run,
+            walkingMinutes: walk * 0.48,
+            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+        )
+        addMovement(
+            group: "Calves",
+            runningMinutes: run,
+            walkingMinutes: walk * 0.58,
+            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+        )
+        addMovement(
+            group: "Hamstrings",
+            runningMinutes: run * 0.82,
+            walkingMinutes: walk * 0.28,
+            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+        )
+        addMovement(
+            group: "Glutes",
+            runningMinutes: run * 0.88,
+            walkingMinutes: walk * 0.42,
+            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+        )
+        addMovement(
+            group: "Core",
+            runningMinutes: run * 0.34,
+            walkingMinutes: walk * 0.16,
+            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+        )
 
         let allGroups = Set(values.keys)
             .union(soreness.todayRatings.keys)
@@ -360,15 +509,38 @@ enum MuscleRecoveryEngine {
                 let item = values[group] ?? Accumulator()
                 let sorenessLevel = soreness.level(for: group)
 
-                let baseRecoveryHours: Double
+                let strengthRecoveryHours: Double
                 switch item.completedSets {
-                case 0...2:
-                    baseRecoveryHours = 36
+                case 0:
+                    strengthRecoveryHours = 0
+                case 1...2:
+                    strengthRecoveryHours = 36
                 case 3...7:
-                    baseRecoveryHours = 48
+                    strengthRecoveryHours = 48
                 default:
-                    baseRecoveryHours = 60
+                    strengthRecoveryHours = 60
                 }
+
+                let movementMinutes =
+                    item.runningMinutes + item.walkingMinutes
+                let movementRecoveryHours: Double
+                switch movementMinutes {
+                case 0:
+                    movementRecoveryHours = 0
+                case 0..<25:
+                    movementRecoveryHours = 24
+                case 25..<70:
+                    movementRecoveryHours = 36
+                case 70..<140:
+                    movementRecoveryHours = 48
+                default:
+                    movementRecoveryHours = 60
+                }
+
+                let baseRecoveryHours = max(
+                    max(strengthRecoveryHours, movementRecoveryHours),
+                    24
+                )
 
                 let sorenessAdjustment: Double
                 switch sorenessLevel {
@@ -382,35 +554,48 @@ enum MuscleRecoveryEngine {
                     muscleGroup: group,
                     lastTrainedAt: item.lastTrainedAt,
                     completedSets: item.completedSets,
+                    runningMinutes: item.runningMinutes,
+                    walkingMinutes: item.walkingMinutes,
                     estimatedRecoveryHours:
                         baseRecoveryHours + sorenessAdjustment,
                     soreness: sorenessLevel
                 )
             }
             .sorted { lhs, rhs in
+                if lhs.loadScore != rhs.loadScore {
+                    return lhs.loadScore > rhs.loadScore
+                }
+
                 if lhs.soreness.rawValue != rhs.soreness.rawValue {
-                    return lhs.soreness.rawValue >
-                        rhs.soreness.rawValue
+                    return lhs.soreness.rawValue > rhs.soreness.rawValue
                 }
 
-                if lhs.progress != rhs.progress {
-                    return lhs.progress < rhs.progress
-                }
-
-                return lhs.muscleGroup < rhs.muscleGroup
+                return lhs.progress < rhs.progress
             }
     }
 
-    private static func normalizedMuscleGroup(
-        _ rawValue: String
-    ) -> String? {
-        let value = rawValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-
-        guard !value.isEmpty else {
+    private static func maxDate(
+        _ lhs: Date?,
+        _ rhs: Date?
+    ) -> Date? {
+        switch (lhs, rhs) {
+        case let (lhs?, rhs?):
+            return max(lhs, rhs)
+        case let (lhs?, nil):
+            return lhs
+        case let (nil, rhs?):
+            return rhs
+        case (nil, nil):
             return nil
         }
+    }
+
+    private static func normalizedMuscleGroup(
+        _ raw: String
+    ) -> String? {
+        let value = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
 
         if value.contains("chest") ||
             value.contains("pectoral") {
@@ -419,25 +604,23 @@ enum MuscleRecoveryEngine {
 
         if value.contains("lat") ||
             value.contains("back") ||
-            value.contains("trap") ||
-            value.contains("rhomboid") {
+            value.contains("trap") {
             return "Back"
         }
 
         if value.contains("shoulder") ||
-            value.contains("deltoid") {
+            value.contains("delt") {
             return "Shoulders"
         }
 
         if value.contains("bicep") ||
             value.contains("tricep") ||
             value.contains("forearm") ||
-            value.contains("brach") {
+            value == "arms" {
             return "Arms"
         }
 
-        if value.contains("abdominal") ||
-            value.contains("abs") ||
+        if value.contains("ab") ||
             value.contains("core") ||
             value.contains("oblique") {
             return "Core"
@@ -456,80 +639,11 @@ enum MuscleRecoveryEngine {
         }
 
         if value.contains("calf") ||
-            value.contains("gastrocnemius") ||
-            value.contains("soleus") {
+            value.contains("calves") {
             return "Calves"
         }
 
-        return rawValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .capitalized
-    }
-}
-
-enum RecoveryTool: String, CaseIterable, Identifiable {
-    case stretch
-    case mobility
-    case breathing
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .stretch: return "Full-body reset"
-        case .mobility: return "Mobility flow"
-        case .breathing: return "Downshift breathing"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .stretch: return "8 min · gentle stretch"
-        case .mobility: return "10 min · hips, spine & shoulders"
-        case .breathing: return "5 min · calm breathing"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .stretch: return "figure.flexibility"
-        case .mobility: return "figure.cooldown"
-        case .breathing: return "wind"
-        }
-    }
-
-    var steps: [RecoveryToolStep] {
-        switch self {
-        case .stretch:
-            return [
-                .init(title: "Cat-cow", seconds: 60),
-                .init(title: "Hip flexor · left", seconds: 60),
-                .init(title: "Hip flexor · right", seconds: 60),
-                .init(title: "Hamstring fold", seconds: 90),
-                .init(title: "Chest opener", seconds: 60),
-                .init(title: "Child’s pose", seconds: 90),
-                .init(title: "Easy reset", seconds: 60)
-            ]
-
-        case .mobility:
-            return [
-                .init(title: "Ankle rocks", seconds: 75),
-                .init(title: "90/90 hips", seconds: 90),
-                .init(title: "World’s greatest stretch", seconds: 120),
-                .init(title: "Thoracic rotations", seconds: 90),
-                .init(title: "Shoulder circles", seconds: 75),
-                .init(title: "Deep squat hold", seconds: 90),
-                .init(title: "Easy reset", seconds: 60)
-            ]
-
-        case .breathing:
-            return [
-                .init(
-                    title: "Inhale 4 sec · exhale 6 sec",
-                    seconds: 300
-                )
-            ]
-        }
+        return nil
     }
 }
 
@@ -1258,11 +1372,11 @@ struct MuscleRecoveryCard: View {
         ATHLTHCard {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Muscle recovery")
+                    Text("Recently trained areas")
                         .font(.title3.weight(.bold))
 
                     Text(
-                        "Updates automatically from completed strength sets. Your check-in can refine soreness."
+                        "Last 7 days · strength, running and walking all contribute."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1277,24 +1391,37 @@ struct MuscleRecoveryCard: View {
                 .font(.caption.weight(.semibold))
             }
 
+            HStack(spacing: 8) {
+                sourceBadge(
+                    title: "Strength",
+                    icon: "figure.strengthtraining.traditional"
+                )
+                sourceBadge(
+                    title: "Run",
+                    icon: "figure.run"
+                )
+                sourceBadge(
+                    title: "Walk",
+                    icon: "figure.walk"
+                )
+            }
+            .padding(.top, 10)
+
             if statuses.isEmpty {
                 HStack(spacing: 11) {
-                    Image(
-                        systemName:
-                            "figure.strengthtraining.traditional"
-                    )
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 38, height: 38)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 12,
-                            style: .continuous
+                    Image(systemName: "figure.mixed.cardio")
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 38, height: 38)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 12,
+                                style: .continuous
+                            )
                         )
-                    )
 
                     Text(
-                        "Complete a tracked strength workout and ATHLTH will automatically start recovery for the muscle groups you trained."
+                        "Complete a tracked strength workout, run or walk and ATHLTH will show which areas have carried the most recent training."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1304,22 +1431,16 @@ struct MuscleRecoveryCard: View {
                 }
                 .padding(.top, 12)
             } else {
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ],
-                    spacing: 10
-                ) {
+                VStack(spacing: 12) {
                     ForEach(statuses.prefix(8)) { status in
-                        muscleTile(status)
+                        muscleRow(status)
                     }
                 }
-                .padding(.top, 12)
+                .padding(.top, 14)
             }
 
             Text(
-                "Recovery percentages are training estimates based on completed sets, time since training and your soreness feedback — not a medical measurement."
+                "Area load is an ATHLTH training estimate based on completed strength sets and recent run/walk duration. Recovery percentages also use time since training and your soreness check-in; they are not medical measurements."
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -1327,73 +1448,69 @@ struct MuscleRecoveryCard: View {
         }
     }
 
-    private func muscleTile(
+    private func sourceBadge(
+        title: String,
+        icon: String
+    ) -> some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                ATHLTHTheme.accentSoft.opacity(0.7),
+                in: Capsule()
+            )
+    }
+
+    private func muscleRow(
         _ status: MuscleRecoveryStatus
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(status.muscleGroup)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+        VStack(spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(status.muscleGroup)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
 
-                Spacer(minLength: 6)
+                    Text(status.sourceSummary)
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
 
-                Text("\(Int((status.progress * 100).rounded()))%")
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .bold,
-                            design: .rounded
-                        )
+                Spacer(minLength: 8)
+
+                Text(status.loadTitle)
+                    .font(.system(size: 9.5, weight: .bold))
+                    .foregroundStyle(loadTint(status))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        loadTint(status).opacity(0.10),
+                        in: Capsule()
                     )
-                    .foregroundStyle(statusTint(status))
             }
 
-            ProgressView(value: status.progress)
-                .tint(statusTint(status))
-
-            Text(status.statusTitle)
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(statusTint(status))
+            ProgressView(value: max(status.loadScore, 0.04))
+                .tint(loadTint(status))
 
             HStack(spacing: 5) {
-                if status.completedSets > 0 {
-                    Text("\(status.completedSets) sets")
-                }
+                Text(
+                    "\(Int((status.progress * 100).rounded()))% recovered"
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(statusTint(status))
+
+                Spacer()
 
                 if let last = status.lastTrainedAt {
-                    if status.completedSets > 0 {
-                        Text("·")
-                    }
                     Text(relativeDescription(last))
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
                 }
             }
-            .font(.system(size: 9.5))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            statusTint(status).opacity(0.055),
-            in: RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-            .stroke(
-                statusTint(status).opacity(0.10),
-                lineWidth: 1
-            )
-        }
+        .accessibilityElement(children: .combine)
     }
 
     private func relativeDescription(
@@ -1404,6 +1521,19 @@ struct MuscleRecoveryCard: View {
                 for: date,
                 relativeTo: Date()
             )
+    }
+
+    private func loadTint(
+        _ status: MuscleRecoveryStatus
+    ) -> Color {
+        switch status.loadScore {
+        case 0.67...:
+            return .red
+        case 0.34..<0.67:
+            return .orange
+        default:
+            return .blue
+        }
     }
 
     private func statusTint(
