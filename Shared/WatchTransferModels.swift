@@ -701,6 +701,30 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var targetAlerts: WatchWorkoutTargetAlertConfiguration? = nil
 }
 
+
+struct WatchTodayWorkoutTransfer: Codable, Hashable {
+    var planID: UUID
+    var workoutID: UUID
+    var title: String
+    var summary: String
+    var kind: WatchWorkoutKind
+    var scheduledStart: Date?
+    var durationMinutes: Int?
+    var distanceKilometers: Double?
+    var routeID: UUID?
+    var runningWorkout: WatchRunningWorkoutTransfer?
+    var audioCoach: WatchAudioCoachConfiguration?
+    var updatedAt: Date
+}
+
+struct WatchWorkoutLapSummary: Codable, Hashable {
+    var number: Int
+    var endedAt: Date
+    var elapsedTime: TimeInterval
+    var distanceMeters: Double
+    var averagePaceSecondsPerKilometer: TimeInterval?
+}
+
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var workoutID: UUID
     var title: String
@@ -757,6 +781,10 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var averageHeartRate: Double?
     var maxHeartRate: Double?
     var routePointCount: Int
+
+    // Optional so queued results created by older Watch builds still decode.
+    var lapSummaries: [WatchWorkoutLapSummary]? = nil
+    var automaticPauseCount: Int? = nil
 
     // Optional route-completion fields keep older Watch/iPhone transfers
     // decodable while giving both devices the same route-quality summary.
@@ -940,6 +968,8 @@ enum WatchTransferKind: String {
     case ghostRace
     case liveSurfaceConfiguration
     case liveSurfaceContext
+    case todayWorkout
+    case todayWorkoutRequest
     case strengthSnapshot
     case strengthCommand
     case connectivityProbe
