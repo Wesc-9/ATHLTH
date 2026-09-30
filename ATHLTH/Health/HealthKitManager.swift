@@ -3560,9 +3560,19 @@ final class HealthKitManager: ObservableObject {
         }
 
         let end = Date()
-        let start = Calendar.current.date(byAdding: .hour, value: -36, to: end)
-            ?? end.addingTimeInterval(-129_600)
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+        let calendar = Calendar.current
+        let start =
+            calendar.date(
+                byAdding: .day,
+                value: -3,
+                to: calendar.startOfDay(for: end)
+            ) ??
+            end.addingTimeInterval(-259_200)
+        let predicate = HKQuery.predicateForSamples(
+            withStart: start,
+            end: end,
+            options: []
+        )
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
 
         let samples = try await withCheckedThrowingContinuation {
@@ -3653,18 +3663,41 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
-        guard let primarySession = sessions.max(by: { lhs, rhs in
-            let leftDuration = mergedDuration(lhs)
-            let rightDuration = mergedDuration(rhs)
+        // Prefer the newest substantial sleep session. The previous
+        // 36-hour query could begin in the middle of an older overnight
+        // session late in the afternoon, leaving only the final couple of
+        // hours visible to ATHLTH. A wider query plus a minimum main-sleep
+        // duration avoids both that truncation and a short later nap
+        // replacing the most recent overnight sleep.
+        let substantialSessions = sessions.filter {
+            mergedDuration($0) >= 3 * 60 * 60
+        }
+        let primaryCandidates =
+            substantialSessions.isEmpty
+                ? sessions
+                : substantialSessions
 
-            if abs(leftDuration - rightDuration) > 60 {
-                return leftDuration < rightDuration
-            }
+        guard let primarySession =
+                primaryCandidates.max(by: { lhs, rhs in
+                    let leftEnd =
+                        lhs.map(\.endDate).max() ??
+                        .distantPast
+                    let rightEnd =
+                        rhs.map(\.endDate).max() ??
+                        .distantPast
 
-            let leftEnd = lhs.map(\.endDate).max() ?? .distantPast
-            let rightEnd = rhs.map(\.endDate).max() ?? .distantPast
-            return leftEnd < rightEnd
-        }) else {
+                    if abs(
+                        leftEnd.timeIntervalSince(
+                            rightEnd
+                        )
+                    ) > 60 {
+                        return leftEnd < rightEnd
+                    }
+
+                    return mergedDuration(lhs) <
+                        mergedDuration(rhs)
+                })
+        else {
             return .empty
         }
 
