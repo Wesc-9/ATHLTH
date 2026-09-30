@@ -2834,6 +2834,3056 @@
           }
         }
       }
+    },
+    "YOUR COACH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DIN COACH"
+          }
+        }
+      }
+    },
+    "Your training profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsprofilen din"
+          }
+        }
+      }
+    },
+    "Edit coach answers": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger coach-svar"
+          }
+        }
+      }
+    },
+    "Training experience": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningserfaring"
+          }
+        }
+      }
+    },
+    "Choose your level": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg nivå"
+          }
+        }
+      }
+    },
+    "Beginner": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nybegynner"
+          }
+        }
+      }
+    },
+    "Intermediate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Middels erfaren"
+          }
+        }
+      }
+    },
+    "Experienced / train regularly": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erfaren / trener regelmessig"
+          }
+        }
+      }
+    },
+    "Training focus": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsfokus"
+          }
+        }
+      }
+    },
+    "Train toward a goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tren mot et mål"
+          }
+        }
+      }
+    },
+    "PRIMARY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PRIMÆR"
+          }
+        }
+      }
+    },
+    "Tell Coach what matters most": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortell Coach hva som er viktigst"
+          }
+        }
+      }
+    },
+    "Coach combines this with the goals you select above. You do not need to repeat information already stored in a goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach kombinerer dette med målene du velger ovenfor. Du trenger ikke gjenta informasjon som allerede ligger i et mål."
+          }
+        }
+      }
+    },
+    "Use my profile interests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk interessene fra profilen min"
+          }
+        }
+      }
+    },
+    "Gym access": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilgang til treningssenter"
+          }
+        }
+      }
+    },
+    "Choose an option": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg et alternativ"
+          }
+        }
+      }
+    },
+    "Yes — I can use a gym": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ja — jeg har tilgang til treningssenter"
+          }
+        }
+      }
+    },
+    "No — home or outdoors": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nei — hjemme eller utendørs"
+          }
+        }
+      }
+    },
+    "Equipment available at home": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utstyr tilgjengelig hjemme"
+          }
+        }
+      }
+    },
+    "Only include details you want ATHLTH Coach to use when planning.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta bare med detaljer du vil at ATHLTH Coach skal bruke i planleggingen."
+          }
+        }
+      }
+    },
+    "Continue to plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett til plan"
+          }
+        }
+      }
+    },
+    "No active goals yet. Coach will build around your training focus and free-text direction.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen aktive mål ennå. Coach bygger rundt treningsfokuset ditt og det du beskriver med egne ord."
+          }
+        }
+      }
+    },
+    "Plan by": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planlegg frem til"
+          }
+        }
+      }
+    },
+    "AI will schedule training only on the days you leave selected and will use recovery/rest days around them.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI planlegger trening bare på dagene du lar være valgt, og legger inn restitusjons-/hviledager rundt dem."
+          }
+        }
+      }
+    },
+    "Regenerate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generer på nytt"
+          }
+        }
+      }
+    },
+    "AI Program": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-program"
+          }
+        }
+      }
+    },
+    "Weeks": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uker"
+          }
+        }
+      }
+    },
+    "Jump between weeks without leaving the planner.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bytt mellom uker uten å forlate planleggeren."
+          }
+        }
+      }
+    },
+    "Add": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til"
+          }
+        }
+      }
+    },
+    "Add workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til økt"
+          }
+        }
+      }
+    },
+    "Rest day — or add a workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hviledag — eller legg til en økt"
+          }
+        }
+      }
+    },
+    "Strength, run, walk, mobility and recovery can all be planned here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrke, løping, gåtur, mobilitet og restitusjon kan planlegges her."
+          }
+        }
+      }
+    },
+    "Week at a glance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uken i korte trekk"
+          }
+        }
+      }
+    },
+    "Tap a day to edit its schedule.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trykk på en dag for å redigere planen."
+          }
+        }
+      }
+    },
+    "Build your training plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg treningsplanen din"
+          }
+        }
+      }
+    },
+    "Start simple, or build an advanced multi-week program with exact workouts, routes, exercises and targets.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start enkelt, eller bygg et avansert flerukersprogram med konkrete økter, ruter, øvelser og mål."
+          }
+        }
+      }
+    },
+    "Create Plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett plan"
+          }
+        }
+      }
+    },
+    "All Plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle planer"
+          }
+        }
+      }
+    },
+    "Completed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullført"
+          }
+        }
+      }
+    },
+    "Delete Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett økt"
+          }
+        }
+      }
+    },
+    "No training plans yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen treningsplaner ennå"
+          }
+        }
+      }
+    },
+    "Create your first dated plan. ATHLTH keeps only the plan covering today active.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett din første datofestede plan. ATHLTH holder bare planen som dekker dagens dato aktiv."
+          }
+        }
+      }
+    },
+    "Delete Plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett plan"
+          }
+        }
+      }
+    },
+    "This removes the plan and its future schedule. Completed workout history is kept.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette fjerner planen og fremtidig timeplan. Historikk for fullførte økter beholdes."
+          }
+        }
+      }
+    },
+    "Edit": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger"
+          }
+        }
+      }
+    },
+    "Duplicate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dupliser"
+          }
+        }
+      }
+    },
+    "YOUR TRAINING PLAN": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DIN TRENINGSPLAN"
+          }
+        }
+      }
+    },
+    "Create plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett plan"
+          }
+        }
+      }
+    },
+    "ATHLTH Coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach"
+          }
+        }
+      }
+    },
+    "All plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle planer"
+          }
+        }
+      }
+    },
+    "Adapt plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilpass plan"
+          }
+        }
+      }
+    },
+    "Fill empty days": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fyll tomme dager"
+          }
+        }
+      }
+    },
+    "Create a plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en plan"
+          }
+        }
+      }
+    },
+    "Program": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Program"
+          }
+        }
+      }
+    },
+    "Add to Calendar": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til i Kalender"
+          }
+        }
+      }
+    },
+    "ATHLTH adds this program to your plan timeline. It becomes active automatically when today falls inside this date range.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH legger programmet inn på tidslinjen din. Det blir automatisk aktivt når dagens dato er innenfor perioden."
+          }
+        }
+      }
+    },
+    "Schedule Conflict": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plankonflikt"
+          }
+        }
+      }
+    },
+    "Choose a start date after the existing plan ends. Only one training plan can be active on a given date.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg en startdato etter at den eksisterende planen slutter. Bare én treningsplan kan være aktiv på samme dato."
+          }
+        }
+      }
+    },
+    "Create": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett"
+          }
+        }
+      }
+    },
+    "How do you want to build it?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvordan vil du bygge den?"
+          }
+        }
+      }
+    },
+    "You can always edit the plan in detail afterwards. This only changes how much ATHLTH sets up for you now.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan alltid detaljredigere planen etterpå. Dette bestemmer bare hvor mye ATHLTH setter opp for deg nå."
+          }
+        }
+      }
+    },
+    "FULL CONTROL": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FULL KONTROLL"
+          }
+        }
+      }
+    },
+    "Plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        }
+      }
+    },
+    "Training Focus": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsfokus"
+          }
+        }
+      }
+    },
+    "Focus": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fokus"
+          }
+        }
+      }
+    },
+    "Weekly Rhythm": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukerytme"
+          }
+        }
+      }
+    },
+    "ATHLTH spreads these sessions across the week. You can move, replace or fully rebuild them later.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH fordeler øktene gjennom uken. Du kan flytte, erstatte eller bygge dem helt om senere."
+          }
+        }
+      }
+    },
+    "Length": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lengde"
+          }
+        }
+      }
+    },
+    "weeks": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "uker"
+          }
+        }
+      }
+    },
+    "Visibility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synlighet"
+          }
+        }
+      }
+    },
+    "Timeline": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidslinje"
+          }
+        }
+      }
+    },
+    "Custom program length": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Egendefinert programlengde"
+          }
+        }
+      }
+    },
+    "Connect Goals": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble til mål"
+          }
+        }
+      }
+    },
+    "What Advanced Unlocks": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette får du med Avansert"
+          }
+        }
+      }
+    },
+    "Exact workout on any day": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eksakt økt på hvilken som helst dag"
+          }
+        }
+      }
+    },
+    "Strength exercises, sets, reps, load, RPE / RIR and progression": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrkeøvelser, sett, repetisjoner, belastning, RPE / RIR og progresjon"
+          }
+        }
+      }
+    },
+    "Structured running blocks, distance and routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strukturerte løpeblokker, distanse og ruter"
+          }
+        }
+      }
+    },
+    "Mobility, recovery, notes and scheduled time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mobilitet, restitusjon, notater og planlagt tidspunkt"
+          }
+        }
+      }
+    },
+    "The new plan starts with an empty calendar so you decide exactly what belongs on each day.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Den nye planen starter med en tom kalender, slik at du bestemmer nøyaktig hva som skal ligge på hver dag."
+          }
+        }
+      }
+    },
+    "Move this plan so it does not overlap another scheduled plan.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flytt denne planen slik at den ikke overlapper en annen plan."
+          }
+        }
+      }
+    },
+    "Create a Goal in Progress to connect it to this program.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett et mål under Fremgang for å koble det til programmet."
+          }
+        }
+      }
+    },
+    "Spotify": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spotify"
+          }
+        }
+      }
+    },
+    "Workout playlist": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spilleliste for økter"
+          }
+        }
+      }
+    },
+    "Start playlist with workouts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start spilleliste med økter"
+          }
+        }
+      }
+    },
+    "The linked playlist is used when a workout from this program starts on iPhone. Watch-only starts never wait for Spotify.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Den valgte spillelisten brukes når en økt fra dette programmet starter på iPhone. Økter som startes kun på Watch venter aldri på Spotify."
+          }
+        }
+      }
+    },
+    "Connect Spotify": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble til Spotify"
+          }
+        }
+      }
+    },
+    "Connect Spotify to attach a playlist to this program.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble til Spotify for å knytte en spilleliste til programmet."
+          }
+        }
+      }
+    },
+    "Spotify needs a client ID before playlists can be linked.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spotify trenger en klient-ID før spillelister kan kobles til."
+          }
+        }
+      }
+    },
+    "Delete Program": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett program"
+          }
+        }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre"
+          }
+        }
+      }
+    },
+    "Type": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type"
+          }
+        }
+      }
+    },
+    "Time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tid"
+          }
+        }
+      }
+    },
+    "Running shoes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løpesko"
+          }
+        }
+      }
+    },
+    "Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økt"
+          }
+        }
+      }
+    },
+    "Editor mode": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redigeringsmodus"
+          }
+        }
+      }
+    },
+    "Recovery / Mobility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon / mobilitet"
+          }
+        }
+      }
+    },
+    "Use duration and notes to describe the session. Structured mobility blocks can be added to the same planner model later.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk varighet og notater for å beskrive økten. Strukturerte mobilitetsblokker kan legges til senere."
+          }
+        }
+      }
+    },
+    "Performance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prestasjon"
+          }
+        }
+      }
+    },
+    "Target pace": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Måltempo"
+          }
+        }
+      }
+    },
+    "Pace": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo"
+          }
+        }
+      }
+    },
+    "Live Targets & Alerts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-mål og varsler"
+          }
+        }
+      }
+    },
+    "Heart-rate target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulsmål"
+          }
+        }
+      }
+    },
+    "Zone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sone"
+          }
+        }
+      }
+    },
+    "Alert outside pace target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsle utenfor måltempo"
+          }
+        }
+      }
+    },
+    "Pace tolerance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempotoleranse"
+          }
+        }
+      }
+    },
+    "Wait before alert": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vent før varsel"
+          }
+        }
+      }
+    },
+    "Immediately": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Umiddelbart"
+          }
+        }
+      }
+    },
+    "Alert style": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varseltype"
+          }
+        }
+      }
+    },
+    "Repeat while outside target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenta mens du er utenfor målområdet"
+          }
+        }
+      }
+    },
+    "Tell me when I'm back in target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si fra når jeg er tilbake i målområdet"
+          }
+        }
+      }
+    },
+    "These targets apply only to this workout. Route-deviation alerts use your global Training settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disse målene gjelder bare denne økten. Varsler om ruteavvik bruker de globale treningsinnstillingene dine."
+          }
+        }
+      }
+    },
+    "Audio Coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio Coach"
+          }
+        }
+      }
+    },
+    "Use the app default or customize cues for this workout only.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk standardinnstillingene i appen eller tilpass varsler bare for denne økten."
+          }
+        }
+      }
+    },
+    "Additional Gear": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekstra utstyr"
+          }
+        }
+      }
+    },
+    "No additional active gear is available. Add watches, headphones or other gear in My Gear.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen ekstra aktivt utstyr er tilgjengelig. Legg til klokker, hodetelefoner eller annet utstyr under Mitt utstyr."
+          }
+        }
+      }
+    },
+    "Selected gear is linked automatically when the workout is completed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgt utstyr kobles automatisk til økten når den fullføres."
+          }
+        }
+      }
+    },
+    "Strength Exercises": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrkeøvelser"
+          }
+        }
+      }
+    },
+    "Freestyle strength workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fri styrkeøkt"
+          }
+        }
+      }
+    },
+    "You can add this workout now and choose exercises later, or add exercises below for a structured session.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan legge til økten nå og velge øvelser senere, eller legge til øvelser nedenfor for en strukturert økt."
+          }
+        }
+      }
+    },
+    "SUPERSET": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SUPERSETT"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett"
+          }
+        }
+      }
+    },
+    "Add Exercise": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til øvelse"
+          }
+        }
+      }
+    },
+    "Running Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løpeøkt"
+          }
+        }
+      }
+    },
+    "Open run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpen løpetur"
+          }
+        }
+      }
+    },
+    "Use the duration and distance above, or add one or more structured workouts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk varighet og distanse over, eller legg til én eller flere strukturerte økter."
+          }
+        }
+      }
+    },
+    "Add Structured Running Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til strukturert løpeøkt"
+          }
+        }
+      }
+    },
+    "Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rute"
+          }
+        }
+      }
+    },
+    "No specific route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen bestemt rute"
+          }
+        }
+      }
+    },
+    "Create a Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en rute"
+          }
+        }
+      }
+    },
+    "Routes are optional. Create one in ATHLTH and it will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruter er valgfritt. Opprett en i ATHLTH, så vises den her."
+          }
+        }
+      }
+    },
+    "Customize for this workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilpass for denne økten"
+          }
+        }
+      }
+    },
+    "When to speak": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når Coach skal snakke"
+          }
+        }
+      }
+    },
+    "Distance interval": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distanseintervall"
+          }
+        }
+      }
+    },
+    "Time interval": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidsintervall"
+          }
+        }
+      }
+    },
+    "Announcements": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunngjøringer"
+          }
+        }
+      }
+    },
+    "Distance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distanse"
+          }
+        }
+      }
+    },
+    "Elapsed time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forløpt tid"
+          }
+        }
+      }
+    },
+    "Average pace": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjennomsnittstempo"
+          }
+        }
+      }
+    },
+    "Clock time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klokkeslett"
+          }
+        }
+      }
+    },
+    "Heart rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puls"
+          }
+        }
+      }
+    },
+    "Remaining route distance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående rutedistanse"
+          }
+        }
+      }
+    },
+    "Estimated route time left": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimert tid igjen på ruten"
+          }
+        }
+      }
+    },
+    "Current workout step": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjeldende øktsteg"
+          }
+        }
+      }
+    },
+    "Remaining step time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående tid i steg"
+          }
+        }
+      }
+    },
+    "Remaining step distance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående distanse i steg"
+          }
+        }
+      }
+    },
+    "Music & other audio": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Musikk og annen lyd"
+          }
+        }
+      }
+    },
+    "Lower music while coach speaks": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demp musikken når Coach snakker"
+          }
+        }
+      }
+    },
+    "Target weight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Målvekt"
+          }
+        }
+      }
+    },
+    "Effort": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anstrengelse"
+          }
+        }
+      }
+    },
+    "Use RPE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk RPE"
+          }
+        }
+      }
+    },
+    "Use RIR": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk RIR"
+          }
+        }
+      }
+    },
+    "Progression": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progresjon"
+          }
+        }
+      }
+    },
+    "Rule": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regel"
+          }
+        }
+      }
+    },
+    "Notes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notater"
+          }
+        }
+      }
+    },
+    "All training plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle treningsplaner"
+          }
+        }
+      }
+    },
+    "Edit training plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger treningsplan"
+          }
+        }
+      }
+    },
+    "Week actions": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukehandlinger"
+          }
+        }
+      }
+    },
+    "Create training plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett treningsplan"
+          }
+        }
+      }
+    },
+    "Start Program": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start program"
+          }
+        }
+      }
+    },
+    "Plan Conflict": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plankonflikt"
+          }
+        }
+      }
+    },
+    "Edit Program": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger program"
+          }
+        }
+      }
+    },
+    "Clear workout time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern økttidspunkt"
+          }
+        }
+      }
+    },
+    "Set workout time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angi økttidspunkt"
+          }
+        }
+      }
+    },
+    "Exercise Target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelsesmål"
+          }
+        }
+      }
+    },
+    "ADAPT YOUR PLAN": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TILPASS PLANEN DIN"
+          }
+        }
+      }
+    },
+    "Life changed. Your plan can too.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Livet endret seg. Planen din kan også gjøre det."
+          }
+        }
+      }
+    },
+    "Coach reviews your current plan, goals and recent training, then proposes changes. Nothing is changed until you accept.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach vurderer gjeldende plan, mål og nylig trening og foreslår endringer. Ingenting endres før du godtar."
+          }
+        }
+      }
+    },
+    "ACTIVE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AKTIV"
+          }
+        }
+      }
+    },
+    "Optional. Tell Coach about travel, a busy week, missed sessions or a change in availability.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgfritt. Fortell Coach om reise, en travel uke, tapte økter eller endret tilgjengelighet."
+          }
+        }
+      }
+    },
+    "YOUR PLAN, ADAPTED": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PLANEN DIN, TILPASSET"
+          }
+        }
+      }
+    },
+    "Why these changes?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvorfor disse endringene?"
+          }
+        }
+      }
+    },
+    "Keep current plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Behold gjeldende plan"
+          }
+        }
+      }
+    },
+    "Accept changes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godta endringer"
+          }
+        }
+      }
+    },
+    "RECENT COACH CHANGES": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NYLIGE COACH-ENDRINGER"
+          }
+        }
+      }
+    },
+    "Undone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angret"
+          }
+        }
+      }
+    },
+    "Undo": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angre"
+          }
+        }
+      }
+    },
+    "Start a training plan first": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start en treningsplan først"
+          }
+        }
+      }
+    },
+    "Coach needs an active plan before it can propose safe changes.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach trenger en aktiv plan før den kan foreslå trygge endringer."
+          }
+        }
+      }
+    },
+    "Build a quick workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg en hurtigøkt"
+          }
+        }
+      }
+    },
+    "Choose what you're doing, then pick the structure. ATHLTH keeps the setup fast and sends the workout to Apple Watch when available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg hva du skal gjøre, og deretter struktur. ATHLTH holder oppsettet raskt og sender økten til Apple Watch når den er tilgjengelig."
+          }
+        }
+      }
+    },
+    "Classic Tabata uses 20 seconds work and 10 seconds rest.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klassisk Tabata bruker 20 sekunder arbeid og 10 sekunder pause."
+          }
+        }
+      }
+    },
+    "Custom": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Egendefinert"
+          }
+        }
+      }
+    },
+    "No additional targets are set for this workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen ekstra mål er satt for denne økten."
+          }
+        }
+      }
+    },
+    "Matched automatically from Apple Health.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matchet automatisk fra Apple Health."
+          }
+        }
+      }
+    },
+    "Manual completion updates your ATHLTH plan only. It does not create an Apple Health workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manuell fullføring oppdaterer bare ATHLTH-planen. Det oppretter ikke en økt i Apple Health."
+          }
+        }
+      }
+    },
+    "Guidance & Alerts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Veiledning og varsler"
+          }
+        }
+      }
+    },
+    "How do you want to run?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvordan vil du løpe?"
+          }
+        }
+      }
+    },
+    "Choose the run type and then decide whether this workout should be recorded with iPhone or Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg type løpetur, og bestem deretter om økten skal registreres med iPhone eller Apple Watch."
+          }
+        }
+      }
+    },
+    "No destination. No target.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen destinasjon. Ingen mål."
+          }
+        }
+      }
+    },
+    "ATHLTH records your run, GPS route, time, distance and available heart-rate data.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH registrerer løpeturen, GPS-ruten, tid, distanse og tilgjengelige pulsdata."
+          }
+        }
+      }
+    },
+    "Directions to start": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Veibeskrivelse til start"
+          }
+        }
+      }
+    },
+    "Create Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett rute"
+          }
+        }
+      }
+    },
+    "Free Walk": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fri gåtur"
+          }
+        }
+      }
+    },
+    "Choose whether this walk should be recorded with iPhone or Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg om gåturen skal registreres med iPhone eller Apple Watch."
+          }
+        }
+      }
+    },
+    "Start Strength": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start styrke"
+          }
+        }
+      }
+    },
+    "Start completely open, or build the session right before you train.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start helt åpent, eller bygg økten rett før du trener."
+          }
+        }
+      }
+    },
+    "Exercises": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelser"
+          }
+        }
+      }
+    },
+    "No exercises yet. Add one below, or go back and choose Start Empty.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen øvelser ennå. Legg til en nedenfor, eller gå tilbake og velg Start tom."
+          }
+        }
+      }
+    },
+    "Continue to Start": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett til start"
+          }
+        }
+      }
+    },
+    "ATHLTH+": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH+"
+          }
+        }
+      }
+    },
+    "Choose when iPhone or Apple Watch speaks and exactly what it tells you.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg når iPhone eller Apple Watch skal snakke og nøyaktig hva som skal sies."
+          }
+        }
+      }
+    },
+    "WHEN TO SPEAK": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NÅR COACH SKAL SNAKKE"
+          }
+        }
+      }
+    },
+    "Distance updates": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distanseoppdateringer"
+          }
+        }
+      }
+    },
+    "Every": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hver"
+          }
+        }
+      }
+    },
+    "Time updates": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidsoppdateringer"
+          }
+        }
+      }
+    },
+    "WHAT TO ANNOUNCE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HVA SOM SKAL LESES OPP"
+          }
+        }
+      }
+    },
+    "Current time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjeldende klokkeslett"
+          }
+        }
+      }
+    },
+    "ROUTE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RUTE"
+          }
+        }
+      }
+    },
+    "Remaining distance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående distanse"
+          }
+        }
+      }
+    },
+    "Estimated time remaining": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimert tid igjen"
+          }
+        }
+      }
+    },
+    "STRUCTURED WORKOUT": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "STRUKTURERT ØKT"
+          }
+        }
+      }
+    },
+    "Current / next step": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjeldende / neste steg"
+          }
+        }
+      }
+    },
+    "MUSIC & OTHER AUDIO": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MUSIKK OG ANNEN LYD"
+          }
+        }
+      }
+    },
+    "Your Settings defaults are loaded here automatically. Changes on this screen apply only to this workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standardinnstillingene dine lastes inn automatisk. Endringer her gjelder bare denne økten."
+          }
+        }
+      }
+    },
+    "Start Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start løpetur"
+          }
+        }
+      }
+    },
+    "Start Walk": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start gåtur"
+          }
+        }
+      }
+    },
+    "Quick Strength": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hurtig styrke"
+          }
+        }
+      }
+    },
+    "Build Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg økt"
+          }
+        }
+      }
+    },
+    "These choices apply only to this workout. Your defaults remain unchanged in Settings → Workout Guidance.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disse valgene gjelder bare denne økten. Standardene dine forblir uendret under Innstillinger → Øktveiledning."
+          }
+        }
+      }
+    },
+    "Edit global defaults": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger globale standarder"
+          }
+        }
+      }
+    },
+    "Route Guardian": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Route Guardian"
+          }
+        }
+      }
+    },
+    "Trigger": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utløser"
+          }
+        }
+      }
+    },
+    "Alert when off route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsle ved ruteavvik"
+          }
+        }
+      }
+    },
+    "Repeat": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenta"
+          }
+        }
+      }
+    },
+    "Delivery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Levering"
+          }
+        }
+      }
+    },
+    "Tell me when I'm back on route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si fra når jeg er tilbake på ruten"
+          }
+        }
+      }
+    },
+    "Use target Ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk mål-Ghost"
+          }
+        }
+      }
+    },
+    "Target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål"
+          }
+        }
+      }
+    },
+    "Updates": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdateringer"
+          }
+        }
+      }
+    },
+    "Ghost Updates": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost-oppdateringer"
+          }
+        }
+      }
+    },
+    "Adjust Ghost Updates defaults": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Juster standarder for Ghost-oppdateringer"
+          }
+        }
+      }
+    },
+    "RECENTLY USED": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NYLIG BRUKT"
+          }
+        }
+      }
+    },
+    "Jump back in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett der du slapp"
+          }
+        }
+      }
+    },
+    "CURATED": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UTVALGT"
+          }
+        }
+      }
+    },
+    "Weekly rhythm": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukerytme"
+          }
+        }
+      }
+    },
+    "Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål"
+          }
+        }
+      }
+    },
+    "Make it mine": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjør den til min"
+          }
+        }
+      }
+    },
+    "FULL PLAN PREVIEW": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FULL PLANFORHÅNDSVISNING"
+          }
+        }
+      }
+    },
+    "Week by week": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uke for uke"
+          }
+        }
+      }
+    },
+    "DELOAD": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NEDLASTINGSUKE"
+          }
+        }
+      }
+    },
+    "TAPER": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NEDTRAPPING"
+          }
+        }
+      }
+    },
+    "START": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "START"
+          }
+        }
+      }
+    },
+    "Plan begins": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planen starter"
+          }
+        }
+      }
+    },
+    "TRAINING DAYS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TRENINGSDAGER"
+          }
+        }
+      }
+    },
+    "PLAN FIT": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PLANTILPASNING"
+          }
+        }
+      }
+    },
+    "Create My Plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett min plan"
+          }
+        }
+      }
+    },
+    "Save for later": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre til senere"
+          }
+        }
+      }
+    },
+    "No plans yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen planer ennå"
+          }
+        }
+      }
+    },
+    "Save a plan from Plan Library or create one from scratch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre en plan fra planbiblioteket eller opprett en fra bunnen av."
+          }
+        }
+      }
+    },
+    "SAVED PLAN": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LAGRET PLAN"
+          }
+        }
+      }
+    },
+    "Schedule Plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planlegg plan"
+          }
+        }
+      }
+    },
+    "Nothing needs your attention": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingenting krever oppmerksomheten din"
+          }
+        }
+      }
+    },
+    "Your plan can continue exactly as scheduled.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planen kan fortsette akkurat som planlagt."
+          }
+        }
+      }
+    },
+    "Ask ATHLTH Coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spør ATHLTH Coach"
+          }
+        }
+      }
+    },
+    "Missed Workouts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tapte økter"
+          }
+        }
+      }
+    },
+    "Favorites": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favoritter"
+          }
+        }
+      }
+    },
+    "Workout source": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktkilde"
+          }
+        }
+      }
+    },
+    "Restore older workouts from this device": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenopprett eldre økter fra denne enheten"
+          }
+        }
+      }
+    },
+    "No custom workouts yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen egne økter ennå"
+          }
+        }
+      }
+    },
+    "Build your own running workout and it will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg din egen løpeøkt, så vises den her."
+          }
+        }
+      }
+    },
+    "Try another workout type.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøv en annen økttype."
+          }
+        }
+      }
+    },
+    "These are my workouts — restore": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette er mine økter — gjenopprett"
+          }
+        }
+      }
+    },
+    "MY WORKOUT": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MIN ØKT"
+          }
+        }
+      }
+    },
+    "Workout Structure": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktstruktur"
+          }
+        }
+      }
+    },
+    "Save Editable Copy": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre redigerbar kopi"
+          }
+        }
+      }
+    },
+    "Delete this running workout?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett denne løpeøkten?"
+          }
+        }
+      }
+    },
+    "Build running workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg løpeøkt"
+          }
+        }
+      }
+    },
+    "Structure": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Struktur"
+          }
+        }
+      }
+    },
+    "Add a block for warm-up, steady running, intervals, recovery or cool-down.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til en blokk for oppvarming, jevn løping, intervaller, restitusjon eller nedjogg."
+          }
+        }
+      }
+    },
+    "Add Block": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til blokk"
+          }
+        }
+      }
+    },
+    "Block": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blokk"
+          }
+        }
+      }
+    },
+    "Phase": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fase"
+          }
+        }
+      }
+    },
+    "Work": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arbeid"
+          }
+        }
+      }
+    },
+    "Measure": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Måleenhet"
+          }
+        }
+      }
+    },
+    "Duration": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varighet"
+          }
+        }
+      }
+    },
+    "Intensity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intensitet"
+          }
+        }
+      }
+    },
+    "Recovery between reps": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause mellom repetisjoner"
+          }
+        }
+      }
+    },
+    "Add recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til pause"
+          }
+        }
+      }
+    },
+    "Restore workouts to this account?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenopprette økter til denne kontoen?"
+          }
+        }
+      }
+    },
+    "Build Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg løpetur"
+          }
+        }
+      }
+    },
+    "Add Running Block": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til løpeblokk"
+          }
+        }
+      }
+    },
+    "Start a strength session from Train.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start en styrkeøkt fra Trening."
+          }
+        }
+      }
+    },
+    "Finish": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslutt"
+          }
+        }
+      }
+    },
+    "Finish Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslutt økt"
+          }
+        }
+      }
+    },
+    "Keep Training": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett å trene"
+          }
+        }
+      }
+    },
+    "Pick from RepDB or your own exercises while the workout keeps running.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg fra RepDB eller egne øvelser mens økten fortsetter."
+          }
+        }
+      }
+    },
+    "Simple tracking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enkel registrering"
+          }
+        }
+      }
+    },
+    "Planned exercises": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planlagte øvelser"
+          }
+        }
+      }
+    },
+    "Enable Advanced Tracking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiver avansert registrering"
+          }
+        }
+      }
+    },
+    "Set completed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sett fullført"
+          }
+        }
+      }
+    },
+    "No rep target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen repetisjonsmål"
+          }
+        }
+      }
+    },
+    "Rest": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        }
+      }
+    },
+    "Complete Set": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør sett"
+          }
+        }
+      }
+    },
+    "Complete set without details": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør sett uten detaljer"
+          }
+        }
+      }
+    },
+    "Skip Rest": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hopp over pause"
+          }
+        }
+      }
+    },
+    "Ready for next set": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klar for neste sett"
+          }
+        }
+      }
+    },
+    "Exercise complete": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelse fullført"
+          }
+        }
+      }
+    },
+    "Next Exercise": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste øvelse"
+          }
+        }
+      }
+    },
+    "All planned exercises are complete.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle planlagte øvelser er fullført."
+          }
+        }
+      }
+    },
+    "Prescription": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planlagt oppsett"
+          }
+        }
+      }
+    },
+    "Add exercise": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til øvelse"
+          }
+        }
+      }
+    },
+    "Finish the full workout?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslutte hele økten?"
+          }
+        }
+      }
+    },
+    "Choose how you want to record this workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg hvordan du vil registrere denne økten."
+          }
+        }
+      }
+    },
+    "Choose for each workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg for hver økt"
+          }
+        }
+      }
+    },
+    "This device choice applies only to the workout you are about to start. You can choose differently next time.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette enhetsvalget gjelder bare økten du skal starte. Du kan velge annerledes neste gang."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
