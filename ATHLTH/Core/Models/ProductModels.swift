@@ -9,7 +9,7 @@ enum SubscriptionTier: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .free: return String(localized: "Free")
+        case .free: return ATHLTHLocalization.string( "Free")
         case .paid: return "ATHLTH+"
         }
     }
@@ -24,11 +24,11 @@ enum SubscriptionAccessState: String, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .free: return String(localized: "Free")
-        case .trial: return String(localized: "ATHLTH+ trial")
+        case .free: return ATHLTHLocalization.string( "Free")
+        case .trial: return ATHLTHLocalization.string( "ATHLTH+ trial")
         case .paid: return "ATHLTH+"
-        case .expired: return String(localized: "ATHLTH+ expired")
-        case .revoked: return String(localized: "ATHLTH+ revoked")
+        case .expired: return ATHLTHLocalization.string( "ATHLTH+ expired")
+        case .revoked: return ATHLTHLocalization.string( "ATHLTH+ revoked")
         }
     }
 }
@@ -42,11 +42,11 @@ enum SubscriptionLifecycleState: String, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .free: return String(localized: "Free")
-        case .trial: return String(localized: "ATHLTH+ trial")
+        case .free: return ATHLTHLocalization.string( "Free")
+        case .trial: return ATHLTHLocalization.string( "ATHLTH+ trial")
         case .active: return "ATHLTH+"
-        case .expired: return String(localized: "ATHLTH+ expired")
-        case .revoked: return String(localized: "ATHLTH+ revoked")
+        case .expired: return ATHLTHLocalization.string( "ATHLTH+ expired")
+        case .revoked: return ATHLTHLocalization.string( "ATHLTH+ revoked")
         }
     }
 }
@@ -155,9 +155,9 @@ struct SubscriptionAccess: Codable, Hashable {
     var billingPeriodTitle: String? {
         switch productID {
         case SubscriptionStore.monthlyProductID:
-            return String(localized: "Monthly")
+            return ATHLTHLocalization.string( "Monthly")
         case SubscriptionStore.yearlyProductID:
-            return String(localized: "Yearly")
+            return ATHLTHLocalization.string( "Yearly")
         default:
             return nil
         }
@@ -181,9 +181,9 @@ enum AccountRole: String, Codable, Hashable, CaseIterable {
 
     var title: String {
         switch self {
-        case .user: return String(localized: "User")
-        case .admin: return String(localized: "Admin")
-        case .owner: return String(localized: "Owner")
+        case .user: return ATHLTHLocalization.string( "User")
+        case .admin: return ATHLTHLocalization.string( "Admin")
+        case .owner: return ATHLTHLocalization.string( "Owner")
         }
     }
 
@@ -205,9 +205,9 @@ enum ProfileVisibility: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .privateOnly: return String(localized: "Private")
-        case .friends: return String(localized: "Followers")
-        case .publicProfile: return String(localized: "Public")
+        case .privateOnly: return ATHLTHLocalization.string( "Private")
+        case .friends: return ATHLTHLocalization.string( "Followers")
+        case .publicProfile: return ATHLTHLocalization.string( "Public")
         }
     }
 }
@@ -256,12 +256,12 @@ enum WorkoutKind: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .running: return String(localized: "Run")
-        case .walking: return String(localized: "Walk")
-        case .strength: return String(localized: "Strength")
-        case .mobility: return String(localized: "Mobility")
-        case .recovery: return String(localized: "Recovery")
-        case .custom: return String(localized: "Custom")
+        case .running: return ATHLTHLocalization.string( "Run")
+        case .walking: return ATHLTHLocalization.string( "Walk")
+        case .strength: return ATHLTHLocalization.string( "Strength")
+        case .mobility: return ATHLTHLocalization.string( "Mobility")
+        case .recovery: return ATHLTHLocalization.string( "Recovery")
+        case .custom: return ATHLTHLocalization.string( "Custom")
         }
     }
 
