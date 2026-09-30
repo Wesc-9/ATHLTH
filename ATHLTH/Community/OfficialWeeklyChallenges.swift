@@ -182,7 +182,7 @@ private struct OfficialWeeklyChallengeShiftParams: Encodable {
 }
 
 private struct OfficialWeeklyChallengeCompletionUpdate: Encodable {
-    let completedAt: Date
+    let completedAt: Date?
     let completionValue: Double
 
     enum CodingKeys: String, CodingKey {
@@ -385,15 +385,24 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                 challenge: challenge,
                 workouts: workouts
             )
+            let previous = row.completionValue ?? 0
+            let completedAt: Date? =
+                value >= challenge.targetValue
+                    ? Date()
+                    : nil
 
-            guard value >= challenge.targetValue else { continue }
+            guard abs(value - previous) > 0.0001 ||
+                    completedAt != nil
+            else {
+                continue
+            }
 
             do {
                 try await client
                     .from("official_weekly_challenge_participants")
                     .update(
                         OfficialWeeklyChallengeCompletionUpdate(
-                            completedAt: Date(),
+                            completedAt: completedAt,
                             completionValue: value
                         )
                     )
