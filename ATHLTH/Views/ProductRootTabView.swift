@@ -3468,9 +3468,9 @@ struct ATHLTHTrainView: View {
         badge: String,
         @ViewBuilder destination: () -> Destination
     ) -> some View {
-        NavigationLink(
-            destination: destination
-        ) {
+        NavigationLink {
+            destination()
+        } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: icon)
@@ -3679,9 +3679,9 @@ struct ATHLTHTrainView: View {
         icon: String,
         @ViewBuilder destination: () -> Destination
     ) -> some View {
-        NavigationLink(
-            destination: destination
-        ) {
+        NavigationLink {
+            destination()
+        } label: {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: icon)
                     .font(
@@ -3746,86 +3746,103 @@ struct ATHLTHTrainView: View {
                 ForEach(
                     session.savedWorkoutTemplates.prefix(3)
                 ) { workout in
-                    Button {
-                        if workout.kind == .strength {
+                    if workout.kind == .strength {
+                        Button {
                             selectedStrengthSession = workout
-                        } else {
-                            selectedSection = 2
+                        } label: {
+                            savedWorkoutRow(
+                                workout,
+                                trailingIcon: "play.fill"
+                            )
                         }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(
-                                systemName:
-                                    workout.kind.systemImage
-                            )
-                            .font(
-                                .system(
-                                    size: 16,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep
-                            )
-                            .frame(width: 38, height: 38)
-                            .background(
-                                ATHLTHTheme.accentSoft,
-                                in: RoundedRectangle(
-                                    cornerRadius: 12,
-                                    style: .continuous
-                                )
-                            )
-
-                            VStack(
-                                alignment: .leading,
-                                spacing: 2
-                            ) {
-                                Text(workout.title)
-                                    .font(
-                                        .subheadline
-                                            .weight(.semibold)
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme.primaryText
-                                    )
-
-                                Text(
-                                    todaySessionSummary(
-                                        workout
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
+                        .buttonStyle(.plain)
+                    } else {
+                        NavigationLink {
+                            TrainingLibraryHomeView { template in
+                                pendingRunningTemplate = template
                             }
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    workout.kind == .strength
-                                        ? "play.fill"
-                                        : "chevron.right"
-                            )
-                            .font(.caption.bold())
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep
+                        } label: {
+                            savedWorkoutRow(
+                                workout,
+                                trailingIcon: "chevron.right"
                             )
                         }
-                        .padding(12)
-                        .background(
-                            Color.white.opacity(0.74),
-                            in: RoundedRectangle(
-                                cornerRadius: 18,
-                                style: .continuous
-                            )
-                        )
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private func savedWorkoutRow(
+        _ workout: PlannedSession,
+        trailingIcon: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    workout.kind.systemImage
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(width: 38, height: 38)
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(workout.title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+
+                Text(
+                    todaySessionSummary(
+                        workout
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(systemName: trailingIcon)
+                .font(.caption.bold())
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+        }
+        .padding(12)
+        .background(
+            Color.white.opacity(0.74),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
     }
 
     private func trainSectionHeader(
