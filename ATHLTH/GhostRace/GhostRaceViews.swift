@@ -1715,7 +1715,11 @@ struct GhostRaceLivePanel: View {
 
             if comparison.routeDeviationMeters > 80 {
                 Label(
-                    "You are about \(Int(comparison.routeDeviationMeters.rounded())) m from the ghost route.",
+                    ATHLTHLocalization.format(
+                    english: "You are about %d m from the ghost route.",
+                    norwegian: "Du er omtrent %d m fra Ghost-ruten.",
+                    Int(comparison.routeDeviationMeters.rounded())
+                ),
                     systemImage: "location.slash.fill"
                 )
                 .font(.caption)
