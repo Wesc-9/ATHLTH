@@ -458,8 +458,22 @@ struct SocialFeedItem: Identifiable, Hashable {
     let activity: SocialActivityRecord
     let actor: SocialProfileCard
     let reactions: [SocialActivityReactionRecord]
-    let comments: [SocialActivityCommentRecord] = []
-    let trainingPartners: [SocialWorkoutParticipantRecord] = []
+    let comments: [SocialActivityCommentRecord]
+    let trainingPartners: [SocialWorkoutParticipantRecord]
+
+    init(
+        activity: SocialActivityRecord,
+        actor: SocialProfileCard,
+        reactions: [SocialActivityReactionRecord],
+        comments: [SocialActivityCommentRecord] = [],
+        trainingPartners: [SocialWorkoutParticipantRecord] = []
+    ) {
+        self.activity = activity
+        self.actor = actor
+        self.reactions = reactions
+        self.comments = comments
+        self.trainingPartners = trainingPartners
+    }
 }
 
 struct SocialInboxEvent: Identifiable, Codable, Hashable {
