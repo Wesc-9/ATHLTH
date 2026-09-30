@@ -313,9 +313,15 @@ struct RouteLibraryListView: View {
                 if entries.isEmpty && !loading && errorMessage == nil {
                     ContentUnavailableView(
                         "No routes found", systemImage: "map",
-                        description: Text(source == .mine
-                            ? "Create or save a route, or try another search or filter."
-                            : "Try another search or filter. Public routes appear here when shared.")
+                        description: Text(
+                            source == .mine
+                                ? ATHLTHLocalization.string(
+                                    "Create or save a route, or try another search or filter."
+                                )
+                                : ATHLTHLocalization.string(
+                                    "Try another search or filter. Public routes appear here when shared."
+                                )
+                        )
                     )
                 }
             }
