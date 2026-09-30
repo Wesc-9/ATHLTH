@@ -281,7 +281,11 @@ struct SocialHubView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("\(social.following.count) Following")
+                    Text(ATHLTHLocalization.format(
+                            english: "%d Following",
+                            norwegian: "%d følger",
+                            social.following.count
+                        ))
                         .font(.title3.bold())
                     Spacer()
                     Button {
@@ -1629,7 +1633,11 @@ struct FriendProfileView: View {
 
                     if items.count > 3 {
                         Text(
-                            "\(items.count) shared"
+                            ATHLTHLocalization.format(
+                            english: "%d shared",
+                            norwegian: "%d delt",
+                            items.count
+                        )
                         )
                         .font(
                             .caption2.weight(
@@ -1813,7 +1821,11 @@ struct FriendProfileView: View {
                         .lineLimit(2)
 
                     Text(
-                        "\(Int((goal.progress * 100).rounded()))% complete"
+                        ATHLTHLocalization.format(
+                            english: "%d%% complete",
+                            norwegian: "%d %% fullført",
+                            Int((goal.progress * 100).rounded())
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
