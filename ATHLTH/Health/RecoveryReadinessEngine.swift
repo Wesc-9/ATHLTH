@@ -57,28 +57,38 @@ enum RecoveryReadinessEngine {
 
         let recentWindow:
             TimeInterval = 48 * 3_600
+        let sleepAge =
+            currentSleep.sleepEnd.map {
+                now.timeIntervalSince($0)
+            }
+        let hrvAge =
+            currentHeart.hrvDate.map {
+                now.timeIntervalSince($0)
+            }
+        let restingAge =
+            currentHeart
+                .restingHeartRateDate
+                .map {
+                    now.timeIntervalSince($0)
+                }
 
         guard baselineDays >= 5,
               currentSleep.totalAsleep > 0,
+              let sleepAge,
+              sleepAge >= 0,
+              sleepAge <= recentWindow,
               let currentHRV =
                 currentHeart.hrvMilliseconds,
               currentHRV > 0,
-              let hrvDate = currentHeart.hrvDate,
-              abs(
-                now.timeIntervalSince(
-                    hrvDate
-                )
-              ) <= recentWindow,
+              let hrvAge,
+              hrvAge >= 0,
+              hrvAge <= recentWindow,
               let currentRestingHeartRate =
                 currentHeart.restingHeartRate,
               currentRestingHeartRate > 0,
-              let restingDate =
-                currentHeart.restingHeartRateDate,
-              abs(
-                now.timeIntervalSince(
-                    restingDate
-                )
-              ) <= recentWindow,
+              let restingAge,
+              restingAge >= 0,
+              restingAge <= recentWindow,
               let averageSleep,
               averageSleep > 0,
               let averageHRV,
