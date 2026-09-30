@@ -582,6 +582,20 @@ private struct SocialActivityCard: View {
 
     let item: SocialFeedItem
 
+    @State private var commentText = ""
+    @State private var showingChallenge = false
+
+    private var canChallenge: Bool {
+        item.actor.userID != social.currentUserID &&
+            social.isMutualFollow(item.actor.userID)
+    }
+
+    private var cleanComment: String {
+        commentText.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
@@ -634,44 +648,82 @@ private struct SocialActivityCard: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                ForEach(SocialActivityReaction.allCases) { reaction in
-                    Button {
-                        let mine = item.reactions.first {
-                            $0.userID == social.currentUserID
-                        }
+            reactionRow
 
-                        Task {
-                            await social.setReaction(
-                                activityID: item.id,
-                                reaction: mine?.reaction == reaction ? nil : reaction
-                            )
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(reaction.emoji)
-                            let count = item.reactions.filter { $0.reaction == reaction }.count
-                            if count > 0 {
-                                Text("\(count)")
-                                    .font(.caption2.bold())
-                            }
-                        }
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
-                        .background(
-                            item.reactions.contains(where: {
-                                $0.userID == social.currentUserID &&
-                                $0.reaction == reaction
-                            })
-                                ? ATHLTHTheme.accent.opacity(0.12)
-                                : Color(.tertiarySystemGroupedBackground),
-                            in: Capsule()
-                        )
+            if !item.comments.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(item.comments.suffix(3)) { comment in
+                        commentRow(comment)
                     }
-                    .buttonStyle(.plain)
+
+                    if item.comments.count > 3 {
+                        Text(
+                            "\(item.comments.count - 3) more comment" +
+                            (item.comments.count - 3 == 1 ? "" : "s")
+                        )
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField(
+                    "Add a comment…",
+                    text: $commentText,
+                    axis: .vertical
+                )
+                .lineLimit(1...3)
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(
+                    Color(.tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                )
+                .onSubmit {
+                    submitComment()
                 }
 
-                Spacer()
+                Button {
+                    submitComment()
+                } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            cleanComment.isEmpty
+                                ? Color.secondary.opacity(0.35)
+                                : ATHLTHTheme.accentDeep,
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(cleanComment.isEmpty)
+                .accessibilityLabel("Post comment")
+
+                if canChallenge {
+                    Button {
+                        showingChallenge = true
+                    } label: {
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.orange)
+                            .frame(width: 34, height: 34)
+                            .background(
+                                Color.orange.opacity(0.10),
+                                in: Circle()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        "Challenge \(item.actor.resolvedName)"
+                    )
+                }
             }
         }
         .padding(15)
@@ -679,6 +731,154 @@ private struct SocialActivityCard: View {
             Color(.secondarySystemGroupedBackground),
             in: RoundedRectangle(cornerRadius: 20)
         )
+        .sheet(isPresented: $showingChallenge) {
+            ChallengeCreationView(
+                preselectedFriends: [item.actor]
+            )
+        }
+    }
+
+    private var reactionRow: some View {
+        HStack(spacing: 7) {
+            ForEach(SocialActivityReaction.allCases) { reaction in
+                Button {
+                    let mine = item.reactions.first {
+                        $0.userID == social.currentUserID
+                    }
+
+                    Task {
+                        await social.setReaction(
+                            activityID: item.id,
+                            reaction:
+                                mine?.reaction == reaction
+                                    ? nil
+                                    : reaction
+                        )
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(reaction.emoji)
+
+                        let count = item.reactions.filter {
+                            $0.reaction == reaction
+                        }.count
+
+                        if count > 0 {
+                            Text("\(count)")
+                                .font(.caption2.bold())
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(
+                        item.reactions.contains(where: {
+                            $0.userID == social.currentUserID &&
+                            $0.reaction == reaction
+                        })
+                            ? ATHLTHTheme.accent.opacity(0.12)
+                            : Color(.tertiarySystemGroupedBackground),
+                        in: Capsule()
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+
+            if !item.comments.isEmpty {
+                Label(
+                    "\(item.comments.count)",
+                    systemImage: "bubble.left"
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func commentRow(
+        _ comment: SocialActivityCommentRecord
+    ) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            if let profile = social.profile(for: comment.userID) {
+                SocialAvatar(
+                    profile: profile,
+                    size: 28
+                )
+            } else {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: Circle()
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    Text(commentAuthor(comment))
+                        .font(.caption.weight(.semibold))
+
+                    Text(comment.createdAt, style: .relative)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Text(comment.body)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            }
+
+            Spacer(minLength: 0)
+        }
+        .contextMenu {
+            if comment.userID == social.currentUserID ||
+                item.actor.userID == social.currentUserID {
+                Button(
+                    "Delete comment",
+                    role: .destructive
+                ) {
+                    Task {
+                        await social.deleteComment(
+                            comment.id
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func commentAuthor(
+        _ comment: SocialActivityCommentRecord
+    ) -> String {
+        if comment.userID == social.currentUserID {
+            return "You"
+        }
+
+        return social.profile(
+            for: comment.userID
+        )?.resolvedName ?? "ATHLTH athlete"
+    }
+
+    private func submitComment() {
+        let body = cleanComment
+        guard !body.isEmpty else { return }
+
+        commentText = ""
+
+        Task {
+            await social.addComment(
+                activityID: item.id,
+                body: body
+            )
+        }
     }
 
     private func activityIcon(_ kind: String) -> String {
@@ -813,6 +1013,22 @@ struct FriendProfileView: View {
             if profile != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button(
+                            social.isMuted(userID)
+                                ? "Unmute activity"
+                                : "Mute activity"
+                        ) {
+                            Task {
+                                await social.setMuted(
+                                    userID,
+                                    muted:
+                                        !social.isMuted(
+                                            userID
+                                        )
+                                )
+                            }
+                        }
+
                         Button("Report") {
                             showingReport = true
                         }
