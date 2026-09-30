@@ -1316,6 +1316,7 @@ private struct OfficialWeeklyChallengeArtwork: View {
 struct OfficialWeeklyChallengeCard: View {
     @EnvironmentObject private var store: OfficialWeeklyChallengeStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var social: SocialStore
 
     let challenge: OfficialWeeklyChallenge
     let profiles: [SocialProfileCard]
@@ -1460,19 +1461,30 @@ struct OfficialWeeklyChallengeCard: View {
                             }
                         }
 
-                        Text(ATHLTHLocalization.format(
-                            english: "%d participating",
-                            norwegian: "%d deltar",
-                            store.participantCount(for: challenge.id)
-                        ))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(.leading, 14)
-                            .shadow(
-                                color: .black.opacity(0.42),
-                                radius: 4,
-                                y: 1
-                            )
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(ATHLTHLocalization.format(
+                                english: "%d participating",
+                                norwegian: "%d deltar",
+                                store.participantCount(for: challenge.id)
+                            ))
+
+                            if friendParticipantCount > 0 {
+                                Text(
+                                    friendParticipantCount == 1
+                                        ? "1 friend joined"
+                                        : "\(friendParticipantCount) friends joined"
+                                )
+                                .font(.caption2.weight(.semibold))
+                            }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.leading, 14)
+                        .shadow(
+                            color: .black.opacity(0.42),
+                            radius: 4,
+                            y: 1
+                        )
                     }
 
                     Spacer(minLength: 8)
@@ -1594,6 +1606,12 @@ struct OfficialWeeklyChallengeCard: View {
         return profiles.filter { ids.contains($0.userID) }
     }
 
+    private var friendParticipantCount: Int {
+        store.participantIDs(for: challenge.id)
+            .filter { social.isMutualFollow($0) }
+            .count
+    }
+
     private var progressRing: some View {
         ZStack {
             Circle()
@@ -1646,9 +1664,17 @@ struct OfficialWeeklyChallengeCard: View {
     }
 }
 
+private struct OfficialWeeklyFriendProgressRow: Identifiable {
+    var id: UUID { profile.userID }
+
+    let profile: SocialProfileCard
+    let value: Double
+}
+
 struct OfficialWeeklyChallengeDetailView: View {
     @EnvironmentObject private var store: OfficialWeeklyChallengeStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var social: SocialStore
 
     let challengeID: UUID
 
@@ -1678,6 +1704,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                             challengeOverviewSection(challenge)
                             progressSection(challenge)
                                 .id("weekly-progress")
+                            friendsProgressSection(challenge)
                             leaderboardSection(challenge)
                                 .id("weekly-leaderboard")
                             countedWorkoutsSection
@@ -2362,6 +2389,172 @@ struct OfficialWeeklyChallengeDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func friendsProgressSection(
+        _ challenge: OfficialWeeklyChallenge
+    ) -> some View {
+        let rows = friendProgressRows(for: challenge)
+
+        return Group {
+            if !rows.isEmpty {
+                ATHLTHCard {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Friends in this challenge")
+                                .font(.title3.bold())
+
+                            Text(
+                                "See how your mutual follows are progressing."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text("\(rows.count)")
+                            .font(.title3.bold())
+                            .monospacedDigit()
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                    }
+
+                    VStack(spacing: 0) {
+                        ForEach(rows) { row in
+                            HStack(spacing: 12) {
+                                OfficialChallengeAvatar(
+                                    url:
+                                        row.profile.avatarURL
+                                            .flatMap(
+                                                URL.init(string:)
+                                            ),
+                                    fallback:
+                                        row.profile.resolvedName,
+                                    size: 40
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 4
+                                ) {
+                                    HStack {
+                                        Text(
+                                            row.profile.resolvedName
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(.semibold)
+                                        )
+                                        .lineLimit(1)
+
+                                        Spacer()
+
+                                        Text(
+                                            challenge.kind.targetText(
+                                                row.value
+                                            )
+                                        )
+                                        .font(
+                                            .caption
+                                                .monospacedDigit()
+                                                .weight(.bold)
+                                        )
+                                    }
+
+                                    ProgressView(
+                                        value: min(
+                                            max(
+                                                row.value /
+                                                max(
+                                                    challenge.targetValue,
+                                                    0.0001
+                                                ),
+                                                0
+                                            ),
+                                            1
+                                        )
+                                    )
+                                    .tint(
+                                        ATHLTHTheme.accentDeep
+                                    )
+
+                                    Text(
+                                        friendDifferenceText(
+                                            row.value,
+                                            challenge: challenge
+                                        )
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 10)
+
+                            if row.id != rows.last?.id {
+                                Divider()
+                                    .padding(.leading, 52)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func friendProgressRows(
+        for challenge: OfficialWeeklyChallenge
+    ) -> [OfficialWeeklyFriendProgressRow] {
+        store.participants
+            .filter {
+                $0.challengeID == challenge.id &&
+                social.isMutualFollow($0.userID)
+            }
+            .compactMap { participant in
+                guard let profile =
+                        social.profile(for: participant.userID)
+                else {
+                    return nil
+                }
+
+                return OfficialWeeklyFriendProgressRow(
+                    profile: profile,
+                    value: participant.completionValue ?? 0
+                )
+            }
+            .sorted {
+                if $0.value == $1.value {
+                    return $0.profile.resolvedName
+                        .localizedCaseInsensitiveCompare(
+                            $1.profile.resolvedName
+                        ) == .orderedAscending
+                }
+
+                return $0.value > $1.value
+            }
+    }
+
+    private func friendDifferenceText(
+        _ friendValue: Double,
+        challenge: OfficialWeeklyChallenge
+    ) -> String {
+        let delta =
+            friendValue -
+            resolvedCurrentValue(for: challenge)
+
+        if abs(delta) < 0.0001 {
+            return "Level with you"
+        }
+
+        let amount =
+            challenge.kind.targetText(
+                abs(delta)
+            )
+
+        return delta > 0
+            ? "\(amount) ahead of you"
+            : "\(amount) behind you"
     }
 
     private func leaderboardSection(
