@@ -83,7 +83,12 @@ struct WatchHomeView: View {
                                         "Send a route from iPhone"
                                     )
                                     : Text(
-                                        "\(routeStore.routes.count) saved"
+                                        ATHLTHLocalization.format(
+                                            "%d saved",
+                                            routeStore
+                                                .routes
+                                                .count
+                                        )
                                     ),
                             icon: "map.fill",
                             accent: false
