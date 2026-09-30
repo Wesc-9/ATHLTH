@@ -3180,6 +3180,10 @@ struct SessionEditorView: View {
     @State private var durationMinutes = 45
     @State private var distanceKilometers = 5.0
     @State private var notes = ""
+    @State private var workoutTemplateID: UUID?
+    @State private var workoutBlocks: [WorkoutTemplateBlock] = []
+    @State private var workoutCategory: String?
+    @State private var showingSavedWorkoutPicker = false
 
     @State private var plannedExercises: [PlannedExercise] = []
     @State private var exerciseBeingEdited: PlannedExercise?
@@ -3249,6 +3253,15 @@ struct SessionEditorView: View {
             initialValue: workout.targetDistanceKilometers ?? 5.0
         )
         _notes = State(initialValue: workout.notes ?? "")
+        _workoutTemplateID = State(
+            initialValue: workout.workoutTemplateID
+        )
+        _workoutBlocks = State(
+            initialValue: workout.resolvedWorkoutBlocks
+        )
+        _workoutCategory = State(
+            initialValue: workout.workoutCategory
+        )
         _plannedExercises = State(initialValue: workout.exercises)
         _selectedRunningWorkouts = State(
             initialValue: workout.resolvedRunningWorkouts
@@ -3344,6 +3357,116 @@ struct SessionEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if existingWorkout == nil {
+                    Section("Start from") {
+                        Button {
+                            showingSavedWorkoutPicker = true
+                        } label: {
+                            HStack(spacing: 11) {
+                                Image(
+                                    systemName:
+                                        "rectangle.stack.fill"
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accent
+                                )
+                                .frame(width: 28)
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text("My Workouts")
+                                        .foregroundStyle(
+                                            ATHLTHTheme.primaryText
+                                        )
+
+                                    Text(
+                                        "Use a complete saved workout as this plan session."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName: "chevron.right"
+                                )
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if !workoutBlocks.isEmpty {
+                    Section("Workout Structure") {
+                        HStack {
+                            Label(
+                                "\(workoutBlocks.count) blocks",
+                                systemImage:
+                                    "list.number"
+                            )
+
+                            Spacer()
+
+                            if let workoutCategory {
+                                Text(
+                                    workoutCategory.capitalized
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        ForEach(
+                            workoutBlocks.prefix(5)
+                        ) { block in
+                            HStack(spacing: 10) {
+                                Image(
+                                    systemName:
+                                        block.kind.systemImage
+                                )
+                                .foregroundStyle(
+                                    block.kind == .run
+                                        ? ATHLTHTheme.vitality
+                                        : ATHLTHTheme.accent
+                                )
+                                .frame(width: 24)
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(block.title)
+                                        .font(.subheadline)
+
+                                    if let target =
+                                        block.targetText {
+                                        Text(target)
+                                            .font(.caption2)
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                    }
+                                }
+
+                                Spacer()
+                            }
+                        }
+
+                        if workoutBlocks.count > 5 {
+                            Text(
+                                "+\(workoutBlocks.count - 5) more blocks"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 Section {
                     TextField("Title", text: $title)
 
@@ -3501,6 +3624,12 @@ struct SessionEditorView: View {
                         saveSession()
                     }
                     .disabled(!canAdd)
+                }
+            }
+            .sheet(isPresented: $showingSavedWorkoutPicker) {
+                SavedWorkoutPickerView { workout in
+                    applySavedWorkout(workout)
+                    showingSavedWorkoutPicker = false
                 }
             }
             .sheet(isPresented: $showingExerciseLibrary) {
@@ -4782,6 +4911,51 @@ struct SessionEditorView: View {
         )
     }
 
+
+    private func applySavedWorkout(
+        _ workout: PlannedSession
+    ) {
+        title = workout.title
+        kind = workout.kind
+        durationMinutes =
+            workout.durationMinutes ?? durationMinutes
+        distanceKilometers =
+            workout.targetDistanceKilometers ??
+            distanceKilometers
+        notes = workout.notes ?? ""
+        plannedExercises = workout.exercises
+        selectedRunningWorkouts =
+            workout.resolvedRunningWorkouts
+        selectedRouteID = workout.routeID
+        selectedGearIDs = Set(workout.gearIDs ?? [])
+        gearSelectionTouched = workout.gearIDs != nil
+        audioCoachOverride =
+            workout.audioCoachConfiguration
+        workoutTemplateID =
+            workout.workoutTemplateID
+        workoutBlocks =
+            workout.resolvedWorkoutBlocks
+        workoutCategory =
+            workout.workoutCategory
+
+        if let scheduled = workout.scheduledStart {
+            scheduledTimeEnabled = true
+            scheduledTime = scheduled
+        }
+
+        if let pace =
+                workout.targetPaceSecondsPerKilometer,
+           pace > 0 {
+            let total = max(
+                Int(pace.rounded()),
+                0
+            )
+            targetPaceEnabled = true
+            targetPaceMinutes = total / 60
+            targetPaceSeconds = total % 60
+        }
+    }
+
     private func saveSession() {
         let cleanNotes = notes
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -4827,11 +5001,13 @@ struct SessionEditorView: View {
                     ? workoutTargetAlertConfigurationForSave
                     : nil,
             workoutTemplateID:
-                existingWorkout?.workoutTemplateID,
+                workoutTemplateID,
             workoutBlocks:
-                existingWorkout?.workoutBlocks,
+                workoutBlocks.isEmpty
+                    ? nil
+                    : workoutBlocks,
             workoutCategory:
-                existingWorkout?.workoutCategory
+                workoutCategory
         )
 
         if existingWorkout != nil,
