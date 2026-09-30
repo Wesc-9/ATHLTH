@@ -159,7 +159,12 @@ final class SupabaseRouteDiscoveryService {
             .execute()
             .value
 
-        let rows = try await titleRows + startRows + endRows
+        let (titles, starts, ends) = try await (
+            titleRows,
+            startRows,
+            endRows
+        )
+        let rows = titles + starts + ends
         var seen = Set<UUID>()
 
         return rows
