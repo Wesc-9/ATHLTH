@@ -577,6 +577,8 @@ struct ChallengeCreationView: View {
     @State private var mapPosition: MapCameraPosition = .automatic
 
     @State private var visibility: ProfileVisibility = .friends
+    @State private var creatingChallenge = false
+    @State private var createError: String?
 
     var body: some View {
         NavigationStack {
@@ -700,6 +702,23 @@ struct ChallengeCreationView: View {
                         )
                     )
                 )
+            }
+            .alert(
+                "Challenge could not be sent",
+                isPresented: Binding(
+                    get: { createError != nil },
+                    set: { shown in
+                        if !shown {
+                            createError = nil
+                        }
+                    }
+                )
+            ) {
+                Button("OK", role: .cancel) {
+                    createError = nil
+                }
+            } message: {
+                Text(createError ?? "")
             }
         }
     }
@@ -1956,17 +1975,32 @@ struct ChallengeCreationView: View {
                 .buttonStyle(.bordered)
             }
 
-            Button(step == 4 ? "Create Challenge" : "Continue") {
+            Button(
+                step == 4
+                    ? (
+                        creatingChallenge
+                            ? "Sending…"
+                            : "Send Challenge"
+                    )
+                    : "Continue"
+            ) {
                 if step == 4 {
-                    createChallenge()
+                    Task {
+                        await createChallenge()
+                    }
                 } else {
-                    withAnimation { step += 1 }
+                    withAnimation {
+                        step += 1
+                    }
                 }
             }
             .buttonStyle(.borderedProminent)
             .tint(ATHLTHTheme.accent)
             .frame(maxWidth: .infinity)
-            .disabled(!canContinue)
+            .disabled(
+                !canContinue ||
+                creatingChallenge
+            )
         }
         .padding()
         .background(.ultraThinMaterial)
@@ -2076,7 +2110,8 @@ struct ChallengeCreationView: View {
         }
     }
 
-    private func createChallenge() {
+    @MainActor
+    private func createChallenge() async {
         let creator = ChallengeParticipant(
             userID: session.profile.userID,
             username: session.profile.username,
@@ -2193,16 +2228,31 @@ struct ChallengeCreationView: View {
             meetup: meetup
         )
 
-        challenges.add(
-            ATHLTHChallenge(
-                creatorID: session.profile.userID,
-                title: resolvedTitle,
-                sport: sport,
-                participants: [creator] + invitees,
-                rules: rules,
-                visibility: visibility
-            )
+        let challenge = ATHLTHChallenge(
+            creatorID: session.profile.userID,
+            title: resolvedTitle,
+            sport: sport,
+            participants: [creator] + invitees,
+            rules: rules,
+            visibility: visibility
         )
+
+        creatingChallenge = true
+        createError = nil
+        challenges.add(challenge)
+
+        let synced =
+            await social.syncChallenge(challenge)
+
+        creatingChallenge = false
+
+        guard synced else {
+            challenges.remove(challenge.id)
+            createError =
+                social.errorMessage ??
+                "This athlete may not be accepting challenge requests."
+            return
+        }
 
         dismiss()
     }
