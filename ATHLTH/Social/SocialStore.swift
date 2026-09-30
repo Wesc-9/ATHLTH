@@ -94,6 +94,14 @@ final class SocialStore: ObservableObject {
             }
     }
 
+    /// People who can be invited into a shared workout.
+    /// Workout invitation RLS requires a mutual follow relationship, so this
+    /// deliberately follows the current Follow/Following model instead of the
+    /// legacy friendships table.
+    var trainingPartners: [SocialProfileCard] {
+        mutualFollows
+    }
+
     func acceptedTrainingPartnerNames(for workoutID: UUID) -> [String] {
         guard let session = workoutSessions.first(where: {
             $0.creatorID == currentUserID &&
@@ -811,7 +819,7 @@ final class SocialStore: ObservableObject {
                 $0.sourceWorkoutID == workout.id
             }
 
-            let selectedFriends = friends.filter {
+            let selectedFriends = trainingPartners.filter {
                 friendIDs.contains($0.userID)
             }
 
