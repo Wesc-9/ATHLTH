@@ -2793,6 +2793,9 @@ private struct ATHLTHTrainPlanWorkspaceView: View {
 }
 
 struct ATHLTHTrainView: View {
+    @Binding private var navigationRequest:
+        ATHLTHTrainNavigationRequest?
+
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
@@ -2820,6 +2823,16 @@ struct ATHLTHTrainView: View {
     @State private var showingStrengthWorkout = false
     @State private var showingSimplePlanCreation = false
     @State private var showingAdvancedPlanCreation = false
+    @State private var showingPlanWorkspace = false
+    @State private var showingGhostHub = false
+
+    init(
+        navigationRequest:
+            Binding<ATHLTHTrainNavigationRequest?> =
+            .constant(nil)
+    ) {
+        _navigationRequest = navigationRequest
+    }
 
     var body: some View {
         NavigationStack {
@@ -2854,6 +2867,16 @@ struct ATHLTHTrainView: View {
                 .hidden,
                 for: .navigationBar
             )
+            .navigationDestination(
+                isPresented: $showingPlanWorkspace
+            ) {
+                ATHLTHTrainPlanWorkspaceView()
+            }
+            .navigationDestination(
+                isPresented: $showingGhostHub
+            ) {
+                GhostRaceHubView()
+            }
             .sheet(
                 isPresented: $showingSimplePlanCreation
             ) {
@@ -3006,6 +3029,12 @@ struct ATHLTHTrainView: View {
             .task {
                 session.refreshActivePlanForToday()
                 await exerciseLibrary.refresh()
+                handleNavigationRequest()
+            }
+            .onChange(
+                of: navigationRequest?.id
+            ) { _, _ in
+                handleNavigationRequest()
             }
             .alert("ATHLTH", isPresented: Binding(
                 get: {
@@ -3138,8 +3167,10 @@ struct ATHLTHTrainView: View {
 
             LazyVGrid(
                 columns: [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
+                    GridItem(
+                        .adaptive(minimum: 145),
+                        spacing: 10
+                    )
                 ],
                 spacing: 10
             ) {
@@ -3306,7 +3337,15 @@ struct ATHLTHTrainView: View {
                 activePlanPreview(plan)
             }
 
-            HStack(spacing: 10) {
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .adaptive(minimum: 150),
+                        spacing: 10
+                    )
+                ],
+                spacing: 10
+            ) {
                 planModeCard(
                     title: "Simple",
                     detail:
@@ -3638,13 +3677,11 @@ struct ATHLTHTrainView: View {
                                 Color.white.opacity(0.70)
                             )
 
-                        Text("Compete with yourself.")
+                        Text(ghostTrainingTitle)
                             .font(.title3.weight(.bold))
                             .foregroundStyle(.white)
 
-                        Text(
-                            "Replay a previous run, chase a target time, race a route or challenge a friend."
-                        )
+                        Text(ghostTrainingDetail)
                         .font(.caption)
                         .foregroundStyle(
                             Color.white.opacity(0.74)
@@ -3695,6 +3732,116 @@ struct ATHLTHTrainView: View {
         .buttonStyle(.plain)
     }
 
+    private var ghostTrainingTitle: String {
+        if let comparison = ghostRace.comparison {
+            let meters = abs(
+                comparison.signedDistanceMeters
+            )
+            let position =
+                comparison.userIsAhead
+                    ? "ahead"
+                    : "behind"
+
+            return String(
+                format: "%.0f m %@",
+                meters,
+                position
+            )
+        }
+
+        if let result = ghostRace.result,
+           let beatGhost = result.beatGhost {
+            return beatGhost
+                ? "You beat your ghost."
+                : "Ghost finished ahead."
+        }
+
+        if let reference = ghostRace.reference {
+            return "Ghost ready · \(reference.title)"
+        }
+
+        return "Compete with yourself."
+    }
+
+    private var ghostTrainingDetail: String {
+        if ghostRace.comparison != nil {
+            return
+                "Live comparison is active. Open Ghost Training for route position, time gap and progress."
+        }
+
+        if let result = ghostRace.result,
+           let seconds = result.signedTimeSeconds {
+            let value = abs(seconds)
+            return String(
+                format:
+                    result.beatGhost == true
+                        ? "Finished %.0f seconds ahead of your reference."
+                        : "Finished %.0f seconds behind your reference.",
+                value
+            )
+        }
+
+        if ghostRace.reference != nil {
+            return
+                "Your reference is prepared. Start when you are ready to race it."
+        }
+
+        return
+            "Replay a previous run, chase a target time, race a route or challenge a friend."
+    }
+
+    private func handleNavigationRequest() {
+        guard let request = navigationRequest else {
+            return
+        }
+
+        switch request {
+        case .plan:
+            showingPlanWorkspace = true
+
+        case let .workout(planID, workoutID):
+            if let plan =
+                    session.trainingPlan(
+                        withID: planID
+                    ),
+               let workout =
+                    plan.weeks
+                        .flatMap(\.days)
+                        .flatMap(\.sessions)
+                        .first(
+                            where: {
+                                $0.id == workoutID
+                            }
+                        ) {
+                selectedPlanWorkout =
+                    PlannedWorkoutSelection(
+                        planID: planID,
+                        workout: workout,
+                        isHealthCompleted:
+                            healthCompletedTodaySessionIDs(
+                                [workout]
+                            )
+                            .contains(workout.id)
+                    )
+            } else {
+                showingPlanWorkspace = true
+            }
+
+        case let .quick(kind):
+            handleQuickStart(kind)
+
+        case .customQuick:
+            if customQuickStartAvailable {
+                showingCustomQuickStart = true
+            }
+
+        case .ghost:
+            showingGhostHub = true
+        }
+
+        navigationRequest = nil
+    }
+
     private var trainingToolsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             trainSectionHeader(
@@ -3704,7 +3851,15 @@ struct ATHLTHTrainView: View {
                     "Everything deeper stays close, without crowding the main screen."
             )
 
-            HStack(spacing: 10) {
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .adaptive(minimum: 100),
+                        spacing: 10
+                    )
+                ],
+                spacing: 10
+            ) {
                 trainToolCard(
                     title: "Library",
                     detail: "Workouts & exercises",
