@@ -77,26 +77,6 @@ struct SocialProfileDetailRecord: Codable, Hashable {
     }
 }
 
-struct SocialFriendshipRecord: Identifiable, Codable, Hashable {
-    let id: UUID
-    let userA: UUID
-    let userB: UUID
-    let createdAt: Date
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case userA = "user_a"
-        case userB = "user_b"
-        case createdAt = "created_at"
-    }
-
-    func otherUserID(for currentUserID: UUID) -> UUID? {
-        if userA == currentUserID { return userB }
-        if userB == currentUserID { return userA }
-        return nil
-    }
-}
-
 struct SocialFriendRequestRecord: Identifiable, Codable, Hashable {
     let id: UUID
     let senderID: UUID
