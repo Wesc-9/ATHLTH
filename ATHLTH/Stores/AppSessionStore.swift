@@ -2935,7 +2935,19 @@ final class AppSessionStore: ObservableObject {
             routeID: source.routeID,
             exercises: source.exercises,
             notes: source.notes,
-            runningWorkout: source.runningWorkout
+            runningWorkout: source.runningWorkout,
+            runningWorkouts: source.runningWorkouts,
+            gearIDs: source.gearIDs,
+            audioCoachConfiguration:
+                source.audioCoachConfiguration,
+            targetAlertConfiguration:
+                source.targetAlertConfiguration,
+            workoutTemplateID:
+                source.workoutTemplateID,
+            workoutBlocks:
+                source.workoutBlocks,
+            workoutCategory:
+                source.workoutCategory
         )
         copy.sharedSourceOwnerID =
             source.sharedSourceOwnerID ?? sourceOwnerID
