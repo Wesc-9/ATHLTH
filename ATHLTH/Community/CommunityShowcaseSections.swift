@@ -687,7 +687,7 @@ struct CommunityFriendsVsFriendsCard: View {
                 Spacer()
 
                 NavigationLink {
-                    SocialHubView(initialTab: .friends)
+                    ProfileFollowListView(mode: .following)
                 } label: {
                     Text("View all")
                         .font(.caption.weight(.semibold))
