@@ -900,8 +900,8 @@ struct CommunityDiscoverPeopleCard: View {
                 Text(
                     state == .none
                         ? "Add"
-                        : state == .friends
-                            ? "Friends"
+                        : state == .mutualFollow
+                            ? "Mutual"
                             : "Pending"
                 )
                 .font(.caption2.weight(.semibold))
