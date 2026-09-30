@@ -2815,9 +2815,9 @@ struct MyTrainingPlansLibraryView: View {
                                         )
 
                                         Text(
-                                            progress.missed.count == 1
-                                                ? "Review 1 missed workout"
-                                                : "Review \(progress.missed.count) missed workouts"
+                                            missedWorkoutReviewTitle(
+                                                progress.missed.count
+                                            )
                                         )
                                         .font(
                                             .caption.weight(.semibold)
@@ -3165,6 +3165,14 @@ struct MyTrainingPlansLibraryView: View {
                 lineWidth: 0.8
             )
         }
+    }
+
+    private func missedWorkoutReviewTitle(
+        _ count: Int
+    ) -> String {
+        count == 1
+            ? "Review 1 missed workout"
+            : "Review \(count) missed workouts"
     }
 
     private func planProgress(
