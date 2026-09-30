@@ -10,6 +10,7 @@ struct PlannedWorkoutDetailView: View {
     let isHealthCompleted: Bool
 
     @State private var showingEditor = false
+    @State private var showingStructuredWorkout = false
 
     private var currentWorkout: PlannedSession {
         guard let plan = session.activePlan,
@@ -61,6 +62,7 @@ struct PlannedWorkoutDetailView: View {
 
                     if currentWorkout.isStructuredWorkout {
                         structuredWorkoutCard
+                        structuredWorkoutStartButton
                     }
 
                     if let notes = cleanNotes {
@@ -105,6 +107,15 @@ struct PlannedWorkoutDetailView: View {
                     planID: planID,
                     workout: currentWorkout
                 )
+            }
+            .fullScreenCover(
+                isPresented:
+                    $showingStructuredWorkout
+            ) {
+                StructuredWorkoutSessionView(
+                    workout: currentWorkout
+                )
+                .environmentObject(session)
             }
         }
         .presentationDetents([.medium, .large])
@@ -391,6 +402,25 @@ struct PlannedWorkoutDetailView: View {
                 }
             }
         }
+    }
+
+
+    private var structuredWorkoutStartButton:
+        some View {
+        Button {
+            showingStructuredWorkout = true
+        } label: {
+            Label(
+                "Start Workout",
+                systemImage: "play.fill"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(ATHLTHTheme.accentDeep)
+        .disabled(isCompleted)
     }
 
     private func notesCard(_ notes: String) -> some View {
