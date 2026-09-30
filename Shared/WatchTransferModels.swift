@@ -286,16 +286,16 @@ enum WatchWorkoutKind: String, Codable, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .running: return String(localized: "Run")
-        case .walking: return String(localized: "Walk")
-        case .strength: return String(localized: "Strength")
-        case .hiit: return String(localized: "HIIT")
-        case .functional: return String(localized: "Functional")
-        case .cycling: return String(localized: "Cycling")
-        case .rowing: return String(localized: "Rowing")
-        case .stairClimbing: return String(localized: "Stairs")
-        case .yoga: return String(localized: "Yoga")
-        case .other: return String(localized: "Workout")
+        case .running: return ATHLTHLocalization.string( "Run")
+        case .walking: return ATHLTHLocalization.string( "Walk")
+        case .strength: return ATHLTHLocalization.string( "Strength")
+        case .hiit: return ATHLTHLocalization.string( "HIIT")
+        case .functional: return ATHLTHLocalization.string( "Functional")
+        case .cycling: return ATHLTHLocalization.string( "Cycling")
+        case .rowing: return ATHLTHLocalization.string( "Rowing")
+        case .stairClimbing: return ATHLTHLocalization.string( "Stairs")
+        case .yoga: return ATHLTHLocalization.string( "Yoga")
+        case .other: return ATHLTHLocalization.string( "Workout")
         }
     }
 
@@ -340,9 +340,9 @@ enum WatchAudioCoachLanguage: String, Codable, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .system: return String(localized: "System")
-        case .english: return String(localized: "English")
-        case .norwegian: return String(localized: "Norsk")
+        case .system: return ATHLTHLocalization.string( "System")
+        case .english: return ATHLTHLocalization.string( "English")
+        case .norwegian: return ATHLTHLocalization.string( "Norsk")
         }
     }
 }
@@ -537,9 +537,9 @@ enum WatchAlertDelivery: String, Codable, CaseIterable, Hashable, Identifiable {
 
     var title: String {
         switch self {
-        case .haptic: return String(localized: "Haptic")
-        case .voice: return String(localized: "Voice")
-        case .both: return String(localized: "Haptic + Voice")
+        case .haptic: return ATHLTHLocalization.string( "Haptic")
+        case .voice: return ATHLTHLocalization.string( "Voice")
+        case .both: return ATHLTHLocalization.string( "Haptic + Voice")
         }
     }
 
