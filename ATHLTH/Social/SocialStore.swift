@@ -1459,7 +1459,7 @@ final class SocialStore: ObservableObject {
             notificationStore.add(
                 ATHLTHNotificationDraft(
                     eventKey: "social-backend-\(event.id.uuidString)",
-                    kind: .social,
+                    kind: notificationKind(for: event),
                     title: event.title,
                     message: event.message,
                     createdAt: event.createdAt,
@@ -1477,6 +1477,20 @@ final class SocialStore: ObservableObject {
                     event.createdAt >= activationDate
             )
         }
+    }
+
+    private func notificationKind(
+        for event: SocialInboxEvent
+    ) -> ATHLTHNotificationKind {
+        let kind = event.kind.lowercased()
+        let entityType = event.entityType?.lowercased() ?? ""
+
+        if kind.contains("challenge") ||
+            entityType.contains("challenge") {
+            return .challenge
+        }
+
+        return .social
     }
 
     private func reset() {
