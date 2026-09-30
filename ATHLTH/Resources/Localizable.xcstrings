@@ -8300,7 +8300,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Måling"
+            "value": "Metrisk"
           }
         }
       }
@@ -11940,7 +11940,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Konkurrer"
+            "value": "Konkurranse"
           }
         }
       }
@@ -15861,6 +15861,1186 @@
           "stringUnit": {
             "state": "translated",
             "value": "Start mål-Ghost"
+          }
+        }
+      }
+    },
+    "Longest Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lengste løpetur"
+          }
+        }
+      }
+    },
+    "Fastest 1K": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskeste 1 km"
+          }
+        }
+      }
+    },
+    "Fastest Mile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskeste mile"
+          }
+        }
+      }
+    },
+    "Fastest 5K": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskeste 5 km"
+          }
+        }
+      }
+    },
+    "Fastest 10K": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskeste 10 km"
+          }
+        }
+      }
+    },
+    "Fastest Half Marathon": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskeste halvmaraton"
+          }
+        }
+      }
+    },
+    "Fastest Marathon": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskeste maraton"
+          }
+        }
+      }
+    },
+    "Longest Ride": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lengste sykkeltur"
+          }
+        }
+      }
+    },
+    "Longest Walk / Hike": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lengste gåtur / tur"
+          }
+        }
+      }
+    },
+    "Longest Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lengste økt"
+          }
+        }
+      }
+    },
+    "Most Active Calories": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flest aktive kalorier"
+          }
+        }
+      }
+    },
+    "Building baseline": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygger grunnlag"
+          }
+        }
+      }
+    },
+    "Ready": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klar"
+          }
+        }
+      }
+    },
+    "Balanced": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Balansert"
+          }
+        }
+      }
+    },
+    "Take it easier": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta det litt roligere"
+          }
+        }
+      }
+    },
+    "Prioritize recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prioriter restitusjon"
+          }
+        }
+      }
+    },
+    "Free": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gratis"
+          }
+        }
+      }
+    },
+    "ATHLTH+ trial": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH+ prøveperiode"
+          }
+        }
+      }
+    },
+    "ATHLTH+ expired": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH+ utløpt"
+          }
+        }
+      }
+    },
+    "ATHLTH+ revoked": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH+ tilbakekalt"
+          }
+        }
+      }
+    },
+    "Monthly": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Månedlig"
+          }
+        }
+      }
+    },
+    "Yearly": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Årlig"
+          }
+        }
+      }
+    },
+    "User": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruker"
+          }
+        }
+      }
+    },
+    "Admin": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Administrator"
+          }
+        }
+      }
+    },
+    "Owner": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eier"
+          }
+        }
+      }
+    },
+    "Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løp"
+          }
+        }
+      }
+    },
+    "Walk": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gåtur"
+          }
+        }
+      }
+    },
+    "Mobility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mobilitet"
+          }
+        }
+      }
+    },
+    "Heart Rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puls"
+          }
+        }
+      }
+    },
+    "Farthest in Time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lengst på tid"
+          }
+        }
+      }
+    },
+    "Most Distance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lengst distanse"
+          }
+        }
+      }
+    },
+    "Heaviest Weight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tyngste vekt"
+          }
+        }
+      }
+    },
+    "Most Reps": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flest repetisjoner"
+          }
+        }
+      }
+    },
+    "Exercise Volume": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelsesvolum"
+          }
+        }
+      }
+    },
+    "Workout Volume": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktvolum"
+          }
+        }
+      }
+    },
+    "Time in Zone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tid i sone"
+          }
+        }
+      }
+    },
+    "Verified required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifisering kreves"
+          }
+        }
+      }
+    },
+    "Verified preferred": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifisert foretrukket"
+          }
+        }
+      }
+    },
+    "Manual allowed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manuell tillatt"
+          }
+        }
+      }
+    },
+    "Manual only": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun manuell"
+          }
+        }
+      }
+    },
+    "Only qualifying ATHLTH or Apple Health attempts count.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare kvalifiserende forsøk fra ATHLTH eller Apple Health teller."
+          }
+        }
+      }
+    },
+    "Verified attempts are preferred, but manual submissions are accepted and labelled.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifiserte forsøk foretrekkes, men manuelle resultater godtas og merkes tydelig."
+          }
+        }
+      }
+    },
+    "Both verified and manual attempts count equally, with clear labels.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifiserte og manuelle forsøk teller likt, med tydelig merking."
+          }
+        }
+      }
+    },
+    "All results are entered manually.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle resultater legges inn manuelt."
+          }
+        }
+      }
+    },
+    "ATHLTH Verified": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-verifisert"
+          }
+        }
+      }
+    },
+    "Elapsed Time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forløpt tid"
+          }
+        }
+      }
+    },
+    "Moving Time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bevegelsestid"
+          }
+        }
+      }
+    },
+    "Same Direction": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Samme retning"
+          }
+        }
+      }
+    },
+    "Either Direction": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Begge retninger"
+          }
+        }
+      }
+    },
+    "Best Attempt": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beste forsøk"
+          }
+        }
+      }
+    },
+    "First Attempt": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Første forsøk"
+          }
+        }
+      }
+    },
+    "Latest Attempt": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste forsøk"
+          }
+        }
+      }
+    },
+    "Best counts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beste teller"
+          }
+        }
+      }
+    },
+    "First counts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Første teller"
+          }
+        }
+      }
+    },
+    "Latest counts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste teller"
+          }
+        }
+      }
+    },
+    "Best Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beste økt"
+          }
+        }
+      }
+    },
+    "Total Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total utfordring"
+          }
+        }
+      }
+    },
+    "Your single workout with the most time in the selected zone counts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Den ene økten med mest tid i valgt sone teller."
+          }
+        }
+      }
+    },
+    "Time in the selected zone adds up across all qualifying workouts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tid i valgt sone summeres på tvers av alle kvalifiserende økter."
+          }
+        }
+      }
+    },
+    "Person": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Person"
+          }
+        }
+      }
+    },
+    "Cumulative": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kumulativ"
+          }
+        }
+      }
+    },
+    "Complete Target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør mål"
+          }
+        }
+      }
+    },
+    "All qualifying workouts add to the result.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle kvalifiserende økter legges til resultatet."
+          }
+        }
+      }
+    },
+    "Only the participant's best qualifying attempt counts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare deltakerens beste kvalifiserende forsøk teller."
+          }
+        }
+      }
+    },
+    "Progress counts until the target is completed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fremgang teller frem til målet er fullført."
+          }
+        }
+      }
+    },
+    "Fastest Time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskeste tid"
+          }
+        }
+      }
+    },
+    "Most Completions": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flest fullføringer"
+          }
+        }
+      }
+    },
+    "Most Active Minutes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flest aktive minutter"
+          }
+        }
+      }
+    },
+    "Total Volume": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Totalt volum"
+          }
+        }
+      }
+    },
+    "Total Reps": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Totale repetisjoner"
+          }
+        }
+      }
+    },
+    "Running & Endurance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løping og utholdenhet"
+          }
+        }
+      }
+    },
+    "Body": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kropp"
+          }
+        }
+      }
+    },
+    "Consistency": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontinuitet"
+          }
+        }
+      }
+    },
+    "Recovery & Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon og helse"
+          }
+        }
+      }
+    },
+    "Custom Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Egendefinert mål"
+          }
+        }
+      }
+    },
+    "Prepare for a race, HYROX, ride or custom event.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forbered deg til løp, HYROX, sykkelritt eller et egendefinert arrangement."
+          }
+        }
+      }
+    },
+    "Distance, pace and endurance targets.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål for distanse, tempo og utholdenhet."
+          }
+        }
+      }
+    },
+    "Exercise-specific weight and rep goals.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelsesspesifikke mål for vekt og repetisjoner."
+          }
+        }
+      }
+    },
+    "Weight and body-composition goals.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål for vekt og kroppssammensetning."
+          }
+        }
+      }
+    },
+    "Workouts, steps and repeatable habits.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økter, skritt og vaner du kan gjenta."
+          }
+        }
+      }
+    },
+    "Sleep and recovery-related targets.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål knyttet til søvn og restitusjon."
+          }
+        }
+      }
+    },
+    "Define a goal that does not fit a template.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definer et mål som ikke passer i en mal."
+          }
+        }
+      }
+    },
+    "Any workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle økter"
+          }
+        }
+      }
+    },
+    "Forest": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skog"
+          }
+        }
+      }
+    },
+    "Summit": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Topp"
+          }
+        }
+      }
+    },
+    "Track": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bane"
+          }
+        }
+      }
+    },
+    "Calm": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rolig"
+          }
+        }
+      }
+    },
+    "Training watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsklokke"
+          }
+        }
+      }
+    },
+    "Shoes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sko"
+          }
+        }
+      }
+    },
+    "Headphones": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hodetelefoner"
+          }
+        }
+      }
+    },
+    "Active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiv"
+          }
+        }
+      }
+    },
+    "Retired": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pensjonert"
+          }
+        }
+      }
+    },
+    "Daily": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daglig"
+          }
+        }
+      }
+    },
+    "Trail": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terreng"
+          }
+        }
+      }
+    },
+    "Treadmill": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tredemølle"
+          }
+        }
+      }
+    },
+    "Gear photos must be smaller than 5 MB.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utstyrsbilder må være mindre enn 5 MB."
+          }
+        }
+      }
+    },
+    "You need to be signed in to update gear.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du må være innlogget for å oppdatere utstyr."
+          }
+        }
+      }
+    },
+    "Imperial": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imperial"
+          }
+        }
+      }
+    },
+    "System": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        }
+      }
+    },
+    "Light": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lys"
+          }
+        }
+      }
+    },
+    "Dark": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mørk"
+          }
+        }
+      }
+    },
+    "Live workouts, heart rate, routes and HealthKit sync": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-økter, puls, ruter og HealthKit-synk"
+          }
+        }
+      }
+    },
+    "Coming soon · Garmin Connect": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kommer snart · Garmin Connect"
+          }
+        }
+      }
+    },
+    "Record outdoor runs and walks. Carry your iPhone throughout the workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrer utendørs løpe- og gåturer. Ha iPhone med deg gjennom hele økten."
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisk"
+          }
+        }
+      }
+    },
+    "Simple": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enkel"
+          }
+        }
+      }
+    },
+    "Ask before importing": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spør før import"
+          }
+        }
+      }
+    },
+    "Automatically import": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer automatisk"
+          }
+        }
+      }
+    },
+    "Don't import": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke importer"
+          }
+        }
+      }
+    },
+    "Ask": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spør"
+          }
+        }
+      }
+    },
+    "Haptic": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haptisk"
+          }
+        }
+      }
+    },
+    "Voice": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stemme"
+          }
+        }
+      }
+    },
+    "Haptic + Voice": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haptisk + stemme"
+          }
+        }
+      }
+    },
+    "Functional": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funksjonell"
+          }
+        }
+      }
+    },
+    "Rowing": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Roing"
+          }
+        }
+      }
+    },
+    "Stairs": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trapper"
+          }
+        }
+      }
+    },
+    "Yoga": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yoga"
+          }
+        }
+      }
+    },
+    "HIIT": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HIIT"
           }
         }
       }
