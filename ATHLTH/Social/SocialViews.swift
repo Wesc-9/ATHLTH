@@ -1175,14 +1175,16 @@ struct FriendProfileView: View {
                 } label: {
                     followStat(
                         value: followOverview.followerCount,
-                        title: "Followers"
+                        title: "Followers",
+                        icon: "person.2.fill"
                     )
                 }
                 .buttonStyle(.plain)
             } else {
                 followStat(
                     value: followOverview.followerCount,
-                    title: "Followers"
+                    title: "Followers",
+                    icon: "person.2.fill"
                 )
             }
 
@@ -1199,14 +1201,16 @@ struct FriendProfileView: View {
                 } label: {
                     followStat(
                         value: followOverview.followingCount,
-                        title: "Following"
+                        title: "Following",
+                        icon: "person.badge.plus"
                     )
                 }
                 .buttonStyle(.plain)
             } else {
                 followStat(
                     value: followOverview.followingCount,
-                    title: "Following"
+                    title: "Following",
+                    icon: "person.badge.plus"
                 )
             }
         }
@@ -1222,18 +1226,46 @@ struct FriendProfileView: View {
 
     private func followStat(
         value: Int,
-        title: String
+        title: String,
+        icon: String
     ) -> some View {
-        VStack(spacing: 2) {
-            Text("\(value)")
-                .font(.headline.monospacedDigit())
-                .foregroundStyle(ATHLTHTheme.primaryText)
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 18,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep.opacity(0.68)
+                )
 
-            Text(title)
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(ATHLTHTheme.mutedText)
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text("\(value)")
+                    .font(
+                        .headline.monospacedDigit()
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Text(title)
+                    .font(
+                        .caption.weight(.medium)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+            }
         }
-        .frame(maxWidth: .infinity)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .center
+        )
         .contentShape(Rectangle())
     }
 
@@ -1665,9 +1697,7 @@ struct FriendProfileView: View {
         HStack(spacing: 11) {
             Image(
                 systemName:
-                    socialIcon(
-                        item.activity.kind
-                    )
+                    socialIcon(item)
             )
             .font(
                 .system(
@@ -1916,6 +1946,36 @@ struct FriendProfileView: View {
     private func formatDistance(_ meters: Double?) -> String {
         guard let meters, meters > 0 else { return "—" }
         return String(format: "%.1f km", meters / 1_000)
+    }
+
+    private func socialIcon(
+        _ item: SocialFeedItem
+    ) -> String {
+        if item.activity.kind == "workout" {
+            switch item.activity.metadata?["kind"] {
+            case "strength":
+                return "dumbbell.fill"
+            case "walking", "walk":
+                return "figure.walk"
+            case "cycling":
+                return "bicycle"
+            case "running", "run":
+                return "figure.run"
+            default:
+                return "figure.run"
+            }
+        }
+
+        switch item.activity.kind {
+        case "trophy":
+            return "trophy.fill"
+        case "goal":
+            return "target"
+        case "challenge":
+            return "person.2.fill"
+        default:
+            return "sparkles"
+        }
     }
 
     private func socialIcon(_ kind: String) -> String {
