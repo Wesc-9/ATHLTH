@@ -1451,7 +1451,11 @@ struct OfficialWeeklyChallengeCard: View {
                             }
                         }
 
-                        Text("\(store.participantCount(for: challenge.id)) participating")
+                        Text(ATHLTHLocalization.format(
+                            english: "%d participating",
+                            norwegian: "%d deltar",
+                            store.participantCount(for: challenge.id)
+                        ))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
                             .padding(.leading, 14)
@@ -1814,7 +1818,11 @@ struct OfficialWeeklyChallengeDetailView: View {
                         Text("•")
 
                         Text(
-                            "\(store.participantCount(for: challenge.id)) participating"
+                            ATHLTHLocalization.format(
+                            english: "%d participating",
+                            norwegian: "%d deltar",
+                            store.participantCount(for: challenge.id)
+                        )
                         )
                     }
                     .font(.caption.weight(.semibold))
@@ -3242,7 +3250,15 @@ struct OfficialWeeklyChallengeAdminListView: View {
                     }
                 }
                 .confirmationDialog(
-                    "Delete \(challengeToDelete?.title ?? "challenge")?",
+                    ATHLTHLocalization.format(
+                    english: "Delete %@?",
+                    norwegian: "Slette %@?",
+                    challengeToDelete?.title ??
+                        ATHLTHLocalization.choose(
+                            english: "challenge",
+                            norwegian: "utfordring"
+                        )
+                ),
                     isPresented: Binding(
                         get: { challengeToDelete != nil },
                         set: { shown in
