@@ -1451,7 +1451,11 @@ struct ATHLTHHomeView: View {
                    completion.completed > 0 &&
                    completion.completed < completion.total {
                     Label(
-                        "\(completion.completed) of \(completion.total) completed today",
+                        ATHLTHLocalization.format(
+                            "%d of %d completed today",
+                            completion.completed,
+                            completion.total
+                        ),
                         systemImage: "checkmark.circle.fill"
                     )
                     .font(.caption.weight(.semibold))
@@ -1551,8 +1555,13 @@ struct ATHLTHHomeView: View {
 
                         Text(
                             completion.total == 1
-                                ? "1 workout completed today."
-                                : "\(completion.total) workouts completed today."
+                                ? ATHLTHLocalization.string(
+                                    "1 workout completed today."
+                                )
+                                : ATHLTHLocalization.format(
+                                    "%d workouts completed today.",
+                                    completion.total
+                                )
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -3842,7 +3851,12 @@ struct ATHLTHTrainView: View {
                         Text("Recovery day")
                             .font(.subheadline.weight(.semibold))
 
-                        Text("Nothing is scheduled in \(plan.title) today.")
+                        Text(
+                            ATHLTHLocalization.format(
+                                "Nothing is scheduled in %@ today.",
+                                plan.title
+                            )
+                        )
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
                     }
@@ -4779,7 +4793,15 @@ struct ATHLTHRecoveryView: View {
 
                         if sessions.count > 1 {
                             Text(
-                                "+\(sessions.count - 1) more session\(sessions.count == 2 ? "" : "s") planned today"
+                                sessions.count == 2
+                                    ? ATHLTHLocalization.format(
+                                        "+%d more session planned today",
+                                        sessions.count - 1
+                                    )
+                                    : ATHLTHLocalization.format(
+                                        "+%d more sessions planned today",
+                                        sessions.count - 1
+                                    )
                             )
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(
@@ -7868,7 +7890,13 @@ struct ATHLTHProfileView: View {
                                 .lineLimit(1)
 
                             Text(
-                                "\(Int((goal.progress * 100).rounded()))% complete · Open Goal Hub"
+                                ATHLTHLocalization.format(
+                                    "%d%% complete · Open Goal Hub",
+                                    Int(
+                                        (goal.progress * 100)
+                                            .rounded()
+                                    )
+                                )
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
