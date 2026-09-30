@@ -209,7 +209,7 @@ struct ATHLTHHomeView: View {
 
     var body: some View {
         NavigationStack {
-            ATHLTHExclusiveHomeHeroLayout(
+            ATHLTHPinnedHeroLayout(
                 accent: ATHLTHTheme.premiumGold.opacity(0.44)
             ) {
                 ZStack(alignment: .topTrailing) {
@@ -375,7 +375,7 @@ struct ATHLTHHomeView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 14)
                 .padding(.bottom, 16)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
