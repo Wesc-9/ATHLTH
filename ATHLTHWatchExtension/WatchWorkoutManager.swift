@@ -3452,7 +3452,9 @@ private extension WatchWorkoutManager {
     func recordFallbackDistance(
         using location: CLLocation
     ) {
-        guard kind == .running || kind == .walking else {
+        guard state == .running,
+              kind == .running || kind == .walking
+        else {
             return
         }
 
