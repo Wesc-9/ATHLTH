@@ -5,7 +5,8 @@ import Supabase
 @MainActor
 final class ExerciseLibraryStore: ObservableObject {
     @Published private(set) var athlthCatalogExercises:
-        [ExerciseLibraryEntry] = Self.fallbackATHLTHExercises
+        [ExerciseLibraryEntry] =
+            ExerciseLibraryStore.fallbackATHLTHExercises
     @Published private(set) var repDBExercises: [ExerciseLibraryEntry] = []
     @Published private(set) var customExercises: [ExerciseLibraryEntry] = []
     @Published private(set) var isLoading = false
