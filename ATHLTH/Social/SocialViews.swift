@@ -513,7 +513,7 @@ struct SocialHubView: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.red)
 
-            case .friends:
+            case .mutualFollow:
                 Button("Follow") {
                     Task {
                         await social.follow(profile)
