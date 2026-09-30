@@ -203,6 +203,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.routeDeviationMeters = nil
             self.routeDistanceToStartMeters = nil
         }
+
+        persistWorkoutRecoveryState()
     }
 
     func configureAudioCoach(
@@ -212,6 +214,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.audioCoachConfiguration = configuration
         }
         resetAudioCoachThresholds()
+        persistWorkoutRecoveryState()
 
         if isActive,
            configuration.enabled,
@@ -228,6 +231,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         resetAudioCoachThresholds()
+        persistWorkoutRecoveryState()
 
         if !configuration.enabled {
             speechSynthesizer.stopSpeaking(at: .immediate)
@@ -262,6 +266,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         targetViolationStartedAt = nil
         lastTargetAlertAt = nil
         targetWasOutside = false
+        persistWorkoutRecoveryState()
 
         if isActive,
            !workout.steps.isEmpty {
@@ -282,6 +287,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostDistanceDeltaMeters = nil
             self.ghostTimeDeltaSeconds = nil
         }
+
+        persistWorkoutRecoveryState()
     }
 
     private func resetGhostAnnouncementThresholds(
@@ -442,6 +449,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         resetAudioCoachThresholds()
 
+        persistWorkoutRecoveryState()
+
         if enabled {
             WKInterfaceDevice.current().play(.click)
             if currentStructuredRunningStep != nil {
@@ -462,12 +471,76 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        lapCount += 1
+        let lapNumber = lapCount + 1
+        let lapElapsed =
+            max(
+                elapsedTime -
+                    lastLapElapsedTime,
+                0
+            )
+        let lapDistance =
+            max(
+                distanceMeters -
+                    lastLapDistanceMeters,
+                0
+            )
+        let averagePace:
+            TimeInterval? =
+            lapDistance >= 25 &&
+            lapElapsed > 0
+                ? lapElapsed /
+                    (lapDistance / 1_000)
+                : nil
+        let now = Date()
+
+        lapSummaries.append(
+            WatchWorkoutLapSummary(
+                number: lapNumber,
+                endedAt: now,
+                elapsedTime: lapElapsed,
+                distanceMeters: lapDistance,
+                averagePaceSecondsPerKilometer:
+                    averagePace
+            )
+        )
+
+        lapCount = lapNumber
         lastLapElapsedTime = elapsedTime
         lastLapDistanceMeters = distanceMeters
         currentLapElapsedTime = 0
         currentLapDistanceMeters = 0
 
+        if let builder = workoutBuilder {
+            let event =
+                HKWorkoutEvent(
+                    type: .lap,
+                    dateInterval:
+                        DateInterval(
+                            start: now,
+                            duration: 0
+                        ),
+                    metadata: [
+                        "ATHLTHLapNumber":
+                            lapNumber
+                    ]
+                )
+
+            Task {
+                do {
+                    try await builder
+                        .addWorkoutEvents(
+                            [event]
+                        )
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage =
+                            "Lap was recorded in ATHLTH, but Apple Health couldn't attach the lap event: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+
+        persistWorkoutRecoveryState()
         WKInterfaceDevice.current().play(.click)
     }
 
@@ -1117,6 +1190,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         targetWasOutside = false
         lastLapElapsedTime = 0
         lastLapDistanceMeters = 0
+        lapSummaries = []
+        automaticPauseActive = false
+        automaticPauseCount = 0
+        capturedRouteLocations = []
+        lastRenderedRouteLocation = nil
         gpsFallbackDistanceMeters = 0
         lastAcceptedOutdoorLocation = nil
         healthKitDistanceMeters = 0
@@ -1143,6 +1221,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.lapCount = 0
             self.currentLapElapsedTime = 0
             self.currentLapDistanceMeters = 0
+            self.lapSummaries = []
+            self.automaticPauseActive = false
+            self.automaticPauseCount = 0
             self.averageHeartRate = nil
             self.maxHeartRate = nil
             self.routePoints = []
@@ -1155,6 +1236,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.completedResult = nil
             self.errorMessage = nil
         }
+
+        clearPersistedWorkoutState()
     }
 
     private func start(
@@ -1212,6 +1295,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredWorkoutComplete = false
         lastLapElapsedTime = 0
         lastLapDistanceMeters = 0
+        lapSummaries = []
+        automaticPauseActive = false
+        automaticPauseCount = 0
+        capturedRouteLocations = []
+        lastRenderedRouteLocation = nil
         gpsFallbackDistanceMeters = 0
         lastAcceptedOutdoorLocation = nil
         healthKitDistanceMeters = 0
@@ -1255,6 +1343,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             let startDate = Date()
             startedAt = startDate
+            persistWorkoutRecoveryState()
 
             do {
                 try await session.startMirroringToCompanionDevice()
@@ -1576,6 +1665,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.liveTargetStatus = nil
         }
 
+        persistWorkoutRecoveryState()
         WKInterfaceDevice.current().play(.notification)
         announceCurrentStructuredStep(prefix: "Next")
     }
@@ -2924,7 +3014,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 averageHeartRate,
             maxHeartRate: maxHeartRate,
             routePointCount:
-                routePoints.count,
+                max(
+                    capturedRouteLocations.count,
+                    routePoints.count
+                ),
+            lapSummaries:
+                lapSummaries,
+            automaticPauseCount:
+                automaticPauseCount,
             routeMatchPercent:
                 routeCompletion?
                     .routeMatchPercent,
@@ -2952,7 +3049,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.elapsedTime =
                 result.duration
             self.state = .completed
+            self.automaticPauseActive =
+                false
         }
+        clearPersistedWorkoutState()
 
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -3364,6 +3464,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         switch state {
         case .running:
             publishState(.running)
+            persistWorkoutRecoveryState()
 
             if kind == .strength {
                 requestStrengthSnapshot()
@@ -3388,6 +3489,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         case .paused:
             publishState(.paused)
+            persistWorkoutRecoveryState()
 
             Task { @MainActor [weak self] in
                 await self?.sendLiveSnapshot(
@@ -3398,6 +3500,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         case .ended:
             publishState(.ending)
+            persistWorkoutRecoveryState()
 
             Task { @MainActor [weak self] in
                 await self?.sendLiveSnapshot(
