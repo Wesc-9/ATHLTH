@@ -14,8 +14,8 @@ enum CommunityGroupOrganizerKind:
 
     var title: String {
         switch self {
-        case .person: return "Person"
-        case .group: return "Group"
+        case .person: return String(localized: "Person")
+        case .group: return String(localized: "Group")
         }
     }
 
@@ -63,22 +63,22 @@ enum CommunityGroupScoringMode:
     var title: String {
         switch self {
         case .cumulative:
-            return "Cumulative"
+            return String(localized: "Cumulative")
         case .bestAttempt:
-            return "Best Attempt"
+            return String(localized: "Best Attempt")
         case .completeTarget:
-            return "Complete Target"
+            return String(localized: "Complete Target")
         }
     }
 
     var subtitle: String {
         switch self {
         case .cumulative:
-            return "All qualifying workouts add to the result."
+            return String(localized: "All qualifying workouts add to the result.")
         case .bestAttempt:
-            return "Only the participant's best qualifying attempt counts."
+            return String(localized: "Only the participant's best qualifying attempt counts.")
         case .completeTarget:
-            return "Progress counts until the target is completed."
+            return String(localized: "Progress counts until the target is completed.")
         }
     }
 }
@@ -103,21 +103,21 @@ enum CommunityGroupChallengeGoalPreset:
     var title: String {
         switch self {
         case .mostDistance:
-            return "Most Distance"
+            return String(localized: "Most Distance")
         case .fastestTime:
-            return "Fastest Time"
+            return String(localized: "Fastest Time")
         case .mostCompletions:
-            return "Most Completions"
+            return String(localized: "Most Completions")
         case .mostActiveMinutes:
-            return "Most Active Minutes"
+            return String(localized: "Most Active Minutes")
         case .strengthVolume:
-            return "Total Volume"
+            return String(localized: "Total Volume")
         case .heaviestWeight:
-            return "Heaviest Weight"
+            return String(localized: "Heaviest Weight")
         case .strengthReps:
-            return "Total Reps"
+            return String(localized: "Total Reps")
         case .completeTarget:
-            return "Complete Target"
+            return String(localized: "Complete Target")
         }
     }
 
