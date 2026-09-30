@@ -4015,9 +4015,9 @@ final class HealthKitManager: ObservableObject {
             walkingHeartRateAverage: walkingHeartRateValue?.0,
             oxygenSaturationPercent:
                 oxygenValue.flatMap {
-                    value,
-                    _ in
+                    sample in
 
+                    let value = sample.0
                     guard value >= 0,
                           value <= 1
                     else {
@@ -4927,7 +4927,7 @@ final class HealthKitManager: ObservableObject {
             }
 
         guard let newestDay =
-                valid.map(\.day).max()
+                valid.map { $0.day }.max()
         else {
             return nil
         }
@@ -4947,7 +4947,7 @@ final class HealthKitManager: ObservableObject {
             } /
             Double(entries.count)
         let latestDate =
-            entries.map(\.date).max() ??
+            entries.map { $0.date }.max() ??
             newestDay
 
         return (average, latestDate)
