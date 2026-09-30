@@ -12,13 +12,10 @@ struct ATHLTHExclusiveHomeHero: View {
     let title: String
     let subtitle: String
 
-    private var resolvedHeight: CGFloat {
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return 216
-        }
-
-        return UIScreen.main.bounds.width < 390 ? 188 : 202
-    }
+    // Keep the Home hero on the same 236 pt vertical rhythm as
+    // Profile so the artwork, sheet transition and first content row line up
+    // consistently across the primary personal surfaces.
+    private let resolvedHeight: CGFloat = 236
 
     var body: some View {
         GeometryReader { proxy in
