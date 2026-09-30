@@ -1096,11 +1096,49 @@ final class HealthKitManager: ObservableObject {
             to: today
         ) ?? today.addingTimeInterval(-6 * 86_400)
 
-        let acuteMinutes = chronicWorkouts
+        let acuteWorkouts = chronicWorkouts
             .filter { $0.startDate >= acuteStart }
-            .reduce(0) {
-                $0 + ($1.duration / 60)
+
+        let acuteMinutes = acuteWorkouts.reduce(0) {
+            $0 + ($1.duration / 60)
+        }
+
+        var strengthMinutes = 0.0
+        var runningMinutes = 0.0
+        var walkingMinutes = 0.0
+        var otherMinutes = 0.0
+        var latestStrengthAt: Date?
+        var latestRunningAt: Date?
+        var latestWalkingAt: Date?
+
+        for workout in acuteWorkouts {
+            let minutes = max(workout.duration / 60, 0)
+            let activityDate = workout.endDate
+
+            switch workout.workoutActivityType {
+            case .running:
+                runningMinutes += minutes
+                if latestRunningAt.map({ activityDate > $0 }) ?? true {
+                    latestRunningAt = activityDate
+                }
+
+            case .walking, .hiking:
+                walkingMinutes += minutes
+                if latestWalkingAt.map({ activityDate > $0 }) ?? true {
+                    latestWalkingAt = activityDate
+                }
+
+            case .traditionalStrengthTraining,
+                 .functionalStrengthTraining:
+                strengthMinutes += minutes
+                if latestStrengthAt.map({ activityDate > $0 }) ?? true {
+                    latestStrengthAt = activityDate
+                }
+
+            default:
+                otherMinutes += minutes
             }
+        }
 
         let chronicMinutes = chronicWorkouts.reduce(0) {
             $0 + ($1.duration / 60)
@@ -1116,7 +1154,14 @@ final class HealthKitManager: ObservableObject {
             trainingLoad: RecoveryTrainingLoadSummary(
                 acuteMinutes: acuteMinutes,
                 chronicWeeklyAverageMinutes:
-                    chronicWeeklyAverage
+                    chronicWeeklyAverage,
+                strengthMinutes: strengthMinutes,
+                runningMinutes: runningMinutes,
+                walkingMinutes: walkingMinutes,
+                otherMinutes: otherMinutes,
+                latestStrengthAt: latestStrengthAt,
+                latestRunningAt: latestRunningAt,
+                latestWalkingAt: latestWalkingAt
             )
         )
 
