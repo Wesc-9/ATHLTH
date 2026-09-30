@@ -3253,7 +3253,7 @@ struct ATHLTHTrainView: View {
                 activePlanPreview(plan)
             }
 
-            HStack(alignment: .stretch, spacing: 10) {
+            HStack(spacing: 10) {
                 planModeCard(
                     title: "Simple",
                     detail:
