@@ -843,7 +843,6 @@ struct FriendProfileView: View {
     @State private var profile: SocialFriendProfile?
     @State private var loading = true
     @State private var showingChallenge = false
-    @State private var showingChallengeUnavailable = false
     @State private var showingReport = false
     @State private var confirmBlock = false
     @State private var followOverview = SocialFollowOverview.empty
@@ -989,16 +988,6 @@ struct FriendProfileView: View {
             if let profile {
                 ReportUserView(profile: profile.card)
             }
-        }
-        .alert(
-            "Challenge unavailable",
-            isPresented: $showingChallengeUnavailable
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(
-                "Challenges are available once you follow each other."
-            )
         }
         .confirmationDialog(
             "Block this user?",
@@ -1272,10 +1261,7 @@ struct FriendProfileView: View {
     private func actionBar(
         _ profile: SocialFriendProfile
     ) -> some View {
-        let isMutual =
-            social.isMutualFollow(userID)
-
-        return HStack(spacing: 10) {
+        HStack(spacing: 10) {
             mainFollowButton(profile)
 
             NavigationLink {
@@ -1293,11 +1279,7 @@ struct FriendProfileView: View {
             .buttonStyle(.plain)
 
             Button {
-                if isMutual {
-                    showingChallenge = true
-                } else {
-                    showingChallengeUnavailable = true
-                }
+                showingChallenge = true
             } label: {
                 profileActionLabel(
                     title: "Challenge",
@@ -1305,13 +1287,10 @@ struct FriendProfileView: View {
                     tint: .orange,
                     emphasized: false
                 )
-                .opacity(isMutual ? 1 : 0.72)
             }
             .buttonStyle(.plain)
             .accessibilityHint(
-                isMutual
-                    ? "Create a challenge with this athlete"
-                    : "Available after you follow each other"
+                "Send this athlete a challenge request"
             )
         }
     }
