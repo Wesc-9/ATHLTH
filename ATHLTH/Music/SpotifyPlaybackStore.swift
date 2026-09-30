@@ -389,6 +389,10 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         pendingPlaybackPlaylist = playlist
 
         guard let appRemote else {
+            pendingPlaybackURI = nil
+            pendingPlaybackPlaylist = nil
+            lastErrorMessage =
+                "Spotify playback control is unavailable in this build."
             return
         }
 
@@ -426,6 +430,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             lastErrorMessage =
                 "Spotify is not installed on this iPhone."
             pendingPlaybackURI = nil
+            pendingPlaybackPlaylist = nil
         }
     }
 
