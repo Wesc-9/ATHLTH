@@ -11,11 +11,11 @@ enum StrengthProgressionKind: String, CaseIterable, Identifiable, Codable, Hasha
 
     var title: String {
         switch self {
-        case .none: return "No automatic progression"
-        case .addWeight: return "Add weight"
-        case .addReps: return "Add reps"
-        case .doubleProgression: return "Double progression"
-        case .percentage: return "Percentage"
+        case .none: return String(localized: "No automatic progression")
+        case .addWeight: return String(localized: "Add weight")
+        case .addReps: return String(localized: "Add reps")
+        case .doubleProgression: return String(localized: "Double progression")
+        case .percentage: return String(localized: "Percentage")
         }
     }
 }
@@ -53,17 +53,17 @@ enum RunningWorkoutType: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .easy: return "Easy Run"
-        case .recovery: return "Recovery Run"
-        case .longRun: return "Long Run"
-        case .tempo: return "Tempo"
-        case .threshold: return "Threshold"
-        case .intervals: return "Intervals"
-        case .fartlek: return "Fartlek"
-        case .hills: return "Hill Repeats"
-        case .racePace: return "Race Pace"
-        case .progression: return "Progression Run"
-        case .custom: return "Custom"
+        case .easy: return String(localized: "Easy Run")
+        case .recovery: return String(localized: "Recovery Run")
+        case .longRun: return String(localized: "Long Run")
+        case .tempo: return String(localized: "Tempo")
+        case .threshold: return String(localized: "Threshold")
+        case .intervals: return String(localized: "Intervals")
+        case .fartlek: return String(localized: "Fartlek")
+        case .hills: return String(localized: "Hill Repeats")
+        case .racePace: return String(localized: "Race Pace")
+        case .progression: return String(localized: "Progression Run")
+        case .custom: return String(localized: "Custom")
         }
     }
 
@@ -92,11 +92,11 @@ enum RunningBlockKind: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .warmup: return "Warm-up"
-        case .work: return "Work"
-        case .recovery: return "Recovery"
-        case .steady: return "Steady"
-        case .cooldown: return "Cool-down"
+        case .warmup: return String(localized: "Warm-up")
+        case .work: return String(localized: "Work")
+        case .recovery: return String(localized: "Recovery")
+        case .steady: return String(localized: "Steady")
+        case .cooldown: return String(localized: "Cool-down")
         }
     }
 }
@@ -110,9 +110,9 @@ enum RunningMeasureKind: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .distance: return "Distance"
-        case .time: return "Time"
-        case .open: return "Open"
+        case .distance: return String(localized: "Distance")
+        case .time: return String(localized: "Time")
+        case .open: return String(localized: "Open")
         }
     }
 }
@@ -128,11 +128,11 @@ enum RunningIntensityKind: String, CaseIterable, Identifiable, Codable, Hashable
 
     var title: String {
         switch self {
-        case .none: return "No target"
-        case .easy: return "Easy effort"
-        case .pace: return "Pace"
-        case .heartRateZone: return "Heart-rate zone"
-        case .rpe: return "RPE"
+        case .none: return String(localized: "No target")
+        case .easy: return String(localized: "Easy effort")
+        case .pace: return String(localized: "Pace")
+        case .heartRateZone: return String(localized: "Heart-rate zone")
+        case .rpe: return String(localized: "RPE")
         }
     }
 }
