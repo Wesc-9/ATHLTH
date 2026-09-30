@@ -775,11 +775,10 @@ struct ATHLTHHomeView: View {
     private var homeInboxUnreadCount: Int {
         messaging.unreadCount +
             messaging.messageRequestCount +
-            challenges
-                .incomingInvitations(
-                    for: session.profile.userID
-                )
-                .count
+            social.inboxEvents.filter {
+                $0.kind == "challenge_invite" &&
+                $0.readAt == nil
+            }.count
     }
 
     private var homeInboxBadgeText: String {
