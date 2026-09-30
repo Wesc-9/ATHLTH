@@ -195,7 +195,11 @@ struct CommunityChallengeSpotlightCard: View {
                             }
 
                             Text(
-                                "\(acceptedParticipants(challenge).count) participating"
+                                ATHLTHLocalization.format(
+                                    english: "%d participating",
+                                    norwegian: "%d deltar",
+                                    acceptedParticipants(challenge).count
+                                )
                             )
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.90))
