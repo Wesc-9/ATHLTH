@@ -5,9 +5,34 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+enum ATHLTHTrainNavigationRequest: Identifiable {
+    case plan
+    case workout(planID: UUID, workoutID: UUID)
+    case quick(WorkoutKind)
+    case customQuick
+    case ghost
+
+    var id: String {
+        switch self {
+        case .plan:
+            return "plan"
+        case let .workout(planID, workoutID):
+            return "workout:\(planID.uuidString):\(workoutID.uuidString)"
+        case let .quick(kind):
+            return "quick:\(kind.title)"
+        case .customQuick:
+            return "quick:custom"
+        case .ghost:
+            return "ghost"
+        }
+    }
+}
+
 struct ProductRootTabView: View {
 
     @State private var selectedTab: Int
+    @State private var trainNavigationRequest:
+        ATHLTHTrainNavigationRequest?
 
     init() {
         let prefix =
@@ -41,13 +66,22 @@ struct ProductRootTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            ATHLTHHomeView { tab in
-                selectedTab = tab
-            }
+            ATHLTHHomeView(
+                onSelectTab: { tab in
+                    selectedTab = tab
+                },
+                onOpenTrain: { request in
+                    trainNavigationRequest = request
+                    selectedTab = 1
+                }
+            )
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(0)
 
-            ATHLTHTrainView()
+            ATHLTHTrainView(
+                navigationRequest:
+                    $trainNavigationRequest
+            )
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
 
@@ -142,6 +176,9 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
 
 struct ATHLTHHomeView: View {
     var onSelectTab: (Int) -> Void = { _ in }
+    var onOpenTrain:
+        (ATHLTHTrainNavigationRequest) -> Void =
+        { _ in }
 
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
@@ -437,10 +474,26 @@ struct ATHLTHHomeView: View {
                     HomeThisWeekCard(
                         plan: session.activePlan,
                         workouts: health.workouts,
-                        streakCount: homeStreakCount
-                    ) {
-                        onSelectTab(2)
-                    }
+                        streakCount: homeStreakCount,
+                        onOpenPlan: {
+                            onOpenTrain(.plan)
+                        },
+                        onOpenWorkout: { workoutID in
+                            guard let planID =
+                                    session.activePlan?.id
+                            else {
+                                onOpenTrain(.plan)
+                                return
+                            }
+
+                            onOpenTrain(
+                                .workout(
+                                    planID: planID,
+                                    workoutID: workoutID
+                                )
+                            )
+                        }
+                    )
 
                     HomeHappeningCard(
                         challenges: challenges.visibleChallenges,
