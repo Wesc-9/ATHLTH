@@ -34,7 +34,7 @@ struct SocialProfileCard: Identifiable, Codable, Hashable {
         let clean = displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !clean.isEmpty { return clean }
         if let username, !username.isEmpty { return "@\(username)" }
-        return String(localized: "ATHLTH Athlete")
+        return ATHLTHLocalization.string( "ATHLTH Athlete")
     }
 
     var usernameLabel: String {
