@@ -3076,23 +3076,34 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         -> ATHLTHRouteCompletionAnalysis?
     {
         guard let route = plannedRoute,
-              route.points.count >= 2,
-              routePoints.count >= 2
+              route.points.count >= 2
         else {
             return nil
         }
 
-        let actual =
-            routePoints
-                .sorted {
-                    $0.sequence < $1.sequence
-                }
-                .map {
-                    CLLocation(
-                        latitude: $0.latitude,
-                        longitude: $0.longitude
-                    )
-                }
+        let actual: [CLLocation]
+
+        if capturedRouteLocations.count >= 2 {
+            actual = capturedRouteLocations
+        } else {
+            guard routePoints.count >= 2 else {
+                return nil
+            }
+
+            actual =
+                routePoints
+                    .sorted {
+                        $0.sequence < $1.sequence
+                    }
+                    .map {
+                        CLLocation(
+                            latitude:
+                                $0.latitude,
+                            longitude:
+                                $0.longitude
+                        )
+                    }
+        }
         let reference =
             route.points
                 .sorted {
@@ -3457,6 +3468,35 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    private func handleSystemWorkoutEvent(
+        _ type: HKWorkoutEventType
+    ) {
+        switch type {
+        case .pauseOrResumeRequest:
+            if state == .running {
+                pause()
+            } else if state == .paused {
+                resume()
+            }
+
+        case .motionPaused:
+            automaticPauseActive = true
+            automaticPauseCount += 1
+            persistWorkoutRecoveryState()
+            WKInterfaceDevice.current()
+                .play(.click)
+
+        case .motionResumed:
+            automaticPauseActive = false
+            persistWorkoutRecoveryState()
+            WKInterfaceDevice.current()
+                .play(.click)
+
+        default:
+            break
+        }
+    }
+
     private func handleWorkoutSessionState(
         _ state: HKWorkoutSessionState,
         date: Date
@@ -3523,6 +3563,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         locationManager.stopUpdatingLocation()
         errorMessage = message
         state = .failed(message)
+        clearPersistedWorkoutState()
 
         Task { @MainActor [weak self] in
             await self?.sendLiveSnapshot(
@@ -3539,6 +3580,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.errorMessage = error.localizedDescription
             self.state = .failed(error.localizedDescription)
         }
+        clearPersistedWorkoutState()
 
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -3624,6 +3666,29 @@ extension WatchWorkoutManager:
             self.handleWorkoutSessionState(
                 state,
                 date: date
+            )
+        }
+    }
+
+    nonisolated func workoutSession(
+        _ workoutSession: HKWorkoutSession,
+        didGenerate event: HKWorkoutEvent
+    ) {
+        let rawType =
+            event.type.rawValue
+
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let type =
+                    HKWorkoutEventType(
+                        rawValue: rawType
+                    )
+            else {
+                return
+            }
+
+            self.handleSystemWorkoutEvent(
+                type
             )
         }
     }
@@ -3805,9 +3870,23 @@ private extension WatchWorkoutManager {
             return
         }
 
-        for location in filtered.sorted(by: { $0.timestamp < $1.timestamp }) {
-            recordFallbackDistance(using: location)
+        let orderedLocations =
+            filtered.sorted {
+                $0.timestamp < $1.timestamp
+            }
+
+        for location in orderedLocations {
+            recordFallbackDistance(
+                using: location
+            )
         }
+
+        capturedRouteLocations
+            .append(
+                contentsOf:
+                    orderedLocations
+            )
+        compactCapturedRouteIfNeeded()
 
         routeBuilder?.insertRouteData(
             filtered
@@ -3838,29 +3917,104 @@ private extension WatchWorkoutManager {
             )
         }
 
-        let startIndex =
-            routePoints.count
-        routePoints.append(
-            contentsOf:
-                filtered.enumerated().map {
-                    offset,
+        for location in orderedLocations {
+            appendRenderedRoutePointIfNeeded(
+                location
+            )
+        }
+    }
+
+    func compactCapturedRouteIfNeeded() {
+        guard capturedRouteLocations.count >
+                6_000
+        else {
+            return
+        }
+
+        capturedRouteLocations =
+            capturedRouteLocations
+                .enumerated()
+                .compactMap {
+                    index,
                     location in
+
+                    index.isMultiple(of: 2)
+                        ? location
+                        : nil
+                }
+    }
+
+    func appendRenderedRoutePointIfNeeded(
+        _ location: CLLocation
+    ) {
+        if let previous =
+                lastRenderedRouteLocation {
+            let distance =
+                location.distance(
+                    from: previous
+                )
+            let interval =
+                location.timestamp
+                    .timeIntervalSince(
+                        previous.timestamp
+                    )
+
+            guard distance >= 10 ||
+                    interval >= 7
+            else {
+                return
+            }
+        }
+
+        lastRenderedRouteLocation =
+            location
+
+        routePoints.append(
+            WatchRoutePoint(
+                latitude:
+                    location.coordinate
+                        .latitude,
+                longitude:
+                    location.coordinate
+                        .longitude,
+                altitude:
+                    location.altitude,
+                sequence:
+                    routePoints.count
+            )
+        )
+
+        guard routePoints.count > 240
+        else {
+            return
+        }
+
+        routePoints =
+            routePoints
+                .enumerated()
+                .compactMap {
+                    index,
+                    point in
+
+                    index.isMultiple(of: 2)
+                        ? point
+                        : nil
+                }
+                .enumerated()
+                .map {
+                    index,
+                    point in
 
                     WatchRoutePoint(
                         latitude:
-                            location.coordinate
-                                .latitude,
+                            point.latitude,
                         longitude:
-                            location.coordinate
-                                .longitude,
+                            point.longitude,
                         altitude:
-                            location.altitude,
-                        sequence:
-                            startIndex +
-                            offset
+                            point.altitude,
+                        sequence: index
                     )
                 }
-        )
     }
 
     func recordFallbackDistance(
