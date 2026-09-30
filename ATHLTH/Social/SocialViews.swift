@@ -843,6 +843,7 @@ struct FriendProfileView: View {
     @State private var profile: SocialFriendProfile?
     @State private var loading = true
     @State private var showingChallenge = false
+    @State private var showingChallengeUnavailable = false
     @State private var showingReport = false
     @State private var confirmBlock = false
     @State private var followOverview = SocialFollowOverview.empty
@@ -871,17 +872,22 @@ struct FriendProfileView: View {
                         privateProfileNotice
                     }
 
-                    // Match the owner's profile order. RLS simply returns no
-                    // rows for sections the athlete has not shared.
-                    if !profile.gear.isEmpty {
-                        remoteGearCard(profile.gear)
-                    }
-
+                    // Public profiles always present Recent Activity as a
+                    // first-class section. RLS still decides which workouts
+                    // are actually visible to the viewer.
                     let workouts = profile.recentActivities.filter {
                         $0.activity.kind == "workout"
                     }
-                    if !workouts.isEmpty {
+
+                    if profile.card.isPublicProfile ||
+                        !workouts.isEmpty {
                         workoutHistoryCard(workouts)
+                    }
+
+                    // Match the owner's remaining profile order. RLS simply
+                    // returns no rows for sections the athlete has not shared.
+                    if !profile.gear.isEmpty {
+                        remoteGearCard(profile.gear)
                     }
 
                     if !profile.goals.isEmpty {
@@ -983,6 +989,16 @@ struct FriendProfileView: View {
             if let profile {
                 ReportUserView(profile: profile.card)
             }
+        }
+        .alert(
+            "Challenge unavailable",
+            isPresented: $showingChallengeUnavailable
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(
+                "Challenges are available once you follow each other."
+            )
         }
         .confirmationDialog(
             "Block this user?",
@@ -1221,119 +1237,212 @@ struct FriendProfileView: View {
         .contentShape(Rectangle())
     }
 
-    private func actionBar(_ profile: SocialFriendProfile) -> some View {
-        let isMutual = social.isMutualFollow(userID)
+    private func actionBar(
+        _ profile: SocialFriendProfile
+    ) -> some View {
+        let isMutual =
+            social.isMutualFollow(userID)
 
-        return VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                mainFollowButton(profile)
+        return HStack(spacing: 10) {
+            mainFollowButton(profile)
 
-                NavigationLink {
-                    DirectMessageThreadView(friend: profile.card)
-                } label: {
-                    Label(
-                        isMutual ? "Message" : "Message request",
-                        systemImage: "message.fill"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHTheme.accentDeep)
+            NavigationLink {
+                DirectMessageThreadView(
+                    friend: profile.card
+                )
+            } label: {
+                profileActionLabel(
+                    title: "Message",
+                    icon: "message.fill",
+                    tint: ATHLTHTheme.accentDeep,
+                    emphasized: true
+                )
             }
+            .buttonStyle(.plain)
 
-            if isMutual {
-                Button {
+            Button {
+                if isMutual {
                     showingChallenge = true
-                } label: {
-                    Label("Challenge", systemImage: "bolt.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
+                } else {
+                    showingChallengeUnavailable = true
                 }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHTheme.accent)
+            } label: {
+                profileActionLabel(
+                    title: "Challenge",
+                    icon: "bolt.fill",
+                    tint: .orange,
+                    emphasized: false
+                )
+                .opacity(isMutual ? 1 : 0.72)
             }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                isMutual
+                    ? "Create a challenge with this athlete"
+                    : "Available after you follow each other"
+            )
         }
+    }
+
+    private func profileActionLabel(
+        title: String,
+        icon: String,
+        tint: Color,
+        emphasized: Bool
+    ) -> some View {
+        VStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    emphasized
+                        ? Color.white
+                        : tint
+                )
+                .frame(width: 34, height: 34)
+                .background(
+                    emphasized
+                        ? Color.white.opacity(0.14)
+                        : tint.opacity(0.10),
+                    in: Circle()
+                )
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    emphasized
+                        ? Color.white
+                        : ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.80)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 78)
+        .background(
+            emphasized
+                ? ATHLTHTheme.accentDeep
+                : Color.white.opacity(0.78),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                emphasized
+                    ? Color.white.opacity(0.08)
+                    : Color.white.opacity(0.90),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                emphasized
+                    ? ATHLTHTheme.accentDeep.opacity(0.10)
+                    : Color.black.opacity(0.025),
+            radius: 8,
+            y: 4
+        )
     }
 
     @ViewBuilder
     private func mainFollowButton(
         _ profile: SocialFriendProfile
     ) -> some View {
-        let relationship = social.relationshipState(with: userID)
-        let followsYou = social.isFollowedBy(userID)
+        let relationship =
+            social.relationshipState(
+                with: userID
+            )
+        let followsYou =
+            social.isFollowedBy(userID)
 
         if social.isFollowing(userID) {
             Button {
                 Task {
                     await social.unfollow(userID)
-                    followOverview = await social.loadFollowOverview(
-                        for: userID
-                    )
+                    followOverview =
+                        await social
+                            .loadFollowOverview(
+                                for: userID
+                            )
                 }
             } label: {
-                Label("Following", systemImage: "person.fill.checkmark")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-            }
-            .buttonStyle(.bordered)
-            .tint(ATHLTHTheme.accentDeep)
-        } else if relationship == .outgoingPending {
-            Label("Requested", systemImage: "clock.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(
-                    Color.primary.opacity(0.05),
-                    in: Capsule()
+                profileActionLabel(
+                    title: "Following",
+                    icon: "person.fill.checkmark",
+                    tint: ATHLTHTheme.accentDeep,
+                    emphasized: false
                 )
+            }
+            .buttonStyle(.plain)
+        } else if relationship == .outgoingPending {
+            profileActionLabel(
+                title: "Requested",
+                icon: "clock.fill",
+                tint: ATHLTHTheme.mutedText,
+                emphasized: false
+            )
         } else if relationship == .blocked {
-            Label("Blocked", systemImage: "nosign")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.red)
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
+            profileActionLabel(
+                title: "Blocked",
+                icon: "nosign",
+                tint: .red,
+                emphasized: false
+            )
         } else if relationship == .selfUser {
             EmptyView()
         } else if profile.card.isPrivateProfile {
             Button {
                 Task {
-                    await social.sendFollowRequest(to: profile.card)
-                }
-            } label: {
-                Label(
-                    followsYou ? "Request to follow back" : "Request to follow",
-                    systemImage: "person.badge.plus"
-                )
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accentDeep)
-        } else {
-            Button {
-                Task {
-                    await social.follow(profile.card)
-                    followOverview = await social.loadFollowOverview(
-                        for: userID
+                    await social.sendFollowRequest(
+                        to: profile.card
                     )
                 }
             } label: {
-                Label(
-                    followsYou ? "Follow back" : "Follow",
-                    systemImage: "person.badge.plus"
+                profileActionLabel(
+                    title:
+                        followsYou
+                            ? "Follow back"
+                            : "Follow",
+                    icon: "person.badge.plus",
+                    tint: ATHLTHTheme.accentDeep,
+                    emphasized: false
                 )
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accentDeep)
+            .buttonStyle(.plain)
+        } else {
+            Button {
+                Task {
+                    await social.follow(
+                        profile.card
+                    )
+                    followOverview =
+                        await social
+                            .loadFollowOverview(
+                                for: userID
+                            )
+                }
+            } label: {
+                profileActionLabel(
+                    title:
+                        followsYou
+                            ? "Follow back"
+                            : "Follow",
+                    icon: "person.badge.plus",
+                    tint: ATHLTHTheme.accentDeep,
+                    emphasized: false
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -1431,42 +1540,190 @@ struct FriendProfileView: View {
         _ items: [SocialFeedItem]
     ) -> some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Workout History")
-                    .font(.headline)
-
-                ForEach(Array(items.prefix(5))) { item in
-                    HStack(spacing: 10) {
-                        Image(systemName: socialIcon(item.activity.kind))
-                            .foregroundStyle(ATHLTHTheme.accent)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                ATHLTHTheme.accentSoft,
-                                in: RoundedRectangle(
-                                    cornerRadius: 11,
-                                    style: .continuous
-                                )
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(
+                    alignment: .firstTextBaseline
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text("Recent Activity")
+                            .font(
+                                .title3.weight(.bold)
                             )
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.activity.title)
-                                .font(.subheadline.weight(.semibold))
-                            if let subtitle = item.activity.subtitle {
-                                Text(subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                        Text(
+                            items.isEmpty
+                                ? "No shared workouts yet."
+                                : "Latest workouts shared on this profile."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    if items.count > 3 {
+                        Text(
+                            "\(items.count) shared"
+                        )
+                        .font(
+                            .caption2.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                    }
+                }
+
+                if items.isEmpty {
+                    HStack(spacing: 12) {
+                        Image(
+                            systemName:
+                                "figure.run.circle"
+                        )
+                        .font(
+                            .system(
+                                size: 22,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .frame(width: 44, height: 44)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 14,
+                                style: .continuous
+                            )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(
+                                "Nothing shared yet"
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(.semibold)
+                            )
+
+                            Text(
+                                "Public workouts will appear here when this athlete shares them."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
                         }
 
                         Spacer()
+                    }
+                    .padding(13)
+                    .background(
+                        Color.primary.opacity(0.025),
+                        in: RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                    )
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(
+                            Array(items.prefix(4))
+                        ) { item in
+                            remoteActivityRow(item)
 
-                        Text(item.activity.createdAt, style: .relative)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            if item.id !=
+                                items.prefix(4).last?.id {
+                                Divider()
+                                    .padding(.leading, 50)
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func remoteActivityRow(
+        _ item: SocialFeedItem
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(
+                systemName:
+                    socialIcon(
+                        item.activity.kind
+                    )
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(width: 40, height: 40)
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(item.activity.title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+
+                HStack(spacing: 5) {
+                    Text(
+                        item.activity.createdAt,
+                        style: .relative
+                    )
+
+                    if let subtitle =
+                            item.activity.subtitle,
+                       !subtitle.isEmpty {
+                        Text("·")
+                        Text(subtitle)
+                            .lineLimit(1)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 9)
     }
 
     private func remoteGoalsCard(
