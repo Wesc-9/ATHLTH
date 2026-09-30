@@ -5258,43 +5258,15 @@ struct ATHLTHRecoveryView: View {
     @State private var selectedRecoveryTool: RecoveryTool?
 
     var body: some View {
-        let useImmersiveRecoveryHero =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
-        return NavigationStack {
-            ATHLTHPinnedHeroLayout(
-                accent: Color.blue.opacity(0.70),
-                softTransition: true,
-                immersiveTransition: useImmersiveRecoveryHero,
-                scrollFadeTransition: true
+        NavigationStack {
+            ATHLTHExclusiveHomeHeroLayout(
+                accent: Color.blue.opacity(0.36)
             ) {
-                ATHLTHTabHero(
+                ATHLTHExclusiveHomeHero(
                     imageName: "RecoveryHero",
                     title: "Recovery",
-                    subtitle: "Understand your body. Make better decisions. Stay in the game.",
-                    height:
-                        useImmersiveRecoveryHero
-                            ? 238
-                            : 190,
-                    alignment: .leading,
-                    focalOffsetX:
-                        useImmersiveRecoveryHero
-                            ? 8
-                            : 14,
-                    focalOffsetY:
-                        useImmersiveRecoveryHero
-                            ? 8
-                            : 16,
-                    titleFontSize:
-                        useImmersiveRecoveryHero
-                            ? 31
-                            : 30,
-                    copyWidthFraction:
-                        useImmersiveRecoveryHero
-                            ? 0.72
-                            : 0.82,
-                    immersiveCopy: useImmersiveRecoveryHero
+                    subtitle:
+                        "Understand your body. Make better decisions. Stay in the game."
                 )
             } content: {
                 LazyVStack(spacing: 16) {
@@ -5302,7 +5274,9 @@ struct ATHLTHRecoveryView: View {
                         if session.hasPaidAccess &&
                             session.aiHealthDataSharingEnabled {
                             RecoveryAIInsightCard(
-                                insight: recoveryAIInsight ?? fallbackRecoveryAIInsight,
+                                insight:
+                                    recoveryAIInsight ??
+                                    fallbackRecoveryAIInsight,
                                 context: recoveryAIContext,
                                 isLoading: isLoadingRecoveryAI,
                                 onScoreDetails: {
@@ -5315,14 +5289,6 @@ struct ATHLTHRecoveryView: View {
                                     showingRecoveryCoach = true
                                 }
                             )
-
-                            RecoverySuggestedTodayCard(
-                                suggestion:
-                                    (recoveryAIInsight ?? fallbackRecoveryAIInsight)
-                                        .suggestion
-                            ) {
-                                onSelectTab(1)
-                            }
                         } else {
                             recoveryScoreCard
 
@@ -5361,6 +5327,20 @@ struct ATHLTHRecoveryView: View {
                             showingSorenessLog = true
                         }
 
+                        if session.hasPaidAccess &&
+                            session.aiHealthDataSharingEnabled {
+                            RecoverySuggestedTodayCard(
+                                suggestion:
+                                    (recoveryAIInsight ??
+                                        fallbackRecoveryAIInsight)
+                                        .suggestion
+                            ) {
+                                onSelectTab(1)
+                            }
+                        } else {
+                            todaysGuidanceCard
+                        }
+
                         RecoveryDailyCheckInCard(
                             store: sorenessStore
                         ) {
@@ -5371,8 +5351,6 @@ struct ATHLTHRecoveryView: View {
                             selectedRecoveryTool = tool
                         }
 
-                        // Keep the familiar raw-data sections, but move
-                        // them below the new interpretation/action layer.
                         if health.sleep.totalAsleep > 0 {
                             RecoveryLastNightCard(
                                 sleep: health.sleep
@@ -5403,8 +5381,8 @@ struct ATHLTHRecoveryView: View {
                         }
                     }
                 }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
                 .padding(.bottom, 30)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
@@ -5435,7 +5413,9 @@ struct ATHLTHRecoveryView: View {
                 if session.aiHealthDataSharingEnabled {
                     RecoveryCoachView(
                         context: recoveryAIContext,
-                        insight: recoveryAIInsight ?? fallbackRecoveryAIInsight
+                        insight:
+                            recoveryAIInsight ??
+                            fallbackRecoveryAIInsight
                     )
                 } else {
                     ContentUnavailableView(
@@ -6074,7 +6054,8 @@ struct ATHLTHRecoveryView: View {
     private var muscleRecoveryStatuses: [MuscleRecoveryStatus] {
         MuscleRecoveryEngine.statuses(
             history: strengthWorkout.workoutHistory,
-            soreness: sorenessStore
+            soreness: sorenessStore,
+            activityLoad: recoverySnapshot.trainingLoad
         )
     }
 
