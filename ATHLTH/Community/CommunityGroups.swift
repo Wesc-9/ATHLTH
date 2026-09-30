@@ -1102,10 +1102,21 @@ final class CommunityGroupStore: ObservableObject {
             guard !Task.isCancelled else { return }
 
             var seen = Set<UUID>()
-            searchResults = (names + locations + summaries)
+            let results = (names + locations + summaries)
                 .filter { seen.insert($0.id).inserted }
                 .prefix(24)
                 .map { $0 }
+
+            searchResults = results
+
+            let existingIDs = Set(groups.map(\.id))
+            let newGroups = results.filter {
+                !existingIDs.contains($0.id)
+            }
+
+            if !newGroups.isEmpty {
+                groups.append(contentsOf: newGroups)
+            }
         } catch is CancellationError {
             return
         } catch {
