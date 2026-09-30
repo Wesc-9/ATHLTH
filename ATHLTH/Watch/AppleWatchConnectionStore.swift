@@ -253,6 +253,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 payload,
                 replyHandler: nil
             ) { [weak self] error in
+                // Reachability can change while the Watch app is launching.
+                // Queue the same payload so route selection is not lost.
+                session.transferUserInfo(payload)
+
                 let message = error.localizedDescription
                 Task { @MainActor [weak self] in
                     self?.workoutLaunchError = message
@@ -381,6 +385,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 payload,
                 replyHandler: nil
             ) { [weak self] error in
+                // An immediate message is best for an already-open Watch app,
+                // but launch-time reachability is transient. Queue a durable
+                // copy if the message fails so workout configuration still
+                // arrives after the Watch process becomes ready.
+                session.transferUserInfo(payload)
+
                 DispatchQueue.main.async {
                     self?.workoutLaunchError =
                         error.localizedDescription
