@@ -1171,34 +1171,30 @@ struct WatchRunWorkoutExperienceView: View {
 
         switch step.measure {
         case .time:
-            guard let seconds =
-                    step.durationSeconds
-            else {
+            if let seconds =
+                    step.durationSeconds {
+                measure =
+                    durationText(seconds)
+            } else {
                 measure = "Open"
-                break
             }
-
-            measure =
-                durationText(seconds)
 
         case .distance:
-            guard let meters =
-                    step.distanceMeters
-            else {
-                measure = "Open"
-                break
-            }
-
-            if meters >= 1_000 {
-                measure =
-                    String(
-                        format:
-                            "%.1f km",
-                        meters / 1_000
-                    )
+            if let meters =
+                    step.distanceMeters {
+                if meters >= 1_000 {
+                    measure =
+                        String(
+                            format:
+                                "%.1f km",
+                            meters / 1_000
+                        )
+                } else {
+                    measure =
+                        "\(Int(meters.rounded())) m"
+                }
             } else {
-                measure =
-                    "\(Int(meters.rounded())) m"
+                measure = "Open"
             }
 
         case .open:
