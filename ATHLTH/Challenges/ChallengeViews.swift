@@ -223,7 +223,7 @@ struct ChallengeHubView: View {
                         challenge: weekly,
                         profiles:
                             social.visibleProfiles +
-                            social.friends
+                            social.mutualFollows
                     )
                 }
 
@@ -619,7 +619,7 @@ struct ChallengeCreationView: View {
                 }
             }
             .task {
-                if social.friends.isEmpty {
+                if social.mutualFollows.isEmpty {
                     await social.refresh()
                 }
 
@@ -1705,7 +1705,7 @@ struct ChallengeCreationView: View {
                 .tracking(1.1)
                 .foregroundStyle(.secondary)
 
-            if social.friends.isEmpty {
+            if social.mutualFollows.isEmpty {
                 VStack(spacing: 10) {
                     Text("Add friends before sending a challenge.")
                         .font(.caption)
@@ -1723,7 +1723,7 @@ struct ChallengeCreationView: View {
                 .padding()
                 .challengeCard()
             } else {
-                ForEach(social.friends) { friend in
+                ForEach(social.mutualFollows) { friend in
                     Button {
                         toggleFriend(friend)
                     } label: {
