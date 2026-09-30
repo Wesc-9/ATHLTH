@@ -144,6 +144,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastLapElapsedTime: TimeInterval = 0
     private var lastLapDistanceMeters: Double = 0
 
+    // GPS is a display/result fallback only. HealthKit remains the primary
+    // distance source whenever it is delivering fresh workout statistics.
+    private var gpsFallbackDistanceMeters: Double = 0
+    private var lastAcceptedOutdoorLocation: CLLocation?
+    private var healthKitDistanceMeters: Double = 0
+    private var healthKitDistanceLastUpdatedAt: Date?
+
     private override init() {
         super.init()
         locationManager.delegate = self
@@ -806,6 +813,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         targetWasOutside = false
         lastLapElapsedTime = 0
         lastLapDistanceMeters = 0
+        gpsFallbackDistanceMeters = 0
+        lastAcceptedOutdoorLocation = nil
+        healthKitDistanceMeters = 0
+        healthKitDistanceLastUpdatedAt = nil
         speechSynthesizer.stopSpeaking(at: .immediate)
         deactivateAudioCoachAudioSession()
         publish {
@@ -853,8 +864,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         cachePlannedRouteGeometry(resolvedRoute)
 
         publish {
-            self.audioCoachConfiguration = .disabled
-            self.structuredRunningWorkout = nil
+            // Keep any launch payload already delivered by iPhone. The old
+            // implementation cleared Audio Coach / structured running data
+            // here, creating a race with WatchConnectivity during launch.
             self.structuredStepIndex = 0
             self.strengthSession =
                 kind == .strength
@@ -881,8 +893,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 }
             self.routeDeviationMeters = nil
             self.routeDistanceToStartMeters = nil
-            self.routeAlertConfiguration = .standard
-            self.targetAlertConfiguration = nil
             self.liveTargetStatus = nil
             self.lapCount = 0
             self.currentLapElapsedTime = 0
@@ -898,6 +908,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredWorkoutComplete = false
         lastLapElapsedTime = 0
         lastLapDistanceMeters = 0
+        gpsFallbackDistanceMeters = 0
+        lastAcceptedOutdoorLocation = nil
+        healthKitDistanceMeters = 0
+        healthKitDistanceLastUpdatedAt = nil
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
@@ -1047,7 +1061,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             throw WatchWorkoutError.healthDataUnavailable
         }
 
-        var shareTypes: Set<HKSampleType> = [
+        // Match Apple's workout-app authorization model: ATHLTH writes the
+        // workout (and route), while live sensor quantities are read by the
+        // HKLiveWorkoutDataSource.
+        let shareTypes: Set<HKSampleType> = [
             HKObjectType.workoutType(),
             HKSeriesType.workoutRoute()
         ]
@@ -1064,7 +1081,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             .distanceCycling
         ] {
             if let type = HKObjectType.quantityType(forIdentifier: identifier) {
-                shareTypes.insert(type)
                 readTypes.insert(type)
             }
         }
@@ -2899,8 +2915,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if let distanceType, types.contains(distanceType),
            let statistics = builder.statistics(for: distanceType),
            let quantity = statistics.sumQuantity() {
+            let healthDistance =
+                quantity.doubleValue(for: .meter())
+
+            healthKitDistanceMeters = max(healthDistance, 0)
+            healthKitDistanceLastUpdatedAt = Date()
+
             publish {
-                self.distanceMeters = quantity.doubleValue(for: .meter())
+                self.distanceMeters = self.healthKitDistanceMeters
             }
         }
     }
@@ -3313,14 +3335,19 @@ extension WatchWorkoutManager:
 
         Task { @MainActor [weak self] in
             guard let self,
-                  self.kind == .strength,
                   self.state == .running
             else {
                 return
             }
 
-            self.locationManager
-                .requestLocation()
+            if self.kind.usesOutdoorLocation {
+                // The initial call can happen while the permission sheet is
+                // unresolved. Starting again here makes outdoor tracking
+                // deterministic after authorization changes.
+                self.locationManager.startUpdatingLocation()
+            } else if self.kind == .strength {
+                self.locationManager.requestLocation()
+            }
         }
     }
 
@@ -3362,6 +3389,10 @@ private extension WatchWorkoutManager {
                 attachWorkoutLocationMetadataIfPossible()
             }
             return
+        }
+
+        for location in filtered.sorted(by: { $0.timestamp < $1.timestamp }) {
+            recordFallbackDistance(using: location)
         }
 
         routeBuilder?.insertRouteData(
@@ -3416,6 +3447,62 @@ private extension WatchWorkoutManager {
                     )
                 }
         )
+    }
+
+    func recordFallbackDistance(
+        using location: CLLocation
+    ) {
+        guard kind == .running || kind == .walking else {
+            return
+        }
+
+        defer {
+            lastAcceptedOutdoorLocation = location
+        }
+
+        guard let previous = lastAcceptedOutdoorLocation else {
+            return
+        }
+
+        let interval =
+            location.timestamp.timeIntervalSince(
+                previous.timestamp
+            )
+
+        guard interval > 0,
+              interval <= 20
+        else {
+            return
+        }
+
+        let delta = location.distance(from: previous)
+        let maximumReasonableDelta =
+            max(45, interval * 12)
+
+        guard delta.isFinite,
+              delta >= 0,
+              delta <= maximumReasonableDelta
+        else {
+            return
+        }
+
+        gpsFallbackDistanceMeters += delta
+
+        let healthDistanceIsFresh =
+            healthKitDistanceLastUpdatedAt.map {
+                Date().timeIntervalSince($0) < 8
+            } ?? false
+
+        guard !healthDistanceIsFresh else {
+            return
+        }
+
+        publish {
+            self.distanceMeters = max(
+                self.healthKitDistanceMeters,
+                self.gpsFallbackDistanceMeters
+            )
+        }
     }
 
     func attachWorkoutLocationMetadataIfPossible() {
