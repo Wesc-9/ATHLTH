@@ -79,7 +79,7 @@ struct ATHLTHApp: App {
                 .environmentObject(accountService)
                 .environment(
                     \.locale,
-                    settings.timeFormatPreference.locale
+                    settings.interfaceLocale
                 )
                 .preferredColorScheme(.light)
                 .tint(ATHLTHTheme.accent)
