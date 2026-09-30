@@ -694,13 +694,66 @@ struct CommunityFriendsVsFriendsCard: View {
                 }
             }
 
-            if entries.isEmpty {
-                Text(
-                    "Add friends to start comparing shared activity."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 14)
+            if friends.isEmpty {
+                NavigationLink {
+                    SocialHubView(initialTab: .discover)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(
+                            systemName:
+                                "person.2.badge.plus"
+                        )
+                        .font(.title3)
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .frame(
+                            width: 42,
+                            height: 42
+                        )
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(
+                                "Follow each other to compete"
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(.semibold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+
+                            Text(
+                                "Friends vs Friends uses mutual follows so the comparison stays between people in your training circle."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(.tertiary)
+                    }
+                    .padding(.top, 12)
+                }
+                .buttonStyle(.plain)
             } else {
                 HStack(alignment: .top, spacing: 8) {
                     ForEach(
