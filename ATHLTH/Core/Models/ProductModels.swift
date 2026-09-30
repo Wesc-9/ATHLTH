@@ -368,6 +368,12 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var targetAlertConfiguration:
         WatchWorkoutTargetAlertConfiguration? = nil
 
+    // Unified workout hierarchy. Optional so all existing plans and saved
+    // workouts continue to decode unchanged.
+    var workoutTemplateID: UUID? = nil
+    var workoutBlocks: [WorkoutTemplateBlock]? = nil
+    var workoutCategory: String? = nil
+
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil
 
@@ -382,6 +388,14 @@ struct PlannedSession: Identifiable, Codable, Hashable {
         }
 
         return []
+    }
+
+    var resolvedWorkoutBlocks: [WorkoutTemplateBlock] {
+        workoutBlocks ?? []
+    }
+
+    var isStructuredWorkout: Bool {
+        !resolvedWorkoutBlocks.isEmpty
     }
 }
 
