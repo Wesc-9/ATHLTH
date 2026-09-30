@@ -986,6 +986,28 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func syncChallenge(
+        _ challenge: ATHLTHChallenge
+    ) async -> Bool {
+        guard service.currentUserID != nil else {
+            errorMessage =
+                "Sign in to use ATHLTH social features."
+            return false
+        }
+
+        do {
+            try await service.syncChallenge(
+                challenge
+            )
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
     func publishStrengthWorkout(
         _ workout: StrengthWorkoutLog,
         visibility: ProfileVisibility = .friends
