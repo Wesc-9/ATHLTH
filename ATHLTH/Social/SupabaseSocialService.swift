@@ -62,14 +62,6 @@ final class SupabaseSocialService: Sendable {
             .value
     }
 
-    func loadFriendships() async throws -> [SocialFriendshipRecord] {
-        try await client
-            .from("friendships")
-            .select()
-            .execute()
-            .value
-    }
-
     func loadFriendRequests() async throws -> [SocialFriendRequestRecord] {
         try await client
             .from("friend_requests")
@@ -156,14 +148,6 @@ final class SupabaseSocialService: Sendable {
             .from("friend_requests")
             .update(["status": status.rawValue])
             .eq("id", value: requestID)
-            .execute()
-    }
-
-    func removeFriendship(_ friendshipID: UUID) async throws {
-        try await client
-            .from("friendships")
-            .delete()
-            .eq("id", value: friendshipID)
             .execute()
     }
 
