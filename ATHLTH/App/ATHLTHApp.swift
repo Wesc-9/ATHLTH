@@ -174,6 +174,12 @@ struct AppRootView: View {
     private let minimumLifecycleRefreshInterval:
         TimeInterval = 90
 
+    private var signedInUserID: UUID? {
+        appSession.signedIn
+            ? appSession.profile.userID
+            : nil
+    }
+
     private var lifecycleContent: some View {
         AnyView(
             Group {
@@ -1073,7 +1079,7 @@ struct AppRootView: View {
                 await syncSocialOwnedData()
             }
         }
-        .onChange(of: appSession.signedIn ? appSession.profile.userID : nil, initial: true) { _, userID in
+        .onChange(of: signedInUserID, initial: true) { _, userID in
             phoneWorkout.switchAccount(userID)
             trainingBackups.switchAccount(userID)
             goals.switchAccount(userID)
@@ -1081,7 +1087,7 @@ struct AppRootView: View {
             exerciseLibrary.switchAccount(userID)
             runningWorkoutLibrary.switchAccount(userID)
         }
-        .task(id: appSession.signedIn ? appSession.profile.userID : nil) {
+        .task(id: signedInUserID) {
             guard appSession.signedIn else { return }
             let userID = appSession.profile.userID
             while !Task.isCancelled {
