@@ -14,19 +14,19 @@ enum ProfileGearCategory: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .watch: return "Training watch"
-        case .shoes: return "Shoes"
-        case .headphones: return "Headphones"
-        case .other: return "Other"
+        case .watch: return String(localized: "Training watch")
+        case .shoes: return String(localized: "Shoes")
+        case .headphones: return String(localized: "Headphones")
+        case .other: return String(localized: "Other")
         }
     }
 
     var shortTitle: String {
         switch self {
-        case .watch: return "Watch"
-        case .shoes: return "Shoes"
-        case .headphones: return "Headphones"
-        case .other: return "Other"
+        case .watch: return String(localized: "Watch")
+        case .shoes: return String(localized: "Shoes")
+        case .headphones: return String(localized: "Headphones")
+        case .other: return String(localized: "Other")
         }
     }
 
@@ -70,8 +70,8 @@ enum ProfileGearStatus: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .active: return "Active"
-        case .retired: return "Retired"
+        case .active: return String(localized: "Active")
+        case .retired: return String(localized: "Retired")
         }
     }
 }
@@ -88,12 +88,12 @@ enum ShoeUseType: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .daily: return "Daily"
-        case .tempo: return "Tempo"
-        case .race: return "Race"
-        case .trail: return "Trail"
-        case .treadmill: return "Treadmill"
-        case .other: return "Other"
+        case .daily: return String(localized: "Daily")
+        case .tempo: return String(localized: "Tempo")
+        case .race: return String(localized: "Race")
+        case .trail: return String(localized: "Trail")
+        case .treadmill: return String(localized: "Treadmill")
+        case .other: return String(localized: "Other")
         }
     }
 
@@ -1138,9 +1138,9 @@ enum ProfileGearError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .imageTooLarge:
-            return "Gear photos must be smaller than 5 MB."
+            return String(localized: "Gear photos must be smaller than 5 MB.")
         case .notAuthenticated:
-            return "You need to be signed in to update gear."
+            return String(localized: "You need to be signed in to update gear.")
         }
     }
 }
@@ -1297,7 +1297,7 @@ struct ProfileGearSummaryView: View {
         stats: ProfileGearUsageStats
     ) -> String {
         guard stats.totalDistanceMeters > 0 else {
-            return "Ready"
+            return String(localized: "Ready")
         }
 
         let kilometers = stats.totalDistanceMeters / 1_000
@@ -1565,8 +1565,8 @@ private enum ProfileGearEditorMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .basic: return "Basic"
-        case .advanced: return "Advanced"
+        case .basic: return String(localized: "Basic")
+        case .advanced: return String(localized: "Advanced")
         }
     }
 }
