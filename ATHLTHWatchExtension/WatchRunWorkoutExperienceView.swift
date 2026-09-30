@@ -9,25 +9,38 @@ import SwiftUI
 struct WatchRunWorkoutExperienceView: View {
     @EnvironmentObject private var workoutManager:
         WatchWorkoutManager
+    @Environment(\.isLuminanceReduced)
+    private var isLuminanceReduced
 
     @State private var selectedPage = 0
     @State private var confirmingEnd = false
 
     var body: some View {
-        TabView(selection: $selectedPage) {
-            metricsPage
-                .tag(0)
+        Group {
+            if isLuminanceReduced {
+                alwaysOnPage
+            } else {
+                TabView(
+                    selection:
+                        $selectedPage
+                ) {
+                    metricsPage
+                        .tag(0)
 
-            planPage
-                .tag(1)
+                    planPage
+                        .tag(1)
 
-            routePage
-                .tag(2)
+                    routePage
+                        .tag(2)
 
-            controlsPage
-                .tag(3)
+                    controlsPage
+                        .tag(3)
+                }
+                .tabViewStyle(
+                    .verticalPage
+                )
+            }
         }
-        .tabViewStyle(.verticalPage)
         .background(
             WatchTheme.canvas
                 .ignoresSafeArea()
@@ -56,6 +69,173 @@ struct WatchRunWorkoutExperienceView: View {
                 "ATHLTH will finish and save the workout to Apple Health."
             )
         }
+    }
+
+    private var alwaysOnPage: some View {
+        VStack(spacing: 7) {
+            HStack {
+                Image(
+                    systemName:
+                        workoutManager
+                            .kind.systemImage
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .bold
+                    )
+                )
+
+                Text(
+                    workoutManager
+                        .automaticPauseActive
+                        ? "AUTO PAUSED"
+                        : workoutManager
+                            .state ==
+                            .paused
+                            ? "PAUSED"
+                            : "ATHLTH"
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.8)
+
+                Spacer()
+
+                Text(
+                    durationText(
+                        workoutManager
+                            .elapsedTime
+                    )
+                )
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+            }
+            .foregroundStyle(
+                WatchTheme
+                    .textSecondary
+            )
+
+            HStack(
+                alignment:
+                    .firstTextBaseline
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 0
+                ) {
+                    Text("PACE")
+                        .font(
+                            .system(
+                                size: 7,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            WatchTheme.muted
+                        )
+
+                    Text(
+                        paceText(
+                            workoutManager
+                                .currentPaceSecondsPerKilometer
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                }
+
+                Spacer()
+
+                VStack(
+                    alignment: .trailing,
+                    spacing: 1
+                ) {
+                    Text(
+                        distanceKilometersText +
+                        " km"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+
+                    Text(
+                        heartRateText +
+                        " bpm"
+                    )
+                    .font(
+                        .system(
+                            size: 12,
+                            weight: .semibold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        WatchTheme
+                            .textSecondary
+                    )
+                }
+            }
+
+            if let step =
+                    workoutManager
+                        .currentStructuredRunningStep {
+                HStack {
+                    Text(step.title)
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .semibold
+                            )
+                        )
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text(
+                        "\(workoutManager.structuredStepIndex + 1)"
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                }
+                .foregroundStyle(
+                    WatchTheme
+                        .textSecondary
+                )
+            }
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(
+            Color.black
+                .ignoresSafeArea()
+        )
     }
 
     // MARK: - Page 1: live metrics
@@ -871,9 +1051,12 @@ struct WatchRunWorkoutExperienceView: View {
 
             Text(
                 workoutManager
-                    .state == .paused
-                    ? "PAUSED"
-                    : "LIVE"
+                    .automaticPauseActive
+                    ? "AUTO PAUSED"
+                    : workoutManager
+                        .state == .paused
+                        ? "PAUSED"
+                        : "LIVE"
             )
             .font(
                 .system(
