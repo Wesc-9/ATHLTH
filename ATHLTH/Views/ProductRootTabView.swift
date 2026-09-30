@@ -4664,7 +4664,7 @@ struct ATHLTHRecoveryView: View {
 
     private var todaysSignalsCard: some View {
         ATHLTHCard {
-            ATHLTHSectionHeader(title: "Today's signals")
+            ATHLTHSectionHeader(title: "Recent signals")
 
             HStack(alignment: .top, spacing: 0) {
                 recoverySignalMetric(
