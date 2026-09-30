@@ -13,13 +13,13 @@ enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .signature: return String(localized: "Signature")
-        case .endurance: return String(localized: "Endurance")
-        case .strength: return String(localized: "Strength")
-        case .consistency: return String(localized: "Consistency")
-        case .goals: return String(localized: "Goals")
-        case .recovery: return String(localized: "Recovery")
-        case .challenges: return String(localized: "Challenges")
+        case .signature: return ATHLTHLocalization.string( "Signature")
+        case .endurance: return ATHLTHLocalization.string( "Endurance")
+        case .strength: return ATHLTHLocalization.string( "Strength")
+        case .consistency: return ATHLTHLocalization.string( "Consistency")
+        case .goals: return ATHLTHLocalization.string( "Goals")
+        case .recovery: return ATHLTHLocalization.string( "Recovery")
+        case .challenges: return ATHLTHLocalization.string( "Challenges")
         }
     }
 
@@ -48,10 +48,10 @@ enum TrophyRarity: Int, CaseIterable, Codable, Hashable, Comparable {
 
     var title: String {
         switch self {
-        case .core: return String(localized: "Core")
-        case .rare: return String(localized: "Rare")
-        case .epic: return String(localized: "Epic")
-        case .signature: return String(localized: "Signature")
+        case .core: return ATHLTHLocalization.string( "Core")
+        case .rare: return ATHLTHLocalization.string( "Rare")
+        case .epic: return ATHLTHLocalization.string( "Epic")
+        case .signature: return ATHLTHLocalization.string( "Signature")
         }
     }
 }
@@ -67,9 +67,9 @@ enum TrophyVerificationSource: String, Codable, Hashable {
         switch self {
         case .appleHealth: return "Apple Health"
         case .athlth: return "ATHLTH"
-        case .goal: return String(localized: "ATHLTH Goal")
-        case .challenge: return String(localized: "ATHLTH Challenge")
-        case .mixed: return String(localized: "Verified")
+        case .goal: return ATHLTHLocalization.string( "ATHLTH Goal")
+        case .challenge: return ATHLTHLocalization.string( "ATHLTH Challenge")
+        case .mixed: return ATHLTHLocalization.string( "Verified")
         }
     }
 
@@ -173,7 +173,7 @@ struct TrophyProgressItem: Identifiable, Hashable {
             return currentStage.title
         }
 
-        return String(localized: "Locked")
+        return ATHLTHLocalization.string( "Locked")
     }
 }
 
