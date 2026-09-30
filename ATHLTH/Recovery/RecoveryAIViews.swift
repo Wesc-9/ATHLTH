@@ -12,11 +12,12 @@ struct RecoveryAIInsightCard: View {
         ATHLTHCard {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.indigo)
 
                 Text("ATHLTH COACH")
                     .font(.caption.weight(.bold))
-                    .tracking(1.6)
+                    .tracking(1.7)
                     .foregroundStyle(.secondary)
 
                 Text("ATHLTH+")
@@ -42,9 +43,15 @@ struct RecoveryAIInsightCard: View {
             }
 
             HStack(alignment: .top, spacing: 14) {
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(insight.headline)
-                        .font(.title3.weight(.bold))
+                        .font(
+                            .system(
+                                size: 24,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .fixedSize(
                             horizontal: false,
@@ -54,7 +61,7 @@ struct RecoveryAIInsightCard: View {
                     Text(insight.summary)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineSpacing(2)
+                        .lineSpacing(3)
                         .fixedSize(
                             horizontal: false,
                             vertical: true
@@ -65,7 +72,7 @@ struct RecoveryAIInsightCard: View {
 
                 readinessRing
             }
-            .padding(.top, 10)
+            .padding(.top, 12)
 
             HStack(spacing: 7) {
                 metricTile(
@@ -92,38 +99,36 @@ struct RecoveryAIInsightCard: View {
                 metricTile(
                     title: "Load",
                     value: loadValue,
-                    icon:
-                        "figure.strengthtraining.traditional",
+                    detail: "7d · all workouts",
+                    icon: "chart.bar.fill",
                     tint: .green
                 )
             }
-            .padding(.top, 12)
+            .padding(.top, 14)
 
-            if !insight.factors.isEmpty {
-                VStack(alignment: .leading, spacing: 9) {
+            if !displayFactors.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
                     Text("What matters most today")
-                        .font(.subheadline.weight(.bold))
+                        .font(.headline.weight(.bold))
                         .foregroundStyle(
                             ATHLTHTheme.primaryText
                         )
 
                     ForEach(
-                        Array(insight.factors.prefix(3))
-                    ) { factor in
-                        let index =
-                            insight.factors.firstIndex(of: factor) ?? 0
-
+                        Array(displayFactors.enumerated()),
+                        id: \.element.id
+                    ) { index, factor in
                         HStack(alignment: .top, spacing: 10) {
                             Text("\(index + 1)")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(
                                     factorTint(factor)
                                 )
-                                .frame(width: 28, height: 28)
+                                .frame(width: 30, height: 30)
                                 .background(
                                     factorTint(factor).opacity(0.10),
                                     in: RoundedRectangle(
-                                        cornerRadius: 9,
+                                        cornerRadius: 10,
                                         style: .continuous
                                     )
                                 )
@@ -140,6 +145,7 @@ struct RecoveryAIInsightCard: View {
                                 Text(factor.detail)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .lineSpacing(2)
                                     .fixedSize(
                                         horizontal: false,
                                         vertical: true
@@ -150,7 +156,7 @@ struct RecoveryAIInsightCard: View {
                         }
                     }
                 }
-                .padding(.top, 14)
+                .padding(.top, 16)
             }
 
             HStack(spacing: 8) {
@@ -161,7 +167,7 @@ struct RecoveryAIInsightCard: View {
                 )
 
                 recoveryActionButton(
-                    title: "Adjust training",
+                    title: "Training suggestion",
                     icon: "slider.horizontal.3",
                     action: onAdjustTraining
                 )
@@ -172,7 +178,7 @@ struct RecoveryAIInsightCard: View {
                     action: onAskATHLTH
                 )
             }
-            .padding(.top, 14)
+            .padding(.top, 15)
         }
     }
 
@@ -198,11 +204,11 @@ struct RecoveryAIInsightCard: View {
                 )
                 .rotationEffect(.degrees(-90))
 
-            VStack(spacing: 0) {
+            VStack(spacing: 1) {
                 Text("\(score)")
                     .font(
                         .system(
-                            size: 25,
+                            size: 28,
                             weight: .bold,
                             design: .rounded
                         )
@@ -218,7 +224,7 @@ struct RecoveryAIInsightCard: View {
                     .minimumScaleFactor(0.7)
             }
         }
-        .frame(width: 86, height: 86)
+        .frame(width: 92, height: 92)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "Readiness \(score), \(context.recoveryState)"
@@ -228,10 +234,11 @@ struct RecoveryAIInsightCard: View {
     private func metricTile(
         title: String,
         value: String,
+        detail: String? = nil,
         icon: String,
         tint: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
@@ -251,10 +258,19 @@ struct RecoveryAIInsightCard: View {
                 )
                 .foregroundStyle(ATHLTHTheme.primaryText)
                 .lineLimit(1)
-                .minimumScaleFactor(0.65)
+                .minimumScaleFactor(0.60)
+
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 7.8, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
         .background(
             tint.opacity(0.055),
             in: RoundedRectangle(
@@ -277,11 +293,11 @@ struct RecoveryAIInsightCard: View {
                 Text(title)
                     .font(.system(size: 9.5, weight: .semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    .minimumScaleFactor(0.70)
             }
             .foregroundStyle(ATHLTHTheme.primaryText)
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
+            .frame(height: 50)
             .background(
                 Color.primary.opacity(0.035),
                 in: RoundedRectangle(
@@ -291,6 +307,54 @@ struct RecoveryAIInsightCard: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var displayFactors: [RecoveryAIFactor] {
+        var factors = Array(insight.factors.prefix(3))
+
+        if !factors.contains(
+            where: {
+                $0.title.localizedCaseInsensitiveContains("load")
+            }
+        ) {
+            if factors.count >= 3 {
+                factors = Array(factors.prefix(2))
+            }
+
+            factors.append(trainingLoadFactor)
+        }
+
+        return Array(factors.prefix(3))
+    }
+
+    private var trainingLoadFactor: RecoveryAIFactor {
+        let acute = Int(context.acuteTrainingMinutes.rounded())
+        let baseline = context.chronicWeeklyAverageMinutes.map {
+            Int($0.rounded())
+        }
+
+        let detail: String
+        if let baseline {
+            detail =
+                "The last 7 days total \(acute) min versus your recent weekly average of \(baseline) min. Imported strength, running and walking all count."
+        } else {
+            detail =
+                "The last 7 days total \(acute) min. Imported strength, running and walking all count while ATHLTH builds your baseline."
+        }
+
+        let impact: String
+        if let baseline, baseline > 0 {
+            let ratio = context.acuteTrainingMinutes / Double(baseline)
+            impact = ratio > 1.45 ? "negative" : ratio < 0.85 ? "positive" : "neutral"
+        } else {
+            impact = "neutral"
+        }
+
+        return RecoveryAIFactor(
+            title: "Training load",
+            detail: detail,
+            impact: impact
+        )
     }
 
     private func factorTint(
@@ -337,7 +401,7 @@ struct RecoveryAIInsightCard: View {
     }
 
     private var loadValue: String {
-        "\(Int(context.yesterdayTrainingMinutes.rounded())) min"
+        "\(Int(context.acuteTrainingMinutes.rounded())) min"
     }
 }
 
