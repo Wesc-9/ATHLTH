@@ -299,6 +299,10 @@ struct ATHLTHCommunityV3View: View {
                         participant.id,
                     state: .invited
                 )
+            } else {
+                await social.markChallengeInviteRead(
+                    challengeID: challenge.id
+                )
             }
         }
     }
