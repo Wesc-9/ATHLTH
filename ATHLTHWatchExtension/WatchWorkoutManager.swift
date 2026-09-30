@@ -184,7 +184,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 3
         locationManager.activityType = .fitness
-        locationManager.pausesLocationUpdatesAutomatically = false
     }
 
     func configurePlannedRoute(
