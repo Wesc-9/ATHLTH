@@ -404,6 +404,20 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
+    func loadActivities(
+        for userID: UUID,
+        limit: Int = 250
+    ) async throws -> [SocialActivityRecord] {
+        try await client
+            .from("social_activities")
+            .select()
+            .eq("actor_id", value: userID)
+            .order("created_at", ascending: false)
+            .limit(min(max(limit, 20), 300))
+            .execute()
+            .value
+    }
+
     func loadFriendProfile(_ userID: UUID) async throws -> SocialFriendProfile {
         async let rawCardTask: SocialProfileCard = client
             .from("social_profile_cards")
