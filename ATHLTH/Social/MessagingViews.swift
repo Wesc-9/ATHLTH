@@ -17,37 +17,7 @@ struct MessageInboxDestinationView: View {
     }
 }
 
-private enum MessageInboxFilter: String, CaseIterable, Identifiable {
-    case priority
-    case direct
-    case voiceNotes
-    case groups
-    case archive
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .priority: return "Priority"
-        case .direct: return "Direct"
-        case .voiceNotes: return "Voice Notes"
-        case .groups: return "Groups"
-        case .archive: return "Archive"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .priority: return "star.fill"
-        case .direct: return "bubble.left"
-        case .voiceNotes: return "waveform"
-        case .groups: return "person.3.fill"
-        case .archive: return "archivebox"
-        }
-    }
-}
-
-struct MessageInboxView: View {
+struct MessageInboxView: View {struct MessageInboxView: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
@@ -56,7 +26,6 @@ struct MessageInboxView: View {
 
     @State private var searchText = ""
     @State private var showingSearch = false
-    @State private var selectedFilter: MessageInboxFilter = .direct
 
     var body: some View {
         ScrollView {
@@ -71,19 +40,17 @@ struct MessageInboxView: View {
                         )
                 }
 
-                filterStrip
-
                 if let error = displayableError {
                     inboxErrorCard(error)
                 }
 
-                if shouldShowIncomingRequests {
+                if !filteredIncomingRequestItems.isEmpty {
                     inboxSectionLabel(
                         "MESSAGE REQUESTS",
-                        count: incomingRequestItems.count
+                        count: filteredIncomingRequestItems.count
                     )
 
-                    ForEach(incomingRequestItems) { item in
+                    ForEach(filteredIncomingRequestItems) { item in
                         MessageRequestRow(
                             friend: item.friend,
                             message: item.lastMessage,
@@ -123,9 +90,9 @@ struct MessageInboxView: View {
                     }
                 }
 
-                if !filteredActiveConversations.isEmpty {
+                if !displayedActiveConversations.isEmpty {
                     LazyVStack(spacing: 9) {
-                        ForEach(filteredActiveConversations) { item in
+                        ForEach(displayedActiveConversations) { item in
                             NavigationLink {
                                 DirectMessageThreadView(
                                     friend: item.friend
@@ -141,36 +108,40 @@ struct MessageInboxView: View {
                                     requestLabel:
                                         conversationRequestLabel(
                                             item.conversation
+                                        ),
+                                    isPinned:
+                                        messaging.isPinned(
+                                            item.conversation.id
                                         )
                                 )
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button {
+                                    withAnimation(
+                                        .easeInOut(duration: 0.18)
+                                    ) {
+                                        messaging.togglePinned(
+                                            item.conversation.id
+                                        )
+                                    }
+                                } label: {
+                                    Label(
+                                        messaging.isPinned(
+                                            item.conversation.id
+                                        )
+                                            ? "Unpin conversation"
+                                            : "Pin conversation",
+                                        systemImage:
+                                            messaging.isPinned(
+                                                item.conversation.id
+                                            )
+                                                ? "pin.slash"
+                                                : "pin.fill"
+                                    )
+                                }
+                            }
                         }
-                    }
-                }
-
-                if shouldShowOutgoingRequests {
-                    inboxSectionLabel(
-                        "PENDING",
-                        count: outgoingRequestItems.count
-                    )
-
-                    ForEach(outgoingRequestItems) { item in
-                        NavigationLink {
-                            DirectMessageThreadView(
-                                friend: item.friend
-                            )
-                        } label: {
-                            MessageRequestRow(
-                                friend: item.friend,
-                                message: item.lastMessage,
-                                direction: .outgoing,
-                                onAccept: {},
-                                onDecline: {},
-                                onBlock: {}
-                            )
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
 
@@ -179,7 +150,7 @@ struct MessageInboxView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.top, 0)
             .padding(.bottom, 34)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
@@ -198,156 +169,90 @@ struct MessageInboxView: View {
         .task {
             await social.refresh()
             await messaging.refresh()
-
-            if messaging.unreadCount > 0 ||
-                messaging.messageRequestCount > 0 {
-                selectedFilter = .priority
-            }
+            messaging.loadPinnedConversations()
         }
     }
 
     private var messagesHeader: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            ZStack {
-                HStack {
-                    currentUserAvatar
-
-                    Spacer()
-
-                    HStack(spacing: 8) {
-                        headerAction(
-                            systemImage:
-                                showingSearch
-                                    ? "xmark"
-                                    : "magnifyingglass",
-                            accessibilityLabel:
-                                showingSearch
-                                    ? "Close message search"
-                                    : "Search messages"
-                        ) {
-                            withAnimation(
-                                .easeInOut(duration: 0.20)
-                            ) {
-                                showingSearch.toggle()
-                                if !showingSearch {
-                                    searchText = ""
-                                }
-                            }
-                        }
-
-                        headerAction(
-                            systemImage:
-                                "square.and.pencil",
-                            accessibilityLabel:
-                                "New message",
-                            action: onNewMessage
-                        )
-                    }
-                }
-
-                inboxWordmark
-            }
-
+        HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("INNER CIRCLE")
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(3.1)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-
                 Text("Messages")
                     .font(
                         .system(
-                            size: 42,
-                            weight: .semibold,
-                            design: .serif
+                            size: 34,
+                            weight: .bold,
+                            design: .rounded
                         )
                     )
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
-                    .minimumScaleFactor(0.82)
                     .lineLimit(1)
 
-                Text("The people who move you forward.")
-                    .font(.system(size: 17, weight: .regular))
+                Text(inboxSummaryText)
+                    .font(.subheadline)
                     .foregroundStyle(
                         ATHLTHTheme.mutedText
                     )
+                    .lineLimit(1)
             }
-        }
-        .padding(.top, 2)
-    }
 
-    private var inboxWordmark: some View {
-        HStack(spacing: 6) {
-            ATHLTHMarkShape()
-                .fill(ATHLTHTheme.primaryText)
-                .frame(width: 20, height: 15)
+            Spacer(minLength: 8)
 
-            Text("THLTH")
-                .font(
-                    .system(
-                        size: 18,
-                        weight: .black
-                    )
-                )
-                .tracking(4.5)
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-                .fixedSize()
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("ATHLTH")
-    }
-
-    private var currentUserAvatar: some View {
-        Group {
-            if let avatarURL = session.profile.avatarURL {
-                AsyncImage(url: avatarURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        avatarFallback
+            HStack(spacing: 8) {
+                headerAction(
+                    systemImage:
+                        showingSearch
+                            ? "xmark"
+                            : "magnifyingglass",
+                    accessibilityLabel:
+                        showingSearch
+                            ? "Close message search"
+                            : "Search messages"
+                ) {
+                    withAnimation(
+                        .easeInOut(duration: 0.20)
+                    ) {
+                        showingSearch.toggle()
+                        if !showingSearch {
+                            searchText = ""
+                        }
                     }
                 }
-            } else {
-                avatarFallback
+
+                headerAction(
+                    systemImage: "square.and.pencil",
+                    accessibilityLabel: "New message",
+                    action: onNewMessage
+                )
             }
         }
-        .frame(width: 42, height: 42)
-        .clipShape(Circle())
-        .overlay {
-            Circle()
-                .stroke(
-                    Color.white.opacity(0.92),
-                    lineWidth: 1
-                )
-        }
-        .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.08),
-            radius: 7,
-            y: 3
-        )
-        .accessibilityHidden(true)
+        .padding(.top, 0)
     }
 
-    private var avatarFallback: some View {
-        ZStack {
-            ATHLTHTheme.accentSoft
-
-            Image(systemName: "person.fill")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+    private var inboxSummaryText: String {
+        if messaging.unreadCount > 0 {
+            return messaging.unreadCount == 1
+                ? "1 unread message"
+                : "\(messaging.unreadCount) unread messages"
         }
+
+        if messaging.messageRequestCount > 0 {
+            return messaging.messageRequestCount == 1
+                ? "1 message request"
+                : "\(messaging.messageRequestCount) message requests"
+        }
+
+        if activeConversations.isEmpty {
+            return "Your conversations"
+        }
+
+        return activeConversations.count == 1
+            ? "1 conversation"
+            : "\(activeConversations.count) conversations"
     }
 
-    private func headerAction(
+    private func headerAction(    private func headerAction(
         systemImage: String,
         accessibilityLabel: String,
         action: @escaping () -> Void
@@ -373,107 +278,7 @@ struct MessageInboxView: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
-    private var filterStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(MessageInboxFilter.allCases) { filter in
-                    filterChip(filter)
-                }
-            }
-            .padding(.vertical, 1)
-        }
-    }
-
-    private func filterChip(
-        _ filter: MessageInboxFilter
-    ) -> some View {
-        let selected = selectedFilter == filter
-        let count = filterCount(filter)
-
-        return Button {
-            withAnimation(
-                .easeInOut(duration: 0.18)
-            ) {
-                selectedFilter = filter
-            }
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: filter.systemImage)
-                    .font(.system(size: 12, weight: .semibold))
-
-                Text(filter.title)
-                    .font(.subheadline.weight(.medium))
-
-                if count > 0 {
-                    Text("\(count)")
-                        .font(
-                            .caption2.weight(.bold)
-                                .monospacedDigit()
-                        )
-                        .foregroundStyle(
-                            selected
-                                ? Color.white
-                                : ATHLTHTheme.primaryText
-                        )
-                        .padding(.horizontal, 6)
-                        .frame(minHeight: 20)
-                        .background(
-                            selected
-                                ? Color.white.opacity(0.20)
-                                : Color.primary.opacity(0.055),
-                            in: Capsule()
-                        )
-                }
-            }
-            .foregroundStyle(
-                selected
-                    ? Color.white
-                    : ATHLTHTheme.primaryText.opacity(0.78)
-            )
-            .padding(.horizontal, 13)
-            .frame(height: 42)
-            .background(
-                selected
-                    ? selectedFilterTint
-                    : Color.white.opacity(0.70),
-                in: Capsule()
-            )
-            .overlay {
-                Capsule()
-                    .stroke(
-                        selected
-                            ? Color.clear
-                            : Color.white.opacity(0.94),
-                        lineWidth: 0.8
-                    )
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var selectedFilterTint: Color {
-        selectedFilter == .priority
-            ? Color.orange.opacity(0.88)
-            : ATHLTHTheme.accentDeep
-    }
-
-    private func filterCount(
-        _ filter: MessageInboxFilter
-    ) -> Int {
-        switch filter {
-        case .priority:
-            return messaging.unreadCount +
-                messaging.messageRequestCount
-        case .direct:
-            return 0
-        case .voiceNotes:
-            return voiceNoteConversations.count
-        case .groups, .archive:
-            return 0
-        }
-    }
-
-    private var inboxSearch: some View {
+    private var inboxSearch: some View {    private var inboxSearch: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -555,54 +360,44 @@ struct MessageInboxView: View {
     }
 
     private var premiumEmptyState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             Image(
                 systemName:
-                    selectedFilter == .voiceNotes
-                        ? "waveform.circle"
-                        : selectedFilter == .groups
-                            ? "person.3"
-                            : selectedFilter == .archive
-                                ? "archivebox"
-                                : "message"
+                    normalizedSearch.isEmpty
+                        ? "bubble.left.and.bubble.right"
+                        : "magnifyingglass"
             )
-            .font(.system(size: 30, weight: .medium))
+            .font(.system(size: 28, weight: .medium))
             .foregroundStyle(ATHLTHTheme.accentDeep)
-            .frame(width: 68, height: 68)
+            .frame(width: 66, height: 66)
             .background(
                 ATHLTHTheme.accentSoft,
                 in: Circle()
             )
 
             VStack(spacing: 5) {
-                Text(emptyStateTitle)
-                    .font(.title3.weight(.semibold))
+                Text(
+                    normalizedSearch.isEmpty
+                        ? "No messages yet"
+                        : "No conversations found"
+                )
+                .font(.title3.weight(.semibold))
 
-                Text(emptyStateDetail)
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .multilineTextAlignment(.center)
-            }
-
-            if selectedFilter == .direct ||
-                selectedFilter == .priority {
-                Button(action: onNewMessage) {
-                    Label(
-                        "New Message",
-                        systemImage: "square.and.pencil"
-                    )
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
+                Text(
+                    normalizedSearch.isEmpty
+                        ? "Your conversations and message requests will appear here."
+                        : "Try another name, username or message keyword."
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(24)
+        .padding(.vertical, 30)
+        .padding(.horizontal, 24)
         .background(
             Color.white.opacity(0.72),
             in: RoundedRectangle(
@@ -612,45 +407,7 @@ struct MessageInboxView: View {
         )
     }
 
-    private var emptyStateTitle: String {
-        if !normalizedSearch.isEmpty {
-            return "No conversations found"
-        }
-
-        switch selectedFilter {
-        case .priority:
-            return "Nothing needs your attention"
-        case .direct:
-            return "Your messages are ready"
-        case .voiceNotes:
-            return "No voice notes yet"
-        case .groups:
-            return "No group conversations yet"
-        case .archive:
-            return "Archive is empty"
-        }
-    }
-
-    private var emptyStateDetail: String {
-        if !normalizedSearch.isEmpty {
-            return "Try another name, username or message keyword."
-        }
-
-        switch selectedFilter {
-        case .priority:
-            return "Unread conversations and message requests will appear here."
-        case .direct:
-            return "Start a private conversation with another ATHLTH athlete."
-        case .voiceNotes:
-            return "Voice-message conversations will collect here when they are available."
-        case .groups:
-            return "Your group conversations will appear here."
-        case .archive:
-            return "Archived conversations will appear here."
-        }
-    }
-
-    private func inboxErrorCard(
+    private func inboxErrorCard(    private func inboxErrorCard(
         _ message: String
     ) -> some View {
         HStack(spacing: 12) {
@@ -712,93 +469,82 @@ struct MessageInboxView: View {
             .lowercased()
     }
 
-    private var filteredActiveConversations:
+    private var displayedActiveConversations:
         [MessageConversationItem] {
-        var conversations: [MessageConversationItem]
-
-        switch selectedFilter {
-        case .priority:
-            conversations = activeConversations.filter {
-                messaging.unreadCount(
-                    for: $0.conversation.id
-                ) > 0 ||
-                (
-                    $0.conversation.requestStatus == .pending &&
-                    $0.conversation.requestedBy !=
-                        messaging.currentUserID
-                )
+        let matching = activeConversations.filter { item in
+            guard !normalizedSearch.isEmpty else {
+                return true
             }
-        case .direct:
-            conversations = activeConversations
-        case .voiceNotes:
-            conversations = voiceNoteConversations
-        case .groups, .archive:
-            conversations = []
-        }
 
-        guard !normalizedSearch.isEmpty else {
-            return conversations
-        }
-
-        return conversations.filter {
-            $0.friend.resolvedName.lowercased()
+            return item.friend.resolvedName.lowercased()
                 .contains(normalizedSearch) ||
-            $0.friend.usernameLabel.lowercased()
+            item.friend.usernameLabel.lowercased()
                 .contains(normalizedSearch) ||
-            ($0.lastMessage?.body?.lowercased()
+            (item.lastMessage?.body?.lowercased()
                 .contains(normalizedSearch) ?? false) ||
-            ($0.lastMessage?.attachmentTitle?
+            (item.lastMessage?.attachmentTitle?
                 .lowercased()
+                .contains(normalizedSearch) ?? false)
+        }
+
+        return matching.sorted { lhs, rhs in
+            let lhsPinned = messaging.isPinned(
+                lhs.conversation.id
+            )
+            let rhsPinned = messaging.isPinned(
+                rhs.conversation.id
+            )
+
+            if lhsPinned != rhsPinned {
+                return lhsPinned && !rhsPinned
+            }
+
+            return (
+                lhs.conversation.lastMessageAt ??
+                    lhs.conversation.createdAt
+            ) > (
+                rhs.conversation.lastMessageAt ??
+                    rhs.conversation.createdAt
+            )
+        }
+    }
+
+    private var filteredIncomingRequestItems:
+        [MessageConversationItem] {
+        guard !normalizedSearch.isEmpty else {
+            return incomingRequestItems
+        }
+
+        return incomingRequestItems.filter { item in
+            item.friend.resolvedName.lowercased()
+                .contains(normalizedSearch) ||
+            item.friend.usernameLabel.lowercased()
+                .contains(normalizedSearch) ||
+            (item.lastMessage?.body?.lowercased()
                 .contains(normalizedSearch) ?? false)
         }
     }
 
-    private var voiceNoteConversations:
-        [MessageConversationItem] {
-        activeConversations.filter { item in
-            guard let raw =
-                    item.lastMessage?
-                        .attachmentKindRaw?
-                        .lowercased()
-            else {
-                return false
-            }
-
-            return raw.contains("voice") ||
-                raw.contains("audio")
-        }
-    }
-
-    private var shouldShowIncomingRequests: Bool {
-        false
-    }
-
-    private var shouldShowOutgoingRequests: Bool {
-        false
-    }
-
     private var shouldShowEmptyState: Bool {
-        if !filteredActiveConversations.isEmpty {
-            return false
-        }
-
-        if shouldShowIncomingRequests ||
-            shouldShowOutgoingRequests {
-            return false
-        }
-
-        return true
+        displayedActiveConversations.isEmpty &&
+            filteredIncomingRequestItems.isEmpty
     }
 
     private var activeConversations:
         [MessageConversationItem] {
         items(
             from: messaging.conversations.filter {
-                $0.requestStatus == .accepted ||
-                    (
-                        $0.requestStatus == .pending &&
-                        messaging.lastMessage(for: $0.id) != nil
-                    )
+                if $0.requestStatus == .accepted {
+                    return true
+                }
+
+                guard $0.requestStatus == .pending,
+                      $0.requestedBy == messaging.currentUserID
+                else {
+                    return false
+                }
+
+                return messaging.lastMessage(for: $0.id) != nil
             }
         )
     }
@@ -809,49 +555,7 @@ struct MessageInboxView: View {
             .filter { $0.lastMessage != nil }
     }
 
-    private var outgoingRequestItems:
-        [MessageConversationItem] {
-        items(from: messaging.outgoingMessageRequests)
-            .filter { $0.lastMessage != nil }
-    }
-
-    private func items(
-        from conversations: [DirectConversationRecord]
-    ) -> [MessageConversationItem] {
-        guard let currentUserID =
-                messaging.currentUserID
-        else {
-            return []
-        }
-
-        return conversations.compactMap { conversation in
-            guard let otherID =
-                    conversation.otherUserID(
-                        for: currentUserID
-                    ),
-                  let profile = profile(for: otherID)
-            else {
-                return nil
-            }
-
-            return MessageConversationItem(
-                conversation: conversation,
-                friend: profile,
-                lastMessage:
-                    messaging.lastMessage(
-                        for: conversation.id
-                    )
-            )
-        }
-        .sorted {
-            ($0.conversation.lastMessageAt ??
-                $0.conversation.createdAt) >
-            ($1.conversation.lastMessageAt ??
-                $1.conversation.createdAt)
-        }
-    }
-
-    private func conversationRequestLabel(
+    private func conversationRequestLabel(    private func conversationRequestLabel(
         _ conversation: DirectConversationRecord
     ) -> String? {
         guard conversation.requestStatus == .pending else {
@@ -978,6 +682,7 @@ private struct MessageConversationRow: View {
     let lastMessage: DirectMessageRecord?
     let unreadCount: Int
     let requestLabel: String?
+    let isPinned: Bool
 
     var body: some View {
         HStack(spacing: 13) {
@@ -1031,6 +736,22 @@ private struct MessageConversationRow: View {
                             ATHLTHTheme.primaryText
                         )
                         .lineLimit(1)
+
+                    if isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                            .accessibilityLabel(
+                                "Pinned conversation"
+                            )
+                    }
 
                     if let requestLabel {
                         Text(requestLabel)
