@@ -374,7 +374,12 @@ struct CommunityLeaderboardCard: View {
                 }
 
                 Text(
-                    "\(metric.explanation) · last \(period.days) days"
+                    ATHLTHLocalization.format(
+                        english: "%@ · last %d days",
+                        norwegian: "%@ · siste %d dager",
+                        metric.explanation,
+                        period.days
+                    )
                 )
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -634,7 +639,11 @@ struct CommunityLeaderboardCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
-                    "Challenge \(entry.displayName)"
+                    ATHLTHLocalization.format(
+                        english: "Challenge %@",
+                        norwegian: "Utfordre %@",
+                        entry.displayName
+                    )
                 )
             }
 
