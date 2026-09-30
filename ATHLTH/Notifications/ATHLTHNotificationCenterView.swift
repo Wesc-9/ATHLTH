@@ -399,9 +399,9 @@ struct ATHLTHNotificationCenterView: View {
 
     @ViewBuilder
     private var inboxSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
             sectionHeader(
-                title: "Inbox",
+                title: "Updates",
                 subtitle: inboxSubtitle
             )
 
@@ -411,13 +411,109 @@ struct ATHLTHNotificationCenterView: View {
             } else if filteredNotificationItems.isEmpty {
                 emptyFilteredState
             } else {
-                LazyVStack(spacing: 10) {
-                    ForEach(filteredNotificationItems) { item in
-                        notificationCard(item)
-                    }
+                if !actionableNotificationItems.isEmpty {
+                    notificationGroup(
+                        title: "Needs attention",
+                        subtitle: "Requests and invites",
+                        items: actionableNotificationItems,
+                        emphasized: true
+                    )
+                }
+
+                if !todayNotificationItems.isEmpty {
+                    notificationGroup(
+                        title: "Today",
+                        subtitle: nil,
+                        items: todayNotificationItems
+                    )
+                }
+
+                if !earlierNotificationItems.isEmpty {
+                    notificationGroup(
+                        title: "Earlier",
+                        subtitle: nil,
+                        items: earlierNotificationItems
+                    )
                 }
             }
         }
+    }
+
+    private func notificationGroup(
+        title: String,
+        subtitle: String?,
+        items: [ATHLTHNotificationItem],
+        emphasized: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.45)
+                    .foregroundStyle(
+                        emphasized
+                            ? ATHLTHTheme.accentDeep
+                            : ATHLTHTheme.mutedText
+                    )
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+
+                let unread = items.filter(\.isUnread).count
+                if unread > 0 {
+                    Text("\(unread) new")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(
+                            emphasized
+                                ? ATHLTHTheme.accentDeep
+                                : ATHLTHTheme.mutedText
+                        )
+                }
+            }
+            .padding(.horizontal, 2)
+
+            LazyVStack(spacing: 9) {
+                ForEach(items) { item in
+                    notificationCard(item)
+                }
+            }
+        }
+    }
+
+    private var actionableNotificationItems:
+        [ATHLTHNotificationItem] {
+        filteredNotificationItems.filter(isActionable)
+    }
+
+    private var todayNotificationItems:
+        [ATHLTHNotificationItem] {
+        filteredNotificationItems.filter {
+            !isActionable($0) &&
+            Calendar.current.isDateInToday($0.createdAt)
+        }
+    }
+
+    private var earlierNotificationItems:
+        [ATHLTHNotificationItem] {
+        filteredNotificationItems.filter {
+            !isActionable($0) &&
+            !Calendar.current.isDateInToday($0.createdAt)
+        }
+    }
+
+    private func isActionable(
+        _ item: ATHLTHNotificationItem
+    ) -> Bool {
+        let eventKind =
+            item.socialEventKind?.lowercased() ?? ""
+
+        return eventKind.contains("request") ||
+            eventKind.contains("invite")
     }
 
     private var emptyState: some View {
@@ -450,7 +546,7 @@ struct ATHLTHNotificationCenterView: View {
                     )
 
                 Text(
-                    "Completed workouts, milestones, goal updates and community activity will appear here."
+                    "Important progress, personal records, challenges and social updates will appear here. Routine workout completions stay in your activity history."
                 )
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.mutedText)
