@@ -3904,9 +3904,25 @@ final class HealthKitManager: ObservableObject {
             now: now
         )
 
-        let latestValue = try? await latest
-        let restingValue = try? await resting
-        let hrvValue = try? await hrv
+        let latestValue:
+            (Double, Date)?
+        do {
+            latestValue =
+                try await latest
+        } catch {
+            if Self.isTemporarilyUnavailableHealthRead(
+                error
+            ) {
+                throw error
+            }
+
+            latestValue = nil
+        }
+
+        let restingValue =
+            try? await resting
+        let hrvValue =
+            try? await hrv
 
         let validLatest =
             latestValue.flatMap {
@@ -4022,8 +4038,22 @@ final class HealthKitManager: ObservableObject {
                 )
         )
 
-        let stepsValue = try? await steps
-        let activeEnergyValue = try? await activeEnergy
+        let stepsValue: Double?
+        do {
+            stepsValue =
+                try await steps
+        } catch {
+            if Self.isTemporarilyUnavailableHealthRead(
+                error
+            ) {
+                throw error
+            }
+
+            stepsValue = nil
+        }
+
+        let activeEnergyValue =
+            try? await activeEnergy
         let moveGoalValue = try? await moveGoal
         let basalEnergyValue = try? await basalEnergy
         let exerciseMinutesValue = try? await exerciseMinutes
@@ -5741,6 +5771,19 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
     }
+    nonisolated private static func isTemporarilyUnavailableHealthRead(
+        _ error: Error
+    ) -> Bool {
+        guard let healthError =
+                error as? HKError
+        else {
+            return false
+        }
+
+        return healthError.code ==
+            .errorDatabaseInaccessible
+    }
+
     nonisolated private static func safeDoubleValue(
         _ quantity: HKQuantity?,
         unit: HKUnit
