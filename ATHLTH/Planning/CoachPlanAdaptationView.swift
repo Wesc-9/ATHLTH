@@ -147,7 +147,12 @@ struct CoachPlanAdaptationView: View {
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
                 Text(
-                    "\(plan.weeks.count) weeks · version \(plan.version)"
+                    ATHLTHLocalization.format(
+                            english: "%d weeks · version %d",
+                            norwegian: "%d uker · versjon %d",
+                            plan.weeks.count,
+                            plan.version
+                        )
                 )
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
