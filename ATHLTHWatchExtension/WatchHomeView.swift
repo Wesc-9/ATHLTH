@@ -11,6 +11,46 @@ struct WatchHomeView: View {
                     header
                     quickRunCard
 
+                    if let errorMessage =
+                            workoutManager
+                                .errorMessage {
+                        HStack(
+                            alignment: .top,
+                            spacing: 7
+                        ) {
+                            Image(
+                                systemName:
+                                    "exclamationmark.triangle.fill"
+                            )
+                            .foregroundStyle(
+                                WatchTheme.warning
+                            )
+
+                            Text(errorMessage)
+                                .font(
+                                    .system(
+                                        size: 9,
+                                        weight: .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    WatchTheme
+                                        .textSecondary
+                                )
+                                .multilineTextAlignment(
+                                    .leading
+                                )
+
+                            Spacer(
+                                minLength: 0
+                            )
+                        }
+                        .padding(9)
+                        .watchSurface(
+                            radius: 15
+                        )
+                    }
+
                     NavigationLink {
                         WatchWorkoutStartView(route: nil)
                     } label: {
