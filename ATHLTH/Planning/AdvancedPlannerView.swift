@@ -2074,12 +2074,30 @@ private enum SimpleTrainingPlanFocus: String, CaseIterable, Identifiable {
     }
 }
 
+struct SimpleTrainingPlanCreationView: View {
+    var body: some View {
+        TrainingPlanCreationView(initialMode: .simple)
+    }
+}
+
+struct AdvancedTrainingPlanCreationView: View {
+    var body: some View {
+        TrainingPlanCreationView(initialMode: .advanced)
+    }
+}
+
 struct TrainingPlanCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
 
     @State private var creationMode: TrainingPlanCreationMode?
+
+    fileprivate init(
+        initialMode: TrainingPlanCreationMode? = nil
+    ) {
+        _creationMode = State(initialValue: initialMode)
+    }
 
     @State private var title = "My Program"
     @State private var summary = ""
