@@ -1110,9 +1110,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                                     url:
                                         friend.avatarURL
                                             .flatMap(
-                                                URL.init(
-                                                    string:
-                                                        )
+                                                URL.init(string:)
                                             ),
                                     fallback:
                                         friend.resolvedName,
@@ -1205,9 +1203,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         selectedFriend
                             .avatarURL
                             .flatMap(
-                                URL.init(
-                                    string:
-                                        )
+                                URL.init(string:)
                             ),
                     label: "FRIEND"
                 )
