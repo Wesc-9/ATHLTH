@@ -104,7 +104,12 @@ struct WatchLiveWorkoutFocusCard: View {
             }
 
             if let progress = workoutManager.routeProgressPercent {
-                ProgressView(value: min(max(progress, 0), 1))
+                ProgressView(
+                    value: min(
+                        max(progress / 100, 0),
+                        1
+                    )
+                )
                     .tint(offRoute ? .orange : WatchTheme.green)
             }
         }
