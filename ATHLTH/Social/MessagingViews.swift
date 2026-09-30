@@ -20,6 +20,8 @@ struct MessageInboxDestinationView: View {
 struct MessageInboxView: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var challenges: ChallengeStore
+    @EnvironmentObject private var session: AppSessionStore
 
     var onNewMessage: () -> Void = {}
 
@@ -43,11 +45,35 @@ struct MessageInboxView: View {
                     inboxErrorCard(error)
                 }
 
-                if !filteredIncomingRequestItems.isEmpty {
+                if totalRequestCount > 0 {
                     inboxSectionLabel(
-                        "MESSAGE REQUESTS",
-                        count: filteredIncomingRequestItems.count
+                        "REQUESTS",
+                        count: totalRequestCount
                     )
+
+                    ForEach(
+                        filteredChallengeRequests
+                    ) { challenge in
+                        ChallengeInboxRequestRow(
+                            challenge: challenge,
+                            creator:
+                                challengeCreatorProfile(
+                                    challenge
+                                ),
+                            onAccept: {
+                                respondToChallenge(
+                                    challenge,
+                                    accept: true
+                                )
+                            },
+                            onDecline: {
+                                respondToChallenge(
+                                    challenge,
+                                    accept: false
+                                )
+                            }
+                        )
+                    }
 
                     ForEach(filteredIncomingRequestItems) { item in
                         MessageRequestRow(
@@ -162,11 +188,15 @@ struct MessageInboxView: View {
             )
         )
         .refreshable {
-            await social.refresh()
+            await social.refresh(
+                challengeStore: challenges
+            )
             await messaging.refresh()
         }
         .task {
-            await social.refresh()
+            await social.refresh(
+                challengeStore: challenges
+            )
             await messaging.refresh()
             messaging.loadPinnedConversations()
         }
@@ -236,10 +266,10 @@ struct MessageInboxView: View {
                 : "\(messaging.unreadCount) unread messages"
         }
 
-        if messaging.messageRequestCount > 0 {
-            return messaging.messageRequestCount == 1
-                ? "1 message request"
-                : "\(messaging.messageRequestCount) message requests"
+        if totalRequestCount > 0 {
+            return totalRequestCount == 1
+                ? "1 request"
+                : "\(totalRequestCount) requests"
         }
 
         if activeConversations.isEmpty {
@@ -526,7 +556,88 @@ struct MessageInboxView: View {
 
     private var shouldShowEmptyState: Bool {
         displayedActiveConversations.isEmpty &&
-            filteredIncomingRequestItems.isEmpty
+            filteredIncomingRequestItems.isEmpty &&
+            filteredChallengeRequests.isEmpty
+    }
+
+    private var incomingChallengeRequests:
+        [ATHLTHChallenge] {
+        challenges.incomingInvitations(
+            for: session.profile.userID
+        )
+    }
+
+    private var filteredChallengeRequests:
+        [ATHLTHChallenge] {
+        guard !normalizedSearch.isEmpty else {
+            return incomingChallengeRequests
+        }
+
+        return incomingChallengeRequests.filter {
+            challenge in
+            let creator =
+                challengeCreatorProfile(
+                    challenge
+                )
+
+            return challenge.title.lowercased()
+                .contains(normalizedSearch) ||
+                challenge.sport.title.lowercased()
+                    .contains(normalizedSearch) ||
+                (creator?.resolvedName.lowercased()
+                    .contains(normalizedSearch) ?? false) ||
+                (creator?.usernameLabel.lowercased()
+                    .contains(normalizedSearch) ?? false)
+        }
+    }
+
+    private var totalRequestCount: Int {
+        filteredIncomingRequestItems.count +
+            filteredChallengeRequests.count
+    }
+
+    private func challengeCreatorProfile(
+        _ challenge: ATHLTHChallenge
+    ) -> SocialProfileCard? {
+        profile(for: challenge.creatorID)
+    }
+
+    private func respondToChallenge(
+        _ challenge: ATHLTHChallenge,
+        accept: Bool
+    ) {
+        guard let participant =
+                challenges.invitationParticipant(
+                    in: challenge,
+                    userID:
+                        session.profile.userID
+                )
+        else {
+            return
+        }
+
+        challenges.setParticipantState(
+            challengeID: challenge.id,
+            participantID: participant.id,
+            state:
+                accept
+                    ? .accepted
+                    : .declined
+        )
+
+        guard let updated =
+                challenges.challenge(
+                    id: challenge.id
+                )
+        else {
+            return
+        }
+
+        Task {
+            _ = await social.syncChallenge(
+                updated
+            )
+        }
     }
 
     private var activeConversations:
@@ -613,6 +724,140 @@ struct MessageInboxView: View {
         } ??
         social.discoverResults.first {
             $0.userID == userID
+        }
+    }
+}
+
+private struct ChallengeInboxRequestRow: View {
+    let challenge: ATHLTHChallenge
+    let creator: SocialProfileCard?
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            NavigationLink {
+                ChallengeDetailView(
+                    challengeID: challenge.id
+                )
+            } label: {
+                HStack(spacing: 12) {
+                    if let creator {
+                        SocialAvatar(
+                            profile: creator,
+                            size: 46
+                        )
+                    } else {
+                        Image(
+                            systemName:
+                                "bolt.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 18,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            .orange
+                        )
+                        .frame(
+                            width: 46,
+                            height: 46
+                        )
+                        .background(
+                            Color.orange.opacity(
+                                0.10
+                            ),
+                            in: Circle()
+                        )
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            creator?.resolvedName
+                                ?? "Challenge request"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+
+                        Text(challenge.title)
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .lineLimit(1)
+
+                        Text(
+                            challenge.sport.title +
+                            " · " +
+                            challenge.rules.scoring.title
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(.caption.bold())
+                    .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 9) {
+                Button(
+                    "Decline",
+                    action: onDecline
+                )
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+
+                Button(
+                    "Accept",
+                    action: onAccept
+                )
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(14)
+        .background(
+            Color.white.opacity(0.82),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.92),
+                lineWidth: 0.8
+            )
         }
     }
 }
