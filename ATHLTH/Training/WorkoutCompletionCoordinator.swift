@@ -582,7 +582,7 @@ final class WorkoutCompletionCoordinator: ObservableObject {
     }
 
     private func weeklyChallengeDetail(
-        kind: OfficialWeeklyChallengeKind,
+        kind: OfficialRunningChallengeKind,
         before: Double,
         after: Double,
         target: Double,
@@ -600,7 +600,7 @@ final class WorkoutCompletionCoordinator: ObservableObject {
 
     private func weeklyValue(
         _ value: Double,
-        kind: OfficialWeeklyChallengeKind
+        kind: OfficialRunningChallengeKind
     ) -> String {
         switch kind {
         case .distance:
