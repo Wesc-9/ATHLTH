@@ -90,7 +90,9 @@ struct HomeActivityCenterV2: View {
             activitySectionShell(
                 title: "Following",
                 subtitle:
-                    followingSectionSubtitle,
+                    Text(
+                        followingSectionSubtitle
+                    ),
                 icon: "person.2.fill",
                 tint:
                     ATHLTHTheme.recoveryBlue
@@ -133,7 +135,9 @@ struct HomeActivityCenterV2: View {
             activitySectionShell(
                 title: "You",
                 subtitle:
-                    "Your latest training, kept close.",
+                    Text(
+                        "Your latest training, kept close."
+                    ),
                 icon:
                     "figure.run.circle.fill",
                 tint:
@@ -257,8 +261,8 @@ struct HomeActivityCenterV2: View {
     private func activitySectionShell<
         Content: View
     >(
-        title: String,
-        subtitle: String,
+        title: LocalizedStringKey,
+        subtitle: Text,
         icon: String,
         tint: Color,
         @ViewBuilder content:
@@ -304,7 +308,7 @@ struct HomeActivityCenterV2: View {
                                 .primaryText
                         )
 
-                    Text(subtitle)
+                    subtitle
                         .font(.caption2)
                         .foregroundStyle(
                             ATHLTHTheme
