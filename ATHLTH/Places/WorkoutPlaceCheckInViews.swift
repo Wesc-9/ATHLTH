@@ -838,6 +838,16 @@ private struct WorkoutPlacePickerView:
                                 item.id
                         }
                     }
+        } catch let mapError as MKError
+            where mapError.code == .placemarkNotFound {
+            nearby = []
+            frequent =
+                await places
+                    .resolvedFrequentPlaces(
+                        near:
+                            currentLocation
+                    )
+            errorMessage = nil
         } catch {
             errorMessage =
                 error.localizedDescription
