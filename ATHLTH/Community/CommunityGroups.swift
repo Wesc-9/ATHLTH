@@ -3906,7 +3906,11 @@ struct CommunityGroupDetailView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(
-                            "Members, \(memberCountText)"
+                            ATHLTHLocalization.format(
+                            english: "Members, %@",
+                            norwegian: "Medlemmer, %@",
+                            memberCountText
+                        )
                         )
 
                         if groups.canManage(currentGroup) {
@@ -4314,7 +4318,11 @@ struct CommunityGroupDetailView: View {
                             Spacer(minLength: 8)
 
                             Text(
-                                "\(entry.score) pts"
+                                ATHLTHLocalization.format(
+                            english: "%d pts",
+                            norwegian: "%d poeng",
+                            entry.score
+                        )
                             )
                             .font(
                                 .subheadline
@@ -5478,7 +5486,11 @@ struct CommunityGroupDetailView: View {
 
                                         if waitlist > 0 {
                                             Text(
-                                                "· \(waitlist) waitlisted"
+                                                ATHLTHLocalization.format(
+                                                english: "· %d waitlisted",
+                                                norwegian: "· %d på venteliste",
+                                                waitlist
+                                            )
                                             )
                                         }
                                     }
@@ -6537,7 +6549,11 @@ struct CommunityGroupSettingsView: View {
                 }
             }
             .confirmationDialog(
-                "Delete \(currentGroup.name)?",
+                ATHLTHLocalization.format(
+                    english: "Delete %@?",
+                    norwegian: "Slette %@?",
+                    currentGroup.name
+                ),
                 isPresented: $showingDeleteConfirmation,
                 titleVisibility: .visible
             ) {
@@ -7810,7 +7826,11 @@ struct CommunityGroupEventCreateView: View {
 
                 Section {
                     Label(
-                        "Only members of \(group.name) can see this event.",
+                        ATHLTHLocalization.format(
+                            english: "Only members of %@ can see this event.",
+                            norwegian: "Bare medlemmer av %@ kan se dette arrangementet.",
+                            group.name
+                        ),
                         systemImage: "lock.fill"
                     )
                     .font(.caption)
