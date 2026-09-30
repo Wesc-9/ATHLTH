@@ -682,8 +682,9 @@ struct AppRootView: View {
                 watchConnection.clearCompletedWorkout()
             }
         }
-        .onChange(of: phoneWorkout.lastCompletedWorkout) { _, workout in
-            guard let workout,
+        .onChange(of: phoneWorkout.lastCompletedWorkout?.id) { _, _ in
+            guard let workout =
+                    phoneWorkout.lastCompletedWorkout,
                   let endedAt = workout.end,
                   appSession.signedIn
             else {
