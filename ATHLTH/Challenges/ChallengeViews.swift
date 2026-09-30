@@ -1044,7 +1044,11 @@ struct ChallengeCreationView: View {
                         )
 
                         Text(
-                            "Participants must match at least \(Int(routeMatchPercent))% of the selected route."
+                            ATHLTHLocalization.format(
+                                english: "Participants must match at least %d%% of the selected route.",
+                                norwegian: "Deltakere må matche minst %d %% av den valgte ruten.",
+                                Int(routeMatchPercent)
+                            )
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1424,12 +1428,24 @@ struct ChallengeCreationView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(
-                                "Zone \(heartRateZone) · \(heartRateZoneBPMText(zone: heartRateZone, maxHR: maximumHeartRateBPM))"
+                                ATHLTHLocalization.format(
+                                    english: "Zone %d · %@",
+                                    norwegian: "Sone %d · %@",
+                                    heartRateZone,
+                                    heartRateZoneBPMText(
+                                        zone: heartRateZone,
+                                        maxHR: maximumHeartRateBPM
+                                    )
+                                )
                             )
                             .font(.subheadline.weight(.semibold))
 
                             Text(
-                                "Calculated from your private max HR of \(maximumHeartRateBPM) bpm."
+                                ATHLTHLocalization.format(
+                                    english: "Calculated from your private max HR of %d bpm.",
+                                    norwegian: "Beregnet fra din private makspuls på %d bpm.",
+                                    maximumHeartRateBPM
+                                )
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
