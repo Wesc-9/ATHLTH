@@ -135,6 +135,7 @@ final class IPhoneWorkoutStore:
     @Published var showingWorkout = false
     @Published private(set) var message: String?
     @Published private(set) var saving = false
+    @Published private(set) var lastCompletedWorkout: PhoneWorkout?
     @Published private(set)
     var lastRouteCompletion: PhoneRouteCompletionSummary?
     private var accountID: UUID?
@@ -199,6 +200,7 @@ final class IPhoneWorkoutStore:
         pendingGhostAudio = nil
         resetRouteRuntime()
         lastRouteCompletion = nil
+        lastCompletedWorkout = nil
         active = userID.flatMap { AccountLocalStorage.read(PhoneWorkout.self, name: "phoneActive", userID: $0) }
         if var workout = active, workout.resumedAt != nil {
             workout.accumulatedSeconds = workout.elapsed(at: workout.lastCheckpoint)
@@ -491,6 +493,16 @@ final class IPhoneWorkoutStore:
             workout,
             userID: userID
         )
+
+        // Emit completion only after the Health save attempt has settled so
+        // downstream Goals, Challenges and the review all see the final
+        // HealthKit workout identity when one is available.
+        lastCompletedWorkout =
+            history.first(
+                where: {
+                    $0.id == workout.id
+                }
+            ) ?? workout
     }
 
     func retryHealthSave(_ workout: PhoneWorkout) async {
