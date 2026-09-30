@@ -3790,37 +3790,74 @@ final class HealthKitManager: ObservableObject {
         }) ?? primarySession
 
         let preferredBundleID =
-            preferredSourceGroup.first?.sourceRevision.source.bundleIdentifier
+            preferredSourceGroup.first?
+                .sourceRevision
+                .source
+                .bundleIdentifier
+        let preferredSessionStart =
+            preferredSourceGroup
+                .map(\.startDate)
+                .min() ??
+            sessionStart
+        let preferredSessionEnd =
+            preferredSourceGroup
+                .map(\.endDate)
+                .max() ??
+            sessionEnd
 
-        func stageDuration(_ stage: HKCategoryValueSleepAnalysis) -> TimeInterval {
-            mergedDuration(preferredSourceGroup.filter {
-                sleepValue($0) == stage
-            })
+        func stageDuration(
+            _ stage:
+                HKCategoryValueSleepAnalysis
+        ) -> TimeInterval {
+            mergedDuration(
+                preferredSourceGroup.filter {
+                    sleepValue($0) ==
+                        stage
+                }
+            )
         }
 
-        let awakeSamples = samples.filter { sample in
-            guard sleepValue(sample) == .awake,
-                  sample.endDate > sessionStart,
-                  sample.startDate < sessionEnd
-            else {
-                return false
-            }
+        let awakeSamples =
+            samples.filter { sample in
+                guard
+                    sleepValue(sample) ==
+                        .awake,
+                    sample.endDate >
+                        preferredSessionStart,
+                    sample.startDate <
+                        preferredSessionEnd
+                else {
+                    return false
+                }
 
-            if let preferredBundleID {
-                return sample.sourceRevision.source.bundleIdentifier == preferredBundleID
-            }
+                if let preferredBundleID {
+                    return sample
+                        .sourceRevision
+                        .source
+                        .bundleIdentifier ==
+                        preferredBundleID
+                }
 
-            return true
-        }
+                return true
+            }
 
         var result = SleepSummary.empty
-        result.totalAsleep = mergedDuration(primarySession)
-        result.core = stageDuration(.asleepCore)
-        result.deep = stageDuration(.asleepDeep)
-        result.rem = stageDuration(.asleepREM)
-        result.awake = mergedDuration(awakeSamples)
-        result.sleepStart = sessionStart
-        result.sleepEnd = sessionEnd
+        result.totalAsleep =
+            mergedDuration(
+                preferredSourceGroup
+            )
+        result.core =
+            stageDuration(.asleepCore)
+        result.deep =
+            stageDuration(.asleepDeep)
+        result.rem =
+            stageDuration(.asleepREM)
+        result.awake =
+            mergedDuration(awakeSamples)
+        result.sleepStart =
+            preferredSessionStart
+        result.sleepEnd =
+            preferredSessionEnd
         return result
     }
 
@@ -4433,8 +4470,7 @@ final class HealthKitManager: ObservableObject {
                             dayEnd,
                             endDate
                         )
-                    ),
-               let fallback {
+                    ) {
                 values[day] = fallback
             }
         }
