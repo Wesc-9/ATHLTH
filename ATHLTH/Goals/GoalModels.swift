@@ -13,25 +13,25 @@ enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .event: return String(localized: "Event")
-        case .endurance: return String(localized: "Running & Endurance")
-        case .strength: return String(localized: "Strength")
-        case .body: return String(localized: "Body")
-        case .consistency: return String(localized: "Consistency")
-        case .recovery: return String(localized: "Recovery & Health")
-        case .custom: return String(localized: "Custom Goal")
+        case .event: return ATHLTHLocalization.string( "Event")
+        case .endurance: return ATHLTHLocalization.string( "Running & Endurance")
+        case .strength: return ATHLTHLocalization.string( "Strength")
+        case .body: return ATHLTHLocalization.string( "Body")
+        case .consistency: return ATHLTHLocalization.string( "Consistency")
+        case .recovery: return ATHLTHLocalization.string( "Recovery & Health")
+        case .custom: return ATHLTHLocalization.string( "Custom Goal")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .event: return String(localized: "Prepare for a race, HYROX, ride or custom event.")
-        case .endurance: return String(localized: "Distance, pace and endurance targets.")
-        case .strength: return String(localized: "Exercise-specific weight and rep goals.")
-        case .body: return String(localized: "Weight and body-composition goals.")
-        case .consistency: return String(localized: "Workouts, steps and repeatable habits.")
-        case .recovery: return String(localized: "Sleep and recovery-related targets.")
-        case .custom: return String(localized: "Define a goal that does not fit a template.")
+        case .event: return ATHLTHLocalization.string( "Prepare for a race, HYROX, ride or custom event.")
+        case .endurance: return ATHLTHLocalization.string( "Distance, pace and endurance targets.")
+        case .strength: return ATHLTHLocalization.string( "Exercise-specific weight and rep goals.")
+        case .body: return ATHLTHLocalization.string( "Weight and body-composition goals.")
+        case .consistency: return ATHLTHLocalization.string( "Workouts, steps and repeatable habits.")
+        case .recovery: return ATHLTHLocalization.string( "Sleep and recovery-related targets.")
+        case .custom: return ATHLTHLocalization.string( "Define a goal that does not fit a template.")
         }
     }
 
@@ -64,9 +64,9 @@ enum GoalPrivacy: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .privateOnly: return String(localized: "Private")
-        case .friends: return String(localized: "Followers")
-        case .publicVisible: return String(localized: "Public")
+        case .privateOnly: return ATHLTHLocalization.string( "Private")
+        case .friends: return ATHLTHLocalization.string( "Followers")
+        case .publicVisible: return ATHLTHLocalization.string( "Public")
         }
     }
 }
@@ -80,9 +80,9 @@ enum GoalDataSource: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .appleHealth: return String(localized: "Apple Health")
-        case .athlth: return String(localized: "ATHLTH")
-        case .manual: return String(localized: "Manual")
+        case .appleHealth: return ATHLTHLocalization.string( "Apple Health")
+        case .athlth: return ATHLTHLocalization.string( "ATHLTH")
+        case .manual: return ATHLTHLocalization.string( "Manual")
         }
     }
 
@@ -122,11 +122,11 @@ enum GoalActivityFilter: String, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .any: return String(localized: "Any workout")
-        case .running: return String(localized: "Running")
-        case .walking: return String(localized: "Walking")
-        case .cycling: return String(localized: "Cycling")
-        case .hiking: return String(localized: "Hiking")
+        case .any: return ATHLTHLocalization.string( "Any workout")
+        case .running: return ATHLTHLocalization.string( "Running")
+        case .walking: return ATHLTHLocalization.string( "Walking")
+        case .cycling: return ATHLTHLocalization.string( "Cycling")
+        case .hiking: return ATHLTHLocalization.string( "Hiking")
         }
     }
 }
@@ -154,11 +154,11 @@ enum GoalCoverStyle: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .forest: return String(localized: "Forest")
-        case .summit: return String(localized: "Summit")
-        case .track: return String(localized: "Track")
-        case .strength: return String(localized: "Strength")
-        case .calm: return String(localized: "Calm")
+        case .forest: return ATHLTHLocalization.string( "Forest")
+        case .summit: return ATHLTHLocalization.string( "Summit")
+        case .track: return ATHLTHLocalization.string( "Track")
+        case .strength: return ATHLTHLocalization.string( "Strength")
+        case .calm: return ATHLTHLocalization.string( "Calm")
         }
     }
 }
