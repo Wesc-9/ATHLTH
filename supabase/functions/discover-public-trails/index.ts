@@ -522,15 +522,26 @@ out body geom qt 160;
       "OVERPASS_API_URL",
     );
 
+  const fallbackOverpassURLs = [
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://lz4.overpass-api.de/api/interpreter",
+    "https://z.overpass-api.de/api/interpreter",
+  ];
+
   const overpassURLs =
-    configuredOverpassURL
-      ? [configuredOverpassURL]
-      : [
-          "https://overpass.private.coffee/api/interpreter",
-          "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-          "https://lz4.overpass-api.de/api/interpreter",
-          "https://z.overpass-api.de/api/interpreter",
-        ];
+    Array.from(
+      new Set(
+        [
+          configuredOverpassURL,
+          ...fallbackOverpassURLs,
+        ].filter(
+          (value):
+            value is string =>
+              Boolean(value),
+        ),
+      ),
+    );
 
   try {
     let payload: any = null;
