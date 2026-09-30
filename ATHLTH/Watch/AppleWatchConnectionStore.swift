@@ -75,6 +75,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     private let healthStore = HKHealthStore()
     private var verificationRequested = true
     private var lastProbeID: String?
+    private var latestTodaySnapshot =
+        WatchTodaySnapshot(
+            workout: nil,
+            updatedAt: .distantPast
+        )
 
     var session: WCSession? {
         WCSession.isSupported() ? WCSession.default : nil
@@ -291,6 +296,21 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         sendWatchPayload(
             ghost,
             kind: .ghostRace
+        )
+    }
+
+    func sendTodayWorkout(
+        _ workout: WatchTodayWorkoutTransfer?
+    ) {
+        let snapshot =
+            WatchTodaySnapshot(
+                workout: workout,
+                updatedAt: Date()
+            )
+        latestTodaySnapshot = snapshot
+        sendWatchPayload(
+            snapshot,
+            kind: .todayWorkout
         )
     }
 
@@ -638,6 +658,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     private func receive(_ payload: IncomingWatchPayload) {
+        if payload.kind ==
+            WatchTransferKind.todayWorkoutRequest.rawValue {
+            sendWatchPayload(
+                latestTodaySnapshot,
+                kind: .todayWorkout
+            )
+            return
+        }
+
         if payload.kind == WatchTransferKind.connectivityAck.rawValue {
             handleConnectivityAck(payload)
             return
