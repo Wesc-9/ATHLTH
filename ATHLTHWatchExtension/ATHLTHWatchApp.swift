@@ -28,4 +28,11 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
             )
         }
     }
+
+    func handleActiveWorkoutRecovery() {
+        Task {
+            await WatchWorkoutManager.shared
+                .recoverActiveWorkout()
+        }
+    }
 }
