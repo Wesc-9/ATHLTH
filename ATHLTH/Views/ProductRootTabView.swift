@@ -638,6 +638,8 @@ struct ATHLTHHomeView: View {
                 _ = await (communityRefresh, activityRefresh)
             }
             .onAppear {
+                syncHomeTodayWorkoutToWatch()
+
                 guard !session.previewModeEnabled else {
                     return
                 }
@@ -710,14 +712,19 @@ struct ATHLTHHomeView: View {
                 )
             }
             .onChange(of: strengthWorkout.workoutHistory.count) {
+                syncHomeTodayWorkoutToWatch()
                 Task {
                     await loadHomeStreak()
                 }
             }
             .onChange(of: health.workouts.count) {
+                syncHomeTodayWorkoutToWatch()
                 Task {
                     await loadHomeStreak()
                 }
+            }
+            .onChange(of: session.activePlan?.id) {
+                syncHomeTodayWorkoutToWatch()
             }
         }
     }
@@ -1750,6 +1757,83 @@ struct ATHLTHHomeView: View {
             exercises: [],
             notes: "Freestyle gym session",
             runningWorkout: nil
+        )
+    }
+
+    private func syncHomeTodayWorkoutToWatch() {
+        guard let today = homeTodayPlanWorkout,
+              let watchKind =
+                PlannedWorkoutWatchBuilder.watchKind(
+                    for: today.workout.kind
+                )
+        else {
+            watchConnection.sendTodayWorkout(nil)
+            return
+        }
+
+        let workout = today.workout
+        let selectedRoute =
+            PlannedWorkoutWatchBuilder.route(
+                for: workout,
+                routes: session.savedRoutes
+            )
+
+        if let selectedRoute {
+            try? watchConnection.sendRoute(
+                selectedRoute
+            )
+        }
+
+        let runningWorkout:
+            WatchRunningWorkoutTransfer?
+
+        if watchKind == .running ||
+            watchKind == .walking {
+            runningWorkout =
+                PlannedWorkoutWatchBuilder
+                    .runningTransfer(
+                        from: workout,
+                        routeAlerts: .standard
+                    )
+        } else {
+            runningWorkout = nil
+        }
+
+        let audioCoach =
+            PlannedWorkoutWatchBuilder
+                .audioCoachConfiguration(
+                    for: workout,
+                    selectedRoute:
+                        selectedRoute,
+                    defaultConfiguration:
+                        .disabled
+                )
+
+        watchConnection.sendTodayWorkout(
+            WatchTodayWorkoutTransfer(
+                planID: today.planID,
+                workoutID: workout.id,
+                title: workout.title,
+                summary:
+                    homeSessionSummary(
+                        workout
+                    ),
+                kind: watchKind,
+                scheduledStart:
+                    workout.scheduledStart,
+                durationMinutes:
+                    workout.durationMinutes,
+                distanceKilometers:
+                    workout
+                        .targetDistanceKilometers,
+                routeID:
+                    workout.routeID,
+                runningWorkout:
+                    runningWorkout,
+                audioCoach:
+                    audioCoach,
+                updatedAt: Date()
+            )
         )
     }
 
