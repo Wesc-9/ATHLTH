@@ -572,6 +572,7 @@ struct WorkoutTemplateDetailView: View {
     let entry: WorkoutTemplateCatalogEntry
 
     @State private var saved = false
+    @State private var showingWorkout = false
 
     var body: some View {
         ScrollView {
@@ -687,29 +688,44 @@ struct WorkoutTemplateDetailView: View {
                     }
                 }
 
-                Button {
-                    session.saveSharedWorkout(
-                        entry.plannedSession(),
-                        sourceSessionID: entry.id
-                    )
-                    saved = true
-                } label: {
-                    Label(
-                        saved
-                            ? "Saved to My Workouts"
-                            : "Save to My Workouts",
-                        systemImage:
+                HStack(spacing: 10) {
+                    Button {
+                        session.saveSharedWorkout(
+                            entry.plannedSession(),
+                            sourceSessionID: entry.id
+                        )
+                        saved = true
+                    } label: {
+                        Label(
                             saved
-                                ? "checkmark.circle.fill"
-                                : "square.and.arrow.down"
-                    )
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+                                ? "Saved"
+                                : "Save",
+                            systemImage:
+                                saved
+                                    ? "checkmark.circle.fill"
+                                    : "square.and.arrow.down"
+                        )
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(saved)
+
+                    Button {
+                        showingWorkout = true
+                    } label: {
+                        Label(
+                            "Start",
+                            systemImage: "play.fill"
+                        )
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
-                .disabled(saved)
             }
             .padding(18)
             .frame(maxWidth: 720)
@@ -722,6 +738,14 @@ struct WorkoutTemplateDetailView: View {
         )
         .navigationTitle("Workout")
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(
+            isPresented: $showingWorkout
+        ) {
+            StructuredWorkoutSessionView(
+                workout: entry.plannedSession()
+            )
+            .environmentObject(session)
+        }
     }
 
     private func blockRow(
