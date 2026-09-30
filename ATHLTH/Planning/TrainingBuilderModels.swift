@@ -11,11 +11,11 @@ enum StrengthProgressionKind: String, CaseIterable, Identifiable, Codable, Hasha
 
     var title: String {
         switch self {
-        case .none: return String(localized: "No automatic progression")
-        case .addWeight: return String(localized: "Add weight")
-        case .addReps: return String(localized: "Add reps")
-        case .doubleProgression: return String(localized: "Double progression")
-        case .percentage: return String(localized: "Percentage")
+        case .none: return ATHLTHLocalization.string( "No automatic progression")
+        case .addWeight: return ATHLTHLocalization.string( "Add weight")
+        case .addReps: return ATHLTHLocalization.string( "Add reps")
+        case .doubleProgression: return ATHLTHLocalization.string( "Double progression")
+        case .percentage: return ATHLTHLocalization.string( "Percentage")
         }
     }
 }
@@ -53,17 +53,17 @@ enum RunningWorkoutType: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .easy: return String(localized: "Easy Run")
-        case .recovery: return String(localized: "Recovery Run")
-        case .longRun: return String(localized: "Long Run")
-        case .tempo: return String(localized: "Tempo")
-        case .threshold: return String(localized: "Threshold")
-        case .intervals: return String(localized: "Intervals")
-        case .fartlek: return String(localized: "Fartlek")
-        case .hills: return String(localized: "Hill Repeats")
-        case .racePace: return String(localized: "Race Pace")
-        case .progression: return String(localized: "Progression Run")
-        case .custom: return String(localized: "Custom")
+        case .easy: return ATHLTHLocalization.string( "Easy Run")
+        case .recovery: return ATHLTHLocalization.string( "Recovery Run")
+        case .longRun: return ATHLTHLocalization.string( "Long Run")
+        case .tempo: return ATHLTHLocalization.string( "Tempo")
+        case .threshold: return ATHLTHLocalization.string( "Threshold")
+        case .intervals: return ATHLTHLocalization.string( "Intervals")
+        case .fartlek: return ATHLTHLocalization.string( "Fartlek")
+        case .hills: return ATHLTHLocalization.string( "Hill Repeats")
+        case .racePace: return ATHLTHLocalization.string( "Race Pace")
+        case .progression: return ATHLTHLocalization.string( "Progression Run")
+        case .custom: return ATHLTHLocalization.string( "Custom")
         }
     }
 
@@ -92,11 +92,11 @@ enum RunningBlockKind: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .warmup: return String(localized: "Warm-up")
-        case .work: return String(localized: "Work")
-        case .recovery: return String(localized: "Recovery")
-        case .steady: return String(localized: "Steady")
-        case .cooldown: return String(localized: "Cool-down")
+        case .warmup: return ATHLTHLocalization.string( "Warm-up")
+        case .work: return ATHLTHLocalization.string( "Work")
+        case .recovery: return ATHLTHLocalization.string( "Recovery")
+        case .steady: return ATHLTHLocalization.string( "Steady")
+        case .cooldown: return ATHLTHLocalization.string( "Cool-down")
         }
     }
 }
@@ -110,9 +110,9 @@ enum RunningMeasureKind: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .distance: return String(localized: "Distance")
-        case .time: return String(localized: "Time")
-        case .open: return String(localized: "Open")
+        case .distance: return ATHLTHLocalization.string( "Distance")
+        case .time: return ATHLTHLocalization.string( "Time")
+        case .open: return ATHLTHLocalization.string( "Open")
         }
     }
 }
@@ -128,11 +128,11 @@ enum RunningIntensityKind: String, CaseIterable, Identifiable, Codable, Hashable
 
     var title: String {
         switch self {
-        case .none: return String(localized: "No target")
-        case .easy: return String(localized: "Easy effort")
-        case .pace: return String(localized: "Pace")
-        case .heartRateZone: return String(localized: "Heart-rate zone")
-        case .rpe: return String(localized: "RPE")
+        case .none: return ATHLTHLocalization.string( "No target")
+        case .easy: return ATHLTHLocalization.string( "Easy effort")
+        case .pace: return ATHLTHLocalization.string( "Pace")
+        case .heartRateZone: return ATHLTHLocalization.string( "Heart-rate zone")
+        case .rpe: return ATHLTHLocalization.string( "RPE")
         }
     }
 }
