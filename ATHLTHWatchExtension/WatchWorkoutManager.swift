@@ -878,7 +878,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             kind = recoveredKind
             startedAt =
                 recovered.startDate ??
-                builder.startDate
+                builder.startDate ??
+                Date()
 
             restorePersistedWorkoutState(
                 expectedKind: recoveredKind
