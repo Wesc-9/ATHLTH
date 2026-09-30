@@ -210,17 +210,17 @@ enum HealthPersonalRecordKind: String, Hashable {
 
     var title: String {
         switch self {
-        case .longestRun: return "Longest Run"
-        case .fastest1K: return "Fastest 1K"
-        case .fastestMile: return "Fastest Mile"
-        case .fastest5K: return "Fastest 5K"
-        case .fastest10K: return "Fastest 10K"
-        case .fastestHalfMarathon: return "Fastest Half Marathon"
-        case .fastestMarathon: return "Fastest Marathon"
-        case .longestRide: return "Longest Ride"
-        case .longestWalkOrHike: return "Longest Walk / Hike"
-        case .longestWorkout: return "Longest Workout"
-        case .mostActiveCalories: return "Most Active Calories"
+        case .longestRun: return String(localized: "Longest Run")
+        case .fastest1K: return String(localized: "Fastest 1K")
+        case .fastestMile: return String(localized: "Fastest Mile")
+        case .fastest5K: return String(localized: "Fastest 5K")
+        case .fastest10K: return String(localized: "Fastest 10K")
+        case .fastestHalfMarathon: return String(localized: "Fastest Half Marathon")
+        case .fastestMarathon: return String(localized: "Fastest Marathon")
+        case .longestRide: return String(localized: "Longest Ride")
+        case .longestWalkOrHike: return String(localized: "Longest Walk / Hike")
+        case .longestWorkout: return String(localized: "Longest Workout")
+        case .mostActiveCalories: return String(localized: "Most Active Calories")
         }
     }
 
@@ -611,11 +611,11 @@ enum RecoveryReadinessState: String, Equatable {
 
     var title: String {
         switch self {
-        case .buildingBaseline: return "Building baseline"
-        case .ready: return "Ready"
-        case .balanced: return "Balanced"
-        case .takeItEasy: return "Take it easier"
-        case .recover: return "Prioritize recovery"
+        case .buildingBaseline: return String(localized: "Building baseline")
+        case .ready: return String(localized: "Ready")
+        case .balanced: return String(localized: "Balanced")
+        case .takeItEasy: return String(localized: "Take it easier")
+        case .recover: return String(localized: "Prioritize recovery")
         }
     }
 
