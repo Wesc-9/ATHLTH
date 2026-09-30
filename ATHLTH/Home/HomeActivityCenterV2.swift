@@ -3223,10 +3223,39 @@ private struct HomeActivityRoutePreviewV2: View {
                     .scaledToFill()
                     .transition(.opacity)
             } else if safeCoordinates.count >= 2 {
-                ProgressView()
-                    .tint(
-                        ATHLTHTheme.primaryText
+                ZStack {
+                    Image(
+                        systemName:
+                            "map.fill"
                     )
+                    .font(
+                        .system(
+                            size: 46,
+                            weight: .light
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.14)
+                    )
+
+                    RoundedRectangle(
+                        cornerRadius: 999,
+                        style: .continuous
+                    )
+                    .fill(
+                        Color.white
+                            .opacity(0.34)
+                    )
+                    .frame(
+                        width: 108,
+                        height: 4
+                    )
+                    .rotationEffect(
+                        .degrees(-18)
+                    )
+                }
             } else {
                 VStack(spacing: 10) {
                     Image(
