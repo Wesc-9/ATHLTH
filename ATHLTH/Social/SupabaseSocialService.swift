@@ -666,55 +666,159 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
+        return try await hydrateChallenges(backendChallenges)
+    }
+
+    func searchRemoteChallenges(
+        _ query: String,
+        limit: Int = 20
+    ) async throws -> [ATHLTHChallenge] {
+        let clean = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard clean.count >= 2 else { return [] }
+
+        let boundedLimit = min(max(limit, 8), 30)
+        let pattern = "%\(clean)%"
+
+        async let titleRows: [BackendSocialChallenge] = client
+            .from("social_challenges")
+            .select()
+            .ilike("title", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        async let sportRows: [BackendSocialChallenge] = client
+            .from("social_challenges")
+            .select()
+            .ilike("sport", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        let (titles, sports) = try await (
+            titleRows,
+            sportRows
+        )
+
+        var seen = Set<UUID>()
+        let matches = (titles + sports)
+            .filter { seen.insert($0.id).inserted }
+            .prefix(boundedLimit)
+            .map { $0 }
+
+        return try await hydrateChallenges(matches)
+    }
+
+    private func hydrateChallenges(
+        _ backendChallenges: [BackendSocialChallenge]
+    ) async throws -> [ATHLTHChallenge] {
         guard !backendChallenges.isEmpty else { return [] }
 
-        let backendParticipants: [BackendChallengeParticipant] = try await client
+        let challengeIDs =
+            backendChallenges.map { $0.id.uuidString }
+
+        async let participantsTask: [BackendChallengeParticipant] = client
             .from("social_challenge_participants")
             .select()
+            .in("challenge_id", values: challengeIDs)
             .limit(1_000)
             .execute()
             .value
 
-        let backendAttempts: [BackendChallengeAttempt] = try await client
+        async let attemptsTask: [BackendChallengeAttempt] = client
             .from("social_challenge_attempts")
             .select()
+            .in("challenge_id", values: challengeIDs)
             .order("submitted_at", ascending: false)
             .limit(1_000)
             .execute()
             .value
 
-        let backendCheckIns: [BackendChallengeCheckIn] = try await client
+        async let checkInsTask: [BackendChallengeCheckIn] = client
             .from("social_challenge_checkins")
             .select()
+            .in("challenge_id", values: challengeIDs)
             .order("checked_in_at", ascending: false)
             .limit(1_000)
             .execute()
             .value
 
-        let cards = try await loadVisibleProfileCards()
-        let cardByID = Dictionary(uniqueKeysWithValues: cards.map { ($0.userID, $0) })
+        let (
+            backendParticipants,
+            backendAttempts,
+            backendCheckIns
+        ) = try await (
+            participantsTask,
+            attemptsTask,
+            checkInsTask
+        )
+
+        let participantUserIDs =
+            Set(backendParticipants.map(\.userID))
+
+        let cards: [SocialProfileCard]
+        if participantUserIDs.isEmpty {
+            cards = []
+        } else {
+            cards = try await client
+                .from("social_profile_cards")
+                .select()
+                .in(
+                    "user_id",
+                    values: participantUserIDs.map(\.uuidString)
+                )
+                .execute()
+                .value
+        }
+
+        let cardByID = Dictionary(
+            uniqueKeysWithValues:
+                cards.map { ($0.userID, $0) }
+        )
 
         return backendChallenges.compactMap { backend in
-            guard let sport = ATHLTHChallengeSport(rawValue: backend.sport),
-                  let status = ATHLTHChallengeStatus(rawValue: backend.status),
-                  let visibility = ProfileVisibility(rawValue: backend.visibility)
+            guard let sport =
+                    ATHLTHChallengeSport(
+                        rawValue: backend.sport
+                    ),
+                  let status =
+                    ATHLTHChallengeStatus(
+                        rawValue: backend.status
+                    ),
+                  let visibility =
+                    ProfileVisibility(
+                        rawValue: backend.visibility
+                    )
             else {
                 return nil
             }
 
             let participants = backendParticipants
-                .filter { $0.challengeID == backend.id }
-                .compactMap { row -> ChallengeParticipant? in
-                    guard let state = ChallengeParticipantState(rawValue: row.state) else {
+                .filter {
+                    $0.challengeID == backend.id
+                }
+                .compactMap {
+                    row -> ChallengeParticipant? in
+
+                    guard let state =
+                            ChallengeParticipantState(
+                                rawValue: row.state
+                            )
+                    else {
                         return nil
                     }
 
                     let card = cardByID[row.userID]
+
                     return ChallengeParticipant(
                         id: row.id,
                         userID: row.userID,
                         username: card?.username,
-                        displayName: card?.resolvedName ?? "ATHLTH Athlete",
+                        displayName:
+                            card?.resolvedName ??
+                            "ATHLTH Athlete",
                         state: state,
                         invitedAt: row.invitedAt,
                         respondedAt: row.respondedAt
@@ -722,46 +826,70 @@ final class SupabaseSocialService: Sendable {
                 }
 
             let attempts = backendAttempts
-                .filter { $0.challengeID == backend.id }
-                .compactMap { row -> ChallengeAttempt? in
-                    guard let verification = ChallengeAttemptVerification(rawValue: row.verification) else {
+                .filter {
+                    $0.challengeID == backend.id
+                }
+                .compactMap {
+                    row -> ChallengeAttempt? in
+
+                    guard let verification =
+                            ChallengeAttemptVerification(
+                                rawValue: row.verification
+                            )
+                    else {
                         return nil
                     }
 
                     return ChallengeAttempt(
                         id: row.id,
                         challengeID: row.challengeID,
-                        participantID: row.participantID,
+                        participantID:
+                            row.participantID,
                         userID: row.userID,
-                        participantName: row.participantName,
-                        submittedAt: row.submittedAt,
+                        participantName:
+                            row.participantName,
+                        submittedAt:
+                            row.submittedAt,
                         startedAt: row.startedAt,
                         endedAt: row.endedAt,
                         verification: verification,
-                        sourceWorkoutID: row.sourceWorkoutID,
-                        durationSeconds: row.durationSeconds,
-                        distanceMeters: row.distanceMeters,
-                        weightKilograms: row.weightKilograms,
+                        sourceWorkoutID:
+                            row.sourceWorkoutID,
+                        durationSeconds:
+                            row.durationSeconds,
+                        distanceMeters:
+                            row.distanceMeters,
+                        weightKilograms:
+                            row.weightKilograms,
                         reps: row.reps,
-                        volumeKilograms: row.volumeKilograms,
-                        routeMatchPercent: row.routeMatchPercent,
+                        volumeKilograms:
+                            row.volumeKilograms,
+                        routeMatchPercent:
+                            row.routeMatchPercent,
                         score: row.score,
                         detail: row.detail,
                         manualNote: row.manualNote,
                         isEligible: row.isEligible,
-                        ineligibilityReason: row.ineligibilityReason
+                        ineligibilityReason:
+                            row.ineligibilityReason
                     )
                 }
 
             let checkIns = backendCheckIns
-                .filter { $0.challengeID == backend.id }
+                .filter {
+                    $0.challengeID == backend.id
+                }
                 .map {
                     ChallengeMeetupCheckIn(
                         id: $0.id,
-                        participantID: $0.participantID,
-                        checkedInAt: $0.checkedInAt,
-                        distanceFromMeetupMeters: $0.distanceFromMeetupMeters,
-                        verifiedNearMeetup: $0.verifiedNearMeetup
+                        participantID:
+                            $0.participantID,
+                        checkedInAt:
+                            $0.checkedInAt,
+                        distanceFromMeetupMeters:
+                            $0.distanceFromMeetupMeters,
+                        verifiedNearMeetup:
+                            $0.verifiedNearMeetup
                     )
                 }
 
@@ -777,7 +905,8 @@ final class SupabaseSocialService: Sendable {
                 attempts: attempts,
                 checkIns: checkIns,
                 visibility: visibility,
-                rulesLockedAt: backend.rulesLockedAt
+                rulesLockedAt:
+                    backend.rulesLockedAt
             )
         }
     }
