@@ -736,7 +736,7 @@ struct MessageInboxView: View {
     private func profile(
         for userID: UUID
     ) -> SocialProfileCard? {
-        social.friends.first {
+        social.mutualFollows.first {
             $0.userID == userID
         } ??
         social.visibleProfiles.first {
