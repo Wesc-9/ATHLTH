@@ -85,7 +85,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     private var webAuthenticationSession: ASWebAuthenticationSession?
     private var pkceCodeVerifier: String?
     private var pkceAuthorizationState: String?
-    private var pkceFallbackAttempted = false
+    private var pkceAuthorizationStarted = false
 
     private var clientID: String {
         let value =
@@ -111,7 +111,21 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     var isConfigured: Bool {
-        !clientID.isEmpty && URL(string: redirectURI) != nil
+        guard !clientID.isEmpty,
+              let url = URL(string: redirectURI),
+              let scheme = url.scheme,
+              !scheme.isEmpty,
+              scheme == scheme.lowercased(),
+              redirectURI == redirectURI.lowercased()
+        else {
+            return false
+        }
+
+        return true
+    }
+
+    var redirectURIForDiagnostics: String {
+        redirectURI
     }
 
     var isConnected: Bool {
@@ -120,8 +134,24 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     var setupMessage: String? {
-        guard !isConfigured else { return nil }
-        return "Add ATHLTH_SPOTIFY_CLIENT_ID to the build configuration and whitelist \(redirectURI) in Spotify Developer Dashboard."
+        guard !clientID.isEmpty else {
+            return "Spotify client ID is missing from this build."
+        }
+
+        guard let url = URL(string: redirectURI),
+              let scheme = url.scheme,
+              !scheme.isEmpty
+        else {
+            return "Spotify redirect URI is invalid."
+        }
+
+        guard scheme == scheme.lowercased(),
+              redirectURI == redirectURI.lowercased()
+        else {
+            return "Spotify requires the iOS redirect URI to use lowercase characters."
+        }
+
+        return nil
     }
 
     private lazy var spotifyConfiguration: SPTConfiguration? = {
@@ -169,31 +199,20 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func connect() {
-        guard isConfigured,
-              let sessionManager
-        else {
+        guard isConfigured else {
             connectionState = .unavailable
             lastErrorMessage = setupMessage
             return
         }
 
+        // Use Authorization Code + PKCE as the primary authorization path.
+        // Spotify iOS SDK 5.0.1 can return unknown_error from app-switch auth
+        // even when the callback itself succeeds. App Remote remains the
+        // playback transport after ATHLTH has obtained a valid access token.
         connectionState = .connecting
         lastErrorMessage = nil
-        pkceFallbackAttempted = false
-
-        let scopes: SPTScope = [
-            .appRemoteControl,
-            .playlistReadPrivate,
-            .playlistReadCollaborative,
-            .userReadPlaybackState,
-            .userModifyPlaybackState
-        ]
-
-        sessionManager.initiateSession(
-            with: scopes,
-            options: .default,
-            campaign: nil
-        )
+        pkceAuthorizationStarted = false
+        beginPKCEAuthorizationIfNeeded()
     }
 
     func disconnect() {
@@ -204,7 +223,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         pkceCodeVerifier = nil
         pkceAuthorizationState = nil
         pkceSession = nil
-        pkceFallbackAttempted = false
+        pkceAuthorizationStarted = false
         deleteStoredSession()
         deleteStoredPKCESession()
         playlists = []
@@ -440,16 +459,16 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
     private func beginPKCEAuthorizationIfNeeded() {
         guard isConfigured,
-              !pkceFallbackAttempted,
+              !pkceAuthorizationStarted,
               webAuthenticationSession == nil
         else {
             return
         }
 
-        pkceFallbackAttempted = true
+        pkceAuthorizationStarted = true
         connectionState = .connecting
         lastErrorMessage =
-            "Spotify app authorization failed. Retrying securely…"
+            "Opening secure Spotify sign-in…"
 
         let verifier = Self.makeCodeVerifier()
         let state = UUID().uuidString
@@ -800,28 +819,14 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             return
         }
 
-        guard let data = readStoredSession(),
-              let session =
-                try? NSKeyedUnarchiver.unarchivedObject(
-                    ofClass: SPTSession.self,
-                    from: data
-                ),
-              let sessionManager
-        else {
-            connectionState = .disconnected
-            return
+        // Older ATHLTH builds stored SPTSession credentials from the SDK
+        // authorization flow. Do not renew those after Spotify's OAuth
+        // migration; reconnect once using PKCE instead.
+        if readStoredSession() != nil {
+            deleteStoredSession()
         }
 
-        sessionManager.session = session
-        appRemote?.connectionParameters.accessToken = session.accessToken
-
-        if session.isExpired {
-            connectionState = .connecting
-            sessionManager.renewSession()
-        } else {
-            connectionState = .connected
-            Task { await refreshPlaylists() }
-        }
+        connectionState = .disconnected
     }
 
     private func storeSession(_ session: SPTSession) {
@@ -1010,12 +1015,12 @@ extension SpotifyPlaybackStore: SPTSessionManagerDelegate {
         didFailWith error: Error
     ) {
         Task { @MainActor in
-            if self.shouldFallbackToPKCE(error) {
-                self.beginPKCEAuthorizationIfNeeded()
-            } else {
-                self.lastErrorMessage = error.localizedDescription
-                self.connectionState = .error(error.localizedDescription)
-            }
+            self.sessionManager?.session = nil
+            self.deleteStoredSession()
+            self.pkceAuthorizationStarted = false
+            self.lastErrorMessage =
+                "Spotify sign-in needs to be refreshed securely."
+            self.beginPKCEAuthorizationIfNeeded()
         }
     }
 
