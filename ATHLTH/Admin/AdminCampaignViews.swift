@@ -238,15 +238,27 @@ private struct AdminCampaignHistoryDetailView: View {
                                 .font(.headline)
 
                             if let deliveredAt = recipient.deliveredAt {
-                                Text("Delivered \(deliveredAt.formatted(date: .abbreviated, time: .shortened))")
+                                Text(ATHLTHLocalization.format(
+                            english: "Delivered %@",
+                            norwegian: "Levert %@",
+                            deliveredAt.formatted(date: .abbreviated, time: .shortened)
+                        ))
                             }
 
                             if let openedAt = recipient.openedAt {
-                                Text("Opened \(openedAt.formatted(date: .abbreviated, time: .shortened))")
+                                Text(ATHLTHLocalization.format(
+                            english: "Opened %@",
+                            norwegian: "Åpnet %@",
+                            openedAt.formatted(date: .abbreviated, time: .shortened)
+                        ))
                             }
 
                             if let convertedAt = recipient.convertedAt {
-                                Text("Converted \(convertedAt.formatted(date: .abbreviated, time: .shortened))")
+                                Text(ATHLTHLocalization.format(
+                            english: "Converted %@",
+                            norwegian: "Konvertert %@",
+                            convertedAt.formatted(date: .abbreviated, time: .shortened)
+                        ))
                                     .foregroundStyle(.green)
                             }
                         }
