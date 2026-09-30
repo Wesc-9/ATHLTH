@@ -682,6 +682,143 @@ struct AppRootView: View {
                 watchConnection.clearCompletedWorkout()
             }
         }
+        .onChange(of: phoneWorkout.lastCompletedWorkout) { _, workout in
+            guard let workout,
+                  let endedAt = workout.end,
+                  appSession.signedIn
+            else {
+                return
+            }
+
+            let publishable =
+                SocialPublishableWorkout(
+                    phoneWorkout: workout
+                )
+            var completionSourceIDs: Set<UUID> = [
+                workout.id
+            ]
+            if let healthID = workout.healthID {
+                completionSourceIDs.insert(
+                    healthID
+                )
+            }
+
+            workoutCompletion.begin(
+                workout: publishable,
+                sourceIDs: completionSourceIDs,
+                goals: goals,
+                challenges: challengeStore,
+                officialWeekly:
+                    officialWeeklyChallenges,
+                healthWorkouts: health.workouts,
+                gear: gear,
+                trophies: trophies
+            )
+
+            Task {
+                await officialWeeklyChallenges
+                    .syncCompletionState(
+                        workouts: health.workouts
+                    )
+
+                await goals.refreshAutomaticMilestones(
+                    health: health,
+                    strength: strengthWorkout
+                )
+                notifications.syncGoalEvents(
+                    from: goals.goals
+                )
+
+                let challengeResult =
+                    WatchWorkoutResult(
+                        id: workout.id,
+                        kind:
+                            workout.walking
+                                ? .walking
+                                : .running,
+                        healthKitWorkoutUUID:
+                            workout.healthID,
+                        startedAt: workout.start,
+                        endedAt: endedAt,
+                        duration:
+                            publishable.duration,
+                        activeCalories: 0,
+                        distanceMeters:
+                            workout.distanceMeters,
+                        averageHeartRate: nil,
+                        maxHeartRate: nil,
+                        routePointCount:
+                            workout.points.count
+                    )
+
+                await challengeStore
+                    .ingestWatchWorkout(
+                        challengeResult,
+                        health: health,
+                        userID:
+                            appSession.profile.userID,
+                        displayName:
+                            appSession.profile.displayName,
+                        maximumHeartRateBPM:
+                            appSession
+                                .onboardingProfile?
+                                .maximumHeartRateBPM
+                    )
+
+                await social.finishActiveWorkout(
+                    sourceWorkoutID:
+                        workout.healthID ??
+                        workout.id,
+                    endedAt: endedAt
+                )
+
+                await gear.savePreparedGearUsage(
+                    for: publishable
+                )
+                await communityGroups.recordCompletedWorkout(
+                    publishable
+                )
+                notifications.syncGearUsageAlerts(
+                    from: gear
+                )
+
+                workoutCompletion.finalize(
+                    workout: publishable,
+                    sourceIDs: completionSourceIDs,
+                    userID: appSession.profile.userID,
+                    goals: goals,
+                    challenges: challengeStore,
+                    officialWeekly:
+                        officialWeeklyChallenges,
+                    healthWorkouts: health.workouts,
+                    gear: gear,
+                    trophies: trophies
+                )
+
+                await handleCompletedWorkoutReview(
+                    publishable
+                )
+                await social.syncChallenges(
+                    challengeStore
+                )
+                await refreshTrophiesAndNotifications()
+
+                workoutCompletion.finalize(
+                    workout: publishable,
+                    sourceIDs: completionSourceIDs,
+                    userID: appSession.profile.userID,
+                    goals: goals,
+                    challenges: challengeStore,
+                    officialWeekly:
+                        officialWeeklyChallenges,
+                    healthWorkouts: health.workouts,
+                    gear: gear,
+                    trophies: trophies
+                )
+
+                await syncSocialOwnedData()
+            }
+        }
         .onChange(of: strengthWorkout.completedWorkout) { _, workout in
             guard let workout else { return }
 
