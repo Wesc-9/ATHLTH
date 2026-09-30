@@ -9,7 +9,7 @@ enum SubscriptionTier: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .free: return "Free"
+        case .free: return String(localized: "Free")
         case .paid: return "ATHLTH+"
         }
     }
@@ -24,11 +24,11 @@ enum SubscriptionAccessState: String, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .free: return "Free"
-        case .trial: return "ATHLTH+ trial"
+        case .free: return String(localized: "Free")
+        case .trial: return String(localized: "ATHLTH+ trial")
         case .paid: return "ATHLTH+"
-        case .expired: return "ATHLTH+ expired"
-        case .revoked: return "ATHLTH+ revoked"
+        case .expired: return String(localized: "ATHLTH+ expired")
+        case .revoked: return String(localized: "ATHLTH+ revoked")
         }
     }
 }
@@ -42,11 +42,11 @@ enum SubscriptionLifecycleState: String, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .free: return "Free"
-        case .trial: return "ATHLTH+ trial"
+        case .free: return String(localized: "Free")
+        case .trial: return String(localized: "ATHLTH+ trial")
         case .active: return "ATHLTH+"
-        case .expired: return "ATHLTH+ expired"
-        case .revoked: return "ATHLTH+ revoked"
+        case .expired: return String(localized: "ATHLTH+ expired")
+        case .revoked: return String(localized: "ATHLTH+ revoked")
         }
     }
 }
@@ -155,9 +155,9 @@ struct SubscriptionAccess: Codable, Hashable {
     var billingPeriodTitle: String? {
         switch productID {
         case SubscriptionStore.monthlyProductID:
-            return "Monthly"
+            return String(localized: "Monthly")
         case SubscriptionStore.yearlyProductID:
-            return "Yearly"
+            return String(localized: "Yearly")
         default:
             return nil
         }
@@ -181,9 +181,9 @@ enum AccountRole: String, Codable, Hashable, CaseIterable {
 
     var title: String {
         switch self {
-        case .user: return "User"
-        case .admin: return "Admin"
-        case .owner: return "Owner"
+        case .user: return String(localized: "User")
+        case .admin: return String(localized: "Admin")
+        case .owner: return String(localized: "Owner")
         }
     }
 
@@ -205,9 +205,9 @@ enum ProfileVisibility: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .privateOnly: return "Private"
-        case .friends: return "Followers"
-        case .publicProfile: return "Public"
+        case .privateOnly: return String(localized: "Private")
+        case .friends: return String(localized: "Followers")
+        case .publicProfile: return String(localized: "Public")
         }
     }
 }
@@ -256,12 +256,12 @@ enum WorkoutKind: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .running: return "Run"
-        case .walking: return "Walk"
-        case .strength: return "Strength"
-        case .mobility: return "Mobility"
-        case .recovery: return "Recovery"
-        case .custom: return "Custom"
+        case .running: return String(localized: "Run")
+        case .walking: return String(localized: "Walk")
+        case .strength: return String(localized: "Strength")
+        case .mobility: return String(localized: "Mobility")
+        case .recovery: return String(localized: "Recovery")
+        case .custom: return String(localized: "Custom")
         }
     }
 
