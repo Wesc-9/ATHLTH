@@ -974,57 +974,27 @@ struct PostWorkoutReviewView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     summaryCard
+                    resultStrip
+                    reflectionCard
+
+                    sectionLabel(
+                        "ATHLTH REPLAY",
+                        subtitle:
+                            "A quick look back at how the session unfolded."
+                    )
 
                     ATHLTHWorkoutReplayCard(
                         workout: workout,
                         context: replayContext
                     )
 
-                    ATHLTHCard {
-                        VStack(alignment: .leading, spacing: 13) {
-                            Text("How did it feel?")
-                                .font(.headline)
-
-                            HStack(alignment: .firstTextBaseline) {
-                                Text("\(Int(effort))")
-                                    .font(.system(size: 38, weight: .bold))
-                                    .monospacedDigit()
-                                    .foregroundStyle(ATHLTHTheme.accent)
-
-                                Text("/10")
-                                    .foregroundStyle(.secondary)
-
-                                Spacer()
-
-                                Text(Self.effortLabel(Int(effort)))
-                                    .font(.subheadline.weight(.semibold))
-                            }
-
-                            Slider(value: $effort, in: 1...10, step: 1)
-                                .tint(ATHLTHTheme.accent)
-
-                            Text("Use this as your perceived effort for the session.")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    ATHLTHCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Description")
-                                .font(.headline)
-
-                            TextField(
-                                "How did the workout go?",
-                                text: $descriptionText,
-                                axis: .vertical
-                            )
-                            .lineLimit(3...7)
-                            .textFieldStyle(.roundedBorder)
-                        }
-                    }
+                    sectionLabel(
+                        "DETAILS & SHARING",
+                        subtitle:
+                            "Optional details for your training history and activity."
+                    )
 
                     WorkoutGearSelectionCard(
                         selectedGearIDs: $selectedGearIDs,
@@ -1037,63 +1007,21 @@ struct PostWorkoutReviewView: View {
                         )
                     }
 
-                    ATHLTHCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Visibility")
-                                .font(.headline)
-
-                            Picker("Visibility", selection: $visibility) {
-                                ForEach(ProfileVisibility.allCases) { option in
-                                    Text(option.title).tag(option)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-
-                            visibilityExplanation
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            if settings.autoPublishCompletedWorkouts {
-                                Label(
-                                    alreadyPublished
-                                        ? "This workout is already shared. Saving updates it."
-                                        : "Sharing is selected by default. Nothing is posted until you save this review.",
-                                    systemImage: "bolt.fill"
-                                )
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.accent)
-                            }
-                        }
-                    }
-
-                    Button {
-                        Task { await save() }
-                    } label: {
-                        HStack {
-                            if saving {
-                                ProgressView()
-                                    .tint(.white)
-                            }
-
-                            Text(
-                                visibility == .privateOnly
-                                    ? "Save Workout"
-                                    : alreadyPublished || wasAutoPublished
-                                        ? "Update Workout"
-                                        : "Save & Share"
-                            )
-                            .font(.headline)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(ATHLTHTheme.accent)
-                    .disabled(saving)
+                    visibilityCard
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 24)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .scrollIndicators(.hidden)
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent:
+                        completionAccent.opacity(0.12)
+                )
+            )
             .navigationTitle("Workout Complete")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1102,6 +1030,9 @@ struct PostWorkoutReviewView: View {
                         dismiss()
                     }
                 }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                saveBar
             }
             .task {
                 async let reviewLoad: Void =
