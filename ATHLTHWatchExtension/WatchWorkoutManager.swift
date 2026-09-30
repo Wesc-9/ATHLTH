@@ -511,13 +511,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         currentLapDistanceMeters = 0
 
         if let builder = workoutBuilder {
+            let lapStart =
+                min(
+                    lapSummaries
+                        .dropLast()
+                        .last?
+                        .endedAt ??
+                    startedAt ??
+                    now,
+                    now
+                )
             let event =
                 HKWorkoutEvent(
                     type: .lap,
                     dateInterval:
                         DateInterval(
-                            start: now,
-                            duration: 0
+                            start: lapStart,
+                            end: now
                         ),
                     metadata: [
                         "ATHLTHLapNumber":
