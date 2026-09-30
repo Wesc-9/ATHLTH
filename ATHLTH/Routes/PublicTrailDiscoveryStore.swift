@@ -136,6 +136,13 @@ final class SupabasePublicTrailDiscoveryService {
         self.client = client
     }
 
+    private struct DiscoverParams: Encodable {
+        let latitude: Double
+        let longitude: Double
+        let radiusKilometers: Double
+        let forceRefresh: Bool
+    }
+
     func discover(
         near location: CLLocation,
         radiusKilometers: Double,
@@ -148,18 +155,18 @@ final class SupabasePublicTrailDiscoveryService {
                     "discover-public-trails",
                     options:
                         FunctionInvokeOptions(
-                            body: [
-                                "latitude":
+                            body: DiscoverParams(
+                                latitude:
                                     location.coordinate
                                         .latitude,
-                                "longitude":
+                                longitude:
                                     location.coordinate
                                         .longitude,
-                                "radiusKilometers":
+                                radiusKilometers:
                                     radiusKilometers,
-                                "forceRefresh":
+                                forceRefresh:
                                     forceRefresh
-                            ]
+                            )
                         )
                 )
 
