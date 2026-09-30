@@ -1497,9 +1497,26 @@ struct MuscleRecoveryCard: View {
                 }
                 .padding(.top, 12)
             } else {
-                VStack(spacing: 12) {
-                    ForEach(statuses.prefix(8)) { status in
-                        muscleRow(status)
+                VStack(spacing: 14) {
+                    StrengthMuscleMapView(
+                        profile: muscleMapProfile,
+                        compact: true
+                    )
+                    .frame(height: 174)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        Color.primary.opacity(0.025),
+                        in: RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                    )
+
+                    VStack(spacing: 12) {
+                        ForEach(statuses.prefix(8)) { status in
+                            muscleRow(status)
+                        }
                     }
                 }
                 .padding(.top, 14)
@@ -1577,6 +1594,75 @@ struct MuscleRecoveryCard: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var muscleMapProfile: StrengthMuscleProfile {
+        var scores: [StrengthMuscleRegion: Double] = [:]
+
+        for status in statuses {
+            let sorenessFloor: Double =
+                status.soreness == .none ? 0 : 0.22
+            let score = max(
+                status.loadScore,
+                sorenessFloor
+            )
+
+            for region in muscleRegions(
+                for: status.muscleGroup
+            ) {
+                scores[region] = max(
+                    scores[region] ?? 0,
+                    score
+                )
+            }
+        }
+
+        return StrengthMuscleProfile(
+            activations: scores.map {
+                StrengthMuscleActivation(
+                    region: $0.key,
+                    score: $0.value
+                )
+            }
+        )
+    }
+
+    private func muscleRegions(
+        for group: String
+    ) -> [StrengthMuscleRegion] {
+        let normalized = group.lowercased()
+
+        if normalized.contains("chest") {
+            return [.chest]
+        }
+        if normalized.contains("back") {
+            return [.lats, .upperBack, .lowerBack]
+        }
+        if normalized.contains("shoulder") {
+            return [.frontDelts, .sideDelts, .rearDelts]
+        }
+        if normalized.contains("arm") {
+            return [.biceps, .triceps, .forearms]
+        }
+        if normalized.contains("core") ||
+            normalized.contains("ab") {
+            return [.abs, .obliques]
+        }
+        if normalized.contains("glute") {
+            return [.glutes, .outerHip]
+        }
+        if normalized.contains("quad") {
+            return [.quads]
+        }
+        if normalized.contains("hamstring") {
+            return [.hamstrings]
+        }
+        if normalized.contains("calf") ||
+            normalized.contains("calves") {
+            return [.calves]
+        }
+
+        return []
     }
 
     private func relativeDescription(
