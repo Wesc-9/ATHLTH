@@ -18614,6 +18614,666 @@
           }
         }
       }
+    },
+    "Skip": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hopp over"
+          }
+        }
+      }
+    },
+    "YOUR BODY. YOUR DATA. YOUR PROGRESS.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DIN KROPP. DINE DATA. DIN FREMGANG."
+          }
+        }
+      }
+    },
+    "USERNAME": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BRUKERNAVN"
+          }
+        }
+      }
+    },
+    "ATHLTH ID": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-ID"
+          }
+        }
+      }
+    },
+    "3–20 characters · letters, numbers & _": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3–20 tegn · bokstaver, tall og _"
+          }
+        }
+      }
+    },
+    "Suggestions for you": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forslag til deg"
+          }
+        }
+      }
+    },
+    "BASED ON YOUR NAME": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BASERT PÅ NAVNET DITT"
+          }
+        }
+      }
+    },
+    "TRAINING PROFILE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TRENINGSPROFIL"
+          }
+        }
+      }
+    },
+    "1 OF 2": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 AV 2"
+          }
+        }
+      }
+    },
+    "YOUR GOALS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DINE MÅL"
+          }
+        }
+      }
+    },
+    "2 OF 2": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 AV 2"
+          }
+        }
+      }
+    },
+    "Change focus": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endre fokus"
+          }
+        }
+      }
+    },
+    "Also interested in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Også interessert i"
+          }
+        }
+      }
+    },
+    "Choose at least one": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg minst én"
+          }
+        }
+      }
+    },
+    "Choose at least one interest to continue, or use Skip.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg minst én interesse for å fortsette, eller bruk Hopp over."
+          }
+        }
+      }
+    },
+    "DEVICES": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ENHETER"
+          }
+        }
+      }
+    },
+    "Open Watch app to install ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne Watch-appen for å installere ATHLTH"
+          }
+        }
+      }
+    },
+    "You can change your training device anytime in Settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan endre treningsenhet når som helst i Innstillinger."
+          }
+        }
+      }
+    },
+    "APPLE HEALTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "APPLE HEALTH"
+          }
+        }
+      }
+    },
+    "ATHLTH only requests the Health data needed for the features you use. Apple Health access is optional.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH ber bare om Health-data som trengs for funksjonene du bruker. Tilgang til Apple Health er valgfritt."
+          }
+        }
+      }
+    },
+    "SETUP COMPLETE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OPPSETT FULLFØRT"
+          }
+        }
+      }
+    },
+    "YOUR SETUP": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DITT OPPSETT"
+          }
+        }
+      }
+    },
+    "You can update your goals and connections anytime in ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan oppdatere mål og tilkoblinger når som helst i ATHLTH."
+          }
+        }
+      }
+    },
+    "Personalize offers from my selections": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilpass tilbud basert på valgene mine"
+          }
+        }
+      }
+    },
+    "Optional · Uses only the goals and interests you choose here. Never Apple Health data.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgfritt · bruker bare mål og interesser du velger her. Aldri Apple Health-data."
+          }
+        }
+      }
+    },
+    "Your health data stays private": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helsedataene dine forblir private"
+          }
+        }
+      }
+    },
+    "Never published to your profile or shared with friends.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publiseres aldri på profilen din eller deles med venner."
+          }
+        }
+      }
+    },
+    "Pair an Apple Watch in Apple’s Watch app first.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble først en Apple Watch til i Apples Watch-app."
+          }
+        }
+      }
+    },
+    "Then return to ATHLTH and check again.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gå deretter tilbake til ATHLTH og sjekk på nytt."
+          }
+        }
+      }
+    },
+    "Garmin setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garmin-oppsett"
+          }
+        }
+      }
+    },
+    "Garmin Connect support is not enabled yet. When it is released, this is where you’ll sign in, authorize ATHLTH and confirm the Garmin data you want to sync.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Støtte for Garmin Connect er ikke aktivert ennå. Når den lanseres, logger du inn her, autoriserer ATHLTH og bekrefter hvilke Garmin-data du vil synkronisere."
+          }
+        }
+      }
+    },
+    "Connect Garmin account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble til Garmin-konto"
+          }
+        }
+      }
+    },
+    "Choose permitted health and workout data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg tillatte helse- og øktdata"
+          }
+        }
+      }
+    },
+    "Confirm sync status before continuing": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekreft synkroniseringsstatus før du fortsetter"
+          }
+        }
+      }
+    },
+    "Skip this step": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hopp over dette steget"
+          }
+        }
+      }
+    },
+    "ATHLTH. Your body. Your data. Your progress.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH. Din kropp. Dine data. Din fremgang."
+          }
+        }
+      }
+    },
+    "Garmin": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garmin"
+          }
+        }
+      }
+    },
+    "ATHLTH spreads these sessions across the week. Once saved, every day, workout, exercise and target can be changed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH fordeler øktene gjennom uken. Etter lagring kan hver dag, økt, øvelse og hvert mål endres."
+          }
+        }
+      }
+    },
+    "This is a reusable starting structure, not a fixed prescription. Adapt volume and intensity to your current training history.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette er en gjenbrukbar startstruktur, ikke en fast oppskrift. Tilpass volum og intensitet til treningshistorikken din."
+          }
+        }
+      }
+    },
+    "Estimated finish": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimert sluttdato"
+          }
+        }
+      }
+    },
+    "The plan keeps its workout order. ATHLTH maps session 1, 2, 3 and so on to your selected days each week.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planen beholder rekkefølgen på øktene. ATHLTH fordeler økt 1, 2, 3 osv. på valgte dager hver uke."
+          }
+        }
+      }
+    },
+    "You can still edit individual workouts, exercises, routes and targets after the plan is created.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan fortsatt redigere individuelle økter, øvelser, ruter og mål etter at planen er opprettet."
+          }
+        }
+      }
+    },
+    "This overlaps another plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette overlapper en annen plan"
+          }
+        }
+      }
+    },
+    "Coach can review the active plan and suggest broader changes. Nothing changes until you accept the proposal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach kan vurdere den aktive planen og foreslå større endringer. Ingenting endres før du godtar forslaget."
+          }
+        }
+      }
+    },
+    "This plan is no longer available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne planen er ikke lenger tilgjengelig."
+          }
+        }
+      }
+    },
+    "Tomorrow": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I morgen"
+          }
+        }
+      }
+    },
+    "Nothing saved here yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingenting lagret her ennå"
+          }
+        }
+      }
+    },
+    "Tap the star on a plan, workout, exercise or route and it will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trykk på stjernen på en plan, økt, øvelse eller rute, så vises den her."
+          }
+        }
+      }
+    },
+    "Plan Library": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planbibliotek"
+          }
+        }
+      }
+    },
+    "Added to My Plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagt til i Mine planer"
+          }
+        }
+      }
+    },
+    "Could not create plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke opprette plan"
+          }
+        }
+      }
+    },
+    "My Plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mine planer"
+          }
+        }
+      }
+    },
+    "Could not schedule plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke planlegge planen"
+          }
+        }
+      }
+    },
+    "Could not update workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke oppdatere økten"
+          }
+        }
+      }
+    },
+    "View all challenge requests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis alle utfordringsforespørsler"
+          }
+        }
+      }
+    },
+    "The attempt must start and finish within this distance of the saved route endpoints.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forsøket må starte og avsluttes innenfor denne avstanden fra den lagrede rutens endepunkter."
+          }
+        }
+      }
+    },
+    "ATHLTH compares time in a personal heart-rate zone. Add your maximum heart rate before creating this challenge.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH sammenligner tid i en personlig pulssone. Legg til maksimalpulsen din før du oppretter utfordringen."
+          }
+        }
+      }
+    },
+    "Any qualifying workout can count when it contains Apple Health heart-rate samples. Manual heart-rate results are never accepted.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle kvalifiserende økter kan telle når de inneholder pulsdata fra Apple Health. Manuelle pulsresultater godtas aldri."
+          }
+        }
+      }
+    },
+    "Every participant is scored against their own private maximum heart rate. ATHLTH never exposes that value to the challenge or leaderboard.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hver deltaker vurderes mot sin egen private maksimalpuls. ATHLTH viser aldri denne verdien i utfordringen eller ledertavlen."
+          }
+        }
+      }
+    },
+    "Manual strength submissions stay clearly labelled Manual. ATHLTH-tracked sets are labelled ATHLTH Verified.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manuelle styrkeresultater merkes tydelig som Manuell. Sett registrert av ATHLTH merkes ATHLTH-verifisert."
+          }
+        }
+      }
+    },
+    "Only attempts inside the challenge window count. Rules lock at start. Verified and Manual strength results stay visibly different.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare forsøk innenfor utfordringsperioden teller. Reglene låses ved start. Verifiserte og manuelle styrkeresultater forblir tydelig forskjellige."
+          }
+        }
+      }
+    },
+    "This challenge uses personal heart-rate zones. Your max HR stays private and is used only to calculate your own zone boundaries.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne utfordringen bruker personlige pulssoner. Maksimalpulsen din forblir privat og brukes bare til å beregne dine egne sonegrenser."
+          }
+        }
+      }
+    },
+    "Accept to join the leaderboard. Declining removes you from active competition.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godta for å bli med på ledertavlen. Hvis du avslår, fjernes du fra aktiv konkurranse."
+          }
+        }
+      }
+    },
+    "Check-in is explicit. ATHLTH requests a one-time location only when you press “I'm here”; it does not continuously expose your live location to other participants.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Innsjekk er eksplisitt. ATHLTH ber bare om posisjon én gang når du trykker «Jeg er her»; live-posisjonen din deles ikke kontinuerlig med andre deltakere."
+          }
+        }
+      }
+    },
+    "85% route match is required for leaderboard ranking.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "85 % rutesamsvar kreves for plassering på ledertavlen."
+          }
+        }
+      }
+    },
+    "Choose a runner who is active now. When they share a route, ATHLTH loads the same course and compares your positions along it. If route data is unavailable, Live Ghost safely falls back to distance.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg en løper som er aktiv nå. Når de deler en rute, laster ATHLTH samme løype og sammenligner posisjonene deres langs den. Hvis rutedata mangler, bruker Live Ghost distanse som sikker reserve."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
