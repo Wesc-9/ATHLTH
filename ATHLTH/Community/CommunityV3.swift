@@ -436,10 +436,9 @@ private struct CommunityChallengeRequestCard:
                         spacing: 3
                     ) {
                         Text(
-                            creator?.resolvedName
-                                .map {
-                                    "\($0) challenged you"
-                                } ??
+                            creator.map {
+                                "\($0.resolvedName) challenged you"
+                            } ??
                             "Challenge invitation"
                         )
                         .font(
