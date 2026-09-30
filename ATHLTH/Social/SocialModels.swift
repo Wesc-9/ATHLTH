@@ -875,6 +875,49 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         source = "ATHLTH"
     }
 
+    init(phoneWorkout: PhoneWorkout) {
+        id = phoneWorkout.healthID ?? phoneWorkout.id
+        title = phoneWorkout.title
+        activity =
+            phoneWorkout.walking
+                ? .walking
+                : .running
+        startDate = phoneWorkout.start
+        endDate =
+            phoneWorkout.end ??
+            phoneWorkout.lastCheckpoint
+
+        let recordedDuration =
+            max(
+                phoneWorkout.accumulatedSeconds,
+                0
+            )
+        let elapsedFallback =
+            max(
+                endDate.timeIntervalSince(
+                    startDate
+                ),
+                0
+            )
+
+        duration =
+            recordedDuration > 0
+                ? recordedDuration
+                : elapsedFallback
+        distanceMeters =
+            phoneWorkout.distanceMeters > 0
+                ? phoneWorkout.distanceMeters
+                : nil
+        activeEnergyKilocalories = nil
+        isIndoor = false
+        strengthMuscleGroups = nil
+        strengthExerciseCount = nil
+        strengthTotalVolumeKilograms = nil
+        strengthHeaviestWeightKilograms = nil
+        strengthTotalReps = nil
+        source = "iPhone"
+    }
+
     init(watchResult: WatchWorkoutResult) {
         id = watchResult.healthKitWorkoutUUID ?? watchResult.id
         title = "\(watchResult.kind.title) completed"
