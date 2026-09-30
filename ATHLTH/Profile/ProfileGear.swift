@@ -1195,7 +1195,11 @@ struct ProfileGearSummaryView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(
-                "Open \(item.name)"
+                ATHLTHLocalization.format(
+                            english: "Open %@",
+                            norwegian: "Åpne %@",
+                            item.name
+                        )
             )
         } else {
             NavigationLink {
@@ -1347,7 +1351,11 @@ struct ProfileGearManagerView: View {
                             addingCategory = category
                         } label: {
                             Label(
-                                "Add \(category.shortTitle.lowercased())",
+                                ATHLTHLocalization.format(
+                            english: "Add %@",
+                            norwegian: "Legg til %@",
+                            category.shortTitle.lowercased()
+                        ),
                                 systemImage: "plus.circle.fill"
                             )
                         }
@@ -1391,7 +1399,11 @@ struct ProfileGearManagerView: View {
 
                         if let featured =
                             gear.featuredItem(in: category) {
-                            Text("Profile: \(featured.name)")
+                            Text(ATHLTHLocalization.format(
+                            english: "Profile: %@",
+                            norwegian: "Profil: %@",
+                            featured.name
+                        ))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
