@@ -9,6 +9,12 @@ struct WatchHomeView: View {
             ScrollView {
                 VStack(spacing: 9) {
                     header
+
+                    if let today =
+                            routeStore.todayWorkout {
+                        todayWorkoutCard(today)
+                    }
+
                     quickRunCard
 
                     if let errorMessage =
@@ -95,6 +101,40 @@ struct WatchHomeView: View {
                 for: .navigationBar
             )
         }
+        .task {
+            await workoutManager
+                .recoverActiveWorkout()
+        }
+        .onOpenURL { url in
+            guard url.scheme ==
+                    "athlth-watch"
+            else {
+                return
+            }
+
+            switch url.host {
+            case "today":
+                if let today =
+                        routeStore
+                            .todayWorkout {
+                    startTodayWorkout(
+                        today
+                    )
+                }
+
+            case "quick-run":
+                Task {
+                    await workoutManager
+                        .start(
+                            kind:
+                                .running
+                        )
+                }
+
+            default:
+                break
+            }
+        }
         .sheet(
             isPresented: Binding(
                 get: {
@@ -162,6 +202,214 @@ struct WatchHomeView: View {
         .padding(.horizontal, 3)
         .padding(.top, 3)
         .padding(.bottom, 2)
+    }
+
+    private func todayWorkoutCard(
+        _ workout:
+            WatchTodayWorkoutTransfer
+    ) -> some View {
+        Button {
+            startTodayWorkout(workout)
+        } label: {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                HStack {
+                    Label(
+                        "TODAY",
+                        systemImage:
+                            "calendar.badge.clock"
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(1)
+                    .foregroundStyle(
+                        WatchTheme.accent
+                    )
+
+                    Spacer()
+
+                    if let start =
+                            workout
+                                .scheduledStart {
+                        Text(
+                            start.formatted(
+                                date: .omitted,
+                                time: .shortened
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 9,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            WatchTheme.muted
+                        )
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                        .fill(
+                            WatchTheme
+                                .accent
+                                .opacity(0.14)
+                        )
+                        .frame(
+                            width: 42,
+                            height: 42
+                        )
+
+                        Image(
+                            systemName:
+                                workout
+                                    .kind
+                                    .systemImage
+                        )
+                        .font(
+                            .system(
+                                size: 20,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            WatchTheme.accent
+                        )
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            workout.title
+                        )
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .bold
+                            )
+                        )
+                        .lineLimit(1)
+
+                        Text(
+                            workout.summary
+                        )
+                        .font(
+                            .system(
+                                size: 9
+                            )
+                        )
+                        .foregroundStyle(
+                            WatchTheme
+                                .textSecondary
+                        )
+                        .lineLimit(2)
+                    }
+
+                    Spacer(
+                        minLength: 2
+                    )
+
+                    Image(
+                        systemName:
+                            "play.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 12,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        WatchTheme.accent
+                    )
+                }
+            }
+            .padding(11)
+            .frame(
+                maxWidth: .infinity
+            )
+            .watchSurface(
+                radius: 19
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(
+            workoutManager.state ==
+                .preparing
+        )
+        .opacity(
+            workoutManager.state ==
+                .preparing
+                ? 0.55
+                : 1
+        )
+    }
+
+    private func startTodayWorkout(
+        _ workout:
+            WatchTodayWorkoutTransfer
+    ) {
+        let route =
+            workout.routeID.flatMap {
+                routeStore.route(
+                    with: $0
+                )
+            }
+
+        workoutManager
+            .configurePlannedRoute(
+                route
+            )
+        workoutManager
+            .configureAudioCoach(
+                workout.audioCoach ??
+                    .disabled
+            )
+
+        if let running =
+                workout.runningWorkout {
+            workoutManager
+                .configureRunningWorkout(
+                    running
+                )
+        } else if workout.kind ==
+                    .running ||
+                    workout.kind ==
+                    .walking {
+            workoutManager
+                .configureRunningWorkout(
+                    WatchRunningWorkoutTransfer(
+                        title:
+                            workout.title,
+                        steps: [],
+                        routeAlerts:
+                            .standard
+                    )
+                )
+        }
+
+        Task {
+            await workoutManager
+                .startPreparedWorkout(
+                    kind:
+                        workout.kind,
+                    route: route
+                )
+        }
     }
 
     private var quickRunCard: some View {
