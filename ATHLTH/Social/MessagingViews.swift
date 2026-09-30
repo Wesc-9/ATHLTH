@@ -45,10 +45,10 @@ struct MessageInboxView: View {
                     inboxErrorCard(error)
                 }
 
-                if totalRequestCount > 0 {
+                if filteredRequestCount > 0 {
                     inboxSectionLabel(
                         "REQUESTS",
-                        count: totalRequestCount
+                        count: filteredRequestCount
                     )
 
                     ForEach(
@@ -591,9 +591,14 @@ struct MessageInboxView: View {
         }
     }
 
-    private var totalRequestCount: Int {
+    private var filteredRequestCount: Int {
         filteredIncomingRequestItems.count +
             filteredChallengeRequests.count
+    }
+
+    private var totalRequestCount: Int {
+        incomingRequestItems.count +
+            incomingChallengeRequests.count
     }
 
     private func challengeCreatorProfile(
@@ -634,9 +639,20 @@ struct MessageInboxView: View {
         }
 
         Task {
-            _ = await social.syncChallenge(
-                updated
-            )
+            let synced =
+                await social.syncChallenge(
+                    updated
+                )
+
+            if !synced {
+                challenges.setParticipantState(
+                    challengeID:
+                        challenge.id,
+                    participantID:
+                        participant.id,
+                    state: .invited
+                )
+            }
         }
     }
 
