@@ -666,7 +666,168 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
-        return try await hydrateChallenges(backendChallenges)
+        guard !backendChallenges.isEmpty else { return [] }
+
+        let backendParticipants: [BackendChallengeParticipant] = try await client
+            .from("social_challenge_participants")
+            .select()
+            .limit(1_000)
+            .execute()
+            .value
+
+        let backendAttempts: [BackendChallengeAttempt] = try await client
+            .from("social_challenge_attempts")
+            .select()
+            .order("submitted_at", ascending: false)
+            .limit(1_000)
+            .execute()
+            .value
+
+        let backendCheckIns: [BackendChallengeCheckIn] = try await client
+            .from("social_challenge_checkins")
+            .select()
+            .order("checked_in_at", ascending: false)
+            .limit(1_000)
+            .execute()
+            .value
+
+        let cards = try await loadVisibleProfileCards()
+        let cardByID = Dictionary(
+            uniqueKeysWithValues:
+                cards.map { ($0.userID, $0) }
+        )
+
+        return backendChallenges.compactMap { backend in
+            guard let sport =
+                    ATHLTHChallengeSport(
+                        rawValue: backend.sport
+                    ),
+                  let status =
+                    ATHLTHChallengeStatus(
+                        rawValue: backend.status
+                    ),
+                  let visibility =
+                    ProfileVisibility(
+                        rawValue: backend.visibility
+                    )
+            else {
+                return nil
+            }
+
+            let participants = backendParticipants
+                .filter {
+                    $0.challengeID == backend.id
+                }
+                .compactMap {
+                    row -> ChallengeParticipant? in
+
+                    guard let state =
+                            ChallengeParticipantState(
+                                rawValue: row.state
+                            )
+                    else {
+                        return nil
+                    }
+
+                    let card = cardByID[row.userID]
+
+                    return ChallengeParticipant(
+                        id: row.id,
+                        userID: row.userID,
+                        username: card?.username,
+                        displayName:
+                            card?.resolvedName ??
+                            "ATHLTH Athlete",
+                        state: state,
+                        invitedAt: row.invitedAt,
+                        respondedAt: row.respondedAt
+                    )
+                }
+
+            let attempts = backendAttempts
+                .filter {
+                    $0.challengeID == backend.id
+                }
+                .compactMap {
+                    row -> ChallengeAttempt? in
+
+                    guard let verification =
+                            ChallengeAttemptVerification(
+                                rawValue: row.verification
+                            )
+                    else {
+                        return nil
+                    }
+
+                    return ChallengeAttempt(
+                        id: row.id,
+                        challengeID: row.challengeID,
+                        participantID:
+                            row.participantID,
+                        userID: row.userID,
+                        participantName:
+                            row.participantName,
+                        submittedAt:
+                            row.submittedAt,
+                        startedAt: row.startedAt,
+                        endedAt: row.endedAt,
+                        verification: verification,
+                        sourceWorkoutID:
+                            row.sourceWorkoutID,
+                        durationSeconds:
+                            row.durationSeconds,
+                        distanceMeters:
+                            row.distanceMeters,
+                        weightKilograms:
+                            row.weightKilograms,
+                        reps: row.reps,
+                        volumeKilograms:
+                            row.volumeKilograms,
+                        routeMatchPercent:
+                            row.routeMatchPercent,
+                        score: row.score,
+                        detail: row.detail,
+                        manualNote: row.manualNote,
+                        isEligible: row.isEligible,
+                        ineligibilityReason:
+                            row.ineligibilityReason
+                    )
+                }
+
+            let checkIns = backendCheckIns
+                .filter {
+                    $0.challengeID == backend.id
+                }
+                .map {
+                    ChallengeMeetupCheckIn(
+                        id: $0.id,
+                        participantID:
+                            $0.participantID,
+                        checkedInAt:
+                            $0.checkedInAt,
+                        distanceFromMeetupMeters:
+                            $0.distanceFromMeetupMeters,
+                        verifiedNearMeetup:
+                            $0.verifiedNearMeetup
+                    )
+                }
+
+            return ATHLTHChallenge(
+                id: backend.id,
+                creatorID: backend.creatorID,
+                title: backend.title,
+                sport: sport,
+                status: status,
+                createdAt: backend.createdAt,
+                participants: participants,
+                rules: backend.rules,
+                attempts: attempts,
+                checkIns: checkIns,
+                visibility: visibility,
+                rulesLockedAt:
+                    backend.rulesLockedAt
+            )
+        }
     }
 
     func searchRemoteChallenges(
