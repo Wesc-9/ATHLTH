@@ -407,13 +407,17 @@ struct HomeAroundYouSection: View {
 
             HStack(spacing: 8) {
                 discoveryCount(
-                    title: "Routes",
+                    title:
+                        ATHLTHLocalization
+                            .string("Routes"),
                     count: nearbyRoutes.count,
                     icon: "point.topleft.down.to.point.bottomright.curvepath"
                 )
 
                 discoveryCount(
-                    title: "Events",
+                    title:
+                        ATHLTHLocalization
+                            .string("Events"),
                     count: nearbyEvents.count,
                     icon: "calendar"
                 )
@@ -1007,7 +1011,11 @@ struct AroundYouExploreView: View {
                                     .buttonStyle(.plain)
                                     .opacity(isDimmed ? 0.34 : 1)
                                     .accessibilityLabel(
-                                        "Preview \(route.title)"
+                                        ATHLTHLocalization.format(
+                                            english: "Preview %@",
+                                            norwegian: "Forhåndsvis %@",
+                                            route.title
+                                        )
                                     )
                                 }
                             }
