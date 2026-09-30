@@ -16,7 +16,11 @@ struct WorkoutFriendPicker: View {
                 Spacer()
 
                 if !selectedFriendIDs.isEmpty {
-                    Text("\(selectedFriendIDs.count) selected")
+                    Text(ATHLTHLocalization.format(
+                            english: "%d selected",
+                            norwegian: "%d valgt",
+                            selectedFriendIDs.count
+                        ))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accent)
                 }
@@ -4580,7 +4584,20 @@ private struct HomeActivityCommunityCard: View {
                     let reactionCount = item.reactions.count
                     if reactionCount > 0 {
                         Text(
-                            "🔥 \(reactionCount) reaction\(reactionCount == 1 ? "" : "s")"
+                            ATHLTHLocalization.format(
+                            english: "🔥 %d %@",
+                            norwegian: "🔥 %d %@",
+                            reactionCount,
+                            reactionCount == 1
+                                ? ATHLTHLocalization.choose(
+                                    english: "reaction",
+                                    norwegian: "reaksjon"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "reactions",
+                                    norwegian: "reaksjoner"
+                                )
+                        )
                         )
                         .font(.caption2)
                         .foregroundStyle(.secondary)
