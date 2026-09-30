@@ -1257,18 +1257,56 @@ struct WatchRunWorkoutExperienceView: View {
             return live
         }
 
-        return workoutManager
-            .plannedRoute?
-            .points
-            .sorted {
-                $0.sequence < $1.sequence
-            }
-            .map {
+        let planned =
+            workoutManager
+                .plannedRoute?
+                .points
+                .sorted {
+                    $0.sequence < $1.sequence
+                } ?? []
+
+        guard planned.count > 240
+        else {
+            return planned.map {
                 CLLocationCoordinate2D(
-                    latitude: $0.latitude,
-                    longitude: $0.longitude
+                    latitude:
+                        $0.latitude,
+                    longitude:
+                        $0.longitude
                 )
-            } ?? []
+            }
+        }
+
+        let strideValue =
+            max(
+                planned.count / 220,
+                1
+            )
+
+        var sampled =
+            stride(
+                from: 0,
+                to: planned.count,
+                by: strideValue
+            )
+            .map {
+                planned[$0]
+            }
+
+        if let last = planned.last,
+           sampled.last?.sequence !=
+            last.sequence {
+            sampled.append(last)
+        }
+
+        return sampled.map {
+            CLLocationCoordinate2D(
+                latitude:
+                    $0.latitude,
+                longitude:
+                    $0.longitude
+            )
+        }
     }
 
     private var remainingDistanceText:
