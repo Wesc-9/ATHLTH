@@ -20,6 +20,49 @@ final class ChallengeStore: ObservableObject {
         challenges.first { $0.id == id }
     }
 
+    func invitationParticipant(
+        in challenge: ATHLTHChallenge,
+        userID: UUID
+    ) -> ChallengeParticipant? {
+        challenge.participants.first {
+            $0.userID == userID &&
+            $0.state == .invited
+        }
+    }
+
+    func incomingInvitations(
+        for userID: UUID
+    ) -> [ATHLTHChallenge] {
+        visibleChallenges.filter {
+            invitationParticipant(
+                in: $0,
+                userID: userID
+            ) != nil &&
+            $0.status != .completed &&
+            $0.status != .cancelled
+        }
+    }
+
+    func trainingChallenges(
+        for userID: UUID
+    ) -> [ATHLTHChallenge] {
+        visibleChallenges.filter { challenge in
+            guard challenge.status == .active ||
+                    challenge.status == .upcoming
+            else {
+                return false
+            }
+
+            return challenge.participants.contains {
+                $0.userID == userID &&
+                (
+                    $0.state == .creator ||
+                    $0.state == .accepted
+                )
+            }
+        }
+    }
+
     func mergeRemoteChallenges(_ remote: [ATHLTHChallenge]) {
         var changed = false
 
@@ -44,6 +87,13 @@ final class ChallengeStore: ObservableObject {
     func add(_ challenge: ATHLTHChallenge) {
         challenges.append(challenge)
         refreshStatuses()
+        persist()
+    }
+
+    func remove(_ challengeID: UUID) {
+        challenges.removeAll {
+            $0.id == challengeID
+        }
         persist()
     }
 
