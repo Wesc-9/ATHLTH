@@ -673,21 +673,15 @@ struct AppRootView: View {
             runningWorkoutLibrary.switchAccount(userID)
         }
         .task(id: signedInUserID) {
-            guard appSession.signedIn else { return }
-            let userID = appSession.profile.userID
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1_800))
-                guard !Task.isCancelled,
-                      appSession.signedIn,
-                      appSession.profile.userID == userID
-                else {
-                    return
-                }
-
-                await trainingBackups.performFailsafeBackup(
-                    userID: userID
-                )
+            guard let userID =
+                    signedInUserID
+            else {
+                return
             }
+
+            await runFailsafeBackupLoop(
+                userID: userID
+            )
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
             guard signedIn else { return }
@@ -963,6 +957,33 @@ struct AppRootView: View {
             appSession.resetAuthenticationState()
             await accountService
                 .discardUnexpectedPersistedSession()
+        }
+    }
+
+    private func runFailsafeBackupLoop(
+        userID: UUID
+    ) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(
+                for: .seconds(1_800)
+            )
+
+            guard !Task.isCancelled else {
+                return
+            }
+            guard appSession.signedIn else {
+                return
+            }
+            guard appSession.profile.userID ==
+                    userID
+            else {
+                return
+            }
+
+            await trainingBackups
+                .performFailsafeBackup(
+                    userID: userID
+                )
         }
     }
 
