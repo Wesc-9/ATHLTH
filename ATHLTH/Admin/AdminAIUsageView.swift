@@ -216,7 +216,15 @@ struct AdminAIUsageView: View {
                 )
 
                 Text(
-                    "\(Int((Double(remaining) / Double(limit) * 100).rounded()))% of reported daily requests remain."
+                    ATHLTHLocalization.format(
+                            english: "%d%% of reported daily requests remain.",
+                            norwegian: "%d %% av rapporterte daglige forespørsler gjenstår.",
+                            Int(
+                                (Double(remaining) /
+                                 Double(limit) * 100)
+                                    .rounded()
+                            )
+                        )
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
