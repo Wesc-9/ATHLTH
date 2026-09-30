@@ -11,13 +11,13 @@ enum ATHLTHNotificationKind: String, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .workoutCompleted: return String(localized: "Workout completed")
-        case .milestoneReached: return String(localized: "Milestone reached")
-        case .goalCompleted: return String(localized: "Goal completed")
-        case .personalRecord: return String(localized: "Personal record")
-        case .achievement: return String(localized: "Achievement")
-        case .social: return String(localized: "Social")
-        case .system: return String(localized: "ATHLTH")
+        case .workoutCompleted: return ATHLTHLocalization.string( "Workout completed")
+        case .milestoneReached: return ATHLTHLocalization.string( "Milestone reached")
+        case .goalCompleted: return ATHLTHLocalization.string( "Goal completed")
+        case .personalRecord: return ATHLTHLocalization.string( "Personal record")
+        case .achievement: return ATHLTHLocalization.string( "Achievement")
+        case .social: return ATHLTHLocalization.string( "Social")
+        case .system: return ATHLTHLocalization.string( "ATHLTH")
         }
     }
 
