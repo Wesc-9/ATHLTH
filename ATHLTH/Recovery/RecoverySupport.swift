@@ -647,6 +647,72 @@ enum MuscleRecoveryEngine {
     }
 }
 
+enum RecoveryTool: String, CaseIterable, Identifiable {
+    case stretch
+    case mobility
+    case breathing
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .stretch: return "Full-body reset"
+        case .mobility: return "Mobility flow"
+        case .breathing: return "Downshift breathing"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .stretch: return "8 min · gentle stretch"
+        case .mobility: return "10 min · hips, spine & shoulders"
+        case .breathing: return "5 min · calm breathing"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .stretch: return "figure.flexibility"
+        case .mobility: return "figure.cooldown"
+        case .breathing: return "wind"
+        }
+    }
+
+    var steps: [RecoveryToolStep] {
+        switch self {
+        case .stretch:
+            return [
+                .init(title: "Cat-cow", seconds: 60),
+                .init(title: "Hip flexor · left", seconds: 60),
+                .init(title: "Hip flexor · right", seconds: 60),
+                .init(title: "Hamstring fold", seconds: 90),
+                .init(title: "Chest opener", seconds: 60),
+                .init(title: "Child’s pose", seconds: 90),
+                .init(title: "Easy reset", seconds: 60)
+            ]
+
+        case .mobility:
+            return [
+                .init(title: "Ankle rocks", seconds: 75),
+                .init(title: "90/90 hips", seconds: 90),
+                .init(title: "World’s greatest stretch", seconds: 120),
+                .init(title: "Thoracic rotations", seconds: 90),
+                .init(title: "Shoulder circles", seconds: 75),
+                .init(title: "Deep squat hold", seconds: 90),
+                .init(title: "Easy reset", seconds: 60)
+            ]
+
+        case .breathing:
+            return [
+                .init(
+                    title: "Inhale 4 sec · exhale 6 sec",
+                    seconds: 300
+                )
+            ]
+        }
+    }
+}
+
 struct RecoveryToolStep: Identifiable, Hashable {
     let id = UUID()
     let title: String
