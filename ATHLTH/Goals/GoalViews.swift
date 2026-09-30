@@ -131,7 +131,12 @@ struct GoalSummaryCard: View {
                     .lineLimit(2)
 
                 HStack {
-                    Text("\(goal.completedMilestones)/\(goal.milestones.count) milestones")
+                    Text(ATHLTHLocalization.format(
+                            english: "%d/%d milestones",
+                            norwegian: "%d/%d milepæler",
+                            goal.completedMilestones,
+                            goal.milestones.count
+                        ))
                         .font(.caption)
                     Spacer()
                     Text("\(Int((goal.progress * 100).rounded()))%")
@@ -364,9 +369,19 @@ struct GoalDetailView: View {
                 .tint(ATHLTHTheme.accent)
 
             HStack {
-                Label("\(goal.completedMilestones) complete", systemImage: "checkmark.circle.fill")
+                Label(ATHLTHLocalization.format(
+                            english: "%d complete",
+                            norwegian: "%d fullført",
+                            goal.completedMilestones
+                        ), systemImage: "checkmark.circle.fill")
                 Spacer()
-                Text("\(goal.milestones.count) milestones")
+                Text(ATHLTHLocalization.counted(
+                            goal.milestones.count,
+                            englishSingular: "milestone",
+                            englishPlural: "milestones",
+                            norwegianSingular: "milepæl",
+                            norwegianPlural: "milepæler"
+                        ))
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -462,7 +477,11 @@ struct GoalDetailView: View {
 
                     if let evidence = milestone.lastEvidenceDescription,
                        !milestone.isCompleted {
-                        Text("Latest: \(evidence)")
+                        Text(ATHLTHLocalization.format(
+                            english: "Latest: %@",
+                            norwegian: "Siste: %@",
+                            evidence
+                        ))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -980,7 +999,11 @@ struct GoalCreationView: View {
             }
 
             if linkActivePlan, let activePlan = session.activePlan {
-                Label("Linked to \(activePlan.title)", systemImage: "list.bullet.clipboard.fill")
+                Label(ATHLTHLocalization.format(
+                            english: "Linked to %@",
+                            norwegian: "Knyttet til %@",
+                            activePlan.title
+                        ), systemImage: "list.bullet.clipboard.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.accent)
             }
