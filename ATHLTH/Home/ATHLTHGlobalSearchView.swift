@@ -77,7 +77,7 @@ struct ATHLTHGlobalSearchView: View {
     @State private var scope: ATHLTHGlobalSearchScope = .all
     @State private var initialLoadFinished = false
     @State private var nearbyLocation: CLLocation?
-    @State private var isSearchingPeople = false
+    @State private var isSearchingRemote = false
     @FocusState private var searchFocused: Bool
 
     private var cleanQuery: String {
@@ -86,6 +86,10 @@ struct ATHLTHGlobalSearchView: View {
 
     private var normalizedQuery: String {
         searchKey(cleanQuery)
+    }
+
+    private var remoteSearchTaskID: String {
+        scope.rawValue + "|" + cleanQuery
     }
 
     private var recentSearches: [String] {
@@ -163,8 +167,8 @@ struct ATHLTHGlobalSearchView: View {
 
                 initialLoadFinished = true
             }
-            .task(id: query) {
-                await refreshRemotePeopleSearch()
+            .task(id: remoteSearchTaskID) {
+                await refreshRemoteSearch()
             }
             .task {
                 do {
@@ -179,7 +183,7 @@ struct ATHLTHGlobalSearchView: View {
                 searchFocused = true
             }
             .onDisappear {
-                social.clearSearch()
+                clearRemoteSearchResults()
             }
         }
     }
@@ -873,7 +877,7 @@ struct ATHLTHGlobalSearchView: View {
                 )
             )
             .padding(.vertical, 70)
-        } else if visibleResultCount == 0 && isSearchingPeople {
+        } else if visibleResultCount == 0 && isSearchingRemote {
             VStack(spacing: 12) {
                 ProgressView()
                     .controlSize(.regular)
@@ -1143,9 +1147,15 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     private var matchingGroups: [CommunityGroupRecord] {
-        groups.groups
+        var seen = Set<UUID>()
+
+        return (groups.groups + groups.searchResults)
             .filter {
-                searchScore([
+                guard seen.insert($0.id).inserted else {
+                    return false
+                }
+
+                return searchScore([
                     $0.name,
                     $0.locationName,
                     $0.summary
@@ -1174,9 +1184,15 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     private var matchingRoutes: [CommunityRouteRecord] {
-        routes.routes
+        var seen = Set<UUID>()
+
+        return (routes.routes + routes.searchResults)
             .filter {
-                searchScore([
+                guard seen.insert($0.id).inserted else {
+                    return false
+                }
+
+                return searchScore([
                     $0.title,
                     $0.startName ?? "",
                     $0.endName ?? ""
@@ -1198,6 +1214,24 @@ struct ATHLTHGlobalSearchView: View {
                     return lhsScore < rhsScore
                 }
 
+                if let nearbyLocation {
+                    let lhsDistance = CLLocation(
+                        latitude: lhs.centerLatitude,
+                        longitude: lhs.centerLongitude
+                    )
+                    .distance(from: nearbyLocation)
+
+                    let rhsDistance = CLLocation(
+                        latitude: rhs.centerLatitude,
+                        longitude: rhs.centerLongitude
+                    )
+                    .distance(from: nearbyLocation)
+
+                    if abs(lhsDistance - rhsDistance) > 1 {
+                        return lhsDistance < rhsDistance
+                    }
+                }
+
                 return lhs.title.localizedCaseInsensitiveCompare(
                     rhs.title
                 ) == .orderedAscending
@@ -1205,12 +1239,20 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     private var matchingEvents: [CommunityEventItem] {
-        community.upcomingEvents
+        var seen = Set<UUID>()
+
+        return (community.upcomingEvents + community.searchResults)
             .filter {
-                searchScore([
+                guard seen.insert($0.id).inserted else {
+                    return false
+                }
+
+                return searchScore([
                     $0.event.title,
                     $0.event.summary,
                     $0.event.meetingName,
+                    $0.event.meetingDetails ?? "",
+                    $0.event.routeTitle ?? "",
                     $0.event.activityType.title
                 ]) < Int.max
             }
@@ -1219,12 +1261,16 @@ struct ATHLTHGlobalSearchView: View {
                     lhs.event.title,
                     lhs.event.summary,
                     lhs.event.meetingName,
+                    lhs.event.meetingDetails ?? "",
+                    lhs.event.routeTitle ?? "",
                     lhs.event.activityType.title
                 ])
                 let rhsScore = searchScore([
                     rhs.event.title,
                     rhs.event.summary,
                     rhs.event.meetingName,
+                    rhs.event.meetingDetails ?? "",
+                    rhs.event.routeTitle ?? "",
                     rhs.event.activityType.title
                 ])
 
@@ -1237,31 +1283,40 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     private var matchingChallenges: [ATHLTHChallenge] {
-        challenges.visibleChallenges
-            .filter {
-                searchScore([
-                    $0.title,
-                    $0.sport.title
-                ]) < Int.max
-            }
-            .sorted { lhs, rhs in
-                let lhsScore = searchScore([
-                    lhs.title,
-                    lhs.sport.title
-                ])
-                let rhsScore = searchScore([
-                    rhs.title,
-                    rhs.sport.title
-                ])
+        var seen = Set<UUID>()
 
-                if lhsScore != rhsScore {
-                    return lhsScore < rhsScore
-                }
-
-                return lhs.title.localizedCaseInsensitiveCompare(
-                    rhs.title
-                ) == .orderedAscending
+        return (
+            challenges.visibleChallenges +
+            social.challengeSearchResults
+        )
+        .filter {
+            guard seen.insert($0.id).inserted else {
+                return false
             }
+
+            return searchScore([
+                $0.title,
+                $0.sport.title
+            ]) < Int.max
+        }
+        .sorted { lhs, rhs in
+            let lhsScore = searchScore([
+                lhs.title,
+                lhs.sport.title
+            ])
+            let rhsScore = searchScore([
+                rhs.title,
+                rhs.sport.title
+            ])
+
+            if lhsScore != rhsScore {
+                return lhsScore < rhsScore
+            }
+
+            return lhs.title.localizedCaseInsensitiveCompare(
+                rhs.title
+            ) == .orderedAscending
+        }
     }
 
     private func searchKey(_ value: String) -> String {
@@ -1320,33 +1375,89 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     @MainActor
-    private func refreshRemotePeopleSearch() async {
-        let requestedQuery =
-            query.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func refreshRemoteSearch() async {
+        let requestedQuery = cleanQuery
+        let requestedScope = scope
 
         guard requestedQuery.count >= 2 else {
-            isSearchingPeople = false
-            social.clearSearch()
+            isSearchingRemote = false
+            clearRemoteSearchResults()
             return
         }
 
         do {
-            try await Task.sleep(nanoseconds: 250_000_000)
+            try await Task.sleep(
+                nanoseconds: 300_000_000
+            )
         } catch {
             return
         }
 
         guard !Task.isCancelled else { return }
 
-        isSearchingPeople = true
-        await social.search(requestedQuery)
+        isSearchingRemote = true
+
+        switch requestedScope {
+        case .all:
+            async let peopleSearch: Void =
+                social.search(requestedQuery)
+            async let routeSearch: Void =
+                routes.search(requestedQuery)
+            async let groupSearch: Void =
+                groups.search(requestedQuery)
+            async let eventSearch: Void =
+                community.search(requestedQuery)
+            async let challengeSearch: Void =
+                social.searchChallenges(requestedQuery)
+
+            _ = await (
+                peopleSearch,
+                routeSearch,
+                groupSearch,
+                eventSearch,
+                challengeSearch
+            )
+
+            challenges.mergeRemoteChallenges(
+                social.challengeSearchResults
+            )
+
+        case .users:
+            await social.search(requestedQuery)
+
+        case .routes:
+            await routes.search(requestedQuery)
+
+        case .groups:
+            await groups.search(requestedQuery)
+
+        case .events:
+            await community.search(requestedQuery)
+
+        case .challenges:
+            await social.searchChallenges(requestedQuery)
+            challenges.mergeRemoteChallenges(
+                social.challengeSearchResults
+            )
+        }
 
         guard !Task.isCancelled else { return }
 
-        if query.trimmingCharacters(in: .whitespacesAndNewlines)
-            .caseInsensitiveCompare(requestedQuery) == .orderedSame {
-            isSearchingPeople = false
+        if cleanQuery.caseInsensitiveCompare(
+            requestedQuery
+        ) == .orderedSame,
+           scope == requestedScope {
+            isSearchingRemote = false
         }
+    }
+
+    private func clearRemoteSearchResults() {
+        social.clearSearch()
+        social.clearChallengeSearch()
+        routes.clearSearch()
+        groups.clearSearch()
+        community.clearSearch()
+        isSearchingRemote = false
     }
 
     private func rememberSearch(_ raw: String) {
