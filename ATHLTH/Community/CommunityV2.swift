@@ -1154,7 +1154,13 @@ private struct CommunityV2ClubCard:
                     .lineLimit(2)
 
                 Text(
-                    "\(memberCount) member\(memberCount == 1 ? "" : "s")"
+                    ATHLTHLocalization.counted(
+                    memberCount,
+                    englishSingular: "member",
+                    englishPlural: "members",
+                    norwegianSingular: "medlem",
+                    norwegianPlural: "medlemmer"
+                )
                 )
                 .font(.caption2)
                 .foregroundStyle(
@@ -1515,7 +1521,11 @@ private struct CommunityV2EventCard:
                 .lineLimit(1)
 
                 Label(
-                    "\(item.participantCount) going",
+                    ATHLTHLocalization.format(
+                    english: "%d going",
+                    norwegian: "%d skal",
+                    item.participantCount
+                ),
                     systemImage:
                         "person.2.fill"
                 )
@@ -1816,7 +1826,11 @@ private struct CommunityV2ChallengeCard:
                     )
 
                     Text(
-                        "\(acceptedCount) participating"
+                        ATHLTHLocalization.format(
+                            english: "%d participating",
+                            norwegian: "%d deltar",
+                            acceptedCount
+                        )
                     )
                 }
                 .font(.caption2)
