@@ -522,6 +522,32 @@ struct AppRootView: View {
                 return
             }
 
+            let publishable =
+                SocialPublishableWorkout(
+                    watchResult: result
+                )
+            var completionSourceIDs: Set<UUID> = [
+                result.id
+            ]
+            if let healthKitWorkoutUUID =
+                    result.healthKitWorkoutUUID {
+                completionSourceIDs.insert(
+                    healthKitWorkoutUUID
+                )
+            }
+
+            workoutCompletion.begin(
+                workout: publishable,
+                sourceIDs: completionSourceIDs,
+                goals: goals,
+                challenges: challengeStore,
+                officialWeekly:
+                    officialWeeklyChallenges,
+                healthWorkouts: health.workouts,
+                gear: gear,
+                trophies: trophies
+            )
+
             let watchFinishedActiveStrength =
                 result.kind == .strength &&
                 strengthWorkout.activeWorkout?.captureDevice == .appleWatch
@@ -576,6 +602,10 @@ struct AppRootView: View {
 
             Task {
                 await health.refreshAll()
+                await officialWeeklyChallenges
+                    .syncCompletionState(
+                        workouts: health.workouts
+                    )
                 syncAppleHealthProfileDetailsIfNeeded()
                 await goals.refreshAutomaticMilestones(
                     health: health,
@@ -606,8 +636,6 @@ struct AppRootView: View {
                     endedAt: result.endedAt
                 )
 
-                let publishable =
-                    SocialPublishableWorkout(watchResult: result)
                 await gear.savePreparedGearUsage(
                     for: publishable
                 )
@@ -617,10 +645,38 @@ struct AppRootView: View {
                 notifications.syncGearUsageAlerts(
                     from: gear
                 )
+
+                workoutCompletion.finalize(
+                    workout: publishable,
+                    sourceIDs: completionSourceIDs,
+                    userID: appSession.profile.userID,
+                    goals: goals,
+                    challenges: challengeStore,
+                    officialWeekly:
+                        officialWeeklyChallenges,
+                    healthWorkouts: health.workouts,
+                    gear: gear,
+                    trophies: trophies
+                )
+
                 await handleCompletedWorkoutReview(
                     publishable
                 )
                 await refreshTrophiesAndNotifications()
+
+                workoutCompletion.finalize(
+                    workout: publishable,
+                    sourceIDs: completionSourceIDs,
+                    userID: appSession.profile.userID,
+                    goals: goals,
+                    challenges: challengeStore,
+                    officialWeekly:
+                        officialWeeklyChallenges,
+                    healthWorkouts: health.workouts,
+                    gear: gear,
+                    trophies: trophies
+                )
+
                 await social.syncChallenges(challengeStore)
                 await syncSocialOwnedData()
                 watchConnection.clearCompletedWorkout()
@@ -628,6 +684,33 @@ struct AppRootView: View {
         }
         .onChange(of: strengthWorkout.completedWorkout) { _, workout in
             guard let workout else { return }
+
+            let publishable =
+                SocialPublishableWorkout(
+                    strengthWorkout: workout
+                )
+            var completionSourceIDs: Set<UUID> = [
+                workout.id
+            ]
+            if let healthKitWorkoutUUID =
+                    workout.healthMetrics
+                        .healthKitWorkoutUUID {
+                completionSourceIDs.insert(
+                    healthKitWorkoutUUID
+                )
+            }
+
+            workoutCompletion.begin(
+                workout: publishable,
+                sourceIDs: completionSourceIDs,
+                goals: goals,
+                challenges: challengeStore,
+                officialWeekly:
+                    officialWeeklyChallenges,
+                healthWorkouts: health.workouts,
+                gear: gear,
+                trophies: trophies
+            )
 
             appSession.applyStrengthProgression(from: workout)
             notifications.recordStrengthWorkout(workout)
@@ -649,16 +732,20 @@ struct AppRootView: View {
                     await health.refreshAll()
                 }
 
+                await goals.refreshAutomaticMilestones(
+                    health: health,
+                    strength: strengthWorkout
+                )
+                notifications.syncGoalEvents(
+                    from: goals.goals
+                )
+
                 if let endedAt = workout.endedAt {
                     await social.finishActiveWorkout(
                         sourceWorkoutID: workout.healthMetrics.healthKitWorkoutUUID ?? workout.id,
                         endedAt: endedAt
                     )
                 }
-                let publishable =
-                    SocialPublishableWorkout(
-                        strengthWorkout: workout
-                    )
                 await gear.savePreparedGearUsage(
                     for: publishable
                 )
@@ -668,11 +755,39 @@ struct AppRootView: View {
                 notifications.syncGearUsageAlerts(
                     from: gear
                 )
+
+                workoutCompletion.finalize(
+                    workout: publishable,
+                    sourceIDs: completionSourceIDs,
+                    userID: appSession.profile.userID,
+                    goals: goals,
+                    challenges: challengeStore,
+                    officialWeekly:
+                        officialWeeklyChallenges,
+                    healthWorkouts: health.workouts,
+                    gear: gear,
+                    trophies: trophies
+                )
+
                 await handleCompletedWorkoutReview(
                     publishable
                 )
                 await social.syncChallenges(challengeStore)
                 await refreshTrophiesAndNotifications()
+
+                workoutCompletion.finalize(
+                    workout: publishable,
+                    sourceIDs: completionSourceIDs,
+                    userID: appSession.profile.userID,
+                    goals: goals,
+                    challenges: challengeStore,
+                    officialWeekly:
+                        officialWeeklyChallenges,
+                    healthWorkouts: health.workouts,
+                    gear: gear,
+                    trophies: trophies
+                )
+
                 await syncSocialOwnedData()
             }
         }
