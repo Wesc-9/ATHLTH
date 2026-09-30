@@ -397,10 +397,14 @@ private struct ATHLTHLockScreenWidgetView: View {
                 systemImage: workout.systemImage
             )
         } else {
-            Label(
-                "Recovery \(entry.snapshot.recoveryScore.map(String.init) ?? "—")",
-                systemImage: "heart.fill"
-            )
+            Label {
+                Text("Recovery") +
+                Text(
+                    " \(entry.snapshot.recoveryScore.map(String.init) ?? "—")"
+                )
+            } icon: {
+                Image(systemName: "heart.fill")
+            }
         }
     }
 
@@ -622,8 +626,9 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                             if let next =
                                 context.state
                                     .runningNextStepTitle {
-                                Text(
-                                    "Next: \(next)"
+                                (
+                                    Text("Next:") +
+                                    Text(" \(next)")
                                 )
                                 .font(.caption2)
                                 .foregroundStyle(
@@ -776,8 +781,9 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                             if let next =
                                 context.state
                                     .runningNextStepTitle {
-                                Text(
-                                    "Next: \(next)"
+                                (
+                                    Text("Next:") +
+                                    Text(" \(next)")
                                 )
                                 .font(.caption2)
                                 .foregroundStyle(
