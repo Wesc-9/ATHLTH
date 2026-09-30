@@ -56,8 +56,8 @@ enum MeasurementPreference: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .metric: return "Metric"
-        case .imperial: return "Imperial"
+        case .metric: return String(localized: "Metric")
+        case .imperial: return String(localized: "Imperial")
         }
     }
 
@@ -122,9 +122,9 @@ enum AppAppearance: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
+        case .system: return String(localized: "System")
+        case .light: return String(localized: "Light")
+        case .dark: return String(localized: "Dark")
         }
     }
 
@@ -156,11 +156,11 @@ enum TrainingDeviceProvider: String, CaseIterable, Identifiable, Codable {
     var subtitle: String {
         switch self {
         case .appleWatch:
-            return "Live workouts, heart rate, routes and HealthKit sync"
+            return String(localized: "Live workouts, heart rate, routes and HealthKit sync")
         case .garmin:
-            return "Coming soon · Garmin Connect"
+            return String(localized: "Coming soon · Garmin Connect")
         case .none:
-            return "Record outdoor runs and walks. Carry your iPhone throughout the workout."
+            return String(localized: "Record outdoor runs and walks. Carry your iPhone throughout the workout.")
         }
     }
 
@@ -190,7 +190,7 @@ enum WorkoutCapturePreference: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .automatic: return "Automatic"
+        case .automatic: return String(localized: "Automatic")
         case .iPhone: return "iPhone"
         case .appleWatch: return "Apple Watch"
         }
@@ -205,8 +205,8 @@ enum StrengthTrackingPreference: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .simple: return "Simple"
-        case .advanced: return "Advanced"
+        case .simple: return String(localized: "Simple")
+        case .advanced: return String(localized: "Advanced")
         }
     }
 }
@@ -220,17 +220,17 @@ enum ExternalWorkoutImportMode: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .ask: return "Ask before importing"
-        case .automatic: return "Automatically import"
-        case .never: return "Don't import"
+        case .ask: return String(localized: "Ask before importing")
+        case .automatic: return String(localized: "Automatically import")
+        case .never: return String(localized: "Don't import")
         }
     }
 
     var shortTitle: String {
         switch self {
-        case .ask: return "Ask"
-        case .automatic: return "Automatic"
-        case .never: return "Off"
+        case .ask: return String(localized: "Ask")
+        case .automatic: return String(localized: "Automatic")
+        case .never: return String(localized: "Off")
         }
     }
 }
