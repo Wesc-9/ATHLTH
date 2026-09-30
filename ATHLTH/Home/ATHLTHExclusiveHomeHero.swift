@@ -111,6 +111,7 @@ struct ATHLTHExclusiveHomeHeroLayout<Hero: View, Content: View>: View {
     private var horizontalSizeClass
 
     let accent: Color
+    private let showsTopSheen: Bool
     private let hero: Hero
     private let content: Content
 
@@ -128,10 +129,12 @@ struct ATHLTHExclusiveHomeHeroLayout<Hero: View, Content: View>: View {
 
     init(
         accent: Color,
+        showsTopSheen: Bool = true,
         @ViewBuilder hero: () -> Hero,
         @ViewBuilder content: () -> Content
     ) {
         self.accent = accent
+        self.showsTopSheen = showsTopSheen
         self.hero = hero()
         self.content = content()
     }
@@ -182,22 +185,24 @@ struct ATHLTHExclusiveHomeHeroLayout<Hero: View, Content: View>: View {
                         )
                     )
                     .overlay(alignment: .top) {
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.72),
-                                Color.white.opacity(0.18),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 34)
-                        .clipShape(
-                            ATHLTHExclusiveHomeSheetShape(
-                                radius: sheetRadius
+                        if showsTopSheen {
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.72),
+                                    Color.white.opacity(0.18),
+                                    Color.clear
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
-                        )
-                        .allowsHitTesting(false)
+                            .frame(height: 34)
+                            .clipShape(
+                                ATHLTHExclusiveHomeSheetShape(
+                                    radius: sheetRadius
+                                )
+                            )
+                            .allowsHitTesting(false)
+                        }
                     }
                 }
                 .scrollIndicators(.hidden)
