@@ -175,6 +175,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastRenderedRouteLocation: CLLocation?
     private let recoveryDefaultsKey =
         "athlth.watch.activeWorkoutRecovery.v1"
+    private var recoveryInProgress = false
 
     private override init() {
         super.init()
@@ -848,8 +849,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func recoverActiveWorkout() async {
-        guard workoutSession == nil else {
+        guard workoutSession == nil,
+              !recoveryInProgress
+        else {
             return
+        }
+
+        recoveryInProgress = true
+        defer {
+            recoveryInProgress = false
         }
 
         do {
