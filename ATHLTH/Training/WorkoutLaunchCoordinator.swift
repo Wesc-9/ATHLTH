@@ -446,6 +446,28 @@ enum WorkoutLaunchCoordinator {
                 .sendGhostRace(transfer)
         }
 
+        let watchRunningWorkout =
+            structuredWorkout ??
+            WatchRunningWorkoutTransfer(
+                title: "",
+                steps: [],
+                routeAlerts:
+                    configuration
+                        .routeAlerts
+            )
+
+        // Deliver ATHLTH-specific run state before asking HealthKit to launch
+        // the Watch. This avoids a launch race where the workout session starts
+        // before intervals, alerts or Audio Coach have arrived.
+        watchConnection
+            .sendAudioCoachConfiguration(
+                resolvedAudioCoach
+            )
+        watchConnection
+            .sendRunningWorkout(
+                watchRunningWorkout
+            )
+
         try await watchConnection
             .startWorkoutOnWatch(.running)
 
@@ -453,27 +475,26 @@ enum WorkoutLaunchCoordinator {
             configuration.gearIDs
         )
 
+        // Launch can briefly change WCSession reachability. Re-send the small
+        // configuration payload after launch; the connection store queues a
+        // durable fallback if the immediate message cannot be delivered.
         watchConnection
             .sendAudioCoachConfiguration(
                 resolvedAudioCoach
             )
+        watchConnection
+            .sendRunningWorkout(
+                watchRunningWorkout
+            )
 
-        if let structuredWorkout {
+        if let selectedRoute {
             watchConnection
-                .sendRunningWorkout(
-                    structuredWorkout
+                .sendWorkoutRouteSelection(
+                    selectedRoute.id
                 )
         } else {
             watchConnection
-                .sendRunningWorkout(
-                    WatchRunningWorkoutTransfer(
-                        title: "",
-                        steps: [],
-                        routeAlerts:
-                            configuration
-                                .routeAlerts
-                    )
-                )
+                .sendWorkoutRouteSelection(nil)
         }
     }
 
