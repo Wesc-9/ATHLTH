@@ -559,7 +559,11 @@ struct AdvancedPlannerView: View {
                     Spacer()
 
                     Text(
-                        "\(week.days.reduce(0) { $0 + $1.sessions.count }) total"
+                        ATHLTHLocalization.format(
+                                english: "%d total",
+                                norwegian: "%d totalt",
+                                week.days.reduce(0) { $0 + $1.sessions.count }
+                            )
                     )
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.accent)
@@ -1921,7 +1925,11 @@ private struct ProgramStartView: View {
                 if let conflict = conflictingPlan {
                     Section("Schedule Conflict") {
                         Label(
-                            "Overlaps with \(conflict.title)",
+                            ATHLTHLocalization.format(
+                                english: "Overlaps with %@",
+                                norwegian: "Overlapper med %@",
+                                conflict.title
+                            ),
                             systemImage: "exclamationmark.triangle.fill"
                         )
                         .foregroundStyle(.orange)
@@ -2475,7 +2483,11 @@ struct TrainingPlanCreationView: View {
             if let conflict = conflictingPlan {
                 Section("Schedule Conflict") {
                     Label(
-                        "Overlaps with \(conflict.title)",
+                        ATHLTHLocalization.format(
+                                english: "Overlaps with %@",
+                                norwegian: "Overlapper med %@",
+                                conflict.title
+                            ),
                         systemImage: "exclamationmark.triangle.fill"
                     )
                     .foregroundStyle(.orange)
@@ -2633,7 +2645,11 @@ struct TrainingPlanCreationView: View {
             if let conflict = conflictingPlan {
                 Section("Schedule Conflict") {
                     Label(
-                        "Overlaps with \(conflict.title)",
+                        ATHLTHLocalization.format(
+                                english: "Overlaps with %@",
+                                norwegian: "Overlapper med %@",
+                                conflict.title
+                            ),
                         systemImage: "exclamationmark.triangle.fill"
                     )
                     .foregroundStyle(.orange)
@@ -2877,7 +2893,11 @@ struct PlanMetadataEditorView: View {
                 if let conflict = conflictingPlan {
                     Section("Schedule Conflict") {
                         Label(
-                            "Overlaps with \(conflict.title)",
+                            ATHLTHLocalization.format(
+                                english: "Overlaps with %@",
+                                norwegian: "Overlapper med %@",
+                                conflict.title
+                            ),
                             systemImage: "exclamationmark.triangle.fill"
                         )
                         .foregroundStyle(.orange)
@@ -3073,7 +3093,11 @@ struct PlanMetadataEditorView: View {
             )
         }
         .confirmationDialog(
-            "Delete \(plan.title)?",
+            ATHLTHLocalization.format(
+                        english: "Delete %@?",
+                        norwegian: "Slette %@?",
+                        plan.title
+                    ),
             isPresented: $showingDeleteConfirmation,
             titleVisibility: .visible
         ) {
@@ -3615,7 +3639,11 @@ struct SessionEditorView: View {
                             selection: $heartRateTargetZone
                         ) {
                             ForEach(1...5, id: \.self) { zone in
-                                Text("Zone \(zone)")
+                                Text(ATHLTHLocalization.format(
+                                    english: "Zone %d",
+                                    norwegian: "Sone %d",
+                                    zone
+                                ))
                                     .tag(zone)
                             }
                         }
@@ -4324,7 +4352,11 @@ struct SessionEditorView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(
-                                "Remove \(workout.title)"
+                                ATHLTHLocalization.format(
+                        english: "Remove %@",
+                        norwegian: "Fjern %@",
+                        workout.title
+                    )
                             )
                         }
 
@@ -4387,7 +4419,11 @@ struct SessionEditorView: View {
                        let seconds =
                             selectedRoute.expectedTravelTimeSeconds {
                         Label(
-                            "\(max(Int((seconds / 60).rounded()), 1)) min",
+                            ATHLTHLocalization.format(
+                                    english: "%d min",
+                                    norwegian: "%d min",
+                                    max(Int((seconds / 60).rounded()), 1)
+                                ),
                             systemImage: "timer"
                         )
                     }
