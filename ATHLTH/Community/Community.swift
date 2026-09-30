@@ -239,6 +239,128 @@ final class SupabaseCommunityService {
         }
     }
 
+    func searchEvents(
+        _ query: String,
+        limit: Int = 20
+    ) async throws -> [CommunityEventItem] {
+        let clean = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard clean.count >= 2 else { return [] }
+
+        let boundedLimit = min(max(limit, 8), 32)
+        let pattern = "%\(clean)%"
+
+        async let titleRows: [CommunityEventRecord] = client
+            .from("community_events")
+            .select()
+            .ilike("title", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        async let meetingRows: [CommunityEventRecord] = client
+            .from("community_events")
+            .select()
+            .ilike("meeting_name", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        async let summaryRows: [CommunityEventRecord] = client
+            .from("community_events")
+            .select()
+            .ilike("summary", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        async let routeRows: [CommunityEventRecord] = client
+            .from("community_events")
+            .select()
+            .ilike("route_title", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        let (titles, meetings, summaries, routes) = try await (
+            titleRows,
+            meetingRows,
+            summaryRows,
+            routeRows
+        )
+
+        var seen = Set<UUID>()
+        let matchedEvents = (titles + meetings + summaries + routes)
+            .filter { seen.insert($0.id).inserted }
+            .sorted { lhs, rhs in
+                let lhsUpcoming =
+                    lhs.status == "upcoming" &&
+                    lhs.startsAt >= Date()
+                let rhsUpcoming =
+                    rhs.status == "upcoming" &&
+                    rhs.startsAt >= Date()
+
+                if lhsUpcoming != rhsUpcoming {
+                    return lhsUpcoming
+                }
+
+                return lhs.startsAt < rhs.startsAt
+            }
+            .prefix(boundedLimit)
+            .map { $0 }
+
+        guard !matchedEvents.isEmpty else { return [] }
+
+        let eventIDs = matchedEvents.map { $0.id.uuidString }
+
+        let participants: [CommunityEventParticipantRecord] = try await client
+            .from("community_event_participants")
+            .select()
+            .in("event_id", values: eventIDs)
+            .execute()
+            .value
+
+        var profileIDs = Set(matchedEvents.map(\.creatorID))
+        profileIDs.formUnion(participants.map(\.userID))
+
+        let profiles: [SocialProfileCard]
+        if profileIDs.isEmpty {
+            profiles = []
+        } else {
+            profiles = try await client
+                .from("social_profile_cards")
+                .select()
+                .in(
+                    "user_id",
+                    values: profileIDs.map(\.uuidString)
+                )
+                .execute()
+                .value
+        }
+
+        let profilesByID = Dictionary(
+            uniqueKeysWithValues: profiles.map {
+                ($0.userID, $0)
+            }
+        )
+
+        return matchedEvents.map { event in
+            let eventParticipants = participants.filter {
+                $0.eventID == event.id
+            }
+
+            return CommunityEventItem(
+                event: event,
+                creator: profilesByID[event.creatorID],
+                participantRows: eventParticipants,
+                participantProfiles: eventParticipants.compactMap {
+                    profilesByID[$0.userID]
+                }
+            )
+        }
+    }
+
     func createEvent(_ draft: CommunityEventDraft) async throws {
         guard let currentUserID else {
             throw CommunityEventError.notAuthenticated
@@ -424,6 +546,7 @@ enum CommunityEventError: LocalizedError {
 @MainActor
 final class CommunityEventStore: ObservableObject {
     @Published private(set) var events: [CommunityEventItem] = []
+    @Published private(set) var searchResults: [CommunityEventItem] = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
@@ -489,6 +612,44 @@ final class CommunityEventStore: ObservableObject {
 
             errorMessage = error.localizedDescription
         }
+    }
+
+    func search(_ query: String) async {
+        let requestedQuery = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard requestedQuery.count >= 2,
+              currentUserID != nil
+        else {
+            searchResults = []
+            return
+        }
+
+        do {
+            let results = try await service.searchEvents(requestedQuery)
+            guard !Task.isCancelled else { return }
+
+            searchResults = results
+
+            let existingIDs = Set(events.map(\.id))
+            let newItems = results.filter {
+                !existingIDs.contains($0.id)
+            }
+
+            if !newItems.isEmpty {
+                events.append(contentsOf: newItems)
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            searchResults = []
+        }
+    }
+
+    func clearSearch() {
+        searchResults = []
     }
 
     func create(_ draft: CommunityEventDraft) async -> Bool {
