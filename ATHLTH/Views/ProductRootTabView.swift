@@ -3193,48 +3193,128 @@ struct ATHLTHTrainView: View {
             .stroke(Color.white.opacity(0.86), lineWidth: 0.8)
         }
 
-        NavigationLink {
-            GhostRaceHubView()
+        Button {
+            showingGhostHub = true
         } label: {
-            ATHLTHCard {
-                HStack(spacing: 14) {
-                    Image(systemName: "figure.run.circle.fill")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.vitality)
-                        .frame(width: 52, height: 52)
-                        .background(
-                            ATHLTHTheme.vitalitySoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 16,
-                                style: .continuous
-                            )
+            HStack(alignment: .center, spacing: 18) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("GHOST TRAINING")
+                        .font(.caption.weight(.bold))
+                        .tracking(3.0)
+                        .foregroundStyle(
+                            Color.white.opacity(0.72)
                         )
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("GHOST RACE")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.5)
-                            .foregroundStyle(ATHLTHTheme.vitality)
+                    Text("Compete with yourself.")
+                        .font(
+                            .system(
+                                size: 27,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
 
-                        Text("Race Yourself")
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text("Follow a live ghost from a previous run or race your best route attempt.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.leading)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.bold())
-                        .foregroundStyle(.tertiary)
+                    Text(
+                        "Replay a previous run, chase a target time, race a route or challenge a friend."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        Color.white.opacity(0.74)
+                    )
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
                 }
+
+                Spacer(minLength: 6)
+
+                ZStack {
+                    Circle()
+                        .fill(
+                            Color.white.opacity(0.13)
+                        )
+                        .frame(width: 82, height: 82)
+
+                    Circle()
+                        .fill(
+                            Color.white.opacity(0.96)
+                        )
+                        .frame(width: 50, height: 50)
+
+                    Image(systemName: "figure.run")
+                        .font(
+                            .system(
+                                size: 25,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            Color(
+                                red: 0.25,
+                                green: 0.28,
+                                blue: 0.34
+                            )
+                        )
+                }
+                .accessibilityHidden(true)
             }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 22)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 168,
+                alignment: .leading
+            )
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color(
+                            red: 0.06,
+                            green: 0.07,
+                            blue: 0.10
+                        ),
+                        Color(
+                            red: 0.15,
+                            green: 0.18,
+                            blue: 0.24
+                        )
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 30,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 30,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white.opacity(0.06),
+                    lineWidth: 0.8
+                )
+            }
+            .contentShape(
+                RoundedRectangle(
+                    cornerRadius: 30,
+                    style: .continuous
+                )
+            )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(
+            "Ghost Training. Compete with yourself."
+        )
+        .accessibilityHint(
+            "Open Ghost Training to replay a previous run, chase a target time, race a route or challenge a friend."
+        )
 
         if !session.savedWorkoutTemplates.isEmpty {
             ATHLTHCard {
