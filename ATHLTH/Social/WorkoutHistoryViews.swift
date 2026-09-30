@@ -1052,43 +1052,98 @@ struct PostWorkoutReviewView: View {
         ZStack(alignment: .bottomLeading) {
             summaryBackground
 
-            if workout.activity == .strength {
-                LinearGradient(
-                    colors: [
-                        .clear,
-                        .black.opacity(0.18),
-                        .black.opacity(0.78)
-                    ],
-                    startPoint: .topTrailing,
-                    endPoint: .bottomLeading
-                )
-            }
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.16),
+                    Color.black.opacity(0.74)
+                ],
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
+            )
 
-            VStack(alignment: .leading, spacing: 8) {
-                Label("WORKOUT COMPLETE", systemImage: "checkmark.circle.fill")
+            VStack(
+                alignment: .leading,
+                spacing: 0
+            ) {
+                HStack {
+                    Label(
+                        "WORKOUT COMPLETE",
+                        systemImage:
+                            "checkmark.circle.fill"
+                    )
                     .font(.caption2.bold())
-                    .tracking(1.3)
+                    .tracking(1.8)
+
+                    Spacer()
+
+                    Text(workout.source.uppercased())
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.2)
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(
+                            Color.white.opacity(0.12),
+                            in: Capsule()
+                        )
+                }
+
+                Spacer()
+
+                Text(workout.activity.rawValue)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        Color.white.opacity(0.70)
+                    )
+                    .padding(.bottom, 4)
 
                 Text(workout.title)
-                    .font(.title.bold())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    .font(
+                        .system(
+                            size: 31,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.74)
 
-                ViewThatFits(in: .horizontal) {
-                    summaryMetrics(maxMuscleGroups: 3)
-                    summaryMetrics(maxMuscleGroups: 2)
-                    summaryMetrics(maxMuscleGroups: 1)
-                }
+                Text(
+                    workout.startDate.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    Color.white.opacity(0.72)
+                )
+                .padding(.top, 5)
             }
             .foregroundStyle(.white)
-            .padding(18)
+            .padding(20)
         }
-        .frame(height: 190)
+        .frame(height: 224)
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 24,
+                cornerRadius: 30,
                 style: .continuous
             )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 30,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.08),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.10),
+            radius: 22,
+            y: 12
         )
     }
 
@@ -1098,74 +1153,582 @@ struct PostWorkoutReviewView: View {
             Image("StrengthPostWorkoutHero")
                 .resizable()
                 .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
                 .clipped()
         } else {
             LinearGradient(
                 colors: [
-                    ATHLTHTheme.accent.opacity(0.88),
-                    .black.opacity(0.92)
+                    completionAccent.opacity(0.92),
+                    Color(
+                        red: 0.07,
+                        green: 0.08,
+                        blue: 0.11
+                    )
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
-            ATHLTHMarkShape()
-                .fill(.white.opacity(0.11))
-                .frame(width: 175, height: 125)
-                .offset(x: 190, y: -30)
+            Image(systemName: workout.activity.icon)
+                .font(
+                    .system(
+                        size: 132,
+                        weight: .medium
+                    )
+                )
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(
+                    Color.white.opacity(0.10)
+                )
+                .offset(x: 118, y: -4)
         }
     }
 
-    @ViewBuilder
-    private func summaryMetrics(
-        maxMuscleGroups: Int
-    ) -> some View {
-        HStack(spacing: 10) {
-            Label(
-                durationText(workout.duration),
-                systemImage: "clock.fill"
+    private var resultStrip: some View {
+        HStack(spacing: 0) {
+            resultMetric(
+                title: "Time",
+                value: durationText(
+                    workout.duration
+                ),
+                icon: "timer"
             )
 
-            if let distance = workout.distanceMeters,
+            resultDivider
+
+            if let distance =
+                    workout.distanceMeters,
                distance > 0 {
-                Label(
-                    String(format: "%.2f km", distance / 1_000),
-                    systemImage: "location.fill"
+                resultMetric(
+                    title: "Distance",
+                    value: String(
+                        format: "%.2f km",
+                        distance / 1_000
+                    ),
+                    icon: "location.fill"
                 )
-            }
 
-            if let calories = workout.activeEnergyKilocalories,
-               calories > 0 {
-                Label(
-                    String(format: "%.0f kcal", calories),
-                    systemImage: "flame.fill"
-                )
-            }
+                resultDivider
 
-            if workout.activity == .strength,
-               let exerciseCount = workout.strengthExerciseCount,
-               exerciseCount > 0 {
-                Label(
-                    exerciseCount == 1
-                        ? "1 exercise"
-                        : "\(exerciseCount) exercises",
-                    systemImage: "dumbbell.fill"
+                resultMetric(
+                    title: "Pace",
+                    value: averagePaceText(
+                        duration:
+                            workout.duration,
+                        distanceMeters:
+                            distance
+                    ),
+                    icon: "speedometer"
                 )
-            }
+            } else if
+                workout.activity == .strength,
+                let exerciseCount =
+                    workout.strengthExerciseCount,
+                exerciseCount > 0 {
+                resultMetric(
+                    title: "Exercises",
+                    value: "\(exerciseCount)",
+                    icon: "dumbbell.fill"
+                )
 
-            if workout.activity == .strength,
-               let muscles = muscleGroupsText(limit: maxMuscleGroups) {
-                Label(
-                    muscles,
-                    systemImage: "figure.strengthtraining.traditional"
+                resultDivider
+
+                resultMetric(
+                    title: "Volume",
+                    value:
+                        strengthVolumeText ??
+                        "—",
+                    icon:
+                        "scalemass.fill"
                 )
-                .lineLimit(1)
+            } else if let calories =
+                        workout
+                            .activeEnergyKilocalories,
+                      calories > 0 {
+                resultMetric(
+                    title: "Energy",
+                    value: String(
+                        format: "%.0f kcal",
+                        calories
+                    ),
+                    icon: "flame.fill"
+                )
+            } else {
+                resultMetric(
+                    title: "Activity",
+                    value:
+                        workout.activity.rawValue,
+                    icon:
+                        workout.activity.icon
+                )
             }
         }
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.white.opacity(0.94))
-        .lineLimit(1)
+        .padding(.vertical, 15)
+        .padding(.horizontal, 6)
+        .background(
+            Color.white.opacity(0.88),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.96),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func resultMetric(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    completionAccent
+                )
+
+            Text(value)
+                .font(
+                    .subheadline.weight(
+                        .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var resultDivider: some View {
+        Rectangle()
+            .fill(
+                ATHLTHTheme.divider.opacity(0.80)
+            )
+            .frame(width: 1, height: 42)
+    }
+
+    private var reflectionCard: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 18
+        ) {
+            HStack(
+                alignment: .top,
+                spacing: 14
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text("HOW DID IT FEEL?")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.7)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text(
+                        Self.effortLabel(
+                            Int(effort)
+                        )
+                    )
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                }
+
+                Spacer()
+
+                HStack(
+                    alignment: .firstTextBaseline,
+                    spacing: 2
+                ) {
+                    Text("\(Int(effort))")
+                        .font(
+                            .system(
+                                size: 36,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .monospacedDigit()
+                        .foregroundStyle(
+                            completionAccent
+                        )
+
+                    Text("/10")
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                }
+            }
+
+            Slider(
+                value: $effort,
+                in: 1...10,
+                step: 1
+            )
+            .tint(completionAccent)
+
+            HStack {
+                Text("Easy")
+                Spacer()
+                Text("Max")
+            }
+            .font(.caption2)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .padding(.top, -8)
+
+            Divider()
+                .opacity(0.65)
+
+            VStack(
+                alignment: .leading,
+                spacing: 9
+            ) {
+                Text("Quick note")
+                    .font(
+                        .subheadline.weight(
+                            .semibold
+                        )
+                    )
+
+                TextField(
+                    "What stood out about this workout?",
+                    text: $descriptionText,
+                    axis: .vertical
+                )
+                .lineLimit(2...5)
+                .padding(13)
+                .background(
+                    Color.black.opacity(0.035),
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
+                )
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    completionAccent.opacity(0.065),
+                    Color.white.opacity(0.94)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                completionAccent.opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var visibilityCard: some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                HStack {
+                    Label(
+                        "Visibility",
+                        systemImage: "eye.fill"
+                    )
+                    .font(.headline)
+
+                    Spacer()
+
+                    Text(
+                        visibility.title
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Picker(
+                    "Visibility",
+                    selection: $visibility
+                ) {
+                    ForEach(
+                        ProfileVisibility.allCases
+                    ) { option in
+                        Text(option.title)
+                            .tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                visibilityExplanation
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if settings
+                    .autoPublishCompletedWorkouts {
+                    Label(
+                        alreadyPublished
+                            ? "Already shared. Saving updates the existing activity."
+                            : "Nothing is posted until you save this review.",
+                        systemImage: "bolt.fill"
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        completionAccent
+                    )
+                }
+            }
+        }
+    }
+
+    private var saveBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .opacity(0.55)
+
+            HStack(spacing: 12) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text("Workout review")
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text(
+                        visibility ==
+                            .privateOnly
+                            ? "Private"
+                            : visibility.title
+                    )
+                    .font(
+                        .subheadline.weight(
+                            .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                }
+
+                Spacer()
+
+                Button {
+                    Task {
+                        await save()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if saving {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(
+                                systemName:
+                                    visibility ==
+                                        .privateOnly
+                                        ? "checkmark"
+                                        : "square.and.arrow.up"
+                            )
+                        }
+
+                        Text(saveButtonTitle)
+                    }
+                    .font(.headline)
+                    .padding(.horizontal, 18)
+                    .frame(height: 50)
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(completionAccent)
+                .disabled(saving)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .background(.ultraThinMaterial)
+    }
+
+    private func sectionLabel(
+        _ title: String,
+        subtitle: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 3
+        ) {
+            Text(title)
+                .font(.caption2.weight(.bold))
+                .tracking(1.7)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(.horizontal, 2)
+        .padding(.top, 4)
+    }
+
+    private var completionAccent: Color {
+        switch workout.activity {
+        case .running:
+            return ATHLTHTheme.vitality
+        case .walking,
+             .hiking:
+            return .teal
+        case .cycling,
+             .swimming:
+            return .blue
+        case .strength:
+            return .indigo
+        case .hiit:
+            return .orange
+        case .rowing,
+             .elliptical,
+             .stairClimbing:
+            return .cyan
+        case .yoga,
+             .coreTraining:
+            return .purple
+        case .other:
+            return ATHLTHTheme.accentDeep
+        }
+    }
+
+    private var strengthVolumeText: String? {
+        guard let volume =
+                workout
+                    .strengthTotalVolumeKilograms,
+              volume > 0
+        else {
+            return nil
+        }
+
+        if volume >= 1_000 {
+            return String(
+                format: "%.1f t",
+                volume / 1_000
+            )
+        }
+
+        return String(
+            format: "%.0f kg",
+            volume
+        )
+    }
+
+    private var saveButtonTitle: String {
+        if visibility == .privateOnly {
+            return "Save"
+        }
+
+        if alreadyPublished ||
+            wasAutoPublished {
+            return "Update"
+        }
+
+        return "Save & Share"
+    }
+
+    private func averagePaceText(
+        duration: TimeInterval,
+        distanceMeters: Double
+    ) -> String {
+        guard distanceMeters > 0 else {
+            return "—"
+        }
+
+        let secondsPerKilometer =
+            duration /
+            (distanceMeters / 1_000)
+
+        guard secondsPerKilometer.isFinite,
+              secondsPerKilometer > 0
+        else {
+            return "—"
+        }
+
+        let total =
+            max(
+                Int(
+                    secondsPerKilometer
+                        .rounded()
+                ),
+                0
+            )
+
+        return String(
+            format: "%d:%02d/km",
+            total / 60,
+            total % 60
+        )
     }
 
     private func muscleGroupsText(
