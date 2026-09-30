@@ -773,7 +773,13 @@ struct ATHLTHHomeView: View {
 
 
     private var homeInboxUnreadCount: Int {
-        messaging.unreadCount + messaging.messageRequestCount
+        messaging.unreadCount +
+            messaging.messageRequestCount +
+            challenges
+                .incomingInvitations(
+                    for: session.profile.userID
+                )
+                .count
     }
 
     private var homeInboxBadgeText: String {
@@ -2810,6 +2816,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var challenges: ChallengeStore
 
     @State private var selectedSection = 0
     @State private var watchTransferMessage: String?
@@ -2847,6 +2854,14 @@ struct ATHLTHTrainView: View {
                     quickTrainSection
                     trainingPlanSection
                     ghostTrainingSection
+
+                    if let challenge =
+                            relevantTrainingChallenge {
+                        trainingChallengeSection(
+                            challenge
+                        )
+                    }
+
                     trainingToolsSection
 
                     if !session.savedWorkoutTemplates.isEmpty {
@@ -3845,6 +3860,141 @@ struct ATHLTHTrainView: View {
         }
 
         navigationRequest = nil
+    }
+
+    private var relevantTrainingChallenge:
+        ATHLTHChallenge? {
+        let available =
+            challenges.trainingChallenges(
+                for: session.profile.userID
+            )
+
+        if let active =
+                available.first(
+                    where: {
+                        $0.status == .active
+                    }
+                ) {
+            return active
+        }
+
+        let cutoff =
+            Date().addingTimeInterval(
+                48 * 3_600
+            )
+
+        return available
+            .filter {
+                $0.status == .upcoming &&
+                $0.rules.startsAt <= cutoff
+            }
+            .sorted {
+                $0.rules.startsAt <
+                    $1.rules.startsAt
+            }
+            .first
+    }
+
+    private func trainingChallengeSection(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        NavigationLink {
+            ChallengeDetailView(
+                challengeID: challenge.id
+            )
+        } label: {
+            HStack(spacing: 14) {
+                Image(
+                    systemName:
+                        challenge.sport.systemImage
+                )
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(.white)
+                .frame(width: 50, height: 50)
+                .background(
+                    Color.white.opacity(0.14),
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text(
+                        challenge.status == .active
+                            ? "CHALLENGE READY"
+                            : "UPCOMING CHALLENGE"
+                    )
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.4)
+                    .foregroundStyle(
+                        Color.white.opacity(0.66)
+                    )
+
+                    Text(challenge.title)
+                        .font(
+                            .headline.weight(
+                                .bold
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    Text(
+                        challenge.status == .active
+                            ? challenge.sport.title +
+                                " · " +
+                                challenge.rules.scoring.title
+                            : "Starts " +
+                                challenge.rules.startsAt
+                                    .formatted(
+                                        date: .abbreviated,
+                                        time: .shortened
+                                    )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        Color.white.opacity(0.72)
+                    )
+                    .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "arrow.up.right"
+                )
+                .font(.caption.bold())
+                .foregroundStyle(
+                    Color.white.opacity(0.80)
+                )
+            }
+            .padding(16)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.orange.opacity(0.88),
+                        ATHLTHTheme.accentDeep
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var trainingToolsSection: some View {
