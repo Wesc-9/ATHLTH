@@ -577,10 +577,17 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
+        guard !activities.isEmpty else {
+            return []
+        }
+
+        let activityIDs = activities.map(\.id)
+
         async let cardsTask = loadVisibleProfileCards()
         async let reactionsTask: [SocialActivityReactionRecord] = client
             .from("social_activity_reactions")
             .select()
+            .in("activity_id", values: activityIDs)
             .order("created_at", ascending: false)
             .limit(2_000)
             .execute()
@@ -588,6 +595,7 @@ final class SupabaseSocialService: Sendable {
         async let commentsTask: [SocialActivityCommentRecord] = client
             .from("social_activity_comments")
             .select()
+            .in("activity_id", values: activityIDs)
             .order("created_at", ascending: false)
             .limit(600)
             .execute()
