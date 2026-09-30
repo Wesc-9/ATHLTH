@@ -501,6 +501,14 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
+        async let commentsTask: [SocialActivityCommentRecord] = client
+            .from("social_activity_comments")
+            .select()
+            .order("created_at", ascending: true)
+            .limit(600)
+            .execute()
+            .value
+
         let (
             focusRows,
             presenceRows,
@@ -509,7 +517,8 @@ final class SupabaseSocialService: Sendable {
             goalRows,
             gearRows,
             activities,
-            reactions
+            reactions,
+            comments
         ) = try await (
             focusRowsTask,
             presenceRowsTask,
@@ -518,15 +527,18 @@ final class SupabaseSocialService: Sendable {
             goalRowsTask,
             gearRowsTask,
             activitiesTask,
-            reactionsTask
+            reactionsTask,
+            commentsTask
         )
 
         let grouped = Dictionary(grouping: reactions, by: \.activityID)
+        let commentsByActivity = Dictionary(grouping: comments, by: \.activityID)
         let feed = activities.map {
             SocialFeedItem(
                 activity: $0,
                 actor: card,
-                reactions: grouped[$0.id] ?? []
+                reactions: grouped[$0.id] ?? [],
+                comments: commentsByActivity[$0.id] ?? []
             )
         }
 
@@ -551,23 +563,58 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
-        let cards = try await loadVisibleProfileCards()
-        let reactions: [SocialActivityReactionRecord] = try await client
+        async let cardsTask = loadVisibleProfileCards()
+        async let reactionsTask: [SocialActivityReactionRecord] = client
             .from("social_activity_reactions")
             .select()
+            .order("created_at", ascending: false)
+            .limit(2_000)
             .execute()
             .value
+        async let commentsTask: [SocialActivityCommentRecord] = client
+            .from("social_activity_comments")
+            .select()
+            .order("created_at", ascending: false)
+            .limit(600)
+            .execute()
+            .value
+        async let mutedTask = loadMutedUserIDs()
 
-        let cardByID = Dictionary(uniqueKeysWithValues: cards.map { ($0.userID, $0) })
-        let reactionsByActivity = Dictionary(grouping: reactions, by: \.activityID)
+        let (cards, reactions, comments, mutedUserIDs) = try await (
+            cardsTask,
+            reactionsTask,
+            commentsTask,
+            mutedTask
+        )
+
+        let cardByID = Dictionary(
+            uniqueKeysWithValues: cards.map { ($0.userID, $0) }
+        )
+        let reactionsByActivity = Dictionary(
+            grouping: reactions,
+            by: \.activityID
+        )
+        let visibleComments = comments.filter {
+            !mutedUserIDs.contains($0.userID)
+        }
+        let commentsByActivity = Dictionary(
+            grouping: visibleComments,
+            by: \.activityID
+        )
 
         return activities.compactMap { activity in
-            guard let actor = cardByID[activity.actorID] else { return nil }
+            guard !mutedUserIDs.contains(activity.actorID),
+                  let actor = cardByID[activity.actorID]
+            else {
+                return nil
+            }
 
             return SocialFeedItem(
                 activity: activity,
                 actor: actor,
-                reactions: reactionsByActivity[activity.id] ?? []
+                reactions: reactionsByActivity[activity.id] ?? [],
+                comments: (commentsByActivity[activity.id] ?? [])
+                    .sorted { $0.createdAt < $1.createdAt }
             )
         }
     }
@@ -597,6 +644,82 @@ final class SupabaseSocialService: Sendable {
                 .delete()
                 .eq("activity_id", value: activityID)
                 .eq("user_id", value: currentUserID)
+                .execute()
+        }
+    }
+
+    func addComment(
+        activityID: UUID,
+        body: String
+    ) async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        let clean = body.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !clean.isEmpty else { return }
+
+        try await client
+            .from("social_activity_comments")
+            .insert(
+                SocialCommentInsert(
+                    activityID: activityID,
+                    userID: currentUserID,
+                    body: String(clean.prefix(280))
+                )
+            )
+            .execute()
+    }
+
+    func deleteComment(_ commentID: UUID) async throws {
+        try await client
+            .from("social_activity_comments")
+            .delete()
+            .eq("id", value: commentID)
+            .execute()
+    }
+
+    func loadMutedUserIDs() async throws -> Set<UUID> {
+        guard currentUserID != nil else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        let rows: [SocialUserMuteRecord] = try await client
+            .from("social_user_mutes")
+            .select()
+            .execute()
+            .value
+
+        return Set(rows.map(\.mutedID))
+    }
+
+    func setUserMuted(
+        _ userID: UUID,
+        muted: Bool
+    ) async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+        guard userID != currentUserID else { return }
+
+        if muted {
+            try await client
+                .from("social_user_mutes")
+                .upsert(
+                    SocialUserMuteWrite(
+                        muterID: currentUserID,
+                        mutedID: userID
+                    )
+                )
+                .execute()
+        } else {
+            try await client
+                .from("social_user_mutes")
+                .delete()
+                .eq("muter_id", value: currentUserID)
+                .eq("muted_id", value: userID)
                 .execute()
         }
     }
@@ -1336,6 +1459,28 @@ private struct ReactionWrite: Encodable {
         case activityID = "activity_id"
         case userID = "user_id"
         case reaction
+    }
+}
+
+private struct SocialCommentInsert: Encodable {
+    let activityID: UUID
+    let userID: UUID
+    let body: String
+
+    enum CodingKeys: String, CodingKey {
+        case activityID = "activity_id"
+        case userID = "user_id"
+        case body
+    }
+}
+
+private struct SocialUserMuteWrite: Encodable {
+    let muterID: UUID
+    let mutedID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case muterID = "muter_id"
+        case mutedID = "muted_id"
     }
 }
 
