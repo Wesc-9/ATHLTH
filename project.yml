@@ -161,6 +161,8 @@ targets:
         NSLocationWhenInUseUsageDescription: "ATHLTH uses your location during outdoor workouts to record your route and, when available, to save the place where an indoor workout such as strength was performed."
         WKBackgroundModes:
           - workout-processing
+          - audio
+        WKSupportsAlwaysOnDisplay: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.watchkitapp
