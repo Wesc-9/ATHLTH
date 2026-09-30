@@ -366,6 +366,7 @@ enum SocialActivityReaction: String, CaseIterable, Identifiable, Codable, Hashab
     case fire
     case strong
     case clap
+    case heart
 
     var id: String { rawValue }
 
@@ -374,6 +375,7 @@ enum SocialActivityReaction: String, CaseIterable, Identifiable, Codable, Hashab
         case .fire: return "🔥"
         case .strong: return "💪"
         case .clap: return "👏"
+        case .heart: return "❤️"
         }
     }
 }
@@ -420,12 +422,43 @@ struct SocialActivityReactionRecord: Identifiable, Codable, Hashable {
     }
 }
 
+struct SocialActivityCommentRecord: Identifiable, Codable, Hashable {
+    let id: UUID
+    let activityID: UUID
+    let userID: UUID
+    let body: String
+    let createdAt: Date
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case activityID = "activity_id"
+        case userID = "user_id"
+        case body
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct SocialUserMuteRecord: Codable, Hashable {
+    let muterID: UUID
+    let mutedID: UUID
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case muterID = "muter_id"
+        case mutedID = "muted_id"
+        case createdAt = "created_at"
+    }
+}
+
 struct SocialFeedItem: Identifiable, Hashable {
     var id: UUID { activity.id }
 
     let activity: SocialActivityRecord
     let actor: SocialProfileCard
     let reactions: [SocialActivityReactionRecord]
+    let comments: [SocialActivityCommentRecord] = []
     let trainingPartners: [SocialWorkoutParticipantRecord] = []
 }
 
