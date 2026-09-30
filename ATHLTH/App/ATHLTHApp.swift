@@ -16,6 +16,7 @@ struct ATHLTHApp: App {
     @StateObject private var phoneWorkout = IPhoneWorkoutStore()
     @StateObject private var profileGear = ProfileGearStore()
     @StateObject private var notifications = ATHLTHNotificationStore()
+    @StateObject private var workoutCompletion = WorkoutCompletionCoordinator()
     @StateObject private var calendarSync = AppleCalendarSyncStore()
     @StateObject private var challengeStore = ChallengeStore()
     @StateObject private var social = SocialStore()
@@ -56,6 +57,7 @@ struct ATHLTHApp: App {
                 .environmentObject(phoneWorkout)
                 .environmentObject(profileGear)
                 .environmentObject(notifications)
+                .environmentObject(workoutCompletion)
                 .environmentObject(calendarSync)
                 .environmentObject(challengeStore)
                 .environmentObject(social)
@@ -144,6 +146,7 @@ struct AppRootView: View {
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var workoutCompletion: WorkoutCompletionCoordinator
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var officialWeeklyChallenges: OfficialWeeklyChallengeStore
