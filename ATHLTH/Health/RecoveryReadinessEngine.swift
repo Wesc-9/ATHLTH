@@ -15,7 +15,26 @@ enum RecoveryReadinessEngine {
                 .intersection(
                     restingHeartRateDays.keys
                 )
-        let baselineDays = commonDays.count
+                .filter { day in
+                    guard let sleep =
+                            sleepDays[day],
+                          let hrv =
+                            hrvDays[day],
+                          let resting =
+                            restingHeartRateDays[day]
+                    else {
+                        return false
+                    }
+
+                    return sleep.isFinite &&
+                        sleep > 0 &&
+                        hrv.isFinite &&
+                        hrv > 0 &&
+                        resting.isFinite &&
+                        resting > 0
+                }
+        let baselineDays =
+            commonDays.count
 
         let averageSleep =
             average(
