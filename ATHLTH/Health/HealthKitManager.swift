@@ -4804,43 +4804,108 @@ final class HealthKitManager: ObservableObject {
         guard let type =
                 HKObjectType.quantityType(
                     forIdentifier: identifier
-                ),
-              let statistics =
-                workout.statistics(
-                    for: type
                 )
         else {
             return nil
         }
 
-        let quantity: HKQuantity?
+        func quantity(
+            from statistics: HKStatistics
+        ) -> HKQuantity? {
+            if option.contains(
+                .cumulativeSum
+            ) {
+                return statistics
+                    .sumQuantity()
+            }
 
-        if option.contains(.cumulativeSum) {
-            quantity =
-                statistics.sumQuantity()
-        } else if option.contains(
-            .discreteAverage
-        ) {
-            quantity =
-                statistics.averageQuantity()
-        } else if option.contains(
-            .discreteMax
-        ) {
-            quantity =
-                statistics.maximumQuantity()
-        } else if option.contains(
-            .discreteMin
-        ) {
-            quantity =
-                statistics.minimumQuantity()
-        } else {
-            quantity = nil
+            if option.contains(
+                .discreteAverage
+            ) {
+                return statistics
+                    .averageQuantity()
+            }
+
+            if option.contains(
+                .discreteMax
+            ) {
+                return statistics
+                    .maximumQuantity()
+            }
+
+            if option.contains(
+                .discreteMin
+            ) {
+                return statistics
+                    .minimumQuantity()
+            }
+
+            return nil
         }
 
-        return Self.safeDoubleValue(
-            quantity,
-            unit: unit
-        )
+        if let statistics =
+                workout.statistics(
+                    for: type
+                ),
+           let value =
+                Self.safeDoubleValue(
+                    quantity(
+                        from: statistics
+                    ),
+                    unit: unit
+                ) {
+            return value
+        }
+
+        // Compatibility fallback for older/imported workouts that have
+        // associated samples but no cached workout statistics.
+        let predicate =
+            HKQuery.predicateForObjects(
+                from: workout
+            )
+
+        return try await withCheckedThrowingContinuation {
+            (
+                continuation:
+                    CheckedContinuation<
+                        Double?,
+                        Error
+                    >
+            ) in
+
+            let query = HKStatisticsQuery(
+                quantityType: type,
+                quantitySamplePredicate:
+                    predicate,
+                options: option
+            ) { _, result, error in
+                if let error {
+                    continuation.resume(
+                        throwing: error
+                    )
+                    return
+                }
+
+                guard let result else {
+                    continuation.resume(
+                        returning: nil
+                    )
+                    return
+                }
+
+                continuation.resume(
+                    returning:
+                        Self.safeDoubleValue(
+                            quantity(
+                                from: result
+                            ),
+                            unit: unit
+                        )
+                )
+            }
+
+            healthStore.execute(query)
+        }
     }
 
     private func latestDailyAverageQuantity(
@@ -5087,10 +5152,6 @@ final class HealthKitManager: ObservableObject {
         guard let type =
                 HKObjectType.quantityType(
                     forIdentifier: .heartRate
-                ),
-              let statistics =
-                workout.statistics(
-                    for: type
                 )
         else {
             return (nil, nil)
@@ -5100,24 +5161,110 @@ final class HealthKitManager: ObservableObject {
             HKUnit.count()
                 .unitDivided(by: .minute())
 
-        let average =
-            Self.safeDoubleValue(
-                statistics.averageQuantity(),
-                unit: unit
+        if let statistics =
+                workout.statistics(
+                    for: type
+                ) {
+            let average =
+                Self.safeDoubleValue(
+                    statistics
+                        .averageQuantity(),
+                    unit: unit
+                )
+            let maximum =
+                Self.safeDoubleValue(
+                    statistics
+                        .maximumQuantity(),
+                    unit: unit
+                )
+            let validAverage =
+                average.flatMap {
+                    $0 >= 30 &&
+                    $0 <= 260
+                        ? $0
+                        : nil
+                }
+            let validMaximum =
+                maximum.flatMap {
+                    $0 >= 30 &&
+                    $0 <= 260
+                        ? $0
+                        : nil
+                }
+
+            if validAverage != nil ||
+                validMaximum != nil {
+                return (
+                    validAverage,
+                    validMaximum
+                )
+            }
+        }
+
+        let predicate =
+            HKQuery.predicateForObjects(
+                from: workout
             )
-        let maximum =
-            Self.safeDoubleValue(
-                statistics.maximumQuantity(),
-                unit: unit
-            )
+        let samples =
+            try await withCheckedThrowingContinuation {
+                (
+                    continuation:
+                        CheckedContinuation<
+                            [HKQuantitySample],
+                            Error
+                        >
+                ) in
+
+                let query = HKSampleQuery(
+                    sampleType: type,
+                    predicate: predicate,
+                    limit: HKObjectQueryNoLimit,
+                    sortDescriptors: nil
+                ) { _, samples, error in
+                    if let error {
+                        continuation.resume(
+                            throwing: error
+                        )
+                        return
+                    }
+
+                    continuation.resume(
+                        returning:
+                            samples
+                                as? [HKQuantitySample]
+                                ?? []
+                    )
+                }
+
+                healthStore.execute(query)
+            }
+
+        let values =
+            samples.compactMap {
+                sample -> Double? in
+
+                guard let value =
+                        Self.safeDoubleValue(
+                            sample.quantity,
+                            unit: unit
+                        ),
+                      value >= 30,
+                      value <= 260
+                else {
+                    return nil
+                }
+
+                return value
+            }
+
+        guard !values.isEmpty else {
+            return (nil, nil)
+        }
 
         return (
-            average.flatMap {
-                $0 > 0 ? $0 : nil
-            },
-            maximum.flatMap {
-                $0 > 0 ? $0 : nil
-            }
+            values.reduce(0, +) /
+                Double(values.count),
+            values.max()
         )
     }
 
