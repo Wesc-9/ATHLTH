@@ -762,6 +762,7 @@ private struct CommunityGroupInviteResponseParams: Encodable {
 @MainActor
 final class CommunityGroupStore: ObservableObject {
     @Published private(set) var groups: [CommunityGroupRecord] = []
+    @Published private(set) var searchResults: [CommunityGroupRecord] = []
     @Published private(set) var ownMemberships: [CommunityGroupMemberRecord] = []
     @Published private(set) var membersByGroup: [UUID: [CommunityGroupMemberRecord]] = [:]
     @Published private(set) var announcementsByGroup: [UUID: [CommunityGroupAnnouncementRecord]] = [:]
@@ -1051,6 +1052,70 @@ final class CommunityGroupStore: ObservableObject {
                 challenge.targetValue
             )
         }
+    }
+
+    func search(_ query: String) async {
+        let requestedQuery = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard requestedQuery.count >= 2,
+              currentUserID != nil
+        else {
+            searchResults = []
+            return
+        }
+
+        let pattern = "%\(requestedQuery)%"
+
+        do {
+            async let nameRows: [CommunityGroupRecord] = client
+                .from("community_groups")
+                .select()
+                .ilike("name", pattern: pattern)
+                .limit(20)
+                .execute()
+                .value
+
+            async let locationRows: [CommunityGroupRecord] = client
+                .from("community_groups")
+                .select()
+                .ilike("location_name", pattern: pattern)
+                .limit(20)
+                .execute()
+                .value
+
+            async let summaryRows: [CommunityGroupRecord] = client
+                .from("community_groups")
+                .select()
+                .ilike("summary", pattern: pattern)
+                .limit(20)
+                .execute()
+                .value
+
+            let (names, locations, summaries) = try await (
+                nameRows,
+                locationRows,
+                summaryRows
+            )
+
+            guard !Task.isCancelled else { return }
+
+            var seen = Set<UUID>()
+            searchResults = (names + locations + summaries)
+                .filter { seen.insert($0.id).inserted }
+                .prefix(24)
+                .map { $0 }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            searchResults = []
+        }
+    }
+
+    func clearSearch() {
+        searchResults = []
     }
 
     func refresh(force: Bool = false) async {
