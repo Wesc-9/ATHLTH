@@ -7,13 +7,17 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var routes: [WatchRouteTransfer] = []
     @Published private(set) var connectionText = "Connecting to iPhone"
     @Published private(set) var companionLinked = false
+    @Published private(set) var todayWorkout: WatchTodayWorkoutTransfer?
 
     private let fileManager = FileManager.default
+    private let todayWorkoutDefaultsKey =
+        "athlth.watch.todayWorkout.v1"
     private var pendingWorkoutRouteID: UUID?
 
     override init() {
         super.init()
         loadRoutes()
+        loadTodayWorkout()
         activateConnectivity()
     }
 
@@ -67,6 +71,78 @@ final class WatchRouteStore: NSObject, ObservableObject {
         if let route = route(with: routeID) {
             WatchWorkoutManager.shared
                 .configurePlannedRoute(route)
+        }
+    }
+
+    private func loadTodayWorkout() {
+        guard let data =
+                UserDefaults.standard.data(
+                    forKey: todayWorkoutDefaultsKey
+                ),
+              let workout =
+                try? JSONDecoder().decode(
+                    WatchTodayWorkoutTransfer.self,
+                    from: data
+                )
+        else {
+            return
+        }
+
+        todayWorkout = workout
+    }
+
+    private func storeTodayWorkout(
+        _ workout: WatchTodayWorkoutTransfer?
+    ) {
+        todayWorkout = workout
+
+        guard let workout else {
+            UserDefaults.standard.removeObject(
+                forKey: todayWorkoutDefaultsKey
+            )
+            return
+        }
+
+        guard let data =
+                try? JSONEncoder().encode(workout)
+        else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey: todayWorkoutDefaultsKey
+        )
+    }
+
+    private func requestTodayWorkoutSnapshot() {
+        guard WCSession.isSupported(),
+              WCSession.default.activationState == .activated
+        else {
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.todayWorkoutRequest.rawValue,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
+        ]
+
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler: { _ in
+                    WCSession.default.transferUserInfo(
+                        payload
+                    )
+                }
+            )
+        } else {
+            WCSession.default.transferUserInfo(
+                payload
+            )
         }
     }
 
@@ -139,6 +215,24 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WatchWorkoutManager.shared
                 .configureLiveSurfaceContext(context)
 
+        case .todayWorkout:
+            guard let workout =
+                    try? JSONDecoder().decode(
+                        WatchTodayWorkoutTransfer.self,
+                        from: data
+                    )
+            else {
+                return
+            }
+
+            // A newer snapshot always wins. This also protects against older
+            // queued transferUserInfo payloads arriving after a fresh one.
+            if todayWorkout == nil ||
+                workout.updatedAt >=
+                    (todayWorkout?.updatedAt ?? .distantPast) {
+                storeTodayWorkout(workout)
+            }
+
         case .strengthSnapshot:
             guard let snapshot = try? JSONDecoder().decode(
                 WatchStrengthSessionSnapshot.self,
@@ -154,6 +248,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
              .workoutResult,
              .workoutCommand,
              .workoutRouteSelection,
+             .todayWorkoutRequest,
              .strengthCommand,
              .connectivityProbe,
              .connectivityAck:
@@ -378,6 +473,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
            transferKind == .ghostRace ||
            transferKind == .liveSurfaceConfiguration ||
            transferKind == .liveSurfaceContext ||
+           transferKind == .todayWorkout ||
            transferKind == .strengthSnapshot {
             Task { @MainActor [weak self] in
                 self?.applyWorkoutConfiguration(
@@ -437,6 +533,10 @@ extension WatchRouteStore:
                     probeID: "watch-launch"
                 )
             )
+
+            Task { @MainActor [weak self] in
+                self?.requestTodayWorkoutSnapshot()
+            }
         }
     }
 
