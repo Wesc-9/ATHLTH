@@ -15,7 +15,7 @@ struct ATHLTHWatchApp: App {
             WatchHomeView()
                 .environmentObject(routeStore)
                 .environmentObject(workoutManager)
-                .preferredColorScheme(.light)
+                .preferredColorScheme(.dark)
         }
     }
 }
