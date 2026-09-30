@@ -115,9 +115,11 @@ struct RecoveryAIInsightCard: View {
                         )
 
                     ForEach(
-                        Array(displayFactors.enumerated()),
-                        id: \.element.id
-                    ) { index, factor in
+                        Array(displayFactors.indices),
+                        id: \.self
+                    ) { index in
+                        let factor = displayFactors[index]
+
                         HStack(alignment: .top, spacing: 10) {
                             Text("\(index + 1)")
                                 .font(.caption.weight(.bold))
