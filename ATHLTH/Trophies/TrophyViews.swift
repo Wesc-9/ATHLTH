@@ -311,7 +311,11 @@ struct TrophyProgressCard: View {
             return "Complete"
         }
 
-        return "Next · \(next.displayTarget)"
+        return ATHLTHLocalization.format(
+                            english: "Next · %@",
+                            norwegian: "Neste · %@",
+                            next.displayTarget
+                        )
     }
 }
 
@@ -380,7 +384,11 @@ struct TrophyCollectionView: View {
                         .tracking(1.4)
                         .foregroundStyle(.secondary)
 
-                    Text("\(trophies.unlockedCount) unlocked")
+                    Text(ATHLTHLocalization.format(
+                            english: "%d unlocked",
+                            norwegian: "%d låst opp",
+                            trophies.unlockedCount
+                        ))
                         .font(.title2.bold())
 
                     Text(
@@ -700,7 +708,11 @@ struct TrophyDetailView: View {
                     Spacer()
 
                     if let next = trophy.nextStage {
-                        Text("Next · \(next.displayTarget)")
+                        Text(ATHLTHLocalization.format(
+                            english: "Next · %@",
+                            norwegian: "Neste · %@",
+                            next.displayTarget
+                        ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -712,9 +724,19 @@ struct TrophyDetailView: View {
                 Divider()
 
                 HStack {
-                    Label("\(completed) milestones", systemImage: "checkmark.circle.fill")
+                    Label(ATHLTHLocalization.counted(
+                            completed,
+                            englishSingular: "milestone",
+                            englishPlural: "milestones",
+                            norwegianSingular: "milepæl",
+                            norwegianPlural: "milepæler"
+                        ), systemImage: "checkmark.circle.fill")
                     Spacer()
-                    Text("\(total) total")
+                    Text(ATHLTHLocalization.format(
+                            english: "%d total",
+                            norwegian: "%d totalt",
+                            total
+                        ))
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
