@@ -2093,8 +2093,12 @@ struct TrainingPlanCreationView: View {
 
     @State private var creationMode: TrainingPlanCreationMode?
 
+    init() {
+        _creationMode = State(initialValue: nil)
+    }
+
     fileprivate init(
-        initialMode: TrainingPlanCreationMode? = nil
+        initialMode: TrainingPlanCreationMode
     ) {
         _creationMode = State(initialValue: initialMode)
     }
