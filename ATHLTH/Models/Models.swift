@@ -210,17 +210,17 @@ enum HealthPersonalRecordKind: String, Hashable {
 
     var title: String {
         switch self {
-        case .longestRun: return String(localized: "Longest Run")
-        case .fastest1K: return String(localized: "Fastest 1K")
-        case .fastestMile: return String(localized: "Fastest Mile")
-        case .fastest5K: return String(localized: "Fastest 5K")
-        case .fastest10K: return String(localized: "Fastest 10K")
-        case .fastestHalfMarathon: return String(localized: "Fastest Half Marathon")
-        case .fastestMarathon: return String(localized: "Fastest Marathon")
-        case .longestRide: return String(localized: "Longest Ride")
-        case .longestWalkOrHike: return String(localized: "Longest Walk / Hike")
-        case .longestWorkout: return String(localized: "Longest Workout")
-        case .mostActiveCalories: return String(localized: "Most Active Calories")
+        case .longestRun: return ATHLTHLocalization.string( "Longest Run")
+        case .fastest1K: return ATHLTHLocalization.string( "Fastest 1K")
+        case .fastestMile: return ATHLTHLocalization.string( "Fastest Mile")
+        case .fastest5K: return ATHLTHLocalization.string( "Fastest 5K")
+        case .fastest10K: return ATHLTHLocalization.string( "Fastest 10K")
+        case .fastestHalfMarathon: return ATHLTHLocalization.string( "Fastest Half Marathon")
+        case .fastestMarathon: return ATHLTHLocalization.string( "Fastest Marathon")
+        case .longestRide: return ATHLTHLocalization.string( "Longest Ride")
+        case .longestWalkOrHike: return ATHLTHLocalization.string( "Longest Walk / Hike")
+        case .longestWorkout: return ATHLTHLocalization.string( "Longest Workout")
+        case .mostActiveCalories: return ATHLTHLocalization.string( "Most Active Calories")
         }
     }
 
@@ -611,11 +611,11 @@ enum RecoveryReadinessState: String, Equatable {
 
     var title: String {
         switch self {
-        case .buildingBaseline: return String(localized: "Building baseline")
-        case .ready: return String(localized: "Ready")
-        case .balanced: return String(localized: "Balanced")
-        case .takeItEasy: return String(localized: "Take it easier")
-        case .recover: return String(localized: "Prioritize recovery")
+        case .buildingBaseline: return ATHLTHLocalization.string( "Building baseline")
+        case .ready: return ATHLTHLocalization.string( "Ready")
+        case .balanced: return ATHLTHLocalization.string( "Balanced")
+        case .takeItEasy: return ATHLTHLocalization.string( "Take it easier")
+        case .recover: return ATHLTHLocalization.string( "Prioritize recovery")
         }
     }
 
