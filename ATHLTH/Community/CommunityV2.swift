@@ -196,7 +196,7 @@ struct ATHLTHCommunityV2View: View {
                             profiles:
                                 social
                                     .visibleProfiles +
-                                social.friends
+                                social.mutualFollows
                         )
                     }
 
@@ -214,7 +214,7 @@ struct ATHLTHCommunityV2View: View {
                                 .profile
                                 .avatarURL,
                         friends:
-                            social.friends,
+                            social.mutualFollows,
                         feed:
                             social.feed,
                         ownWorkouts:
