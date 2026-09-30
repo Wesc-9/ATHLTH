@@ -19274,6 +19274,346 @@
           }
         }
       }
+    },
+    "ATHLTH Athlete": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-utøver"
+          }
+        }
+      }
+    },
+    "Workout completed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økt fullført"
+          }
+        }
+      }
+    },
+    "Milestone reached": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Milepæl nådd"
+          }
+        }
+      }
+    },
+    "Goal completed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål fullført"
+          }
+        }
+      }
+    },
+    "Personal record": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personlig rekord"
+          }
+        }
+      }
+    },
+    "Achievement": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prestasjon"
+          }
+        }
+      }
+    },
+    "Signature": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signatur"
+          }
+        }
+      }
+    },
+    "Endurance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utholdenhet"
+          }
+        }
+      }
+    },
+    "Core": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kjerne"
+          }
+        }
+      }
+    },
+    "Rare": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjelden"
+          }
+        }
+      }
+    },
+    "Epic": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Episk"
+          }
+        }
+      }
+    },
+    "ATHLTH Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-mål"
+          }
+        }
+      }
+    },
+    "ATHLTH Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-utfordring"
+          }
+        }
+      }
+    },
+    "Verified": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifisert"
+          }
+        }
+      }
+    },
+    "Locked": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Låst"
+          }
+        }
+      }
+    },
+    "No automatic progression": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen automatisk progresjon"
+          }
+        }
+      }
+    },
+    "Add weight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til vekt"
+          }
+        }
+      }
+    },
+    "Add reps": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til repetisjoner"
+          }
+        }
+      }
+    },
+    "Double progression": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dobbel progresjon"
+          }
+        }
+      }
+    },
+    "Percentage": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prosent"
+          }
+        }
+      }
+    },
+    "Easy Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rolig løpetur"
+          }
+        }
+      }
+    },
+    "Recovery Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjonsløp"
+          }
+        }
+      }
+    },
+    "Long Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langtur"
+          }
+        }
+      }
+    },
+    "Threshold": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terskel"
+          }
+        }
+      }
+    },
+    "Intervals": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intervaller"
+          }
+        }
+      }
+    },
+    "Fartlek": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fartslek"
+          }
+        }
+      }
+    },
+    "Hill Repeats": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bakkeintervaller"
+          }
+        }
+      }
+    },
+    "Race Pace": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurransetempo"
+          }
+        }
+      }
+    },
+    "Progression Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progressiv løpetur"
+          }
+        }
+      }
+    },
+    "Warm-up": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppvarming"
+          }
+        }
+      }
+    },
+    "Steady": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jevnt"
+          }
+        }
+      }
+    },
+    "Cool-down": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nedjogg"
+          }
+        }
+      }
+    },
+    "No target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen mål"
+          }
+        }
+      }
+    },
+    "Easy effort": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rolig innsats"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
