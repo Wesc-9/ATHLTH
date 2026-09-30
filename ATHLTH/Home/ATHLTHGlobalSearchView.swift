@@ -85,7 +85,7 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     private var normalizedQuery: String {
-        cleanQuery.lowercased()
+        searchKey(cleanQuery)
     }
 
     private var recentSearches: [String] {
@@ -165,6 +165,18 @@ struct ATHLTHGlobalSearchView: View {
             }
             .task(id: query) {
                 await refreshRemotePeopleSearch()
+            }
+            .task {
+                do {
+                    try await Task.sleep(
+                        nanoseconds: 160_000_000
+                    )
+                } catch {
+                    return
+                }
+
+                guard !Task.isCancelled else { return }
+                searchFocused = true
             }
             .onDisappear {
                 social.clearSearch()
@@ -1082,14 +1094,27 @@ struct ATHLTHGlobalSearchView: View {
                     return false
                 }
 
-                return profile.resolvedName.lowercased()
-                    .contains(normalizedQuery) ||
-                    profile.usernameLabel.lowercased()
-                    .contains(normalizedQuery)
+                return searchScore([
+                    profile.resolvedName,
+                    profile.usernameLabel
+                ]) < Int.max
             }
-            .sorted {
-                $0.resolvedName.localizedCaseInsensitiveCompare(
-                    $1.resolvedName
+            .sorted { lhs, rhs in
+                let lhsScore = searchScore([
+                    lhs.resolvedName,
+                    lhs.usernameLabel
+                ])
+                let rhsScore = searchScore([
+                    rhs.resolvedName,
+                    rhs.usernameLabel
+                ])
+
+                if lhsScore != rhsScore {
+                    return lhsScore < rhsScore
+                }
+
+                return lhs.resolvedName.localizedCaseInsensitiveCompare(
+                    rhs.resolvedName
                 ) == .orderedAscending
             }
     }
@@ -1118,36 +1143,180 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     private var matchingGroups: [CommunityGroupRecord] {
-        groups.groups.filter {
-            $0.name.lowercased().contains(normalizedQuery) ||
-            $0.locationName.lowercased().contains(normalizedQuery) ||
-            $0.summary.lowercased().contains(normalizedQuery)
-        }
+        groups.groups
+            .filter {
+                searchScore([
+                    $0.name,
+                    $0.locationName,
+                    $0.summary
+                ]) < Int.max
+            }
+            .sorted { lhs, rhs in
+                let lhsScore = searchScore([
+                    lhs.name,
+                    lhs.locationName,
+                    lhs.summary
+                ])
+                let rhsScore = searchScore([
+                    rhs.name,
+                    rhs.locationName,
+                    rhs.summary
+                ])
+
+                if lhsScore != rhsScore {
+                    return lhsScore < rhsScore
+                }
+
+                return lhs.name.localizedCaseInsensitiveCompare(
+                    rhs.name
+                ) == .orderedAscending
+            }
     }
 
     private var matchingRoutes: [CommunityRouteRecord] {
-        routes.routes.filter {
-            $0.title.lowercased().contains(normalizedQuery) ||
-            ($0.startName?.lowercased().contains(normalizedQuery) ?? false) ||
-            ($0.endName?.lowercased().contains(normalizedQuery) ?? false)
-        }
+        routes.routes
+            .filter {
+                searchScore([
+                    $0.title,
+                    $0.startName ?? "",
+                    $0.endName ?? ""
+                ]) < Int.max
+            }
+            .sorted { lhs, rhs in
+                let lhsScore = searchScore([
+                    lhs.title,
+                    lhs.startName ?? "",
+                    lhs.endName ?? ""
+                ])
+                let rhsScore = searchScore([
+                    rhs.title,
+                    rhs.startName ?? "",
+                    rhs.endName ?? ""
+                ])
+
+                if lhsScore != rhsScore {
+                    return lhsScore < rhsScore
+                }
+
+                return lhs.title.localizedCaseInsensitiveCompare(
+                    rhs.title
+                ) == .orderedAscending
+            }
     }
 
     private var matchingEvents: [CommunityEventItem] {
-        community.upcomingEvents.filter {
-            $0.event.title.lowercased().contains(normalizedQuery) ||
-            $0.event.summary.lowercased().contains(normalizedQuery) ||
-            $0.event.meetingName.lowercased().contains(normalizedQuery) ||
-            $0.event.activityType.title.lowercased()
-                .contains(normalizedQuery)
-        }
+        community.upcomingEvents
+            .filter {
+                searchScore([
+                    $0.event.title,
+                    $0.event.summary,
+                    $0.event.meetingName,
+                    $0.event.activityType.title
+                ]) < Int.max
+            }
+            .sorted { lhs, rhs in
+                let lhsScore = searchScore([
+                    lhs.event.title,
+                    lhs.event.summary,
+                    lhs.event.meetingName,
+                    lhs.event.activityType.title
+                ])
+                let rhsScore = searchScore([
+                    rhs.event.title,
+                    rhs.event.summary,
+                    rhs.event.meetingName,
+                    rhs.event.activityType.title
+                ])
+
+                if lhsScore != rhsScore {
+                    return lhsScore < rhsScore
+                }
+
+                return lhs.event.startsAt < rhs.event.startsAt
+            }
     }
 
     private var matchingChallenges: [ATHLTHChallenge] {
-        challenges.visibleChallenges.filter {
-            $0.title.lowercased().contains(normalizedQuery) ||
-            $0.sport.title.lowercased().contains(normalizedQuery)
+        challenges.visibleChallenges
+            .filter {
+                searchScore([
+                    $0.title,
+                    $0.sport.title
+                ]) < Int.max
+            }
+            .sorted { lhs, rhs in
+                let lhsScore = searchScore([
+                    lhs.title,
+                    lhs.sport.title
+                ])
+                let rhsScore = searchScore([
+                    rhs.title,
+                    rhs.sport.title
+                ])
+
+                if lhsScore != rhsScore {
+                    return lhsScore < rhsScore
+                }
+
+                return lhs.title.localizedCaseInsensitiveCompare(
+                    rhs.title
+                ) == .orderedAscending
+            }
+    }
+
+    private func searchKey(_ value: String) -> String {
+        value
+            .folding(
+                options: [
+                    .caseInsensitive,
+                    .diacriticInsensitive,
+                    .widthInsensitive
+                ],
+                locale: .current
+            )
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(
+                of: #"\s+"#,
+                with: " ",
+                options: .regularExpression
+            )
+    }
+
+    private func searchScore(_ values: [String]) -> Int {
+        let needle = normalizedQuery
+        guard needle.count >= 2 else { return Int.max }
+
+        var best = Int.max
+
+        for value in values {
+            let candidate = searchKey(value)
+            guard !candidate.isEmpty else { continue }
+
+            if candidate == needle {
+                best = min(best, 0)
+                continue
+            }
+
+            if candidate.hasPrefix(needle) {
+                best = min(best, 1)
+                continue
+            }
+
+            if candidate
+                .split(separator: " ")
+                .contains(where: {
+                    $0.hasPrefix(Substring(needle))
+                }) {
+                best = min(best, 2)
+                continue
+            }
+
+            if candidate.contains(needle) {
+                best = min(best, 3)
+            }
         }
+
+        return best
     }
 
     @MainActor
