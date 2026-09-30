@@ -289,7 +289,13 @@ struct RunningWorkoutLibraryView: View {
 
             HStack(spacing: 10) {
                 Label(
-                    "\(workout.blocks.count) blocks",
+                    ATHLTHLocalization.counted(
+                            workout.blocks.count,
+                            englishSingular: "block",
+                            englishPlural: "blocks",
+                            norwegianSingular: "blokk",
+                            norwegianPlural: "blokker"
+                        ),
                     systemImage: "list.number"
                 )
 
@@ -302,7 +308,11 @@ struct RunningWorkoutLibraryView: View {
 
                 if let duration = workout.estimatedDurationSeconds {
                     Label(
-                        "\(Int((duration / 60).rounded())) min",
+                        ATHLTHLocalization.format(
+                            english: "%d min",
+                            norwegian: "%d min",
+                            Int((duration / 60).rounded())
+                        ),
                         systemImage: "timer"
                     )
                 }
@@ -881,7 +891,11 @@ struct RunningWorkoutBlockRow: View {
                     .foregroundStyle(.secondary)
 
                 if let recovery = block.recovery {
-                    Text("Recovery · \(stepDescription(recovery))")
+                    Text(ATHLTHLocalization.format(
+                                english: "Recovery · %@",
+                                norwegian: "Restitusjon · %@",
+                                stepDescription(recovery)
+                            ))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
