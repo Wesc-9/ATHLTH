@@ -960,6 +960,26 @@
           }
         }
       }
+    },
+    "No structured steps. Pace, distance and route tracking continue normally.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen strukturerte steg. Tempo, distanse og rutesporing fortsetter som normalt."
+          }
+        }
+      }
+    },
+    "/km": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/km"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
