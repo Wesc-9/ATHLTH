@@ -1078,9 +1078,67 @@ extension WorkoutTemplateCatalogEntry {
 struct MyWorkoutTemplatesView: View {
     @EnvironmentObject private var session: AppSessionStore
 
+    @State private var completionHistory:
+        [StructuredWorkoutCompletion] = []
+
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                if !completionHistory.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("RECENT COMPLETED")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.7)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+
+                        ForEach(
+                            completionHistory.prefix(3)
+                        ) { completion in
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "checkmark.circle.fill"
+                                )
+                                .foregroundStyle(.green)
+                                .frame(width: 34, height: 34)
+                                .background(
+                                    Color.green.opacity(0.09),
+                                    in: Circle()
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(completion.title)
+                                        .font(
+                                            .subheadline
+                                                .weight(.semibold)
+                                        )
+
+                                    Text(
+                                        "\(completion.completedBlockCount)/\(completion.totalBlockCount) blocks · \(completion.endedAt.formatted(date: .abbreviated, time: .shortened))"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(12)
+                            .background(
+                                Color.white.opacity(0.72),
+                                in: RoundedRectangle(
+                                    cornerRadius: 17,
+                                    style: .continuous
+                                )
+                            )
+                        }
+                    }
+                }
+
                 if session.savedWorkoutTemplates.isEmpty {
                     ContentUnavailableView(
                         "No saved workouts",
@@ -1109,6 +1167,12 @@ struct MyWorkoutTemplatesView: View {
         )
         .navigationTitle("My Workouts")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            completionHistory =
+                StructuredWorkoutCompletionStore.load(
+                    userID: session.profile.userID
+                )
+        }
     }
 
     private func savedWorkoutCard(
@@ -1230,6 +1294,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var title = ""
     @State private var category = "hybrid"
     @State private var blocks: [WorkoutTemplateBlock] = []
+    @State private var selectedRouteID: UUID?
     @State private var showingExercisePicker = false
 
     private var canSave: Bool {
@@ -1273,6 +1338,46 @@ struct WorkoutTemplateBuilderView: View {
                         }
                         .pickerStyle(.segmented)
                         .padding(.top, 12)
+                    }
+
+                    if category == "running" ||
+                        category == "hybrid" {
+                        ATHLTHCard {
+                            HStack {
+                                Label(
+                                    "Route",
+                                    systemImage: "map"
+                                )
+                                .font(.headline)
+
+                                Spacer()
+
+                                Picker(
+                                    "Route",
+                                    selection: $selectedRouteID
+                                ) {
+                                    Text("–")
+                                        .tag(nil as UUID?)
+
+                                    ForEach(
+                                        session.savedRoutes
+                                    ) { route in
+                                        Text(route.title)
+                                            .tag(
+                                                route.id as UUID?
+                                            )
+                                    }
+                                }
+                                .labelsHidden()
+                            }
+
+                            Text(
+                                "Optional. The route is attached to this workout, not treated as a separate workout."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
@@ -1601,7 +1706,7 @@ struct WorkoutTemplateBuilderView: View {
             durationMinutes: nil,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
-            routeID: nil,
+            routeID: selectedRouteID,
             exercises: [],
             notes: nil
         )
