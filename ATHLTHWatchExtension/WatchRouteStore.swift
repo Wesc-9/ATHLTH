@@ -216,22 +216,37 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 .configureLiveSurfaceContext(context)
 
         case .todayWorkout:
-            guard let workout =
+            guard let snapshot =
                     try? JSONDecoder().decode(
-                        WatchTodayWorkoutTransfer.self,
+                        WatchTodaySnapshot.self,
                         from: data
                     )
             else {
                 return
             }
 
-            // A newer snapshot always wins. This also protects against older
-            // queued transferUserInfo payloads arriving after a fresh one.
-            if todayWorkout == nil ||
-                workout.updatedAt >=
-                    (todayWorkout?.updatedAt ?? .distantPast) {
-                storeTodayWorkout(workout)
+            let currentUpdatedAt =
+                todayWorkout?.updatedAt ??
+                UserDefaults.standard.object(
+                    forKey:
+                        "athlth.watch.todayWorkoutSnapshotDate.v1"
+                ) as? Date ??
+                .distantPast
+
+            // A newer snapshot always wins. This protects against older queued
+            // transferUserInfo payloads arriving after a fresh clear/update.
+            guard snapshot.updatedAt >= currentUpdatedAt else {
+                return
             }
+
+            UserDefaults.standard.set(
+                snapshot.updatedAt,
+                forKey:
+                    "athlth.watch.todayWorkoutSnapshotDate.v1"
+            )
+            storeTodayWorkout(
+                snapshot.workout
+            )
 
         case .strengthSnapshot:
             guard let snapshot = try? JSONDecoder().decode(
