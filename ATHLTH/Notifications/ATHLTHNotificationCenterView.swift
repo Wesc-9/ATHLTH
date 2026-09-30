@@ -783,34 +783,71 @@ struct ATHLTHNotificationCenterView: View {
 
     private var filteredNotificationItems:
         [ATHLTHNotificationItem] {
+        items(for: selectedScope)
+    }
+
+    private func items(
+        for scope: ATHLTHNotificationScope
+    ) -> [ATHLTHNotificationItem] {
         notifications.notificationCenterItems.filter {
             item in
-            switch selectedScope {
+
+            switch scope {
             case .all:
                 return true
+
             case .activity:
-                return item.kind == .workoutCompleted ||
-                    item.kind == .personalRecord ||
-                    item.kind == .system
-            case .goals:
-                return item.kind == .milestoneReached ||
+                return item.kind == .personalRecord ||
+                    item.kind == .milestoneReached ||
                     item.kind == .goalCompleted ||
-                    item.kind == .achievement
+                    item.kind == .achievement ||
+                    item.kind == .system
+
             case .social:
-                return item.kind == .social
+                return item.kind == .social &&
+                    !isChallengeItem(item)
+
+            case .challenges:
+                return isChallengeItem(item)
             }
         }
     }
 
+    private func unreadCount(
+        for scope: ATHLTHNotificationScope
+    ) -> Int {
+        items(for: scope)
+            .filter(\.isUnread)
+            .count
+    }
+
+    private func isChallengeItem(
+        _ item: ATHLTHNotificationItem
+    ) -> Bool {
+        if item.kind == .challenge ||
+            item.challengeID != nil {
+            return true
+        }
+
+        let eventKind =
+            item.socialEventKind?.lowercased() ?? ""
+        let entityType =
+            item.socialEntityType?.lowercased() ?? ""
+
+        return eventKind.contains("challenge") ||
+            entityType.contains("challenge")
+    }
+
     private var inboxSubtitle: String? {
         let unread =
-            filteredNotificationItems.filter(\.isUnread)
+            filteredNotificationItems
+                .filter(\.isUnread)
                 .count
 
         if unread > 0 {
             return unread == 1
-                ? "1 unread"
-                : "\(unread) unread"
+                ? "1 new"
+                : "\(unread) new"
         }
 
         if !filteredNotificationItems.isEmpty {
@@ -822,10 +859,10 @@ struct ATHLTHNotificationCenterView: View {
 
     private var permissionExplanation: String {
         if notifications.authorizationStatus == .denied {
-            return "Your ATHLTH inbox still works. Turn device alerts back on in iOS Settings when you want workout, goal and social updates outside the app."
+            return "Your ATHLTH inbox still works. Turn device alerts back on in iOS Settings when you want important progress, challenge and social updates outside the app."
         }
 
-        return "Get workout completions, milestones, goals and important community updates without needing to keep ATHLTH open."
+        return "Get personal records, milestones, challenge updates and important social activity without needing to keep ATHLTH open."
     }
 
     private var permissionActionTitle: String {
