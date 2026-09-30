@@ -6662,7 +6662,7 @@ struct ATHLTHRecoveryView: View {
         if sleepHRVPairs.count >= 6,
            let averageSleep =
                 recoveryAverage(
-                    sleepHRVPairs.map(\.sleep)
+                    sleepHRVPairs.map { $0.sleep }
                 ) {
             let higher =
                 sleepHRVPairs.filter {
@@ -6677,11 +6677,11 @@ struct ATHLTHRecoveryView: View {
                lower.count >= 2,
                let highHRV =
                     recoveryAverage(
-                        higher.map(\.hrv)
+                        higher.map { $0.hrv }
                     ),
                let lowHRV =
                     recoveryAverage(
-                        lower.map(\.hrv)
+                        lower.map { $0.hrv }
                     ) {
                 let difference =
                     highHRV - lowHRV
@@ -6714,7 +6714,7 @@ struct ATHLTHRecoveryView: View {
         if loadNextRHR.count >= 6,
            let averageLoad =
                 recoveryAverage(
-                    loadNextRHR.map(\.load)
+                    loadNextRHR.map { $0.load }
                 ) {
             let higher =
                 loadNextRHR.filter {
@@ -6729,11 +6729,11 @@ struct ATHLTHRecoveryView: View {
                lower.count >= 2,
                let highRHR =
                     recoveryAverage(
-                        higher.map(\.rhr)
+                        higher.map { $0.rhr }
                     ),
                let lowRHR =
                     recoveryAverage(
-                        lower.map(\.rhr)
+                        lower.map { $0.rhr }
                     ) {
                 let difference =
                     highRHR - lowRHR
