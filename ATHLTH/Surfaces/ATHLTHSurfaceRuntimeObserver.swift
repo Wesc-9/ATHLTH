@@ -169,7 +169,8 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                         .signedDistanceMeters,
                 timeDelta:
                     comparison
-                        .estimatedTimeDeltaSeconds,
+                        .estimatedTimeDeltaSeconds ??
+                    0,
                 configuration:
                     phoneWorkout
                         .active?
