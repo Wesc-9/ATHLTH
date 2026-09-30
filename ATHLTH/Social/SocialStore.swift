@@ -533,6 +533,22 @@ final class SocialStore: ObservableObject {
         return .none
     }
 
+    func loadActivitiesForMatchup(
+        _ userID: UUID
+    ) async -> [SocialActivityRecord] {
+        do {
+            return try await service.loadActivities(
+                for: userID
+            )
+        } catch is CancellationError {
+            return []
+        } catch {
+            guard !Task.isCancelled else { return [] }
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
     func loadFriendProfile(
         _ userID: UUID,
         forceRefresh: Bool = false
