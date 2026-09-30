@@ -62,7 +62,10 @@ struct WatchHomeView: View {
                     } label: {
                         menuCard(
                             title: "Other workouts",
-                            subtitle: "Walk · Strength",
+                            subtitle:
+                                Text(
+                                    "Walk · Strength"
+                                ),
                             icon: "figure.mixed.cardio",
                             accent: false
                         )
@@ -76,8 +79,12 @@ struct WatchHomeView: View {
                             title: "Routes",
                             subtitle:
                                 routeStore.routes.isEmpty
-                                    ? "Send a route from iPhone"
-                                    : "\(routeStore.routes.count) saved",
+                                    ? Text(
+                                        "Send a route from iPhone"
+                                    )
+                                    : Text(
+                                        "\(routeStore.routes.count) saved"
+                                    ),
                             icon: "map.fill",
                             accent: false
                         )
@@ -508,8 +515,8 @@ struct WatchHomeView: View {
     }
 
     private func menuCard(
-        title: String,
-        subtitle: String,
+        title: LocalizedStringKey,
+        subtitle: Text,
         icon: String,
         accent: Bool
     ) -> some View {
@@ -557,7 +564,7 @@ struct WatchHomeView: View {
                         )
                     )
 
-                Text(subtitle)
+                subtitle
                     .font(
                         .system(size: 9)
                     )
@@ -602,12 +609,18 @@ struct WatchHomeView: View {
                 .system(size: 10)
             )
 
-            Text(
-                routeStore
-                    .companionLinked
-                    ? "iPhone connected"
-                    : "Watch can record independently"
-            )
+            Group {
+                if routeStore
+                    .companionLinked {
+                    Text(
+                        "iPhone connected"
+                    )
+                } else {
+                    Text(
+                        "Watch can record independently"
+                    )
+                }
+            }
             .font(
                 .system(
                     size: 9,
