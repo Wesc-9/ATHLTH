@@ -11,6 +11,15 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    static var currentlySupported:
+        [AppLanguage] {
+        [
+            .system,
+            .english,
+            .norwegian
+        ]
+    }
+
     var title: String {
         switch self {
         case .system: return "iPhone"
@@ -331,6 +340,22 @@ final class AppSettingsStore: ObservableObject {
 
     @Published var spotifyAutoplayLinkedPlaylists: Bool { didSet { persist() } }
 
+    var interfaceLocale: Locale {
+        var components =
+            Locale.Components(
+                locale:
+                    language.locale
+            )
+        components.hourCycle =
+            timeFormatPreference ==
+                .twentyFourHour
+                ? .zeroToTwentyThree
+                : .oneToTwelve
+        return Locale(
+            components: components
+        )
+    }
+
     @Published var healthConnected: Bool = false
     @Published var watchConnected: Bool { didSet { persist() } }
     @Published var spotifyConnected: Bool { didSet { persist() } }
@@ -342,9 +367,15 @@ final class AppSettingsStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        // ATHLTH currently ships in English with a Light-only interface.
-        // Keep the underlying types in place so localization/themes can expand later.
-        language = .english
+        language =
+            AppLanguage(
+                rawValue:
+                    defaults.string(
+                        forKey:
+                            "settings.language"
+                    ) ?? ""
+            ) ??
+            .english
 
         let resolvedMeasurementPreference =
             MeasurementPreference(
