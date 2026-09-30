@@ -1108,15 +1108,6 @@ final class CommunityGroupStore: ObservableObject {
                 .map { $0 }
 
             searchResults = results
-
-            let existingIDs = Set(groups.map(\.id))
-            let newGroups = results.filter {
-                !existingIDs.contains($0.id)
-            }
-
-            if !newGroups.isEmpty {
-                groups.append(contentsOf: newGroups)
-            }
         } catch is CancellationError {
             return
         } catch {
@@ -3576,7 +3567,11 @@ struct CommunityGroupDetailView: View {
     private var currentGroup: CommunityGroupRecord {
         groups.groups.first {
             $0.id == group.id
-        } ?? group
+        } ??
+        groups.searchResults.first {
+            $0.id == group.id
+        } ??
+        group
     }
 
     private var isMember: Bool {
@@ -3690,7 +3685,13 @@ struct CommunityGroupDetailView: View {
         .onChange(
             of: groups.groups.map(\.id)
         ) { _, groupIDs in
-            if !groupIDs.contains(group.id) {
+            let isSearchResult =
+                groups.searchResults.contains {
+                    $0.id == group.id
+                }
+
+            if !groupIDs.contains(group.id) &&
+                !isSearchResult {
                 dismiss()
             }
         }
