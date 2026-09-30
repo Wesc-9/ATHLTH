@@ -2975,13 +2975,12 @@ final class HealthKitManager: ObservableObject {
                         return nil
                     }
 
-                    let value =
-                        Self.safeDoubleValue(
-                            sample.quantity,
-                            unit: heartUnit
-                        ) ?? 0
-
-                    guard value >= 30,
+                    guard let value =
+                            Self.safeDoubleValue(
+                                sample.quantity,
+                                unit: heartUnit
+                            ),
+                          value >= 30,
                           value <= 260
                     else {
                         return nil
@@ -3970,21 +3969,39 @@ final class HealthKitManager: ObservableObject {
             start: start,
             end: end
         )
+        let now = Date()
+
         async let vo2 = latestQuantity(
             identifier: .vo2Max,
-            unit: HKUnit(from: "ml/kg*min")
+            unit: HKUnit(from: "ml/kg*min"),
+            startDate:
+                now.addingTimeInterval(
+                    -90 * 86_400
+                )
         )
         async let walkingHeartRate = latestQuantity(
             identifier: .walkingHeartRateAverage,
-            unit: HKUnit.count().unitDivided(by: .minute())
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            startDate:
+                now.addingTimeInterval(
+                    -7 * 86_400
+                )
         )
         async let oxygen = latestQuantity(
             identifier: .oxygenSaturation,
-            unit: .percent()
+            unit: .percent(),
+            startDate:
+                now.addingTimeInterval(
+                    -7 * 86_400
+                )
         )
         async let respiratory = latestQuantity(
             identifier: .respiratoryRate,
-            unit: HKUnit.count().unitDivided(by: .minute())
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            startDate:
+                now.addingTimeInterval(
+                    -7 * 86_400
+                )
         )
 
         let stepsValue = try? await steps
