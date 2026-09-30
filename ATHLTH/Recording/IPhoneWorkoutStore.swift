@@ -1104,7 +1104,7 @@ final class IPhoneWorkoutStore:
     func applyLiveGhostUpdate(
         title: String,
         distanceDelta: Double,
-        timeDelta: TimeInterval,
+        timeDelta: TimeInterval?,
         configuration:
             WatchGhostRaceAudioConfiguration?
     ) {
@@ -1431,7 +1431,7 @@ final class IPhoneWorkoutStore:
     private func evaluateGhostUpdates(
         workout: PhoneWorkout,
         distanceDelta: Double,
-        timeDelta: TimeInterval
+        timeDelta: TimeInterval?
     ) {
         guard let configuration =
                 workout.ghostAudioConfiguration,
@@ -1571,13 +1571,12 @@ final class IPhoneWorkoutStore:
 
     private func deliverGhostUpdate(
         distanceDelta: Double,
-        timeDelta: TimeInterval,
+        timeDelta: TimeInterval?,
         delivery: WatchAlertDelivery,
         priority: ATHLTHGuidancePriority,
         workout: PhoneWorkout
     ) {
         let meters = abs(distanceDelta)
-        let seconds = abs(timeDelta)
         let english: String
         let norwegian: String
 
@@ -1587,31 +1586,79 @@ final class IPhoneWorkoutStore:
             norwegian =
                 "Spøkelsesløp. Helt jevnt."
         } else if distanceDelta > 0 {
-            english =
+            var englishParts = [
                 "Ghost Race. You are " +
-                routeDistancePhrase(meters) +
-                " ahead. About " +
-                durationPhrase(seconds) +
-                " ahead."
-            norwegian =
+                    routeDistancePhrase(meters) +
+                    " ahead."
+            ]
+            var norwegianParts = [
                 "Spøkelsesløp. Du er " +
-                routeDistancePhrase(meters) +
-                " foran. Omtrent " +
-                durationPhrase(seconds) +
-                " foran."
-        } else {
+                    routeDistancePhrase(meters) +
+                    " foran."
+            ]
+
+            if let timeDelta {
+                englishParts.append(
+                    "About " +
+                    durationPhrase(
+                        abs(timeDelta)
+                    ) +
+                    " ahead."
+                )
+                norwegianParts.append(
+                    "Omtrent " +
+                    durationPhrase(
+                        abs(timeDelta)
+                    ) +
+                    " foran."
+                )
+            }
+
             english =
-                "Ghost Race. Your ghost is " +
-                routeDistancePhrase(meters) +
-                " ahead. About " +
-                durationPhrase(seconds) +
-                " behind."
+                englishParts.joined(
+                    separator: " "
+                )
             norwegian =
+                norwegianParts.joined(
+                    separator: " "
+                )
+        } else {
+            var englishParts = [
+                "Ghost Race. Your ghost is " +
+                    routeDistancePhrase(meters) +
+                    " ahead."
+            ]
+            var norwegianParts = [
                 "Spøkelsesløp. Spøkelset er " +
-                routeDistancePhrase(meters) +
-                " foran. Omtrent " +
-                durationPhrase(seconds) +
-                " bak."
+                    routeDistancePhrase(meters) +
+                    " foran."
+            ]
+
+            if let timeDelta {
+                englishParts.append(
+                    "About " +
+                    durationPhrase(
+                        abs(timeDelta)
+                    ) +
+                    " behind."
+                )
+                norwegianParts.append(
+                    "Omtrent " +
+                    durationPhrase(
+                        abs(timeDelta)
+                    ) +
+                    " bak."
+                )
+            }
+
+            english =
+                englishParts.joined(
+                    separator: " "
+                )
+            norwegian =
+                norwegianParts.joined(
+                    separator: " "
+                )
         }
 
         deliverPhoneGuidanceAlert(
