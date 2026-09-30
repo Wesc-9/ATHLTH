@@ -1,0 +1,126 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "READY TO MOVE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KLAR FOR ØKT"
+          }
+        }
+      }
+    },
+    "TODAY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I DAG"
+          }
+        }
+      }
+    },
+    "Quick Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hurtigstart"
+          }
+        }
+      }
+    },
+    "Outdoor · GPS · Heart rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utendørs · GPS · Puls"
+          }
+        }
+      }
+    },
+    "Other workouts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Andre økter"
+          }
+        }
+      }
+    },
+    "Walk · Strength": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gåtur · Styrke"
+          }
+        }
+      }
+    },
+    "Routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruter"
+          }
+        }
+      }
+    },
+    "Send a route from iPhone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send en rute fra iPhone"
+          }
+        }
+      }
+    },
+    "iPhone connected": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone tilkoblet"
+          }
+        }
+      }
+    },
+    "Watch can record independently": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch kan registrere selvstendig"
+          }
+        }
+      }
+    },
+    "No routes yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen ruter ennå"
+          }
+        }
+      }
+    },
+    "Send a route from ATHLTH on iPhone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send en rute fra ATHLTH på iPhone."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
