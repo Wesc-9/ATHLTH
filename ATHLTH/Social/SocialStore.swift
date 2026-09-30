@@ -11,6 +11,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var visibleProfiles: [SocialProfileCard] = []
     @Published private(set) var feed: [SocialFeedItem] = []
     @Published private(set) var blockedUsers: [SocialBlockedUser] = []
+    @Published private(set) var mutedUserIDs: Set<UUID> = []
     @Published private(set) var inboxEvents: [SocialInboxEvent] = []
     @Published private(set) var workoutSessions: [SocialWorkoutSessionRecord] = []
     @Published private(set) var workoutParticipants: [SocialWorkoutParticipantRecord] = []
@@ -83,6 +84,14 @@ final class SocialStore: ObservableObject {
             followerIDs.contains(userID)
     }
 
+    func isMuted(_ userID: UUID) -> Bool {
+        mutedUserIDs.contains(userID)
+    }
+
+    func profile(for userID: UUID) -> SocialProfileCard? {
+        visibleProfiles.first { $0.userID == userID }
+    }
+
     var mutualFollows: [SocialProfileCard] {
         visibleProfiles
             .filter { isMutualFollow($0.userID) }
@@ -140,6 +149,7 @@ final class SocialStore: ObservableObject {
             async let privacyTask = service.loadPrivacySettings()
             async let feedTask = service.loadFeed()
             async let blockedTask = service.loadBlockedUsers()
+            async let mutedTask = service.loadMutedUserIDs()
             async let inboxTask = service.loadInboxEvents()
             async let remoteChallengesTask = service.loadRemoteChallenges()
             async let workoutSessionsTask = service.loadWorkoutSessions()
@@ -152,6 +162,7 @@ final class SocialStore: ObservableObject {
             let privacy = try await privacyTask
             let feed = try await feedTask
             let blocked = try await blockedTask
+            let muted = try await mutedTask
             let inbox = try await inboxTask
             let remoteChallenges = try await remoteChallengesTask
             let workoutSessions = try await workoutSessionsTask
@@ -179,6 +190,7 @@ final class SocialStore: ObservableObject {
                 followingIDs.contains(item.activity.actorID)
             }
             blockedUsers = blocked
+            mutedUserIDs = muted
             inboxEvents = inbox
             applyWorkoutSessions(
                 sessions: workoutSessions,
@@ -603,7 +615,67 @@ final class SocialStore: ObservableObject {
                 activityID: activityID,
                 reaction: reaction
             )
-            feed = try await service.loadFeed()
+            feed = scopedFeed(
+                try await service.loadFeed()
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func addComment(
+        activityID: UUID,
+        body: String
+    ) async {
+        errorMessage = nil
+
+        do {
+            try await service.addComment(
+                activityID: activityID,
+                body: body
+            )
+            feed = scopedFeed(
+                try await service.loadFeed()
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteComment(_ commentID: UUID) async {
+        errorMessage = nil
+
+        do {
+            try await service.deleteComment(commentID)
+            feed = scopedFeed(
+                try await service.loadFeed()
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func setMuted(
+        _ userID: UUID,
+        muted: Bool
+    ) async {
+        errorMessage = nil
+
+        do {
+            try await service.setUserMuted(
+                userID,
+                muted: muted
+            )
+
+            if muted {
+                mutedUserIDs.insert(userID)
+            } else {
+                mutedUserIDs.remove(userID)
+            }
+
+            feed = scopedFeed(
+                try await service.loadFeed()
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1511,6 +1583,17 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    private func scopedFeed(
+        _ loaded: [SocialFeedItem]
+    ) -> [SocialFeedItem] {
+        guard let currentUserID else { return [] }
+
+        return loaded.filter { item in
+            item.activity.actorID == currentUserID ||
+                followingIDs.contains(item.activity.actorID)
+        }
+    }
+
     private func notificationKind(
         for event: SocialInboxEvent
     ) -> ATHLTHNotificationKind {
@@ -1535,6 +1618,7 @@ final class SocialStore: ObservableObject {
         visibleProfiles = []
         feed = []
         blockedUsers = []
+        mutedUserIDs = []
         inboxEvents = []
         workoutSessions = []
         workoutParticipants = []
