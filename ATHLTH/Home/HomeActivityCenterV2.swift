@@ -20,54 +20,74 @@ struct HomeActivityCenterV2: View {
     @State private var showingPublish = false
     @State private var selectedPublishWorkoutID: UUID?
 
-    private var workouts: [SocialPublishableWorkout] {
-        let localStrength =
-            strength.workoutHistory
+    private var latestWorkout: SocialPublishableWorkout? {
+        let finishedStrength =
+            strength.workoutHistory.lazy
                 .filter(\.isFinished)
+
+        let localStrengthIDs = Set(
+            finishedStrength.map(\.id)
+        )
+
+        let latestStrength =
+            finishedStrength
                 .map(SocialPublishableWorkout.init)
+                .max {
+                    $0.startDate < $1.startDate
+                }
 
-        let localStrengthIDs = Set(localStrength.map(\.id))
-
-        let healthWorkouts =
-            health.workouts
+        let latestHealth =
+            health.workouts.lazy
                 .map(SocialPublishableWorkout.init)
                 .filter {
                     !(
                         $0.activity == .strength &&
-                        localStrengthIDs.contains($0.id)
+                        localStrengthIDs.contains(
+                            $0.id
+                        )
                     )
                 }
+                .max {
+                    $0.startDate < $1.startDate
+                }
 
-        return (healthWorkouts + localStrength)
-            .sorted { $0.startDate > $1.startDate }
-    }
-
-    private var latestWorkout: SocialPublishableWorkout? {
-        workouts.first
+        switch (latestStrength, latestHealth) {
+        case let (strength?, health?):
+            return strength.startDate >= health.startDate
+                ? strength
+                : health
+        case let (strength?, nil):
+            return strength
+        case let (nil, health?):
+            return health
+        case (nil, nil):
+            return nil
+        }
     }
 
     private var friendActivity: [SocialFeedItem] {
         guard let currentUserID = social.currentUserID else {
-            return Array(social.feed.prefix(4))
+            return Array(social.feed.prefix(2))
         }
 
         return Array(
-            social.feed
+            social.feed.lazy
                 .filter {
                     $0.actor.userID != currentUserID
                 }
-                .prefix(4)
+                .prefix(2)
         )
     }
 
     private var liveFriendSessions:
         [ATHLTHLiveWorkoutSession] {
-        realtime.visibleLiveSessions
-            .filter {
-                $0.ownerID != social.currentUserID
-            }
-            .prefix(4)
-            .map { $0 }
+        Array(
+            realtime.visibleLiveSessions.lazy
+                .filter {
+                    $0.ownerID != social.currentUserID
+                }
+                .prefix(3)
+        )
     }
 
     var body: some View {
@@ -118,18 +138,10 @@ struct HomeActivityCenterV2: View {
             )
         }
         .task {
-            async let feedRefresh: Void =
-                social.refreshHomeFeed()
-            async let liveRefresh: Void =
-                realtime.refreshVisibleLiveSessions()
-            async let onlineRefresh: Void =
-                realtime.refreshOnlineUsers()
-
-            _ = await (
-                feedRefresh,
-                liveRefresh,
-                onlineRefresh
-            )
+            // Home already refreshes the social feed. Activity Center only
+            // asks for the live-session data it actually renders.
+            await realtime
+                .refreshVisibleLiveSessions()
         }
     }
 
