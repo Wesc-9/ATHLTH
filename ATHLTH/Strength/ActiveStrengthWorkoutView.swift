@@ -197,7 +197,13 @@ struct ActiveStrengthWorkoutView: View {
                         .foregroundStyle(.secondary)
 
                     if workout.trackingMode == .advanced {
-                        Text("\(workout.totalCompletedSets) sets")
+                        Text(ATHLTHLocalization.counted(
+                            workout.totalCompletedSets,
+                            englishSingular: "set",
+                            englishPlural: "sets",
+                            norwegianSingular: "sett",
+                            norwegianPlural: "sett"
+                        ))
                             .font(.subheadline.weight(.semibold))
                     }
                 }
@@ -287,7 +293,12 @@ struct ActiveStrengthWorkoutView: View {
         ATHLTHCard {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Exercise \(strength.currentExerciseIndex + 1) of \(workout.exercises.count)")
+                    Text(ATHLTHLocalization.format(
+                            english: "Exercise %d of %d",
+                            norwegian: "Øvelse %d av %d",
+                            strength.currentExerciseIndex + 1,
+                            workout.exercises.count
+                        ))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Text(exercise.exercise.name)
@@ -448,7 +459,11 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 } else {
                     if let plannedReps = set.plannedReps {
-                        Text("Target: \(plannedReps) reps")
+                        Text(ATHLTHLocalization.format(
+                            english: "Target: %d reps",
+                            norwegian: "Mål: %d repetisjoner",
+                            plannedReps
+                        ))
                             .font(.subheadline.weight(.medium))
                     } else {
                         Text("No rep target")
