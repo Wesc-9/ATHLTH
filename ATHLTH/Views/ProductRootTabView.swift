@@ -85,7 +85,7 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
 
-            ATHLTHInsightsView { tab in
+            ATHLTHRecoveryView { tab in
                 selectedTab = tab
             }
                 .tabItem { Label("Insights", systemImage: "sparkles") }
@@ -5383,7 +5383,7 @@ struct ATHLTHRecoveryView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.top, 10)
                 .padding(.bottom, 30)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
