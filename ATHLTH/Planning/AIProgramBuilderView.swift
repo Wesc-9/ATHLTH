@@ -832,7 +832,12 @@ struct AIProgramBuilderView: View {
             )
 
             Text(
-                "\(startDate.formatted(date: .abbreviated, time: .omitted)) – \(resolvedEndDate.formatted(date: .abbreviated, time: .omitted))"
+                ATHLTHLocalization.format(
+                            english: "%@ – %@",
+                            norwegian: "%@ – %@",
+                            startDate.formatted(date: .abbreviated, time: .omitted),
+                            resolvedEndDate.formatted(date: .abbreviated, time: .omitted)
+                        )
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -933,7 +938,11 @@ struct AIProgramBuilderView: View {
             }
 
             if draft.weeks.count > 4 {
-                Text("+ \(draft.weeks.count - 4) more weeks")
+                Text(ATHLTHLocalization.format(
+                            english: "+ %d more weeks",
+                            norwegian: "+ %d uker til",
+                            draft.weeks.count - 4
+                        ))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
