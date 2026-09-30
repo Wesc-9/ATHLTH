@@ -554,6 +554,42 @@ struct MessageInboxView: View {
             .filter { $0.lastMessage != nil }
     }
 
+    private func items(
+        from conversations: [DirectConversationRecord]
+    ) -> [MessageConversationItem] {
+        guard let currentUserID =
+                messaging.currentUserID
+        else {
+            return []
+        }
+
+        return conversations.compactMap { conversation in
+            guard let otherID =
+                    conversation.otherUserID(
+                        for: currentUserID
+                    ),
+                  let profile = profile(for: otherID)
+            else {
+                return nil
+            }
+
+            return MessageConversationItem(
+                conversation: conversation,
+                friend: profile,
+                lastMessage:
+                    messaging.lastMessage(
+                        for: conversation.id
+                    )
+            )
+        }
+        .sorted {
+            ($0.conversation.lastMessageAt ??
+                $0.conversation.createdAt) >
+            ($1.conversation.lastMessageAt ??
+                $1.conversation.createdAt)
+        }
+    }
+
     private func conversationRequestLabel(
         _ conversation: DirectConversationRecord
     ) -> String? {
