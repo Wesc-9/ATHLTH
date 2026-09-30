@@ -1136,11 +1136,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func prepareForLocalWorkoutStart() {
         ghostRaceConfiguration = nil
+        cachePlannedRouteGeometry(nil)
 
         publish {
             self.audioCoachConfiguration = .disabled
             self.structuredRunningWorkout = nil
             self.structuredStepIndex = 0
+            self.plannedRoute = nil
+            self.routeProgressPercent = nil
+            self.routeRemainingMeters = nil
+            self.routeDeviationMeters = nil
+            self.routeDistanceToStartMeters = nil
             self.routeAlertConfiguration = .standard
             self.targetAlertConfiguration = nil
             self.liveTargetStatus = nil
