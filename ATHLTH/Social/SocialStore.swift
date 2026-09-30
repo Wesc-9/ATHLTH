@@ -337,15 +337,32 @@ final class SocialStore: ObservableObject {
     }
 
     func search(_ query: String) async {
+        let requestedQuery = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard requestedQuery.count >= 2 else {
+            discoverResults = []
+            return
+        }
+
         errorMessage = nil
 
         do {
             let blockedIDs = Set(
                 blockedUsers.map { $0.profile.userID }
             )
-            discoverResults = try await service.searchProfiles(query)
-                .filter { !blockedIDs.contains($0.userID) }
+            let results = try await service.searchProfiles(requestedQuery)
+
+            guard !Task.isCancelled else { return }
+
+            discoverResults = results.filter {
+                !blockedIDs.contains($0.userID)
+            }
+        } catch is CancellationError {
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             discoverResults = []
             errorMessage = error.localizedDescription
         }
