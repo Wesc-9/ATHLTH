@@ -136,9 +136,11 @@ struct HomeActivityRunDetailView: View {
             VStack(spacing: 16) {
                 summaryCard
 
-                WorkoutPlaceCheckInSection(
-                    workoutID: workout.id
-                )
+                if workout.allowsTrainingPlaceCheckIn {
+                    WorkoutPlaceCheckInSection(
+                        workoutID: workout.id
+                    )
+                }
 
                 mapCard
 
