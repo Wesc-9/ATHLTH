@@ -99,7 +99,7 @@ struct RecoveryAIInsightCard: View {
                 metricTile(
                     title: "Load",
                     value: loadValue,
-                    detail: "7d · all workouts",
+                    detail: "7d · strength + walk + run",
                     icon: "chart.bar.fill",
                     tint: .green
                 )
