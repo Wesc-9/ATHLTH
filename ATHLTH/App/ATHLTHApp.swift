@@ -682,6 +682,32 @@ struct AppRootView: View {
                 watchConnection.clearCompletedWorkout()
             }
         }
+        .onChange(of: phoneWorkout.completionStartedWorkout?.id) { _, _ in
+            guard let workout =
+                    phoneWorkout.completionStartedWorkout,
+                  appSession.signedIn
+            else {
+                return
+            }
+
+            let publishable =
+                SocialPublishableWorkout(
+                    phoneWorkout: workout
+                )
+
+            workoutCompletion.begin(
+                workout: publishable,
+                baselineKey: workout.id,
+                sourceIDs: [workout.id],
+                goals: goals,
+                challenges: challengeStore,
+                officialWeekly:
+                    officialWeeklyChallenges,
+                healthWorkouts: health.workouts,
+                gear: gear,
+                trophies: trophies
+            )
+        }
         .onChange(of: phoneWorkout.lastCompletedWorkout?.id) { _, _ in
             guard let workout =
                     phoneWorkout.lastCompletedWorkout,
@@ -706,6 +732,7 @@ struct AppRootView: View {
 
             workoutCompletion.begin(
                 workout: publishable,
+                baselineKey: workout.id,
                 sourceIDs: completionSourceIDs,
                 goals: goals,
                 challenges: challengeStore,
@@ -785,6 +812,7 @@ struct AppRootView: View {
 
                 workoutCompletion.finalize(
                     workout: publishable,
+                    baselineKey: workout.id,
                     sourceIDs: completionSourceIDs,
                     userID: appSession.profile.userID,
                     goals: goals,
@@ -806,6 +834,7 @@ struct AppRootView: View {
 
                 workoutCompletion.finalize(
                     workout: publishable,
+                    baselineKey: workout.id,
                     sourceIDs: completionSourceIDs,
                     userID: appSession.profile.userID,
                     goals: goals,
