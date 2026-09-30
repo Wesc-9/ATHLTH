@@ -4,7 +4,8 @@ struct HomeThisWeekCard: View {
     let plan: TrainingPlan?
     let workouts: [WorkoutSummary]
     let streakCount: Int
-    let onOpenProgress: () -> Void
+    let onOpenPlan: () -> Void
+    let onOpenWorkout: (UUID) -> Void
 
     private let calendar = Calendar.current
 
@@ -16,10 +17,28 @@ struct HomeThisWeekCard: View {
                 progressRing
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(plan?.title ?? "Your week")
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
+                    HStack(spacing: 8) {
+                        Text(plan?.title ?? "Your week")
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+
+                        if let planStatusText {
+                            Text(planStatusText)
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(0.6)
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                )
+                                .padding(.horizontal, 7)
+                                .frame(height: 22)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: Capsule()
+                                )
+                                .lineLimit(1)
+                        }
+                    }
 
                     Text(weekSummary)
                         .font(.caption)
@@ -99,7 +118,7 @@ struct HomeThisWeekCard: View {
             Spacer()
 
             Button {
-                onOpenProgress()
+                onOpenPlan()
             } label: {
                 HStack(spacing: 5) {
                     Text("Details")
@@ -152,6 +171,9 @@ struct HomeThisWeekCard: View {
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
+                    .contentTransition(
+                        .numericText()
+                    )
 
                 Text(progressCaption)
                     .font(.system(size: 8.5, weight: .semibold))
@@ -161,6 +183,10 @@ struct HomeThisWeekCard: View {
             }
         }
         .frame(width: 66, height: 66)
+        .animation(
+            .snappy(duration: 0.28),
+            value: completedWorkoutCount
+        )
     }
 
     private var weekStrip: some View {
@@ -174,7 +200,10 @@ struct HomeThisWeekCard: View {
     @ViewBuilder
     private var nextUpCard: some View {
         if let next = nextPlannedSession {
-            HStack(spacing: 12) {
+            Button {
+                onOpenWorkout(next.id)
+            } label: {
+                HStack(spacing: 12) {
                 Image(systemName: next.kind.systemImage)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(
@@ -214,20 +243,22 @@ struct HomeThisWeekCard: View {
 
                 Spacer()
 
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.bold())
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.bold())
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                }
+                .padding(13)
+                .background(
+                    Color.primary.opacity(0.025),
+                    in: RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
                     )
-            }
-            .padding(13)
-            .background(
-                Color.primary.opacity(0.025),
-                in: RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
                 )
-            )
+            }
+            .buttonStyle(.plain)
         } else if plan != nil {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
@@ -478,6 +509,39 @@ struct HomeThisWeekCard: View {
         plannedWorkoutCount > 0
             ? "DONE"
             : "SESSIONS"
+    }
+
+    private var planStatusText: String? {
+        guard let plan,
+              !plan.weeks.isEmpty
+        else {
+            return nil
+        }
+
+        guard let startDate = plan.startDate else {
+            return "\(plan.weeks.count) WEEKS"
+        }
+
+        let start = calendar.startOfDay(
+            for: startDate
+        )
+        let today = calendar.startOfDay(
+            for: Date()
+        )
+        let days = max(
+            calendar.dateComponents(
+                [.day],
+                from: start,
+                to: today
+            ).day ?? 0,
+            0
+        )
+        let weekNumber = min(
+            days / 7 + 1,
+            plan.weeks.count
+        )
+
+        return "WEEK \(weekNumber)/\(plan.weeks.count)"
     }
 
     private var weekSummary: String {
