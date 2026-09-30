@@ -3287,9 +3287,12 @@ private final class
         NSCache<NSString, UIImage>()
 
     private init() {
-        cache.countLimit = 4
+        // Home only ever needs a handful of recent previews. Keep this cache
+        // deliberately small so Activity Center cannot become a scrolling
+        // memory sink.
+        cache.countLimit = 3
         cache.totalCostLimit =
-            8 * 1_024 * 1_024
+            3 * 1_024 * 1_024
     }
 
     static func cacheKey(
@@ -3345,14 +3348,14 @@ private final class
 
         let size =
             CGSize(
-                width: 420,
-                height: 260
+                width: 360,
+                height: 210
             )
 
         let options =
             MKMapSnapshotter.Options()
         options.size = size
-        options.scale = 1.5
+        options.scale = 1.25
         options.region =
             Self.safeRegion(
                 for: points
@@ -3362,13 +3365,16 @@ private final class
                 userInterfaceStyle: .light
             )
 
-        // Hybrid imagery keeps the terrain character from the reference,
-        // but deliberately avoids realistic 3D elevation on Home.
+        // A muted standard snapshot gives geographic context without the
+        // visual weight, memory pressure and GPU cost of an interactive map.
         let configuration =
-            MKHybridMapConfiguration(
-                elevationStyle: .flat
+            MKStandardMapConfiguration(
+                elevationStyle: .flat,
+                emphasisStyle: .muted
             )
         configuration.showsTraffic = false
+        configuration.pointOfInterestFilter =
+            .excludingAll
         options.preferredConfiguration =
             configuration
 
@@ -3386,7 +3392,7 @@ private final class
             let format =
                 UIGraphicsImageRendererFormat
                     .default()
-            format.scale = 1.5
+            format.scale = 1.25
             format.opaque = true
 
             let renderer =
@@ -3573,87 +3579,37 @@ private final class
             }
         }
 
+        // ATHLTH route ribbon: soft shadow, white separation and a single
+        // calm accent line. It stays readable without implying pace zones.
         UIColor.black
-            .withAlphaComponent(0.20)
+            .withAlphaComponent(0.18)
             .setStroke()
-        path.lineWidth = 15
+        path.lineWidth = 11
         path.stroke()
 
         UIColor.white
             .withAlphaComponent(0.96)
             .setStroke()
-        path.lineWidth = 12
+        path.lineWidth = 7
         path.stroke()
 
-        let palette: [UIColor] = [
-            UIColor(
-                red: 0.02,
-                green: 0.64,
-                blue: 0.53,
-                alpha: 1
-            ),
-            UIColor(
-                red: 0.22,
-                green: 0.78,
-                blue: 0.40,
-                alpha: 1
-            ),
-            UIColor(
-                red: 0.78,
-                green: 0.86,
-                blue: 0.20,
-                alpha: 1
-            ),
-            UIColor(
-                red: 0.99,
-                green: 0.62,
-                blue: 0.08,
-                alpha: 1
-            ),
-            UIColor(
-                red: 0.94,
-                green: 0.24,
-                blue: 0.19,
-                alpha: 1
-            )
-        ]
-
-        for index in
-            1..<renderedPoints.count {
-            let progress =
-                CGFloat(index - 1) /
-                CGFloat(
-                    max(
-                        renderedPoints.count -
-                            2,
-                        1
-                    )
-                )
-
-            let color =
-                interpolatedColor(
-                    palette: palette,
-                    progress: progress
-                )
-
-            let segment =
-                UIBezierPath()
-            segment.move(
-                to: renderedPoints[
-                    index - 1
-                ]
-            )
-            segment.addLine(
-                to: renderedPoints[index]
-            )
-            segment.lineCapStyle = .round
-            color.setStroke()
-            segment.lineWidth = 8
-            segment.stroke()
-        }
+        UIColor(
+            red: 0.10,
+            green: 0.61,
+            blue: 0.45,
+            alpha: 1
+        )
+        .setStroke()
+        path.lineWidth = 4.5
+        path.stroke()
 
         drawStart(
             renderedPoints.first
+        )
+        drawCourseMarker(
+            renderedPoints[
+                renderedPoints.count / 2
+            ]
         )
         drawFinish(
             renderedPoints.last
@@ -3695,6 +3651,80 @@ private final class
             )
         )
         .fill()
+    }
+
+    private static func drawCourseMarker(
+        _ point: CGPoint
+    ) {
+        let outer =
+            UIBezierPath()
+        outer.move(
+            to: CGPoint(
+                x: point.x,
+                y: point.y - 7
+            )
+        )
+        outer.addLine(
+            to: CGPoint(
+                x: point.x + 7,
+                y: point.y
+            )
+        )
+        outer.addLine(
+            to: CGPoint(
+                x: point.x,
+                y: point.y + 7
+            )
+        )
+        outer.addLine(
+            to: CGPoint(
+                x: point.x - 7,
+                y: point.y
+            )
+        )
+        outer.close()
+
+        UIColor.white
+            .withAlphaComponent(0.98)
+            .setFill()
+        outer.fill()
+
+        let inner =
+            UIBezierPath()
+        inner.move(
+            to: CGPoint(
+                x: point.x,
+                y: point.y - 4
+            )
+        )
+        inner.addLine(
+            to: CGPoint(
+                x: point.x + 4,
+                y: point.y
+            )
+        )
+        inner.addLine(
+            to: CGPoint(
+                x: point.x,
+                y: point.y + 4
+            )
+        )
+        inner.addLine(
+            to: CGPoint(
+                x: point.x - 4,
+                y: point.y
+            )
+        )
+        inner.close()
+
+        UIColor(
+            red: 0.08,
+            green: 0.23,
+            blue: 0.18,
+            alpha: 1
+        )
+        .setFill()
+        inner.fill()
     }
 
     private static func drawFinish(
