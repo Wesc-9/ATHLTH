@@ -624,7 +624,7 @@ struct RunQuickStartSheet: View {
                     didLoadGuidanceDefaults = true
                 }
 
-                if social.friends.isEmpty {
+                if social.trainingPartners.isEmpty {
                     await social.refresh()
                 }
 
@@ -959,7 +959,7 @@ struct RunQuickStartSheet: View {
 
     private var startButton: some View {
         Button {
-            let friends = social.friends.filter {
+            let friends = social.trainingPartners.filter {
                 selectedFriendIDs.contains($0.userID)
             }
 
@@ -1315,7 +1315,7 @@ struct WalkQuickStartSheet: View {
                     }
 
                     Button {
-                        let friends = social.friends.filter {
+                        let friends = social.trainingPartners.filter {
                             selectedFriendIDs.contains($0.userID)
                         }
 
@@ -1372,7 +1372,7 @@ struct WalkQuickStartSheet: View {
                     didLoadAudioCoachDefaults = true
                 }
 
-                if social.friends.isEmpty {
+                if social.trainingPartners.isEmpty {
                     await social.refresh()
                 }
 
