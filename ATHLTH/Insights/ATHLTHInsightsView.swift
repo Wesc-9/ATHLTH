@@ -19,16 +19,13 @@ struct ATHLTHInsightsView: View {
 
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.accentDeep.opacity(0.62),
-                softTransition: true,
-                immersiveTransition: immersive,
-                scrollFadeTransition: true
+                accent: ATHLTHTheme.accentDeep.opacity(0.62)
             ) {
                 ATHLTHTabHero(
                     imageName: "ProgressHero",
                     title: "Insights",
                     subtitle: "Understand what is happening, what changed and what it means for your training.",
-                    height: immersive ? 232 : 190,
+                    height: 236,
                     alignment: .leading,
                     focalOffsetX: immersive ? 4 : 16,
                     focalOffsetY: immersive ? 6 : 16,
@@ -48,9 +45,9 @@ struct ATHLTHInsightsView: View {
                     detailDestinationsCard
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 14)
                 .padding(.bottom, 32)
-                .frame(maxWidth: 780)
+                .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
             .toolbar(.hidden, for: .navigationBar)
