@@ -3736,6 +3736,8 @@ struct LibraryFavoritesView: View {
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
     @StateObject private var planLibrary = TrainingPlanLibraryStore()
+    @StateObject private var workoutLibrary =
+        WorkoutTemplateCatalogStore()
     @State private var selectedKind: LibraryFavoriteKind?
 
     private var displayedFavorites: [LibraryFavoriteRecord] {
@@ -3898,8 +3900,14 @@ struct LibraryFavoritesView: View {
             recents.refresh()
             async let saved: Void = favorites.refresh()
             async let plans: Void = planLibrary.refresh()
+            async let workouts: Void = workoutLibrary.refresh()
             async let exercises: Void = exerciseLibrary.refresh()
-            _ = await (saved, plans, exercises)
+            _ = await (
+                saved,
+                plans,
+                workouts,
+                exercises
+            )
         }
     }
 
@@ -3932,11 +3940,17 @@ struct LibraryFavoritesView: View {
                     onSelect: nil,
                     onStart: onStartRunning
                 )
-            } else {
-                RunningWorkoutLibraryView(
-                    source: .library,
-                    onStart: onStartRunning
+            } else if let id =
+                        UUID(uuidString: item.itemID),
+                      let workout =
+                        workoutLibrary.entries.first(
+                            where: { $0.id == id }
+                        ) {
+                WorkoutTemplateDetailView(
+                    entry: workout
                 )
+            } else {
+                WorkoutTemplateLibraryView()
             }
 
         case .exercise:
