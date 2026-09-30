@@ -142,7 +142,7 @@ struct WorkoutStartOptionsView: View {
                     }
 
                     Button {
-                        let selectedFriends = social.friends.filter {
+                        let selectedFriends = social.trainingPartners.filter {
                             selectedFriendIDs.contains($0.userID)
                         }
                         onStart(
@@ -176,7 +176,7 @@ struct WorkoutStartOptionsView: View {
                     audioCoachLoaded = true
                 }
 
-                if social.friends.isEmpty {
+                if social.trainingPartners.isEmpty {
                     await social.refresh()
                 }
             }
