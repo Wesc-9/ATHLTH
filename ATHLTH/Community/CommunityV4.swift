@@ -386,9 +386,7 @@ struct ATHLTHCommunityV4View: View {
                 destinationTitle: "Following",
                 destination: {
                     AnyView(
-                        SocialHubView(
-                            initialTab: .friends
-                        )
+                        ProfileFollowListView(mode: .following)
                     )
                 }
             )
@@ -895,9 +893,7 @@ private struct CommunityV4SocialSnapshot: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
-                    SocialHubView(
-                        initialTab: .friends
-                    )
+                    ProfileFollowListView(mode: .following)
                 } label: {
                     metric(
                         mutuals,
@@ -907,9 +903,7 @@ private struct CommunityV4SocialSnapshot: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
-                    SocialHubView(
-                        initialTab: .friends
-                    )
+                    ProfileFollowListView(mode: .following)
                 } label: {
                     metric(
                         online,
