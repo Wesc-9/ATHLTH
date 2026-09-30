@@ -301,6 +301,7 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
 }
 
 enum ExerciseLibrarySource: String, Codable, Hashable {
+    case athlthCatalog
     case repDB
     case custom
 }
