@@ -5257,6 +5257,15 @@ struct ATHLTHRecoveryView: View {
     @State private var showingRecoveryCoach = false
     @State private var selectedRecoveryTool: RecoveryTool?
 
+    private struct RecoveryChangeItem: Identifiable {
+        let id: String
+        let title: String
+        let detail: String
+        let icon: String
+        let tint: Color
+        let magnitude: Double
+    }
+
     var body: some View {
         NavigationStack {
             ATHLTHExclusiveHomeHeroLayout(
@@ -5329,6 +5338,17 @@ struct ATHLTHRecoveryView: View {
                             showingSorenessLog = true
                         }
 
+                        plannedWorkoutInsightCard
+                        whatChangedCard
+                        loadBalanceCard
+
+                        RecoveryTrendsCard(
+                            snapshot: recoverySnapshot,
+                            sleep: health.sleep
+                        )
+
+                        recoveryPatternsCard
+
                         if session.hasPaidAccess &&
                             session.aiHealthDataSharingEnabled {
                             RecoverySuggestedTodayCard(
@@ -5358,11 +5378,6 @@ struct ATHLTHRecoveryView: View {
                                 sleep: health.sleep
                             )
                         }
-
-                        RecoveryTrendsCard(
-                            snapshot: recoverySnapshot,
-                            sleep: health.sleep
-                        )
                     } else {
                         recoveryUnavailableCard
 
@@ -5371,6 +5386,8 @@ struct ATHLTHRecoveryView: View {
                         ) {
                             showingSorenessLog = true
                         }
+
+                        plannedWorkoutInsightCard
 
                         RecoveryDailyCheckInCard(
                             store: sorenessStore
@@ -5642,6 +5659,1169 @@ struct ATHLTHRecoveryView: View {
             }
             .padding(.top, 14)
         }
+    }
+
+
+    private var plannedWorkoutInsightCard: some View {
+        let sessions = recoveryTodaySessions
+        let overlaps = recoveryPlanOverlapStatuses(
+            sessions: sessions
+        )
+
+        return ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Today vs planned workout")
+                        .font(.title3.weight(.bold))
+
+                    Text(
+                        "Recovery context applied to what you already planned."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(recoveryPlanStatusTitle)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(recoveryPlanStatusTint)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        recoveryPlanStatusTint.opacity(0.10),
+                        in: Capsule()
+                    )
+            }
+
+            if let first = sessions.first {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: first.kind.systemImage)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(
+                            recoveryWorkoutTint(first.kind)
+                        )
+                        .frame(width: 44, height: 44)
+                        .background(
+                            recoveryWorkoutTint(first.kind).opacity(0.09),
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(first.title)
+                            .font(.headline)
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+
+                        Text(recoverySessionSummary(first))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if sessions.count > 1 {
+                            Text(
+                                "+\(sessions.count - 1) more session\(sessions.count == 2 ? "" : "s") planned today"
+                            )
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 12)
+
+                Text(recoveryPlanDetail(overlaps: overlaps))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(2)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                    .padding(.top, 10)
+
+                if !overlaps.isEmpty {
+                    HStack(spacing: 7) {
+                        ForEach(overlaps.prefix(3)) { status in
+                            Text(status.muscleGroup)
+                                .font(.system(size: 9.5, weight: .semibold))
+                                .foregroundStyle(
+                                    status.loadScore >= 0.67
+                                        ? Color.red
+                                        : Color.orange
+                                )
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(
+                                    (
+                                        status.loadScore >= 0.67
+                                            ? Color.red
+                                            : Color.orange
+                                    ).opacity(0.09),
+                                    in: Capsule()
+                                )
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, 9)
+                }
+            } else {
+                HStack(alignment: .top, spacing: 11) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+                        .frame(width: 42, height: 42)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("No workout planned today")
+                            .font(.headline)
+
+                        Text(
+                            "ATHLTH can still use your recovery and muscle load when you choose a quick-start workout."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 12)
+            }
+
+            Button {
+                onSelectTab(1)
+            } label: {
+                HStack {
+                    Label(
+                        sessions.isEmpty
+                            ? "Open Train"
+                            : "Review today's training",
+                        systemImage: "dumbbell.fill"
+                    )
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                }
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
+            .padding(.top, 12)
+        }
+    }
+
+    private var whatChangedCard: some View {
+        ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("What changed?")
+                        .font(.title3.weight(.bold))
+
+                    Text("Recent 7 days compared with the previous 7.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.up.and.down.text.horizontal")
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+            }
+
+            let items = Array(
+                recoveryChangeItems.prefix(3)
+            )
+
+            if items.isEmpty {
+                HStack(alignment: .top, spacing: 11) {
+                    Image(systemName: "equal.circle.fill")
+                        .foregroundStyle(ATHLTHTheme.accent)
+
+                    Text(
+                        "No clear shift yet, or there are not enough comparable days. ATHLTH will surface only changes large enough to be useful."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 12)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(items) { item in
+                        HStack(alignment: .top, spacing: 11) {
+                            Image(systemName: item.icon)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(item.tint)
+                                .frame(width: 34, height: 34)
+                                .background(
+                                    item.tint.opacity(0.10),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 11,
+                                        style: .continuous
+                                    )
+                                )
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+
+                                Text(item.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 9)
+
+                        if item.id != items.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+                .padding(.top, 5)
+            }
+        }
+    }
+
+    private var loadBalanceCard: some View {
+        let load = recoverySnapshot.trainingLoad
+        let total = max(
+            load.strengthMinutes +
+                load.runningMinutes +
+                load.walkingMinutes +
+                load.otherMinutes,
+            0
+        )
+
+        return ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Load & balance")
+                        .font(.title3.weight(.bold))
+
+                    Text(
+                        "Last 7 days · strength, run, walk and other tracked workouts."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+
+                Spacer()
+
+                Text(load.title)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: Capsule()
+                    )
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text("\(Int(load.acuteMinutes.rounded()))")
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text("min / 7d")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if let baseline =
+                    load.chronicWeeklyAverageMinutes {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(Int(baseline.rounded())) min")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                        Text("28d weekly avg")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.top, 12)
+
+            if total > 0 {
+                VStack(spacing: 10) {
+                    recoveryLoadRow(
+                        title: "Strength",
+                        icon: "dumbbell.fill",
+                        minutes: load.strengthMinutes,
+                        total: total,
+                        tint: .purple
+                    )
+                    recoveryLoadRow(
+                        title: "Run",
+                        icon: "figure.run",
+                        minutes: load.runningMinutes,
+                        total: total,
+                        tint: .green
+                    )
+                    recoveryLoadRow(
+                        title: "Walk",
+                        icon: "figure.walk",
+                        minutes: load.walkingMinutes,
+                        total: total,
+                        tint: .blue
+                    )
+
+                    if load.otherMinutes >= 1 {
+                        recoveryLoadRow(
+                            title: "Other",
+                            icon: "figure.mixed.cardio",
+                            minutes: load.otherMinutes,
+                            total: total,
+                            tint: .gray
+                        )
+                    }
+                }
+                .padding(.top, 14)
+            } else {
+                Text(
+                    "No tracked workout load was found in the last 7 days."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 12)
+            }
+
+            Text(
+                "This load view is currently duration-based. It combines tracked activity without pretending that a minute of walking and a minute of hard intervals create identical stress."
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 10)
+        }
+    }
+
+    private var recoveryPatternsCard: some View {
+        let patterns = Array(
+            recoveryObservedPatterns.prefix(3)
+        )
+
+        return ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Patterns ATHLTH noticed")
+                        .font(.title3.weight(.bold))
+
+                    Text("Observed in your recent data when enough days exist.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "sparkles")
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+            }
+
+            if patterns.isEmpty {
+                HStack(alignment: .top, spacing: 11) {
+                    Image(systemName: "hourglass")
+                        .foregroundStyle(ATHLTHTheme.accent)
+
+                    Text(
+                        "ATHLTH is still building enough comparable history to show useful personal patterns."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 12)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(
+                        Array(patterns.enumerated()),
+                        id: \.offset
+                    ) { index, pattern in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text("\(index + 1)")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                )
+                                .frame(width: 30, height: 30)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 10,
+                                        style: .continuous
+                                    )
+                                )
+
+                            Text(pattern)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineSpacing(2)
+                                .fixedSize(
+                                    horizontal: false,
+                                    vertical: true
+                                )
+
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+                .padding(.top, 12)
+            }
+
+            Label(
+                "Observed associations only — not proof that one signal caused another.",
+                systemImage: "info.circle"
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(.top, 10)
+        }
+    }
+
+    private func recoveryLoadRow(
+        title: String,
+        icon: String,
+        minutes: Double,
+        total: Double,
+        tint: Color
+    ) -> some View {
+        let fraction =
+            total > 0
+                ? min(max(minutes / total, 0), 1)
+                : 0
+
+        return VStack(spacing: 5) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 18)
+
+                Text(title)
+                    .font(.caption.weight(.semibold))
+
+                Spacer()
+
+                Text("\(Int(minutes.rounded())) min")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.055))
+
+                    Capsule()
+                        .fill(tint.opacity(0.72))
+                        .frame(
+                            width: proxy.size.width * fraction
+                        )
+                }
+            }
+            .frame(height: 7)
+        }
+    }
+
+    private var recoveryTodaySessions: [PlannedSession] {
+        guard let plan = session.activePlan else {
+            return []
+        }
+
+        let calendar = Calendar.current
+        let weekday =
+            calendar.component(.weekday, from: Date())
+        let dayIndex = ((weekday + 5) % 7) + 1
+
+        let week: TrainingPlanWeek?
+
+        if let startDate = plan.startDate {
+            let start = calendar.startOfDay(for: startDate)
+            let today = calendar.startOfDay(for: Date())
+            let days = max(
+                calendar.dateComponents(
+                    [.day],
+                    from: start,
+                    to: today
+                ).day ?? 0,
+                0
+            )
+            let weekIndex = min(
+                days / 7,
+                max(plan.weeks.count - 1, 0)
+            )
+            week = plan.weeks.indices.contains(weekIndex)
+                ? plan.weeks[weekIndex]
+                : plan.weeks.first
+        } else {
+            week = plan.weeks.first
+        }
+
+        return week?
+            .days
+            .first(
+                where: {
+                    $0.dayIndex == dayIndex
+                }
+            )?
+            .sessions ?? []
+    }
+
+    private func recoverySessionSummary(
+        _ workout: PlannedSession
+    ) -> String {
+        var parts = [workout.kind.title]
+
+        if let duration = workout.durationMinutes {
+            parts.append("\(duration) min")
+        }
+
+        if let distance =
+            workout.targetDistanceKilometers {
+            parts.append(
+                String(
+                    format: "%.1f km",
+                    distance
+                )
+            )
+        }
+
+        if !workout.exercises.isEmpty {
+            parts.append(
+                "\(workout.exercises.count) exercises"
+            )
+        }
+
+        if let running = workout.runningWorkout {
+            parts.append(running.type.title)
+        }
+
+        return parts.joined(separator: " · ")
+    }
+
+    private func recoveryWorkoutTint(
+        _ kind: WorkoutKind
+    ) -> Color {
+        switch kind {
+        case .running: return .green
+        case .walking: return .blue
+        case .strength: return .purple
+        case .mobility: return .teal
+        case .recovery: return .indigo
+        case .custom: return ATHLTHTheme.accentDeep
+        }
+    }
+
+    private var recoveryPlanStatusTitle: String {
+        guard !recoveryTodaySessions.isEmpty else {
+            return "No plan"
+        }
+
+        guard shouldShowWearableRecoveryContent ||
+                !muscleRecoveryStatuses.isEmpty else {
+            return "Check manually"
+        }
+
+        if recoveryPlanSeverity >= 2 {
+            return "Adjust"
+        }
+
+        if recoveryPlanSeverity == 1 {
+            return "Watch"
+        }
+
+        return "On track"
+    }
+
+    private var recoveryPlanStatusTint: Color {
+        switch recoveryPlanSeverity {
+        case 2...: return .red
+        case 1: return .orange
+        default: return .green
+        }
+    }
+
+    private var recoveryPlanSeverity: Int {
+        guard !recoveryTodaySessions.isEmpty else {
+            return 0
+        }
+
+        if health.recovery.state == .recover {
+            return 2
+        }
+
+        if recoveryPlanOverlapStatuses(
+            sessions: recoveryTodaySessions
+        ).contains(
+            where: {
+                $0.soreness == .high ||
+                    $0.loadScore >= 0.67 ||
+                    $0.progress < 0.45
+            }
+        ) {
+            return 2
+        }
+
+        if health.recovery.state == .takeItEasy ||
+            recoverySnapshot.trainingLoad.ratio.map({
+                $0 >= 1.50
+            }) ?? false {
+            return 1
+        }
+
+        if !recoveryPlanOverlapStatuses(
+            sessions: recoveryTodaySessions
+        ).isEmpty {
+            return 1
+        }
+
+        return 0
+    }
+
+    private func recoveryPlanDetail(
+        overlaps: [MuscleRecoveryStatus]
+    ) -> String {
+        guard let first = recoveryTodaySessions.first else {
+            return ""
+        }
+
+        if health.recovery.state == .recover {
+            return
+                "Your current recovery signals are below your normal range. Consider reducing the volume or intensity of \(first.title), or moving it if that fits your plan."
+        }
+
+        if !overlaps.isEmpty {
+            let names = overlaps
+                .prefix(3)
+                .map(\.muscleGroup)
+                .joined(separator: ", ")
+
+            return
+                "\(names) overlap with today's planned work and are still carrying recent load. Review intensity before you start rather than changing the plan automatically."
+        }
+
+        if let ratio =
+            recoverySnapshot.trainingLoad.ratio,
+           ratio >= 1.50 {
+            return
+                "Your 7-day training load is high relative to your recent weekly average. The workout can stay planned, but lower volume or intensity may be worth considering."
+        }
+
+        if shouldShowWearableRecoveryContent {
+            return
+                "Recovery signals and recent muscle load do not show a clear reason to change today's planned workout."
+        }
+
+        return
+            "There is not enough wearable recovery data to assess this workout yet. Use soreness, energy and how the warm-up feels as the final check."
+    }
+
+    private func recoveryPlanOverlapStatuses(
+        sessions: [PlannedSession]
+    ) -> [MuscleRecoveryStatus] {
+        let groups = recoveryPlanMuscleGroups(
+            sessions: sessions
+        )
+
+        guard !groups.isEmpty else {
+            return []
+        }
+
+        return muscleRecoveryStatuses
+            .filter {
+                groups.contains($0.muscleGroup) &&
+                    (
+                        $0.loadScore >= 0.34 ||
+                        $0.progress < 0.85 ||
+                        $0.soreness.rawValue >=
+                            RecoverySorenessLevel.moderate.rawValue
+                    )
+            }
+            .sorted {
+                if $0.loadScore != $1.loadScore {
+                    return $0.loadScore > $1.loadScore
+                }
+
+                return $0.progress < $1.progress
+            }
+    }
+
+    private func recoveryPlanMuscleGroups(
+        sessions: [PlannedSession]
+    ) -> Set<String> {
+        var groups = Set<String>()
+
+        for workout in sessions {
+            switch workout.kind {
+            case .running:
+                groups.formUnion(
+                    [
+                        "Quads",
+                        "Calves",
+                        "Hamstrings",
+                        "Glutes",
+                        "Core"
+                    ]
+                )
+
+            case .walking:
+                groups.formUnion(
+                    [
+                        "Quads",
+                        "Calves",
+                        "Glutes"
+                    ]
+                )
+
+            case .strength:
+                for exercise in workout.exercises {
+                    for raw in
+                        exercise.embeddedExercise.primaryMuscles {
+                        if let group =
+                            recoveryNormalizedMuscleGroup(raw) {
+                            groups.insert(group)
+                        }
+                    }
+                }
+
+            case .mobility, .recovery, .custom:
+                break
+            }
+        }
+
+        return groups
+    }
+
+    private func recoveryNormalizedMuscleGroup(
+        _ raw: String
+    ) -> String? {
+        let value = raw
+            .lowercased()
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+
+        if value.contains("chest") ||
+            value.contains("pect") {
+            return "Chest"
+        }
+        if value.contains("lat") ||
+            value.contains("back") ||
+            value.contains("trap") {
+            return "Back"
+        }
+        if value.contains("shoulder") ||
+            value.contains("delt") {
+            return "Shoulders"
+        }
+        if value.contains("bicep") ||
+            value.contains("tricep") ||
+            value.contains("forearm") {
+            return "Arms"
+        }
+        if value.contains("core") ||
+            value.contains("ab") ||
+            value.contains("oblique") {
+            return "Core"
+        }
+        if value.contains("glute") ||
+            value.contains("hip") {
+            return "Glutes"
+        }
+        if value.contains("quad") {
+            return "Quads"
+        }
+        if value.contains("hamstring") {
+            return "Hamstrings"
+        }
+        if value.contains("calf") ||
+            value.contains("calves") {
+            return "Calves"
+        }
+
+        return nil
+    }
+
+    private var recoveryChangeItems:
+        [RecoveryChangeItem] {
+        let ordered =
+            recoverySnapshot.days
+                .sorted { $0.date < $1.date }
+
+        guard ordered.count >= 8 else {
+            return []
+        }
+
+        let split = ordered.count / 2
+        let previous = Array(ordered.prefix(split))
+        let recent = Array(ordered.suffix(ordered.count - split))
+
+        var items: [RecoveryChangeItem] = []
+
+        if let recentSleep =
+                recoveryAverage(
+                    recent.compactMap(\.sleepDuration)
+                ),
+           let previousSleep =
+                recoveryAverage(
+                    previous.compactMap(\.sleepDuration)
+                ),
+           previousSleep > 0 {
+            let deltaMinutes =
+                (recentSleep - previousSleep) / 60
+            let magnitude =
+                abs(recentSleep - previousSleep) /
+                previousSleep
+
+            if abs(deltaMinutes) >= 15 {
+                items.append(
+                    RecoveryChangeItem(
+                        id: "sleep",
+                        title: "Sleep duration",
+                        detail:
+                            "\(recoverySignedMinutes(deltaMinutes)) average sleep vs previous 7 days.",
+                        icon: "moon.fill",
+                        tint:
+                            deltaMinutes >= 0
+                                ? .green
+                                : .orange,
+                        magnitude: magnitude
+                    )
+                )
+            }
+        }
+
+        if let recentHRV =
+                recoveryAverage(
+                    recent.compactMap(\.hrvMilliseconds)
+                ),
+           let previousHRV =
+                recoveryAverage(
+                    previous.compactMap(\.hrvMilliseconds)
+                ),
+           previousHRV > 0 {
+            let delta = recentHRV - previousHRV
+            let magnitude = abs(delta) / previousHRV
+
+            if abs(delta) >= 3 {
+                items.append(
+                    RecoveryChangeItem(
+                        id: "hrv",
+                        title: "Heart rate variability",
+                        detail:
+                            "\(recoverySignedNumber(delta)) ms average HRV vs previous 7 days.",
+                        icon: "waveform.path.ecg",
+                        tint:
+                            delta >= 0
+                                ? .green
+                                : .orange,
+                        magnitude: magnitude
+                    )
+                )
+            }
+        }
+
+        if let recentRHR =
+                recoveryAverage(
+                    recent.compactMap(\.restingHeartRate)
+                ),
+           let previousRHR =
+                recoveryAverage(
+                    previous.compactMap(\.restingHeartRate)
+                ),
+           previousRHR > 0 {
+            let delta = recentRHR - previousRHR
+            let magnitude = abs(delta) / previousRHR
+
+            if abs(delta) >= 2 {
+                items.append(
+                    RecoveryChangeItem(
+                        id: "rhr",
+                        title: "Resting heart rate",
+                        detail:
+                            "\(recoverySignedNumber(delta)) bpm average resting HR vs previous 7 days.",
+                        icon: "heart.fill",
+                        tint:
+                            delta <= 0
+                                ? .green
+                                : .orange,
+                        magnitude: magnitude
+                    )
+                )
+            }
+        }
+
+        let recentTraining =
+            recent.reduce(0) {
+                $0 + $1.trainingMinutes
+            }
+        let previousTraining =
+            previous.reduce(0) {
+                $0 + $1.trainingMinutes
+            }
+
+        if recentTraining > 0 ||
+            previousTraining > 0 {
+            let delta =
+                recentTraining - previousTraining
+            let denominator =
+                max(previousTraining, 30)
+            let magnitude =
+                abs(delta) / denominator
+
+            if abs(delta) >= 20 {
+                items.append(
+                    RecoveryChangeItem(
+                        id: "load",
+                        title: "Training load",
+                        detail:
+                            "\(recoverySignedNumber(delta)) min tracked training vs previous 7 days.",
+                        icon: "chart.line.uptrend.xyaxis",
+                        tint: .blue,
+                        magnitude: magnitude
+                    )
+                )
+            }
+        }
+
+        return items.sorted {
+            $0.magnitude > $1.magnitude
+        }
+    }
+
+    private var recoveryObservedPatterns: [String] {
+        let days =
+            recoverySnapshot.days
+                .sorted { $0.date < $1.date }
+        var patterns: [String] = []
+
+        let sleepHRVPairs:
+            [(sleep: Double, hrv: Double)] =
+            days.compactMap { day in
+                guard let sleep = day.sleepDuration,
+                      let hrv = day.hrvMilliseconds
+                else {
+                    return nil
+                }
+
+                return (sleep, hrv)
+            }
+
+        if sleepHRVPairs.count >= 6,
+           let averageSleep =
+                recoveryAverage(
+                    sleepHRVPairs.map(\.sleep)
+                ) {
+            let higher =
+                sleepHRVPairs.filter {
+                    $0.sleep >= averageSleep
+                }
+            let lower =
+                sleepHRVPairs.filter {
+                    $0.sleep < averageSleep
+                }
+
+            if higher.count >= 2,
+               lower.count >= 2,
+               let highHRV =
+                    recoveryAverage(
+                        higher.map(\.hrv)
+                    ),
+               let lowHRV =
+                    recoveryAverage(
+                        lower.map(\.hrv)
+                    ) {
+                let difference =
+                    highHRV - lowHRV
+
+                if abs(difference) >= 3 {
+                    patterns.append(
+                        "On higher-sleep days in this 14-day window, HRV averaged \(Int(abs(difference).rounded())) ms \(difference >= 0 ? "higher" : "lower") than on lower-sleep days."
+                    )
+                }
+            }
+        }
+
+        var loadNextRHR:
+            [(load: Double, rhr: Double)] = []
+
+        if days.count >= 2 {
+            for index in 0..<(days.count - 1) {
+                if let nextRHR =
+                    days[index + 1].restingHeartRate {
+                    loadNextRHR.append(
+                        (
+                            days[index].trainingMinutes,
+                            nextRHR
+                        )
+                    )
+                }
+            }
+        }
+
+        if loadNextRHR.count >= 6,
+           let averageLoad =
+                recoveryAverage(
+                    loadNextRHR.map(\.load)
+                ) {
+            let higher =
+                loadNextRHR.filter {
+                    $0.load > averageLoad
+                }
+            let lower =
+                loadNextRHR.filter {
+                    $0.load <= averageLoad
+                }
+
+            if higher.count >= 2,
+               lower.count >= 2,
+               let highRHR =
+                    recoveryAverage(
+                        higher.map(\.rhr)
+                    ),
+               let lowRHR =
+                    recoveryAverage(
+                        lower.map(\.rhr)
+                    ) {
+                let difference =
+                    highRHR - lowRHR
+
+                if abs(difference) >= 2 {
+                    patterns.append(
+                        "Days after higher training volume showed resting HR averaging \(Int(abs(difference).rounded())) bpm \(difference >= 0 ? "higher" : "lower") than after lighter days."
+                    )
+                }
+            }
+        }
+
+        let load =
+            recoverySnapshot.trainingLoad
+        let total =
+            load.strengthMinutes +
+            load.runningMinutes +
+            load.walkingMinutes +
+            load.otherMinutes
+
+        if total >= 60 {
+            let sources: [(String, Double)] = [
+                ("strength", load.strengthMinutes),
+                ("running", load.runningMinutes),
+                ("walking", load.walkingMinutes),
+                ("other training", load.otherMinutes)
+            ]
+
+            if let dominant =
+                sources.max(
+                    by: {
+                        $0.1 < $1.1
+                    }
+                ),
+               dominant.1 / total >= 0.55 {
+                patterns.append(
+                    "\(Int(((dominant.1 / total) * 100).rounded()))% of your tracked 7-day training time came from \(dominant.0)."
+                )
+            }
+        }
+
+        let loadedAreas =
+            muscleRecoveryStatuses
+                .filter {
+                    $0.loadScore >= 0.34 &&
+                        $0.progress < 0.90
+                }
+                .prefix(2)
+                .map(\.muscleGroup)
+
+        if !loadedAreas.isEmpty {
+            patterns.append(
+                "\(loadedAreas.joined(separator: " and ")) currently carry the most notable combination of recent load and incomplete recovery."
+            )
+        }
+
+        return Array(patterns.prefix(3))
+    }
+
+    private func recoveryAverage(
+        _ values: [Double]
+    ) -> Double? {
+        guard !values.isEmpty else {
+            return nil
+        }
+
+        return values.reduce(0, +) /
+            Double(values.count)
+    }
+
+    private func recoverySignedNumber(
+        _ value: Double
+    ) -> String {
+        let rounded =
+            Int(abs(value).rounded())
+        return value >= 0
+            ? "+\(rounded)"
+            : "−\(rounded)"
+    }
+
+    private func recoverySignedMinutes(
+        _ value: Double
+    ) -> String {
+        let rounded =
+            Int(abs(value).rounded())
+        return value >= 0
+            ? "+\(rounded) min"
+            : "−\(rounded) min"
     }
 
     private var todaysGuidanceCard: some View {
