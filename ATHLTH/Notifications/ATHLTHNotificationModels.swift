@@ -6,6 +6,7 @@ enum ATHLTHNotificationKind: String, Codable, Hashable {
     case goalCompleted
     case personalRecord
     case achievement
+    case challenge
     case social
     case system
 
@@ -16,6 +17,7 @@ enum ATHLTHNotificationKind: String, Codable, Hashable {
         case .goalCompleted: return ATHLTHLocalization.string( "Goal completed")
         case .personalRecord: return ATHLTHLocalization.string( "Personal record")
         case .achievement: return ATHLTHLocalization.string( "Achievement")
+        case .challenge: return ATHLTHLocalization.string( "Challenge")
         case .social: return ATHLTHLocalization.string( "Social")
         case .system: return ATHLTHLocalization.string( "ATHLTH")
         }
@@ -28,6 +30,7 @@ enum ATHLTHNotificationKind: String, Codable, Hashable {
         case .goalCompleted: return "target"
         case .personalRecord: return "trophy.fill"
         case .achievement: return "medal.fill"
+        case .challenge: return "trophy.fill"
         case .social: return "person.2.fill"
         case .system: return "bell.fill"
         }
