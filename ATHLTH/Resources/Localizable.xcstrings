@@ -17044,6 +17044,1576 @@
           }
         }
       }
+    },
+    "Live provider quota": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live leverandørkvote"
+          }
+        }
+      }
+    },
+    "ATHLTH reads the request allowance reported by Groq after AI calls. This is the actual project/organization limit, not a hard-coded Free-plan estimate.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH leser forespørselskvoten Groq rapporterer etter AI-kall. Dette er den faktiske prosjekt-/organisasjonsgrensen, ikke et hardkodet estimat for gratisplanen."
+          }
+        }
+      }
+    },
+    "Quota": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kvote"
+          }
+        }
+      }
+    },
+    "Use an ATHLTH AI feature once. The next Groq response will populate the live quota here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk en ATHLTH AI-funksjon én gang. Neste svar fra Groq fyller inn live-kvoten her."
+          }
+        }
+      }
+    },
+    "Prompt-saving behavior": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slik spares prompts"
+          }
+        }
+      }
+    },
+    "Workout Insight reuses a cached answer while the workout data is unchanged.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktinnsikt gjenbruker et hurtigbufret svar så lenge øktdataene er uendret."
+          }
+        }
+      }
+    },
+    "Recovery reuses the same AI insight for unchanged recovery data for up to 6 hours.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon gjenbruker samme AI-innsikt for uendrede restitusjonsdata i opptil 6 timer."
+          }
+        }
+      }
+    },
+    "Pull to refresh in Recovery still forces a fresh AI interpretation.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dra for å oppdatere i Restitusjon tvinger fortsatt frem en ny AI-tolkning."
+          }
+        }
+      }
+    },
+    "Training-plan generation and Coach questions remain user initiated and are not artificially blocked.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generering av treningsplan og Coach-spørsmål er fortsatt brukerinitiert og blokkeres ikke kunstig."
+          }
+        }
+      }
+    },
+    "Error": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feil"
+          }
+        }
+      }
+    },
+    "AI Usage": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-bruk"
+          }
+        }
+      }
+    },
+    "Audience": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Målgruppe"
+          }
+        }
+      }
+    },
+    "In production, delivery must still filter by channel eligibility and applicable marketing consent. Selecting Free users never overrides an individual user's communication choices.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I produksjon må utsending fortsatt filtreres etter kanaltilgjengelighet og gjeldende markedsføringssamtykke. Valg av gratisbrukere overstyrer aldri brukerens egne kommunikasjonsvalg."
+          }
+        }
+      }
+    },
+    "Campaign": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanje"
+          }
+        }
+      }
+    },
+    "Channels": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanaler"
+          }
+        }
+      }
+    },
+    "Delivery gate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utsendingskontroll"
+          }
+        }
+      }
+    },
+    "Campaign delivery is disabled in V0.1.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanjeutsending er deaktivert i V0.1."
+          }
+        }
+      }
+    },
+    "The composer, audience preview and history are ready. A backend delivery service must be connected and explicitly enabled before ATHLTH can send a real campaign.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Komponering, forhåndsvisning av målgruppe og historikk er klart. En backend-tjeneste for utsending må kobles til og aktiveres eksplisitt før ATHLTH kan sende en ekte kampanje."
+          }
+        }
+      }
+    },
+    "Prepare Free-user campaign": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klargjør kampanje for gratisbrukere"
+          }
+        }
+      }
+    },
+    "Send to Free users": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send til gratisbrukere"
+          }
+        }
+      }
+    },
+    "Campaign was added to history as blocked / not sent.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanjen ble lagt til i historikken som blokkert / ikke sendt."
+          }
+        }
+      }
+    },
+    "Add to campaign history": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til i kampanjehistorikk"
+          }
+        }
+      }
+    },
+    "This records the campaign configuration but does not send anything.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette lagrer kampanjeoppsettet, men sender ingenting."
+          }
+        }
+      }
+    },
+    "All": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle"
+          }
+        }
+      }
+    },
+    "Draft": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utkast"
+          }
+        }
+      }
+    },
+    "Campaigns": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanjer"
+          }
+        }
+      }
+    },
+    "History is demo/local data in V0.1. Production campaign records should be immutable server-side audit records.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historikken er demo-/lokaldata i V0.1. Kampanjedata i produksjon bør være uforanderlige revisjonsposter på serveren."
+          }
+        }
+      }
+    },
+    "Message": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Melding"
+          }
+        }
+      }
+    },
+    "Recorded recipients": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrerte mottakere"
+          }
+        }
+      }
+    },
+    "No recipient records are stored for this preview campaign.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen mottakerposter lagres for denne forhåndsvisningskampanjen."
+          }
+        }
+      }
+    },
+    "User timeline": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukertidslinje"
+          }
+        }
+      }
+    },
+    "This campaign was not delivered to the user.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne kampanjen ble ikke sendt til brukeren."
+          }
+        }
+      }
+    },
+    "Free-user Campaign": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanje for gratisbrukere"
+          }
+        }
+      }
+    },
+    "Prepare campaign?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klargjøre kampanjen?"
+          }
+        }
+      }
+    },
+    "Campaign History": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanjehistorikk"
+          }
+        }
+      }
+    },
+    "Campaign Event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanjehendelse"
+          }
+        }
+      }
+    },
+    "This account does not have access to ATHLTH Control Center.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne kontoen har ikke tilgang til ATHLTH Control Center."
+          }
+        }
+      }
+    },
+    "HealthKit measurements and individual health results are excluded from campaign and offer targeting.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthKit-målinger og individuelle helseresultater brukes ikke til målretting av kampanjer eller tilbud."
+          }
+        }
+      }
+    },
+    "AI Activity Center visuals": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-bilder i Aktivitetssenter"
+          }
+        }
+      }
+    },
+    "Individual Apple Health / HealthKit values are not shown in Control Center.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Individuelle Apple Health / HealthKit-verdier vises ikke i Control Center."
+          }
+        }
+      }
+    },
+    "Backend connection required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backend-tilkobling kreves"
+          }
+        }
+      }
+    },
+    "Live analytics, user directory, safety cases, audit history and campaigns stay empty until Control Center is connected to the ATHLTH backend.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-analyse, brukerkatalog, sikkerhetssaker, revisjonshistorikk og kampanjer forblir tomme til Control Center er koblet til ATHLTH-backend."
+          }
+        }
+      }
+    },
+    "Directory preview": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forhåndsvisning av katalog"
+          }
+        }
+      }
+    },
+    "Individual HealthKit values are never exposed in this user directory.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Individuelle HealthKit-verdier vises aldri i denne brukerkatalogen."
+          }
+        }
+      }
+    },
+    "Self-declared personalization": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selvvalgt personalisering"
+          }
+        }
+      }
+    },
+    "Campaign & offer history": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanje- og tilbudshistorikk"
+          }
+        }
+      }
+    },
+    "No campaign or offer history for this user.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen kampanje- eller tilbudshistorikk for denne brukeren."
+          }
+        }
+      }
+    },
+    "Connections": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilkoblinger"
+          }
+        }
+      }
+    },
+    "Only connection status is shown. Health measurements are not available to administrators here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare tilkoblingsstatus vises. Helsemålinger er ikke tilgjengelige for administratorer her."
+          }
+        }
+      }
+    },
+    "Remove admin access": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern administratortilgang"
+          }
+        }
+      }
+    },
+    "Privileged accounts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privilegerte kontoer"
+          }
+        }
+      }
+    },
+    "Only Owner can add or remove admins. Owner access cannot be changed from this screen.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare eier kan legge til eller fjerne administratorer. Eier-tilgang kan ikke endres fra denne skjermen."
+          }
+        }
+      }
+    },
+    "Owner controls": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eierkontroller"
+          }
+        }
+      }
+    },
+    "Add admin": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til administrator"
+          }
+        }
+      }
+    },
+    "Select a user to grant Admin access. Owner remains the only role that can manage admins.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg en bruker som skal få administratortilgang. Eier er fortsatt den eneste rollen som kan administrere administratorer."
+          }
+        }
+      }
+    },
+    "Eligible users": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kvalifiserte brukere"
+          }
+        }
+      }
+    },
+    "Acquisition": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anskaffelse"
+          }
+        }
+      }
+    },
+    "Onboarding": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppstart"
+          }
+        }
+      }
+    },
+    "Growth metrics remain unavailable until analytics events and the Control Center backend are connected.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vekstmålinger er utilgjengelige til analysehendelser og Control Center-backend er koblet til."
+          }
+        }
+      }
+    },
+    "Current goals": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjeldende mål"
+          }
+        }
+      }
+    },
+    "Interests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interesser"
+          }
+        }
+      }
+    },
+    "These are aggregated self-declared goals and interests. This view intentionally does not expose individual HealthKit measurements.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette er aggregerte, selvoppgitte mål og interesser. Denne visningen viser med vilje ikke individuelle HealthKit-målinger."
+          }
+        }
+      }
+    },
+    "Adoption": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk"
+          }
+        }
+      }
+    },
+    "Only aggregate connection rates belong here. Individual health measurements remain outside Control Center.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare aggregerte tilkoblingsrater hører hjemme her. Individuelle helsemålinger forblir utenfor Control Center."
+          }
+        }
+      }
+    },
+    "System status": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Systemstatus"
+          }
+        }
+      }
+    },
+    "No campaign can be sent from V0.1.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen kampanje kan sendes fra V0.1."
+          }
+        }
+      }
+    },
+    "Campaign drafts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanjeutkast"
+          }
+        }
+      }
+    },
+    "Current-user preview": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forhåndsvisning for gjeldende bruker"
+          }
+        }
+      }
+    },
+    "Send campaign": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send kampanje"
+          }
+        }
+      }
+    },
+    "Sending is intentionally unavailable in V0.1.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utsending er med vilje utilgjengelig i V0.1."
+          }
+        }
+      }
+    },
+    "Marketplace readiness": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klarhet for markedsplass"
+          }
+        }
+      }
+    },
+    "Prepared product types": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klargjorte produkttyper"
+          }
+        }
+      }
+    },
+    "Training plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsplaner"
+          }
+        }
+      }
+    },
+    "Nutrition plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ernæringsplaner"
+          }
+        }
+      }
+    },
+    "Combined programs": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kombinerte programmer"
+          }
+        }
+      }
+    },
+    "Payment-provider and App Store purchase logic will be connected later. Subscription tier is intentionally separate from account role.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Betalingsleverandør og kjøpslogikk for App Store kobles til senere. Abonnementsnivå er bevisst adskilt fra kontorolle."
+          }
+        }
+      }
+    },
+    "Cases": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saker"
+          }
+        }
+      }
+    },
+    "Account suspension is available from the user detail screen. Production safety tooling will require backend enforcement and audit logging.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontosuspensjon er tilgjengelig fra brukerdetaljer. Sikkerhetsverktøy i produksjon vil kreve backend-håndheving og revisjonslogging."
+          }
+        }
+      }
+    },
+    "Control Center": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control Center"
+          }
+        }
+      }
+    },
+    "Users": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukere"
+          }
+        }
+      }
+    },
+    "Admins & Owner": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Administratorer og eier"
+          }
+        }
+      }
+    },
+    "Add Admin": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til administrator"
+          }
+        }
+      }
+    },
+    "Growth": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vekst"
+          }
+        }
+      }
+    },
+    "Goals & Interests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål og interesser"
+          }
+        }
+      }
+    },
+    "Integrations": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrasjoner"
+          }
+        }
+      }
+    },
+    "Offer Readiness": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilbudsklarhet"
+          }
+        }
+      }
+    },
+    "Marketplace": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Markedsplass"
+          }
+        }
+      }
+    },
+    "Audit Log": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revisjonslogg"
+          }
+        }
+      }
+    },
+    "Exercise source": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelseskilde"
+          }
+        }
+      }
+    },
+    "No custom exercises yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen egne øvelser ennå"
+          }
+        }
+      }
+    },
+    "Create your own exercise and it will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett din egen øvelse, så vises den her."
+          }
+        }
+      }
+    },
+    "Create Exercise": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett øvelse"
+          }
+        }
+      }
+    },
+    "Exercise data by RepDB": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelsesdata fra RepDB"
+          }
+        }
+      }
+    },
+    "CUSTOM": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EGEN"
+          }
+        }
+      }
+    },
+    "Open source video": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne kildevideo"
+          }
+        }
+      }
+    },
+    "Delete Custom Exercise": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett egen øvelse"
+          }
+        }
+      }
+    },
+    "Exercise": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelse"
+          }
+        }
+      }
+    },
+    "Instructions": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instruksjoner"
+          }
+        }
+      }
+    },
+    "Media": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Media"
+          }
+        }
+      }
+    },
+    "Your image is stored locally in ATHLTH. A direct video URL can be attached to the exercise and shown on its detail page.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildet lagres lokalt i ATHLTH. En direkte video-URL kan knyttes til øvelsen og vises på detaljsiden."
+          }
+        }
+      }
+    },
+    "Sharing": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deling"
+          }
+        }
+      }
+    },
+    "Allow this exercise in shared plans": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat denne øvelsen i delte planer"
+          }
+        }
+      }
+    },
+    "Create exercise": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett øvelse"
+          }
+        }
+      }
+    },
+    "Delete this custom exercise?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette denne egendefinerte øvelsen?"
+          }
+        }
+      }
+    },
+    "Training place": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningssted"
+          }
+        }
+      }
+    },
+    "Change": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endre"
+          }
+        }
+      }
+    },
+    "Remove place": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern sted"
+          }
+        }
+      }
+    },
+    "Add training place": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til treningssted"
+          }
+        }
+      }
+    },
+    "ATHLTH stores the Apple Place ID, not a separate copy of the venue address. Place check-ins are private unless you explicitly choose to share them later.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH lagrer Apple Place-ID-en, ikke en separat kopi av adressen. Innsjekker på steder er private med mindre du eksplisitt velger å dele dem senere."
+          }
+        }
+      }
+    },
+    "Finding fitness centers within 150 m…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finner treningssentre innen 150 m…"
+          }
+        }
+      }
+    },
+    "Move closer to the venue and refresh. ATHLTH only allows a check-in when you're physically nearby.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flytt deg nærmere stedet og oppdater. ATHLTH tillater bare innsjekk når du fysisk er i nærheten."
+          }
+        }
+      }
+    },
+    "Private check-in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privat innsjekk"
+          }
+        }
+      }
+    },
+    "This place is saved to your workout only. It is not added to your public activity automatically.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette stedet lagres bare på økten din. Det legges ikke automatisk til offentlig aktivitet."
+          }
+        }
+      }
+    },
+    "(count) previous": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(count) tidligere"
+          }
+        }
+      }
+    },
+    "Too far": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For langt unna"
+          }
+        }
+      }
+    },
+    "Refresh location": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdater posisjon"
+          }
+        }
+      }
+    },
+    "The map updates only while a participant is actively sharing a supported outdoor workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartet oppdateres bare mens en deltaker aktivt deler en støttet utendørsøkt."
+          }
+        }
+      }
+    },
+    "Share my live position": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del live-posisjonen min"
+          }
+        }
+      }
+    },
+    "You can turn this off without stopping the workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan slå dette av uten å stoppe økten."
+          }
+        }
+      }
+    },
+    "ATHLTH Replay": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Replay"
+          }
+        }
+      }
+    },
+    "REPLAY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "REPLAY"
+          }
+        }
+      }
+    },
+    "Detailed phases appear when the workout contains enough route or heart-rate data.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detaljerte faser vises når økten inneholder nok rute- eller pulsdata."
+          }
+        }
+      }
+    },
+    "completed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fullført"
+          }
+        }
+      }
+    },
+    "Apple Maps · pace by segment": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Maps · tempo per segment"
+          }
+        }
+      }
+    },
+    "Route details appear when this workout contains GPS data.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutedetaljer vises når økten inneholder GPS-data."
+          }
+        }
+      }
+    },
+    "Faster": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskere"
+          }
+        }
+      }
+    },
+    "Average": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjennomsnitt"
+          }
+        }
+      }
+    },
+    "Slower": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saktere"
+          }
+        }
+      }
+    },
+    "Colors are relative to this workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fargene er relative til denne økten."
+          }
+        }
+      }
+    },
+    "Route details": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutedetaljer"
+          }
+        }
+      }
+    },
+    "Coach is analyzing pace, route, elevation and effort…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach analyserer tempo, rute, høyde og innsats…"
+          }
+        }
+      }
+    },
+    "Muscle focus": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muskelfokus"
+          }
+        }
+      }
+    },
+    "Based on the exercises and completed sets in this session.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basert på øvelsene og fullførte sett i denne økten."
+          }
+        }
+      }
+    },
+    "Muscle focus appears when the recorded exercises include muscle metadata.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muskelfokus vises når registrerte øvelser inneholder muskelmetadata."
+          }
+        }
+      }
+    },
+    "The shading is a relative session-focus estimate from primary/secondary exercise roles and set count. It is not a measured muscle-activation percentage.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skyggeleggingen er et relativt estimat av øktfokus basert på primære/sekundære muskelroller og antall sett. Det er ikke en målt prosentandel muskelaktivering."
+          }
+        }
+      }
+    },
+    "No exercise breakdown is available for this workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen øvelsesfordeling er tilgjengelig for denne økten."
+          }
+        }
+      }
+    },
+    "Coach is analyzing exercise selection, set volume and muscle focus…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach analyserer øvelsesvalg, settvolum og muskelfokus…"
+          }
+        }
+      }
+    },
+    "Strength details": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrkedetaljer"
+          }
+        }
+      }
+    },
+    "View ATHLTH+": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis ATHLTH+"
+          }
+        }
+      }
+    },
+    "Build": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build"
+          }
+        }
+      }
+    },
+    "Capabilities": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funksjoner"
+          }
+        }
+      }
+    },
+    "Refresh System Status": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdater systemstatus"
+          }
+        }
+      }
+    },
+    "Open Capability Tests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne funksjonstester"
+          }
+        }
+      }
+    },
+    "Diagnostics are read-only except for refreshing local connection status. No passwords, Health values or push tokens are displayed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostikk er skrivebeskyttet bortsett fra oppdatering av lokal tilkoblingsstatus. Ingen passord, Health-verdier eller push-tokens vises."
+          }
+        }
+      }
+    },
+    "System Diagnostics": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Systemdiagnostikk"
+          }
+        }
+      }
+    },
+    "Capability Lab": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funksjonslab"
+          }
+        }
+      }
+    },
+    "Low-level capability tests for ATHLTH development and TestFlight diagnostics.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lavnivå funksjonstester for ATHLTH-utvikling og TestFlight-diagnostikk."
+          }
+        }
+      }
+    },
+    "Privacy note": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personvernmerknad"
+          }
+        }
+      }
+    },
+    "Lab": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lab"
+          }
+        }
+      }
+    },
+    "Email account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-postkonto"
+          }
+        }
+      }
+    },
+    "Use at least 12 characters with uppercase, lowercase and a number.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk minst 12 tegn med stor bokstav, liten bokstav og et tall."
+          }
+        }
+      }
+    },
+    "Email verification required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-postbekreftelse kreves"
+          }
+        }
+      }
+    },
+    "Your ATHLTH account has been created, but sign-in is not completed until the email address is verified.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-kontoen din er opprettet, men innloggingen er ikke fullført før e-postadressen er bekreftet."
+          }
+        }
+      }
+    },
+    "Back to sign in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilbake til innlogging"
+          }
+        }
+      }
+    },
+    "Set a new password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angi nytt passord"
+          }
+        }
+      }
+    },
+    "Choose a new password for your ATHLTH account.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg et nytt passord for ATHLTH-kontoen din."
+          }
+        }
+      }
+    },
+    "Update Password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdater passord"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
