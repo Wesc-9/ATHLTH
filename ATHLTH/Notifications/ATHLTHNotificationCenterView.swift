@@ -5,7 +5,7 @@ import UserNotifications
 private enum ATHLTHNotificationScope: String, CaseIterable, Identifiable {
     case all = "All"
     case activity = "Activity"
-    case goals = "Goals"
+    case challenges = "Challenges"
     case social = "Social"
 
     var id: String { rawValue }
@@ -16,8 +16,8 @@ private enum ATHLTHNotificationScope: String, CaseIterable, Identifiable {
             return ATHLTHLocalization.string("All")
         case .activity:
             return ATHLTHLocalization.string("Activity")
-        case .goals:
-            return ATHLTHLocalization.string("Goals")
+        case .challenges:
+            return ATHLTHLocalization.string("Challenges")
         case .social:
             return ATHLTHLocalization.string("Social")
         }
@@ -29,8 +29,8 @@ private enum ATHLTHNotificationScope: String, CaseIterable, Identifiable {
             return "sparkles"
         case .activity:
             return "figure.run"
-        case .goals:
-            return "target"
+        case .challenges:
+            return "trophy.fill"
         case .social:
             return "person.2.fill"
         }
@@ -41,6 +41,7 @@ struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var challenges: ChallengeStore
 
     @State private var selectedWorkoutImportIDs: Set<UUID> = []
     @State private var selectedScope: ATHLTHNotificationScope = .all
@@ -120,6 +121,25 @@ struct ATHLTHNotificationCenterView: View {
 
                         Text(scope.localizedTitle)
                             .lineLimit(1)
+
+                        let count = unreadCount(for: scope)
+                        if count > 0 {
+                            Text("\(min(count, 99))")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(
+                                    selectedScope == scope
+                                        ? ATHLTHTheme.accentDeep
+                                        : Color.white
+                                )
+                                .frame(minWidth: 17, minHeight: 17)
+                                .padding(.horizontal, count > 9 ? 2 : 0)
+                                .background(
+                                    selectedScope == scope
+                                        ? Color.white
+                                        : ATHLTHTheme.accentDeep,
+                                    in: Capsule()
+                                )
+                        }
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
