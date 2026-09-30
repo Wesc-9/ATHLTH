@@ -52,8 +52,7 @@ final class ATHLTHNotificationStore: ObservableObject {
         switch item.socialEventKind?.lowercased() {
         case "message",
              "message_request",
-             "message_request_accepted",
-             "mention":
+             "message_request_accepted":
             return true
         default:
             return false
@@ -213,21 +212,6 @@ final class ATHLTHNotificationStore: ObservableObject {
         currentUserID: UUID
     ) {
         for challenge in challenges {
-            if challenge.creatorID == currentUserID,
-               challenge.createdAt >= activationDate {
-                add(
-                    ATHLTHNotificationDraft(
-                        eventKey: "challenge-\(challenge.id.uuidString)-created",
-                        kind: .challenge,
-                        title: "Challenge created",
-                        message: "\(challenge.title) is ready. Rules lock when it starts.",
-                        createdAt: challenge.createdAt,
-                        challengeID: challenge.id
-                    ),
-                    deliverSystemAlert: false
-                )
-            }
-
             let currentParticipantID = challenge.participants.first {
                 $0.userID == currentUserID
             }?.id
