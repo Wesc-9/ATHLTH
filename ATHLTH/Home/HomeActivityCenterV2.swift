@@ -509,12 +509,15 @@ struct HomeActivityCenterV2: View {
             }
 
             NavigationLink {
-                SocialHubView(
-                    initialTab:
-                        social.followingIDs.isEmpty
-                            ? .discover
-                            : .friends
-                )
+                if social.followingIDs.isEmpty {
+                    SocialHubView(
+                        initialTab: .discover
+                    )
+                } else {
+                    ProfileFollowListView(
+                        mode: .following
+                    )
+                }
             } label: {
                 Label(
                     social.followingIDs.isEmpty
