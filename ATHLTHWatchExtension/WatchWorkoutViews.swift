@@ -108,7 +108,7 @@ struct WatchActiveWorkoutView: View {
                 }
             } else if workoutManager.kind == .running ||
                         workoutManager.kind == .walking {
-                WatchRunWalkWorkoutPager()
+                WatchRunWorkoutExperienceView()
                     .environmentObject(workoutManager)
             } else {
                 ScrollView {
