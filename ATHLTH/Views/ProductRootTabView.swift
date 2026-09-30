@@ -1377,82 +1377,16 @@ struct ATHLTHHomeView: View {
 
                 Spacer()
 
-                Menu {
-                    Button {
-                        onOpenTrain(
-                            .quick(.running)
-                        )
-                    } label: {
-                        Label(
-                            "Run",
-                            systemImage: "figure.run"
-                        )
+                if session.activePlan != nil {
+                    Button("Train") {
+                        onOpenTrain(.plan)
                     }
-
-                    Button {
-                        onOpenTrain(
-                            .quick(.strength)
-                        )
-                    } label: {
-                        Label(
-                            "Strength",
-                            systemImage: "dumbbell.fill"
-                        )
-                    }
-
-                    Button {
-                        onOpenTrain(
-                            .quick(.walking)
-                        )
-                    } label: {
-                        Label(
-                            "Walk",
-                            systemImage: "figure.walk"
-                        )
-                    }
-
-                    Button {
-                        onOpenTrain(
-                            .customQuick
-                        )
-                    } label: {
-                        Label(
-                            "Custom",
-                            systemImage: "plus.circle"
-                        )
-                    }
-
-                    if session.activePlan != nil {
-                        Divider()
-
-                        Button {
-                            onOpenTrain(.plan)
-                        } label: {
-                            Label(
-                                "Open Training Plan",
-                                systemImage:
-                                    "calendar.badge.clock"
-                            )
-                        }
-                    }
-                } label: {
-                    Label(
-                        "Quick Train",
-                        systemImage: "bolt.fill"
-                    )
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
                         ATHLTHTheme.accentDeep
                     )
-                    .padding(.horizontal, 10)
-                    .frame(height: 32)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: Capsule()
-                    )
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Quick Train")
             }
 
             if workoutMirroring.hasActiveMirroredWorkout,
