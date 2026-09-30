@@ -8,6 +8,7 @@ type DiscoverRequest = {
   latitude?: number;
   longitude?: number;
   radiusKilometers?: number;
+  forceRefresh?: boolean;
 };
 
 type OSMPoint = {
@@ -28,6 +29,17 @@ type OSMRelation = {
   members?: OSMMember[];
 };
 
+type OSMWay = {
+  type?: string;
+  id?: number;
+  tags?: Record<string, string>;
+  geometry?: OSMPoint[];
+};
+
+type OSMTrailElement =
+  | OSMRelation
+  | OSMWay;
+
 type Bounds = {
   south: number;
   west: number;
@@ -39,6 +51,7 @@ const MIN_DISCOVERY_KM = 0.5;
 const MIN_LEADERBOARD_KM = 1.0;
 const MAX_ROUTE_KM = 80;
 const CACHE_HOURS = 12;
+const EMPTY_CACHE_RETRY_SECONDS = 5 * 60;
 const REFRESH_LOCK_SECONDS = 90;
 const MAX_RESULT_ROUTES = 48;
 const MAX_POINTS_PER_ROUTE = 300;
@@ -480,13 +493,28 @@ async function refreshCell(
   bounds: Bounds,
 ) {
   const query = `
-[out:json][timeout:12];
-relation
-  ["type"="route"]
-  ["route"~"^(hiking|foot)$"]
-  ["name"]
-  (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
-out body geom qt;
+[out:json][timeout:15];
+(
+  relation
+    ["type"="route"]
+    ["route"~"^(hiking|foot)$"]
+    ["name"]
+    (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
+  relation
+    ["type"="route"]
+    ["route"~"^(hiking|foot)$"]
+    ["ref"]
+    (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
+  way
+    ["highway"~"^(path|footway|track|bridleway)$"]
+    ["name"]
+    (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
+  way
+    ["highway"~"^(path|footway|track|bridleway)$"]
+    ["ref"]
+    (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
+);
+out body geom qt 160;
 `.trim();
 
   const configuredOverpassURL =
@@ -526,6 +554,10 @@ out body geom qt;
               headers: {
                 "User-Agent":
                   "ATHLTH/1.5 public-trail-cache",
+                "Accept":
+                  "application/json",
+                "Content-Type":
+                  "application/x-www-form-urlencoded; charset=UTF-8",
               },
               body:
                 "data=" +
@@ -558,8 +590,8 @@ out body geom qt;
       );
     }
 
-    const relations:
-      OSMRelation[] =
+    const elements:
+      OSMTrailElement[] =
         Array.isArray(
           payload?.elements,
         )
@@ -567,10 +599,12 @@ out body geom qt;
               .filter(
                 (
                   element:
-                    OSMRelation,
+                    OSMTrailElement,
                 ) =>
                   element?.type ===
-                  "relation",
+                    "relation" ||
+                  element?.type ===
+                    "way",
               )
           : [];
 
@@ -585,39 +619,81 @@ out body geom qt;
       >[] = [];
 
     for (
-      const relation
-      of relations
+      const element
+      of elements
     ) {
-      const relationID =
-        relation.id;
+      const rawID =
+        element.id;
       const tags =
-        relation.tags ?? {};
+        element.tags ?? {};
       const name =
         String(
-          tags.name ?? "",
+          tags.name ??
+          tags.ref ??
+          "",
         ).trim();
+
       const routeKind =
+        element.type ===
+          "relation"
+          ? String(
+              tags.route ?? "",
+            )
+          : "foot";
+
+      const access =
         String(
-          tags.route ?? "",
-        );
+          tags.access ?? "",
+        ).toLowerCase();
+      const footAccess =
+        String(
+          tags.foot ?? "",
+        ).toLowerCase();
 
       if (
-        !relationID ||
+        !rawID ||
         !name ||
         ![
           "hiking",
           "foot",
         ].includes(
           routeKind,
+        ) ||
+        (
+          [
+            "no",
+            "private",
+          ].includes(access) &&
+          ![
+            "yes",
+            "designated",
+            "permissive",
+          ].includes(footAccess)
         )
       ) {
         continue;
       }
 
+      // Keep relation IDs positive and encode OSM way IDs as negative values.
+      // This preserves the existing unique bigint key without a schema change.
+      const sourceID =
+        element.type ===
+          "way"
+          ? -Math.abs(rawID)
+          : rawID;
+
       const fullGeometry =
-        continuousGeometry(
-          relation,
-        );
+        element.type ===
+          "relation"
+          ? continuousGeometry(
+              element as
+                OSMRelation,
+            )
+          : (
+              (element as OSMWay)
+                .geometry ??
+              []
+            );
 
       if (
         fullGeometry.length < 2
@@ -650,7 +726,7 @@ out body geom qt;
 
       writes.push({
         osm_relation_id:
-          relationID,
+          sourceID,
         name:
           name.slice(
             0,
@@ -993,6 +1069,8 @@ Deno.serve(
         3,
         20,
       ) ?? 12;
+    const forceRefresh =
+      body.forceRefresh === true;
 
     if (
       latitude == null ||
@@ -1030,7 +1108,7 @@ Deno.serve(
             "public_trail_fetch_cells",
           )
           .select(
-            "fetched_at,refresh_started_at",
+            "fetched_at,refresh_started_at,last_success_count,last_error",
           )
           .eq(
             "cell_key",
@@ -1054,14 +1132,26 @@ Deno.serve(
           ).getTime()
         : null;
 
+    const lastSuccessCount =
+      Number(
+        cell?.last_success_count ??
+        0,
+      );
+    const allowedCacheAge =
+      lastSuccessCount > 0
+        ? CACHE_HOURS *
+          60 *
+          60 *
+          1000
+        : EMPTY_CACHE_RETRY_SECONDS *
+          1000;
+
     const cacheFresh =
+      !forceRefresh &&
       cacheAgeMilliseconds != null &&
       cacheAgeMilliseconds >= 0 &&
       cacheAgeMilliseconds <
-        CACHE_HOURS *
-        60 *
-        60 *
-        1000;
+        allowedCacheAge;
 
     const refreshAgeMilliseconds =
       cell?.refresh_started_at
@@ -1080,7 +1170,7 @@ Deno.serve(
 
     let refreshScheduled =
       false;
-    let coldRefreshAttempted =
+    let synchronousRefreshAttempted =
       false;
 
     if (
@@ -1129,12 +1219,12 @@ Deno.serve(
           true;
 
         if (
+          forceRefresh ||
           initialCachedTrails.length === 0
         ) {
-          // A cold cache has no durable fallback yet. Populate it before
-          // responding once, then every later request is served from
-          // Supabase even if all Overpass instances are unavailable.
-          coldRefreshAttempted =
+          // A user-requested area search should return the refreshed result,
+          // and a cold cache needs one synchronous population pass.
+          synchronousRefreshAttempted =
             true;
 
           await refreshCell(
@@ -1177,7 +1267,7 @@ Deno.serve(
     }
 
     const cachedTrails =
-      coldRefreshAttempted
+      synchronousRefreshAttempted
         ? await loadCachedTrails(
             admin,
             bounds,
@@ -1185,9 +1275,9 @@ Deno.serve(
         : initialCachedTrails;
 
     const source =
-      coldRefreshAttempted &&
+      synchronousRefreshAttempted &&
       cachedTrails.length > 0
-        ? "cache"
+        ? "fresh"
         : cacheFresh
           ? "cache"
           : cachedTrails.length > 0
