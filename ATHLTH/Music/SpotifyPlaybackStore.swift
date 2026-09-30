@@ -237,35 +237,67 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     func handleOpenURL(_ url: URL) -> Bool {
         guard isConfigured else { return false }
 
+        // App Remote app-switch callbacks are handled first. Spotify iOS SDK
+        // 5.0.1 can return unknown_error without an access token even after a
+        // successful switch. When ATHLTH already has a PKCE session, ignore
+        // that broken auth payload and reconnect App Remote with the known
+        // valid token instead.
+        if let appRemote,
+           let parameters =
+                appRemote.authorizationParameters(
+                    from: url
+                ) {
+            if let token =
+                    parameters[
+                        SPTAppRemoteAccessTokenKey
+                    ],
+               !token.isEmpty {
+                appRemote
+                    .connectionParameters
+                    .accessToken = token
+                appRemote.connect()
+                return true
+            }
+
+            if let message =
+                    parameters[
+                        SPTAppRemoteErrorDescriptionKey
+                    ] {
+                if let token =
+                        pkceSession?
+                            .accessToken,
+                   !token.isEmpty {
+                    appRemote
+                        .connectionParameters
+                        .accessToken = token
+                    lastErrorMessage = nil
+                    appRemote.connect()
+                } else {
+                    pkceAuthorizationStarted =
+                        false
+                    if shouldFallbackToPKCE(
+                        message
+                    ) {
+                        beginPKCEAuthorizationIfNeeded()
+                    } else {
+                        lastErrorMessage =
+                            message
+                        connectionState =
+                            .error(message)
+                    }
+                }
+                return true
+            }
+        }
+
+        // Kept only for callbacks from older ATHLTH installations. New account
+        // connections use PKCE and do not initiate SPTSessionManager auth.
         if let sessionManager,
            sessionManager.application(
                 UIApplication.shared,
                 open: url,
                 options: [:]
            ) {
-            return true
-        }
-
-        guard let appRemote,
-              let parameters =
-                appRemote.authorizationParameters(from: url)
-        else {
-            return false
-        }
-
-        if let token = parameters[SPTAppRemoteAccessTokenKey] {
-            appRemote.connectionParameters.accessToken = token
-            appRemote.connect()
-            return true
-        }
-
-        if let message = parameters[SPTAppRemoteErrorDescriptionKey] {
-            if shouldFallbackToPKCE(message) {
-                beginPKCEAuthorizationIfNeeded()
-            } else {
-                lastErrorMessage = message
-                connectionState = .error(message)
-            }
             return true
         }
 
@@ -317,11 +349,22 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         lastErrorMessage = nil
         pendingPlaybackURI = playlist.uri
 
-        guard let appRemote else { return }
-
-        if let token = await accessTokenForRequest() {
-            appRemote.connectionParameters.accessToken = token
+        guard let appRemote else {
+            return
         }
+
+        guard let token =
+                await accessTokenForRequest()
+        else {
+            connectionState = .disconnected
+            lastErrorMessage =
+                "Reconnect Spotify before starting linked playback."
+            pendingPlaybackURI = nil
+            return
+        }
+
+        appRemote.connectionParameters
+            .accessToken = token
 
         if appRemote.isConnected {
             await playThroughConnectedRemote(
@@ -331,17 +374,15 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             return
         }
 
-        // This deliberately opens/wakes Spotify on iPhone. The Watch app does
-        // not run this code and never blocks workout start waiting for Spotify.
+        // Wake Spotify and return through the registered callback. The callback
+        // is NOT trusted for account authorization anymore; ATHLTH already owns
+        // a valid PKCE token and reuses it if Spotify returns unknown_error.
         let installed =
             await appRemote.authorizeAndPlayURI(
                 playlist.uri
             )
 
-        if installed {
-            activePlaylist = playlist
-            lastStartedAt = Date()
-        } else {
+        if !installed {
             lastErrorMessage =
                 "Spotify is not installed on this iPhone."
             pendingPlaybackURI = nil
@@ -531,8 +572,13 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
         if !authSession.start() {
             webAuthenticationSession = nil
-            connectionState = .error("Could not open Spotify login.")
-            lastErrorMessage = "Could not open Spotify login."
+            pkceAuthorizationStarted = false
+            connectionState =
+                .error(
+                    "Could not open Spotify login."
+                )
+            lastErrorMessage =
+                "Could not open Spotify login."
         }
     }
 
@@ -546,6 +592,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             webAuthenticationSession = nil
             pkceCodeVerifier = nil
             pkceAuthorizationState = nil
+            pkceAuthorizationStarted = false
         }
 
         if let error {
@@ -563,13 +610,20 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         }
 
         guard let callbackURL,
+              callbackMatchesConfiguredRedirect(
+                callbackURL
+              ),
               let components = URLComponents(
                 url: callbackURL,
                 resolvingAgainstBaseURL: false
               )
         else {
-            connectionState = .error("Spotify returned an invalid callback.")
-            lastErrorMessage = "Spotify returned an invalid callback."
+            connectionState =
+                .error(
+                    "Spotify returned an invalid callback."
+                )
+            lastErrorMessage =
+                "Spotify returned an invalid callback. Expected \(redirectURI)."
             return
         }
 
@@ -617,6 +671,31 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             connectionState = .error(error.localizedDescription)
             lastErrorMessage = error.localizedDescription
         }
+    }
+
+    private func callbackMatchesConfiguredRedirect(
+        _ callbackURL: URL
+    ) -> Bool {
+        guard let expected =
+                URLComponents(
+                    string: redirectURI
+                ),
+              let received =
+                URLComponents(
+                    url: callbackURL,
+                    resolvingAgainstBaseURL:
+                        false
+                )
+        else {
+            return false
+        }
+
+        return expected.scheme ==
+                received.scheme &&
+            expected.host ==
+                received.host &&
+            expected.path ==
+                received.path
     }
 
     private func exchangeAuthorizationCode(
