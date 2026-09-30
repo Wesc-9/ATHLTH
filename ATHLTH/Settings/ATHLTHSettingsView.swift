@@ -1910,12 +1910,18 @@ private struct PremiumSettingsRow<Trailing: View>: View {
                 )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
+                Text(
+                    LocalizedStringKey(title)
+                )
                     .font(.system(size: 16.5, weight: .medium))
                     .foregroundStyle(titleColor)
 
                 if let subtitle {
-                    Text(subtitle)
+                    Text(
+                        LocalizedStringKey(
+                            subtitle
+                        )
+                    )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         .lineLimit(2)
