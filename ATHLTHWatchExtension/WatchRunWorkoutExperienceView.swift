@@ -553,7 +553,7 @@ struct WatchRunWorkoutExperienceView: View {
                             value:
                                 min(
                                     max(
-                                        progress,
+                                        progress / 100,
                                         0
                                     ),
                                     1
