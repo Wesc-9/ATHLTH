@@ -785,7 +785,11 @@ private struct AdminUsersView: View {
                                 Text("·")
                                 Text(user.status.title)
                                 Text("·")
-                                Text("Active \(user.lastActiveAt.formatted(.relative(presentation: .named)))")
+                                Text(ATHLTHLocalization.format(
+                            english: "Active %@",
+                            norwegian: "Aktiv %@",
+                            user.lastActiveAt.formatted(.relative(presentation: .named))
+                        ))
                             }
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -1218,7 +1222,11 @@ private struct AdminOffersView: View {
                             Text(draft.productName)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text("Delivery: \(draft.deliveryState.title)")
+                            Text(ATHLTHLocalization.format(
+                            english: "Delivery: %@",
+                            norwegian: "Levering: %@",
+                            draft.deliveryState.title
+                        ))
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.orange)
                         }
