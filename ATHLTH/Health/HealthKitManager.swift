@@ -743,6 +743,8 @@ final class HealthKitManager: ObservableObject {
         async let trainingTask = fetchTrainingSummary()
 
         var completedRead = false
+        var sleepReadSucceeded = false
+        var heartReadSucceeded = false
         var failures: [String] = []
 
         do {
@@ -800,6 +802,7 @@ final class HealthKitManager: ObservableObject {
             if sleepChanged {
                 invalidateTrophySnapshotCache()
             }
+            sleepReadSucceeded = true
             completedRead = true
         } catch {
             failures.append("Sleep: \(error.localizedDescription)")
@@ -807,6 +810,7 @@ final class HealthKitManager: ObservableObject {
 
         do {
             heart = try await heartTask
+            heartReadSucceeded = true
             completedRead = true
         } catch {
             failures.append("Heart: \(error.localizedDescription)")
@@ -819,14 +823,19 @@ final class HealthKitManager: ObservableObject {
             failures.append("Activity: \(error.localizedDescription)")
         }
 
-        do {
-            recovery = try await fetchRecoveryReadiness(
-                currentSleep: sleep,
-                currentHeart: heart
-            )
-            completedRead = true
-        } catch {
-            failures.append("Recovery: \(error.localizedDescription)")
+        if sleepReadSucceeded &&
+            heartReadSucceeded {
+            do {
+                recovery = try await fetchRecoveryReadiness(
+                    currentSleep: sleep,
+                    currentHeart: heart
+                )
+                completedRead = true
+            } catch {
+                failures.append(
+                    "Recovery: \(error.localizedDescription)"
+                )
+            }
         }
 
         await refreshPersonalDetails()
@@ -3816,17 +3825,29 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func fetchHeartSummary() async throws -> HeartSummary {
+        let now = Date()
+
         async let latest = latestQuantity(
             identifier: .heartRate,
-            unit: HKUnit.count().unitDivided(by: .minute())
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            startDate:
+                now.addingTimeInterval(
+                    -24 * 3_600
+                )
         )
         async let resting = latestQuantity(
             identifier: .restingHeartRate,
-            unit: HKUnit.count().unitDivided(by: .minute())
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            startDate:
+                now.addingTimeInterval(
+                    -72 * 3_600
+                )
         )
-        async let hrv = latestQuantity(
+        async let hrv = latestDailyAverageQuantity(
             identifier: .heartRateVariabilitySDNN,
-            unit: .secondUnit(with: .milli)
+            unit: .secondUnit(with: .milli),
+            lookbackDays: 3,
+            now: now
         )
 
         let latestValue = try? await latest
@@ -3940,7 +3961,19 @@ final class HealthKitManager: ObservableObject {
             flightsClimbedToday: flightsValue,
             vo2Max: vo2Value?.0,
             walkingHeartRateAverage: walkingHeartRateValue?.0,
-            oxygenSaturationPercent: oxygenValue?.0,
+            oxygenSaturationPercent:
+                oxygenValue.flatMap {
+                    value,
+                    _ in
+
+                    guard value >= 0,
+                          value <= 1
+                    else {
+                        return nil
+                    }
+
+                    return value * 100
+                },
             respiratoryRate: respiratoryValue?.0
         )
     }
