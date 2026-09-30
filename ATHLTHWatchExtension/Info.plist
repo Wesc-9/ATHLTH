@@ -19,6 +19,9 @@
     <key>WKBackgroundModes</key>
     <array>
         <string>workout-processing</string>
+        <string>audio</string>
     </array>
+    <key>WKSupportsAlwaysOnDisplay</key>
+    <true/>
 </dict>
 </plist>
