@@ -1924,9 +1924,11 @@ struct SpotifySettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                    Text("Redirect URI: athlth-spotify-login://callback")
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
+                    Text(
+                        "Redirect URI: \(spotify.redirectURIForDiagnostics)"
+                    )
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
                 }
             } else if spotify.isConnected {
                 Section("Workout Playback") {
@@ -1992,7 +1994,7 @@ struct SpotifySettingsView: View {
                     .disabled(spotify.connectionState == .connecting)
 
                     Text(
-                        "ATHLTH requests only the Spotify access needed to read your playlists and control playback you start from a workout."
+                        "ATHLTH signs in with Spotify using Authorization Code + PKCE, then keeps the refresh token securely in Keychain. App Remote is used only when playback control is needed."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -2008,6 +2010,39 @@ struct SpotifySettingsView: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.orange)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(
+                            "Spotify redirect URI"
+                        )
+                        .font(
+                            .caption2.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+                        Text(
+                            spotify
+                                .redirectURIForDiagnostics
+                        )
+                        .font(
+                            .caption
+                                .monospaced()
+                        )
+                        .textSelection(.enabled)
+                    }
+
+                    Text(
+                        "If Spotify reports a redirect or authorization error, this value must match the Redirect URI in Spotify Developer Dashboard exactly."
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
             }
 
