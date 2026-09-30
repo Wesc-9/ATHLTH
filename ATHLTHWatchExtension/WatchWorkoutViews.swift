@@ -650,6 +650,125 @@ struct WatchActiveWorkoutView: View {
                 .padding(.vertical, 9)
                 .watchSurface()
 
+                if let laps =
+                        result.lapSummaries,
+                   !laps.isEmpty {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 7
+                    ) {
+                        HStack {
+                            Label(
+                                "Laps",
+                                systemImage:
+                                    "flag.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                WatchTheme.accent
+                            )
+
+                            Spacer()
+
+                            Text(
+                                "\(laps.count)"
+                            )
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                WatchTheme.muted
+                            )
+                        }
+
+                        ForEach(
+                            Array(
+                                laps
+                                    .suffix(6)
+                                    .enumerated()
+                            ),
+                            id: \.offset
+                        ) { _, lap in
+                            HStack {
+                                Text(
+                                    "Lap \(lap.number)"
+                                )
+                                .font(
+                                    .system(
+                                        size: 9,
+                                        weight: .semibold
+                                    )
+                                )
+
+                                Spacer()
+
+                                Text(
+                                    durationText(
+                                        lap.elapsedTime
+                                    )
+                                )
+                                .font(
+                                    .system(
+                                        size: 9,
+                                        weight: .semibold,
+                                        design: .rounded
+                                    )
+                                )
+                                .monospacedDigit()
+
+                                if let pace =
+                                        lap.averagePaceSecondsPerKilometer {
+                                    Text(
+                                        lapPaceText(
+                                            pace
+                                        )
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 8,
+                                            weight: .semibold,
+                                            design: .rounded
+                                        )
+                                    )
+                                    .monospacedDigit()
+                                    .foregroundStyle(
+                                        WatchTheme.muted
+                                    )
+                                }
+                            }
+                        }
+
+                        if let count =
+                                result.automaticPauseCount,
+                           count > 0 {
+                            Label(
+                                "Auto-Pause \(count)x",
+                                systemImage:
+                                    "pause.circle.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 8,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                WatchTheme.muted
+                            )
+                        }
+                    }
+                    .padding(10)
+                    .watchSurface()
+                }
+
                 if let match =
                         result.routeMatchPercent {
                     VStack(
@@ -823,6 +942,33 @@ struct WatchActiveWorkoutView: View {
         case .idle: return "Ready"
         case .failed: return "Error"
         }
+    }
+
+    private func lapPaceText(
+        _ secondsPerKilometer:
+            TimeInterval
+    ) -> String {
+        guard secondsPerKilometer.isFinite,
+              secondsPerKilometer > 0
+        else {
+            return "—"
+        }
+
+        let total =
+            max(
+                Int(
+                    secondsPerKilometer
+                        .rounded()
+                ),
+                0
+            )
+
+        return String(
+            format:
+                "%d:%02d/km",
+            total / 60,
+            total % 60
+        )
     }
 
     private func durationText(_ duration: TimeInterval) -> String {
