@@ -1,8 +1,11 @@
 import CryptoKit
 import Foundation
+import Supabase
 
 @MainActor
 final class ExerciseLibraryStore: ObservableObject {
+    @Published private(set) var athlthCatalogExercises:
+        [ExerciseLibraryEntry] = Self.fallbackATHLTHExercises
     @Published private(set) var repDBExercises: [ExerciseLibraryEntry] = []
     @Published private(set) var customExercises: [ExerciseLibraryEntry] = []
     @Published private(set) var isLoading = false
@@ -11,6 +14,7 @@ final class ExerciseLibraryStore: ObservableObject {
 
     private let datasetURL = URL(string: "https://exercise-dataset.com/exercises.json")!
     private let imageBaseURL = URL(string: "https://exercise-dataset.com/")!
+    private let client: SupabaseClient = SupabaseEnvironment.client
 
     private var accountID: UUID?
 
@@ -27,8 +31,20 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     var allExercises: [ExerciseLibraryEntry] {
-        (customExercises + repDBExercises).sorted {
-            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        (
+            customExercises +
+            athlthCatalogExercises +
+            repDBExercises
+        )
+        .reduce(into: [UUID: ExerciseLibraryEntry]()) {
+            result, entry in
+            result[entry.id] = entry
+        }
+        .values
+        .sorted {
+            $0.name.localizedCaseInsensitiveCompare(
+                $1.name
+            ) == .orderedAscending
         }
     }
 
@@ -51,6 +67,8 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     func refresh(force: Bool = false) async {
+        await refreshATHLTHCatalog()
+
         if !force,
            !repDBExercises.isEmpty,
            let lastUpdated,
@@ -227,6 +245,64 @@ final class ExerciseLibraryStore: ObservableObject {
         persistCustomExercises()
     }
 
+
+    private func refreshATHLTHCatalog() async {
+        do {
+            let rows: [ATHLTHExerciseCatalogRecord] =
+                try await client
+                    .from("exercise_catalog")
+                    .select(
+                        "id,slug,name,summary,instructions,primary_muscles,secondary_muscles,equipment,category,difficulty,source_label,source_url,sort_order"
+                    )
+                    .eq("is_published", value: true)
+                    .order("sort_order", ascending: true)
+                    .execute()
+                    .value
+
+            if !rows.isEmpty {
+                athlthCatalogExercises =
+                    rows.map(mapATHLTHCatalog)
+            }
+        } catch {
+            if athlthCatalogExercises.isEmpty {
+                athlthCatalogExercises =
+                    Self.fallbackATHLTHExercises
+            }
+        }
+    }
+
+    private func mapATHLTHCatalog(
+        _ source: ATHLTHExerciseCatalogRecord
+    ) -> ExerciseLibraryEntry {
+        let exercise = Exercise(
+            id: source.id,
+            origin: .publicCatalog,
+            ownerID: nil,
+            name: source.name,
+            instructions: source.instructions,
+            primaryMuscles: source.primaryMuscles,
+            secondaryMuscles: source.secondaryMuscles,
+            equipment: source.equipment,
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true,
+            videoURL: nil
+        )
+
+        return ExerciseLibraryEntry(
+            id: source.id,
+            exercise: exercise,
+            source: .athlthCatalog,
+            sourceIdentifier: source.slug,
+            summary: source.summary,
+            tips: [],
+            category: source.category,
+            difficulty: source.difficulty,
+            bodyPart: source.primaryMuscles.first,
+            imageStartURL: nil,
+            imagePeakURL: nil
+        )
+    }
+
     private func mapRepDB(_ source: RepDBExercise) -> ExerciseLibraryEntry {
         let startURL = source.images?.flat?.start
             .flatMap { URL(string: $0, relativeTo: imageBaseURL)?.absoluteURL }
@@ -357,6 +433,130 @@ final class ExerciseLibraryStore: ObservableObject {
         ATHLTHTrainingDataChangeSignal.post(userID: accountID)
     }
 
+
+    private static var fallbackATHLTHExercises:
+        [ExerciseLibraryEntry] {
+        let values:
+            [(UUID, String, String, [String], [String], [String])] = [
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000001")!,
+                    "SkiErg",
+                    "Full-body ski ergometer station for sustained pulling power and aerobic output.",
+                    ["Back", "Core"],
+                    ["Shoulders", "Arms", "Glutes"],
+                    ["SkiErg"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000002")!,
+                    "Sled Push",
+                    "Heavy horizontal push performed over a prescribed distance.",
+                    ["Quads", "Glutes"],
+                    ["Calves", "Core"],
+                    ["Sled"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000003")!,
+                    "Sled Pull",
+                    "Rope sled pull combining posterior-chain, back and grip endurance.",
+                    ["Back", "Glutes"],
+                    ["Biceps", "Core", "Hamstrings"],
+                    ["Sled", "Rope"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000004")!,
+                    "Burpee Broad Jump",
+                    "Chest-to-floor burpee followed by a two-foot broad jump.",
+                    ["Full Body"],
+                    ["Quads", "Glutes", "Chest", "Core"],
+                    ["Bodyweight"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000005")!,
+                    "Rowing",
+                    "Indoor rowing station performed for distance.",
+                    ["Back", "Quads"],
+                    ["Glutes", "Hamstrings", "Arms", "Core"],
+                    ["RowErg"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000006")!,
+                    "Farmers Carry",
+                    "Loaded carry with one implement in each hand.",
+                    ["Forearms", "Core"],
+                    ["Upper Back", "Shoulders", "Glutes"],
+                    ["Kettlebells", "Dumbbells"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000007")!,
+                    "Sandbag Walking Lunge",
+                    "Alternating walking lunges performed while carrying a sandbag.",
+                    ["Quads", "Glutes"],
+                    ["Hamstrings", "Core"],
+                    ["Sandbag"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000008")!,
+                    "Wall Ball",
+                    "Squat-to-throw movement using a medicine ball and wall target.",
+                    ["Quads", "Glutes"],
+                    ["Shoulders", "Core"],
+                    ["Medicine Ball", "Wall Target"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000009")!,
+                    "Stationary Lunge",
+                    "Alternating in-place lunges for repetitions.",
+                    ["Quads", "Glutes"],
+                    ["Hamstrings", "Core"],
+                    ["Bodyweight"]
+                ),
+                (
+                    UUID(uuidString: "C2000000-0000-0000-0000-000000000010")!,
+                    "Hand-Release Push-Up",
+                    "Push-up variation with a brief hand release at the bottom.",
+                    ["Chest", "Triceps"],
+                    ["Shoulders", "Core"],
+                    ["Bodyweight"]
+                )
+            ]
+
+        return values.map {
+            id, name, summary, primary, secondary, equipment in
+            let exercise = Exercise(
+                id: id,
+                origin: .publicCatalog,
+                ownerID: nil,
+                name: name,
+                instructions: [],
+                primaryMuscles: primary,
+                secondaryMuscles: secondary,
+                equipment: equipment,
+                imageURL: nil,
+                isVisibleOutsideOwnerLibrary: true
+            )
+
+            return ExerciseLibraryEntry(
+                id: id,
+                exercise: exercise,
+                source: .athlthCatalog,
+                sourceIdentifier:
+                    "athlth:" +
+                    name.lowercased()
+                        .replacingOccurrences(
+                            of: " ",
+                            with: "-"
+                        ),
+                summary: summary,
+                tips: [],
+                category: "functional",
+                difficulty: "All levels",
+                bodyPart: primary.first,
+                imageStartURL: nil,
+                imagePeakURL: nil
+            )
+        }
+    }
+
     private static var storageDirectory: URL? {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
@@ -414,6 +614,39 @@ enum ExerciseLibraryError: LocalizedError {
         case .storageUnavailable:
             return "ATHLTH could not store the custom exercise media."
         }
+    }
+}
+
+
+private struct ATHLTHExerciseCatalogRecord: Decodable {
+    let id: UUID
+    let slug: String
+    let name: String
+    let summary: String
+    let instructions: [String]
+    let primaryMuscles: [String]
+    let secondaryMuscles: [String]
+    let equipment: [String]
+    let category: String
+    let difficulty: String
+    let sourceLabel: String?
+    let sourceURL: String?
+    let sortOrder: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case slug
+        case name
+        case summary
+        case instructions
+        case primaryMuscles = "primary_muscles"
+        case secondaryMuscles = "secondary_muscles"
+        case equipment
+        case category
+        case difficulty
+        case sourceLabel = "source_label"
+        case sourceURL = "source_url"
+        case sortOrder = "sort_order"
     }
 }
 
