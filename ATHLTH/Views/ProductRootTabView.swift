@@ -2765,6 +2765,8 @@ struct ATHLTHTrainView: View {
     @State private var pendingStrengthStartSession: PlannedSession?
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
+    @State private var showingSimplePlanCreation = false
+    @State private var showingAdvancedPlanCreation = false
 
     var body: some View {
         NavigationStack {
@@ -2799,6 +2801,16 @@ struct ATHLTHTrainView: View {
                 .hidden,
                 for: .navigationBar
             )
+            .sheet(
+                isPresented: $showingSimplePlanCreation
+            ) {
+                SimpleTrainingPlanCreationView()
+            }
+            .sheet(
+                isPresented: $showingAdvancedPlanCreation
+            ) {
+                AdvancedTrainingPlanCreationView()
+            }
             .sheet(item: $selectedPlanWorkout) { selection in
                 PlannedWorkoutDetailView(
                     planID: selection.planID,
@@ -3068,7 +3080,7 @@ struct ATHLTHTrainView: View {
                 eyebrow: "QUICK TRAIN",
                 title: "Start in seconds",
                 detail:
-                    "No setup required. Add Watch, routes, gear, Audio Coach or friends when you want more control."
+                    "No plan required. Choose Watch or iPhone, then add routes, gear, Audio Coach or friends when you want more control."
             )
 
             LazyVGrid(
@@ -3249,7 +3261,7 @@ struct ATHLTHTrainView: View {
                     icon: "wand.and.stars",
                     badge: "FAST"
                 ) {
-                    SimpleTrainingPlanCreationView()
+                    showingSimplePlanCreation = true
                 }
 
                 planModeCard(
@@ -3259,7 +3271,7 @@ struct ATHLTHTrainView: View {
                     icon: "slider.horizontal.3",
                     badge: "PRO"
                 ) {
-                    AdvancedTrainingPlanCreationView()
+                    showingAdvancedPlanCreation = true
                 }
             }
 
@@ -3461,16 +3473,14 @@ struct ATHLTHTrainView: View {
         }
     }
 
-    private func planModeCard<Destination: View>(
+    private func planModeCard(
         title: String,
         detail: String,
         icon: String,
         badge: String,
-        @ViewBuilder destination: () -> Destination
+        action: @escaping () -> Void
     ) -> some View {
-        NavigationLink {
-            destination()
-        } label: {
+        Button(action: action) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: icon)
