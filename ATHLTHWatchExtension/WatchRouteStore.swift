@@ -88,6 +88,20 @@ final class WatchRouteStore: NSObject, ObservableObject {
             return
         }
 
+        guard Calendar.current
+                .isDateInToday(
+                    workout.updatedAt
+                )
+        else {
+            UserDefaults.standard
+                .removeObject(
+                    forKey:
+                        todayWorkoutDefaultsKey
+                )
+            todayWorkout = nil
+            return
+        }
+
         todayWorkout = workout
     }
 
