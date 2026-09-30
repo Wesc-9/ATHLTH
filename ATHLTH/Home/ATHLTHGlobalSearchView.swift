@@ -182,9 +182,6 @@ struct ATHLTHGlobalSearchView: View {
                 guard !Task.isCancelled else { return }
                 searchFocused = true
             }
-            .onDisappear {
-                clearRemoteSearchResults()
-            }
         }
     }
 
