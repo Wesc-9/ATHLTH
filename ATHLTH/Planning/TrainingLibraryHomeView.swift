@@ -12,7 +12,10 @@ struct TrainingLibraryHomeView: View {
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
     @StateObject private var planCatalog = TrainingPlanLibraryStore()
+    @StateObject private var workoutCatalog =
+        WorkoutTemplateCatalogStore()
     @State private var showingCreatePlan = false
+    @State private var showingCreateWorkout = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -33,7 +36,7 @@ struct TrainingLibraryHomeView: View {
                     )
 
                     LibraryStatPill(
-                        value: "4",
+                        value: "5",
                         label: "collections",
                         icon: "square.stack.3d.up.fill",
                         tint: ATHLTHTheme.accent
@@ -100,6 +103,48 @@ struct TrainingLibraryHomeView: View {
                         subtitle: "Build it your way",
                         icon: "plus.rectangle.on.rectangle",
                         tint: ATHLTHTheme.accent
+                    )
+                }
+            }
+
+            librarySection(
+                "Workouts",
+                subtitle:
+                    "Complete sessions that can combine running, exercises, rest and targets."
+            ) {
+                NavigationLink {
+                    WorkoutTemplateLibraryView()
+                } label: {
+                    LibraryDestinationTile(
+                        title: "Workout Library",
+                        subtitle: "Hybrid, running, strength & more",
+                        icon: "rectangle.stack.fill",
+                        tint: ATHLTHTheme.accent
+                    )
+                }
+
+                NavigationLink {
+                    MyWorkoutTemplatesView()
+                } label: {
+                    LibraryDestinationTile(
+                        title: "My Workouts",
+                        subtitle:
+                            session.savedWorkoutTemplates.isEmpty
+                                ? "Save or build complete sessions"
+                                : "\(session.savedWorkoutTemplates.count) saved sessions",
+                        icon: "bookmark.square.fill",
+                        tint: ATHLTHTheme.accentDeep
+                    )
+                }
+
+                Button {
+                    showingCreateWorkout = true
+                } label: {
+                    LibraryDestinationTile(
+                        title: "Create Workout",
+                        subtitle: "Combine blocks your way",
+                        icon: "plus.rectangle.on.rectangle",
+                        tint: Color.teal
                     )
                 }
             }
@@ -195,11 +240,20 @@ struct TrainingLibraryHomeView: View {
         .sheet(isPresented: $showingCreatePlan) {
             TrainingPlanCreationView()
         }
+        .sheet(isPresented: $showingCreateWorkout) {
+            WorkoutTemplateBuilderView()
+        }
         .task {
             recents.refresh()
             async let favoriteRefresh: Void = favorites.refresh()
             async let planRefresh: Void = planCatalog.refresh()
-            _ = await (favoriteRefresh, planRefresh)
+            async let workoutRefresh: Void =
+                workoutCatalog.refresh()
+            _ = await (
+                favoriteRefresh,
+                planRefresh,
+                workoutRefresh
+            )
         }
     }
 
@@ -358,11 +412,17 @@ struct TrainingLibraryHomeView: View {
                     onSelect: nil,
                     onStart: onStartRunning
                 )
-            } else {
-                RunningWorkoutLibraryView(
-                    source: .library,
-                    onStart: onStartRunning
+            } else if let id =
+                        UUID(uuidString: item.itemID),
+                      let workout =
+                        workoutCatalog.entries.first(
+                            where: { $0.id == id }
+                        ) {
+                WorkoutTemplateDetailView(
+                    entry: workout
                 )
+            } else {
+                WorkoutTemplateLibraryView()
             }
 
         case .exercise:
