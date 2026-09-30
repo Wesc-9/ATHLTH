@@ -624,7 +624,7 @@ final class SupabaseSocialService: Sendable {
             by: \.activityID
         )
 
-        return activities.compactMap { activity in
+        return activities.compactMap { activity -> SocialFeedItem? in
             guard !mutedUserIDs.contains(activity.actorID),
                   let actor = cardByID[activity.actorID]
             else {
