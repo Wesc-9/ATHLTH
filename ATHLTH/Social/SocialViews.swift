@@ -2,7 +2,6 @@ import SwiftUI
 
 enum SocialHubTab: String, CaseIterable, Identifiable {
     case feed
-    case friends
     case messages
     case requests
     case discover
@@ -12,7 +11,6 @@ enum SocialHubTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .feed: return "Feed"
-        case .friends: return "Following"
         case .messages: return "Messages"
         case .requests: return "Requests"
         case .discover: return "Discover"
@@ -39,7 +37,7 @@ struct ProfileFriendsSection: View {
                 Spacer()
 
                 NavigationLink {
-                    SocialHubView(initialTab: .friends)
+                    ProfileFollowListView(mode: .following)
                 } label: {
                     HStack(spacing: 5) {
                         let socialBadgeCount =
@@ -208,8 +206,6 @@ struct SocialHubView: View {
                 switch selectedTab {
                 case .feed:
                     SocialFeedView()
-                case .friends:
-                    friendsContent
                 case .messages:
                     MessageInboxView {
                         showingNewMessage = true
@@ -274,146 +270,6 @@ struct SocialHubView: View {
                 onlineRefresh,
                 liveRefresh
             )
-        }
-    }
-
-    private var friendsContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text(ATHLTHLocalization.format(
-                            english: "%d Following",
-                            norwegian: "%d følger",
-                            social.following.count
-                        ))
-                        .font(.title3.bold())
-                    Spacer()
-                    Button {
-                        selectedTab = .discover
-                    } label: {
-                        Label("Find", systemImage: "person.badge.plus")
-                            .font(.caption.weight(.semibold))
-                    }
-                }
-
-                if !realtime.visibleLiveSessions.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label(
-                            "Live now",
-                            systemImage:
-                                "dot.radiowaves.left.and.right"
-                        )
-                        .font(.headline)
-                        .foregroundStyle(
-                            ATHLTHTheme.vitality
-                        )
-
-                        ForEach(
-                            realtime.visibleLiveSessions
-                                .prefix(6)
-                        ) { session in
-                            NavigationLink {
-                                ATHLTHLiveWorkoutMapView(
-                                    session: session
-                                )
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(
-                                        systemName:
-                                            session.ghostChallengeID ==
-                                            nil
-                                                ? "figure.run"
-                                                : "flag.checkered"
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme.vitality
-                                    )
-                                    .frame(
-                                        width: 38,
-                                        height: 38
-                                    )
-                                    .background(
-                                        ATHLTHTheme.vitality
-                                            .opacity(0.10),
-                                        in: Circle()
-                                    )
-
-                                    VStack(
-                                        alignment: .leading,
-                                        spacing: 2
-                                    ) {
-                                        Text(session.title)
-                                            .font(
-                                                .subheadline
-                                                    .weight(
-                                                        .semibold
-                                                    )
-                                            )
-                                            .foregroundStyle(
-                                                .primary
-                                            )
-
-                                        Text(
-                                            session.ghostChallengeID ==
-                                                nil
-                                                ? "Live workout"
-                                                : "Live Ghost Run"
-                                        )
-                                        .font(.caption)
-                                        .foregroundStyle(
-                                            .secondary
-                                        )
-                                    }
-
-                                    Spacer()
-
-                                    Image(
-                                        systemName:
-                                            "chevron.right"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
-                                }
-                                .padding(12)
-                                .background(
-                                    Color(
-                                        .secondarySystemGroupedBackground
-                                    ),
-                                    in: RoundedRectangle(
-                                        cornerRadius: 16
-                                    )
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                if social.following.isEmpty {
-                    ContentUnavailableView(
-                        "Not following anyone yet",
-                        systemImage: "person.2",
-                        description: Text("Find people by their ATHLTH username.")
-                    )
-                    .padding(.vertical, 50)
-                } else {
-                    ForEach(social.following) { friend in
-                        NavigationLink {
-                            FriendProfileView(userID: friend.userID)
-                        } label: {
-                            SocialProfileRow(profile: friend) {
-                                Text("Following")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .padding()
         }
     }
 
