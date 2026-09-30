@@ -9,9 +9,9 @@ enum ATHLTHChallengeSport: String, CaseIterable, Identifiable, Codable, Hashable
 
     var title: String {
         switch self {
-        case .running: return "Running"
-        case .strength: return "Strength"
-        case .heartRate: return "Heart Rate"
+        case .running: return String(localized: "Running")
+        case .strength: return String(localized: "Strength")
+        case .heartRate: return String(localized: "Heart Rate")
         }
     }
 
@@ -40,16 +40,16 @@ enum ATHLTHChallengeScoring: String, CaseIterable, Identifiable, Codable, Hashab
     var title: String {
         switch self {
         case .fastestDistance, .fastestRoute:
-            return "Fastest"
+            return String(localized: "Fastest")
         case .farthestInTime:
-            return "Farthest in Time"
+            return String(localized: "Farthest in Time")
         case .mostDistance:
-            return "Most Distance"
-        case .heaviestWeight: return "Heaviest Weight"
-        case .mostReps: return "Most Reps"
-        case .exerciseVolume: return "Exercise Volume"
-        case .workoutVolume: return "Workout Volume"
-        case .heartRateZoneTime: return "Time in Zone"
+            return String(localized: "Most Distance")
+        case .heaviestWeight: return String(localized: "Heaviest Weight")
+        case .mostReps: return String(localized: "Most Reps")
+        case .exerciseVolume: return String(localized: "Exercise Volume")
+        case .workoutVolume: return String(localized: "Workout Volume")
+        case .heartRateZoneTime: return String(localized: "Time in Zone")
         }
     }
 
@@ -73,23 +73,23 @@ enum ChallengeVerificationPolicy: String, CaseIterable, Identifiable, Codable, H
 
     var title: String {
         switch self {
-        case .verifiedRequired: return "Verified required"
-        case .verifiedPreferredManualAllowed: return "Verified preferred"
-        case .manualAllowed: return "Manual allowed"
-        case .manualOnly: return "Manual only"
+        case .verifiedRequired: return String(localized: "Verified required")
+        case .verifiedPreferredManualAllowed: return String(localized: "Verified preferred")
+        case .manualAllowed: return String(localized: "Manual allowed")
+        case .manualOnly: return String(localized: "Manual only")
         }
     }
 
     var subtitle: String {
         switch self {
         case .verifiedRequired:
-            return "Only qualifying ATHLTH or Apple Health attempts count."
+            return String(localized: "Only qualifying ATHLTH or Apple Health attempts count.")
         case .verifiedPreferredManualAllowed:
-            return "Verified attempts are preferred, but manual submissions are accepted and labelled."
+            return String(localized: "Verified attempts are preferred, but manual submissions are accepted and labelled.")
         case .manualAllowed:
-            return "Both verified and manual attempts count equally, with clear labels."
+            return String(localized: "Both verified and manual attempts count equally, with clear labels.")
         case .manualOnly:
-            return "All results are entered manually."
+            return String(localized: "All results are entered manually.")
         }
     }
 
@@ -109,9 +109,9 @@ enum ChallengeAttemptVerification: String, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .appleHealth: return "Apple Health"
-        case .athlth: return "ATHLTH Verified"
-        case .manual: return "Manual"
+        case .appleHealth: return String(localized: "Apple Health")
+        case .athlth: return String(localized: "ATHLTH Verified")
+        case .manual: return String(localized: "Manual")
         }
     }
 
@@ -132,8 +132,8 @@ enum ChallengeTimeBasis: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .elapsed: return "Elapsed Time"
-        case .moving: return "Moving Time"
+        case .elapsed: return String(localized: "Elapsed Time")
+        case .moving: return String(localized: "Moving Time")
         }
     }
 }
@@ -146,8 +146,8 @@ enum ChallengeRouteDirection: String, CaseIterable, Identifiable, Codable, Hasha
 
     var title: String {
         switch self {
-        case .sameDirection: return "Same Direction"
-        case .eitherDirection: return "Either Direction"
+        case .sameDirection: return String(localized: "Same Direction")
+        case .eitherDirection: return String(localized: "Either Direction")
         }
     }
 }
@@ -161,17 +161,17 @@ enum ChallengeAttemptPolicy: String, CaseIterable, Identifiable, Codable, Hashab
 
     var title: String {
         switch self {
-        case .best: return "Best Attempt"
-        case .first: return "First Attempt"
-        case .latest: return "Latest Attempt"
+        case .best: return String(localized: "Best Attempt")
+        case .first: return String(localized: "First Attempt")
+        case .latest: return String(localized: "Latest Attempt")
         }
     }
 
     var shortTitle: String {
         switch self {
-        case .best: return "Best counts"
-        case .first: return "First counts"
-        case .latest: return "Latest counts"
+        case .best: return String(localized: "Best counts")
+        case .first: return String(localized: "First counts")
+        case .latest: return String(localized: "Latest counts")
         }
     }
 }
@@ -185,18 +185,18 @@ enum ChallengeHeartRateAggregation: String, CaseIterable, Identifiable, Codable,
     var title: String {
         switch self {
         case .bestWorkout:
-            return "Best Workout"
+            return String(localized: "Best Workout")
         case .totalChallenge:
-            return "Total Challenge"
+            return String(localized: "Total Challenge")
         }
     }
 
     var subtitle: String {
         switch self {
         case .bestWorkout:
-            return "Your single workout with the most time in the selected zone counts."
+            return String(localized: "Your single workout with the most time in the selected zone counts.")
         case .totalChallenge:
-            return "Time in the selected zone adds up across all qualifying workouts."
+            return String(localized: "Time in the selected zone adds up across all qualifying workouts.")
         }
     }
 }
