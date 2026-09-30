@@ -286,9 +286,20 @@ struct ATHLTHCommunityV3View: View {
         }
 
         Task {
-            _ = await social.syncChallenge(
-                updated
-            )
+            let synced =
+                await social.syncChallenge(
+                    updated
+                )
+
+            if !synced {
+                challenges.setParticipantState(
+                    challengeID:
+                        challenge.id,
+                    participantID:
+                        participant.id,
+                    state: .invited
+                )
+            }
         }
     }
 
