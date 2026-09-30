@@ -5,6 +5,7 @@ final class MessagingStore: ObservableObject {
     @Published private(set) var conversations: [DirectConversationRecord] = []
     @Published private(set) var recentMessages: [DirectMessageRecord] = []
     @Published private(set) var messagesByConversation: [UUID: [DirectMessageRecord]] = [:]
+    @Published private(set) var pinnedConversationIDs: Set<UUID> = []
     @Published private(set) var isRefreshing = false
     @Published var errorMessage: String?
 
@@ -88,6 +89,46 @@ final class MessagingStore: ObservableObject {
         recentMessages
             .filter { $0.conversationID == conversationID && $0.deletedAt == nil }
             .max { $0.createdAt < $1.createdAt }
+    }
+
+    func loadPinnedConversations() {
+        guard let key = pinnedStorageKey else {
+            pinnedConversationIDs = []
+            return
+        }
+
+        let storedIDs = UserDefaults.standard.stringArray(forKey: key) ?? []
+        pinnedConversationIDs = Set(storedIDs.compactMap(UUID.init(uuidString:)))
+    }
+
+    func isPinned(_ conversationID: UUID) -> Bool {
+        pinnedConversationIDs.contains(conversationID)
+    }
+
+    func togglePinned(_ conversationID: UUID) {
+        if pinnedConversationIDs.contains(conversationID) {
+            pinnedConversationIDs.remove(conversationID)
+        } else {
+            pinnedConversationIDs.insert(conversationID)
+        }
+
+        persistPinnedConversations()
+    }
+
+    private var pinnedStorageKey: String? {
+        guard let currentUserID else { return nil }
+        return "athlth.messaging.pinned.\(currentUserID.uuidString.lowercased())"
+    }
+
+    private func persistPinnedConversations() {
+        guard let key = pinnedStorageKey else { return }
+
+        UserDefaults.standard.set(
+            pinnedConversationIDs
+                .map(\.uuidString)
+                .sorted(),
+            forKey: key
+        )
     }
 
     func refresh() async {
@@ -237,6 +278,7 @@ final class MessagingStore: ObservableObject {
         conversations = []
         recentMessages = []
         messagesByConversation = [:]
+        pinnedConversationIDs = []
         errorMessage = nil
     }
 }
