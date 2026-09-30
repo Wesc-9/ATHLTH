@@ -691,7 +691,7 @@ struct ATHLTHCommunityView: View {
                             challenge: weekly,
                             profiles:
                                 social.visibleProfiles +
-                                social.friends
+                                social.mutualFollows
                         )
                     }
 
@@ -703,7 +703,7 @@ struct ATHLTHCommunityView: View {
                         currentUserID: session.profile.userID,
                         currentDisplayName: session.profile.displayName,
                         currentAvatarURL: session.profile.avatarURL,
-                        friends: social.friends,
+                        friends: social.mutualFollows,
                         feed: social.feed,
                         ownWorkouts: health.workouts
                     )
