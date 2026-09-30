@@ -162,7 +162,7 @@ enum RecoveryReadinessEngine {
             score: score,
             state: state,
             detail:
-                "Based on last night's sleep and today's HRV/resting heart rate compared with your recent baseline.",
+                "Based on last night's sleep and your most recent HRV/resting heart rate compared with your recent baseline.",
             baselineDays: baselineDays,
             averageSleepDuration:
                 averageSleep,
