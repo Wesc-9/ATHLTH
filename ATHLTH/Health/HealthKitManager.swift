@@ -3854,13 +3854,28 @@ final class HealthKitManager: ObservableObject {
         let restingValue = try? await resting
         let hrvValue = try? await hrv
 
+        let validLatest =
+            latestValue.flatMap {
+                $0.0 > 0 ? $0 : nil
+            }
+        let validResting =
+            restingValue.flatMap {
+                $0.0 > 0 ? $0 : nil
+            }
+
         return HeartSummary(
-            latestHeartRate: latestValue?.0,
-            latestHeartRateDate: latestValue?.1,
-            restingHeartRate: restingValue?.0,
-            restingHeartRateDate: restingValue?.1,
-            hrvMilliseconds: hrvValue?.0,
-            hrvDate: hrvValue?.1
+            latestHeartRate:
+                validLatest?.0,
+            latestHeartRateDate:
+                validLatest?.1,
+            restingHeartRate:
+                validResting?.0,
+            restingHeartRateDate:
+                validResting?.1,
+            hrvMilliseconds:
+                hrvValue?.0,
+            hrvDate:
+                hrvValue?.1
         )
     }
 
@@ -4240,63 +4255,191 @@ final class HealthKitManager: ObservableObject {
         endDate: Date
     ) async throws -> [Date: Double] {
         guard startDate <= endDate,
-              let type = HKObjectType.quantityType(forIdentifier: identifier)
+              let type =
+                HKObjectType.quantityType(
+                    forIdentifier: identifier
+                )
         else {
             return [:]
         }
 
         let calendar = Calendar.current
-        let anchor = calendar.startOfDay(for: startDate)
-        let predicate = HKQuery.predicateForSamples(
-            withStart: startDate,
-            end: endDate,
-            options: .strictStartDate
-        )
-
-        return try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<[Date: Double], Error>) in
-
-            let query = HKStatisticsCollectionQuery(
-                quantityType: type,
-                quantitySamplePredicate: predicate,
-                options: .cumulativeSum,
-                anchorDate: anchor,
-                intervalComponents: DateComponents(day: 1)
+        let anchor =
+            calendar.startOfDay(
+                for: startDate
+            )
+        let predicate =
+            HKQuery.predicateForSamples(
+                withStart: startDate,
+                end: endDate,
+                options: .strictStartDate
             )
 
-            query.initialResultsHandler = { _, results, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
+        var values =
+            try await withCheckedThrowingContinuation {
+                (
+                    continuation:
+                        CheckedContinuation<
+                            [Date: Double],
+                            Error
+                        >
+                ) in
 
-                guard let results else {
-                    continuation.resume(returning: [:])
-                    return
-                }
+                let query =
+                    HKStatisticsCollectionQuery(
+                        quantityType: type,
+                        quantitySamplePredicate:
+                            predicate,
+                        options:
+                            .cumulativeSum,
+                        anchorDate: anchor,
+                        intervalComponents:
+                            DateComponents(
+                                day: 1
+                            )
+                    )
 
-                var values: [Date: Double] = [:]
-                results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
-                    guard let quantity = statistics.sumQuantity() else { return }
-                    let day =
-                        calendar.startOfDay(
-                            for: statistics.startDate
+                query.initialResultsHandler = {
+                    _,
+                    results,
+                    error in
+
+                    if let error {
+                        continuation.resume(
+                            throwing: error
                         )
-
-                    if let value =
-                            Self.safeDoubleValue(
-                                quantity,
-                                unit: unit
-                            ) {
-                        values[day] = value
+                        return
                     }
+
+                    guard let results else {
+                        continuation.resume(
+                            returning: [:]
+                        )
+                        return
+                    }
+
+                    var collected:
+                        [Date: Double] = [:]
+
+                    results.enumerateStatistics(
+                        from: startDate,
+                        to: endDate
+                    ) {
+                        statistics,
+                        _ in
+
+                        guard let quantity =
+                                statistics
+                                    .sumQuantity(),
+                              let value =
+                                Self.safeDoubleValue(
+                                    quantity,
+                                    unit: unit
+                                )
+                        else {
+                            return
+                        }
+
+                        let day =
+                            calendar.startOfDay(
+                                for:
+                                    statistics
+                                        .startDate
+                            )
+                        collected[day] =
+                            value
+                    }
+
+                    continuation.resume(
+                        returning: collected
+                    )
                 }
 
-                continuation.resume(returning: values)
+                healthStore.execute(query)
             }
 
-            healthStore.execute(query)
+        // iOS 27 has shown intermittent empty HKStatisticsCollection buckets
+        // for existing step data. Re-check only the newest missing days with a
+        // direct statistics query. This is intentionally bounded to avoid
+        // turning progress refreshes into N-per-day HealthKit work.
+        let today =
+            calendar.startOfDay(
+                for: Date()
+            )
+        let recentStart =
+            max(
+                calendar.startOfDay(
+                    for: startDate
+                ),
+                calendar.date(
+                    byAdding: .day,
+                    value: -6,
+                    to: today
+                ) ?? today
+            )
+
+        var missingRecentDays:
+            [Date] = []
+        var cursor = recentStart
+        let finalDay =
+            min(
+                calendar.startOfDay(
+                    for: endDate
+                ),
+                today
+            )
+
+        while cursor <= finalDay {
+            if values[cursor] == nil {
+                missingRecentDays.append(
+                    cursor
+                )
+            }
+
+            guard let next =
+                    calendar.date(
+                        byAdding: .day,
+                        value: 1,
+                        to: cursor
+                    ),
+                  next > cursor
+            else {
+                break
+            }
+            cursor = next
         }
+
+        for day in
+            missingRecentDays.suffix(3) {
+            guard let dayEnd =
+                    calendar.date(
+                        byAdding: .day,
+                        value: 1,
+                        to: day
+                    )
+            else {
+                continue
+            }
+
+            if let fallback =
+                    try? await summedQuantity(
+                        identifier: identifier,
+                        unit: unit,
+                        start: max(
+                            day,
+                            startDate
+                        ),
+                        end: min(
+                            dayEnd,
+                            endDate
+                        )
+                    ),
+               let fallback {
+                values[day] = fallback
+            }
+        }
+
+        return values
     }
 
     private func sleepDurationsByWakeDay(
