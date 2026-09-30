@@ -846,6 +846,8 @@ struct FriendProfileView: View {
     @State private var showingReport = false
     @State private var confirmBlock = false
     @State private var followOverview = SocialFollowOverview.empty
+    @State private var followActionInProgress = false
+    @State private var followActionError: String?
 
     var body: some View {
         ATHLTHPinnedHeroLayout(
@@ -1002,6 +1004,26 @@ struct FriendProfileView: View {
                     }
                 }
             }
+        }
+        .alert(
+            "Follow unavailable",
+            isPresented: Binding(
+                get: { followActionError != nil },
+                set: { visible in
+                    if !visible {
+                        followActionError = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                followActionError = nil
+            }
+        } message: {
+            Text(
+                followActionError ??
+                    "ATHLTH could not update this follow right now."
+            )
         }
     }
 
@@ -1379,12 +1401,20 @@ struct FriendProfileView: View {
         if social.isFollowing(userID) {
             Button {
                 Task {
+                    followActionInProgress = true
                     await social.unfollow(userID)
-                    followOverview =
-                        await social
-                            .loadFollowOverview(
-                                for: userID
-                            )
+
+                    if let error = social.errorMessage {
+                        followActionError = error
+                    } else {
+                        followOverview =
+                            await social
+                                .loadFollowOverview(
+                                    for: userID
+                                )
+                    }
+
+                    followActionInProgress = false
                 }
             } label: {
                 profileActionLabel(
@@ -1395,6 +1425,7 @@ struct FriendProfileView: View {
                 )
             }
             .buttonStyle(.plain)
+            .disabled(followActionInProgress)
         } else if relationship == .outgoingPending {
             profileActionLabel(
                 title: "Requested",
@@ -1414,9 +1445,18 @@ struct FriendProfileView: View {
         } else if profile.card.isPrivateProfile {
             Button {
                 Task {
+                    followActionInProgress = true
                     await social.sendFollowRequest(
                         to: profile.card
                     )
+
+                    if let error = social.errorMessage {
+                        followActionError = error
+                    } else {
+                        await load(force: true)
+                    }
+
+                    followActionInProgress = false
                 }
             } label: {
                 profileActionLabel(
@@ -1430,17 +1470,26 @@ struct FriendProfileView: View {
                 )
             }
             .buttonStyle(.plain)
+            .disabled(followActionInProgress)
         } else {
             Button {
                 Task {
+                    followActionInProgress = true
                     await social.follow(
                         profile.card
                     )
-                    followOverview =
-                        await social
-                            .loadFollowOverview(
-                                for: userID
-                            )
+
+                    if let error = social.errorMessage {
+                        followActionError = error
+                    } else {
+                        followOverview =
+                            await social
+                                .loadFollowOverview(
+                                    for: userID
+                                )
+                    }
+
+                    followActionInProgress = false
                 }
             } label: {
                 profileActionLabel(
@@ -1454,6 +1503,7 @@ struct FriendProfileView: View {
                 )
             }
             .buttonStyle(.plain)
+            .disabled(followActionInProgress)
         }
     }
 
