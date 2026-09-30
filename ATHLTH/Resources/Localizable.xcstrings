@@ -5540,7 +5540,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Blokk"
+            "value": "Blokker"
           }
         }
       }
@@ -7821,6 +7821,4216 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trofé"
+          }
+        }
+      }
+    },
+    "No events yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen arrangementer ennå"
+          }
+        }
+      }
+    },
+    "Create a public or friends-only run, walk or group workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en offentlig eller vennebegrenset løpetur, gåtur eller gruppeøkt."
+          }
+        }
+      }
+    },
+    "Create Event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett arrangement"
+          }
+        }
+      }
+    },
+    "Upcoming": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kommende"
+          }
+        }
+      }
+    },
+    "History": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historikk"
+          }
+        }
+      }
+    },
+    "Cancel Event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avlys arrangement"
+          }
+        }
+      }
+    },
+    "Deltar": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deltar"
+          }
+        }
+      }
+    },
+    "Delta": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delta"
+          }
+        }
+      }
+    },
+    "People": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personer"
+          }
+        }
+      }
+    },
+    "Host": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vert"
+          }
+        }
+      }
+    },
+    "Event host": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrangør"
+          }
+        }
+      }
+    },
+    "Event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrangement"
+          }
+        }
+      }
+    },
+    "Who can see it": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvem kan se det"
+          }
+        }
+      }
+    },
+    "Meet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppmøte"
+          }
+        }
+      }
+    },
+    "No route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen rute"
+          }
+        }
+      }
+    },
+    "Participants": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deltakere"
+          }
+        }
+      }
+    },
+    "Limit participants": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Begrens deltakere"
+          }
+        }
+      }
+    },
+    "Public events can be discovered by signed-in ATHLTH users. Friends-only events are limited to your ATHLTH friends.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offentlige arrangementer kan oppdages av innloggede ATHLTH-brukere. Vennearrangementer er begrenset til ATHLTH-vennene dine."
+          }
+        }
+      }
+    },
+    "Manage weekly challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Administrer ukentlige utfordringer"
+          }
+        }
+      }
+    },
+    "Events": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrangementer"
+          }
+        }
+      }
+    },
+    "Complete or share workouts to start building the leaderboard.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør eller del økter for å begynne å bygge ledertavlen."
+          }
+        }
+      }
+    },
+    "YOUR POSITION": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DIN PLASSERING"
+          }
+        }
+      }
+    },
+    "Leaderboard": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledertavle"
+          }
+        }
+      }
+    },
+    "Leaderboard scope": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Omfang for ledertavle"
+          }
+        }
+      }
+    },
+    "YOU": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DU"
+          }
+        }
+      }
+    },
+    "Discover People": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdag personer"
+          }
+        }
+      }
+    },
+    "Find athletes to follow, train and compete with.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn utøvere å følge, trene og konkurrere med."
+          }
+        }
+      }
+    },
+    "New people will appear here when they become discoverable.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nye personer vises her når de blir synlige."
+          }
+        }
+      }
+    },
+    "Edit Event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger arrangement"
+          }
+        }
+      }
+    },
+    "Hosted by": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrangert av"
+          }
+        }
+      }
+    },
+    "Co-hosts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medarrangører"
+          }
+        }
+      }
+    },
+    "When & where": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når og hvor"
+          }
+        }
+      }
+    },
+    "Attendance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deltakelse"
+          }
+        }
+      }
+    },
+    "You're on the waitlist": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du står på ventelisten"
+          }
+        }
+      }
+    },
+    "Set Reminder": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sett påminnelse"
+          }
+        }
+      }
+    },
+    "Edit Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger utfordring"
+          }
+        }
+      }
+    },
+    "Cancel Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avbryt utfordring"
+          }
+        }
+      }
+    },
+    "Challenge Rules": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regler for utfordringen"
+          }
+        }
+      }
+    },
+    "Core competition rules are locked after start.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De viktigste konkurransereglene låses etter start."
+          }
+        }
+      }
+    },
+    "Participation": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deltakelse"
+          }
+        }
+      }
+    },
+    "My Progress": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Min fremgang"
+          }
+        }
+      }
+    },
+    "Log Manual Result": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrer manuelt resultat"
+          }
+        }
+      }
+    },
+    "No qualifying results yet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen kvalifiserende resultater ennå."
+          }
+        }
+      }
+    },
+    "Discussion": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diskusjon"
+          }
+        }
+      }
+    },
+    "No comments yet. Ask a question or share an update about this event.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen kommentarer ennå. Still et spørsmål eller del en oppdatering om arrangementet."
+          }
+        }
+      }
+    },
+    "Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordring"
+          }
+        }
+      }
+    },
+    "Important changes such as time, meeting point or activity notify people who are going, maybe going or waitlisted.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viktige endringer som tidspunkt, møtested eller aktivitet varsler personer som skal, kanskje skal eller står på venteliste."
+          }
+        }
+      }
+    },
+    "Metric": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Måling"
+          }
+        }
+      }
+    },
+    "Scoring": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poengberegning"
+          }
+        }
+      }
+    },
+    "Window": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Periode"
+          }
+        }
+      }
+    },
+    "Could Not Save Event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke lagre arrangement"
+          }
+        }
+      }
+    },
+    "Could Not Save Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke lagre utfordring"
+          }
+        }
+      }
+    },
+    "Create a group for your city, area or training community.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en gruppe for byen, området eller treningsmiljøet ditt."
+          }
+        }
+      }
+    },
+    "Train with your community": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tren med fellesskapet ditt"
+          }
+        }
+      }
+    },
+    "Find public groups, train together and take on shared challenges.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn offentlige grupper, tren sammen og delta i felles utfordringer."
+          }
+        }
+      }
+    },
+    "You were invited to join": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du er invitert til å bli med"
+          }
+        }
+      }
+    },
+    "Decline": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslå"
+          }
+        }
+      }
+    },
+    "Join": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bli med"
+          }
+        }
+      }
+    },
+    "Joined": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medlem"
+          }
+        }
+      }
+    },
+    "Group area": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppeområde"
+          }
+        }
+      }
+    },
+    "You have a group invitation": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du har en gruppeinvitasjon"
+          }
+        }
+      }
+    },
+    "Accept the invitation to unlock chat, events and challenges.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godta invitasjonen for å få tilgang til chat, arrangementer og utfordringer."
+          }
+        }
+      }
+    },
+    "Join Group": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bli med i gruppen"
+          }
+        }
+      }
+    },
+    "Membership request pending": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medlemsforespørsel venter"
+          }
+        }
+      }
+    },
+    "An Owner or Admin can approve your request.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En eier eller administrator kan godkjenne forespørselen din."
+          }
+        }
+      }
+    },
+    "Invitation required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invitasjon kreves"
+          }
+        }
+      }
+    },
+    "This group only accepts members who have been invited by an Owner or Admin.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne gruppen tar bare imot medlemmer som er invitert av en eier eller administrator."
+          }
+        }
+      }
+    },
+    "CLUB": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KLUBB"
+          }
+        }
+      }
+    },
+    "Club Settings": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubbinnstillinger"
+          }
+        }
+      }
+    },
+    "Leave Club": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forlat klubb"
+          }
+        }
+      }
+    },
+    "Pinned Post": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Festet innlegg"
+          }
+        }
+      }
+    },
+    "Club Posts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubbinnlegg"
+          }
+        }
+      }
+    },
+    "Club Leaderboard": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubbledertavle"
+          }
+        }
+      }
+    },
+    "Last 7 days · training, participation and Club activity.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste 7 dager · trening, deltakelse og klubbaktivitet."
+          }
+        }
+      }
+    },
+    "Leaderboard activity will appear as members train and take part in the Club.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktivitet på ledertavlen vises når medlemmer trener og deltar i klubben."
+          }
+        }
+      }
+    },
+    "Club Post": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubbinnlegg"
+          }
+        }
+      }
+    },
+    "Visible to every group member": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synlig for alle gruppemedlemmer"
+          }
+        }
+      }
+    },
+    "Coming Up": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "På vei"
+          }
+        }
+      }
+    },
+    "The next things happening in this group.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Det neste som skjer i denne gruppen."
+          }
+        }
+      }
+    },
+    "No upcoming events or challenges yet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen kommende arrangementer eller utfordringer ennå."
+          }
+        }
+      }
+    },
+    "Recent Activity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nylig aktivitet"
+          }
+        }
+      }
+    },
+    "What has changed in the group lately.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette har skjedd i gruppen i det siste."
+          }
+        }
+      }
+    },
+    "New members, events and challenges will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nye medlemmer, arrangementer og utfordringer vises her."
+          }
+        }
+      }
+    },
+    "Delete Post": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett innlegg"
+          }
+        }
+      }
+    },
+    "Start the Club conversation.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start samtalen i klubben."
+          }
+        }
+      }
+    },
+    "Group Events": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppearrangementer"
+          }
+        }
+      }
+    },
+    "Group Challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppeutfordringer"
+          }
+        }
+      }
+    },
+    "Remove Photo": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern bilde"
+          }
+        }
+      }
+    },
+    "This photo becomes the Club hero image and is also used as the Club thumbnail.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette bildet blir klubbens hovedbilde og brukes også som miniatyrbilde."
+          }
+        }
+      }
+    },
+    "Club photo": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubbilde"
+          }
+        }
+      }
+    },
+    "Club": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubb"
+          }
+        }
+      }
+    },
+    "Group visibility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppesynlighet"
+          }
+        }
+      }
+    },
+    "Private": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privat"
+          }
+        }
+      }
+    },
+    "Membership": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medlemskap"
+          }
+        }
+      }
+    },
+    "Who can join": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvem kan bli med"
+          }
+        }
+      }
+    },
+    "Open": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpen"
+          }
+        }
+      }
+    },
+    "Approval required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Krever godkjenning"
+          }
+        }
+      }
+    },
+    "Invite only": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun invitasjon"
+          }
+        }
+      }
+    },
+    "Member permissions": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medlemstillatelser"
+          }
+        }
+      }
+    },
+    "Members can create events & challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medlemmer kan opprette arrangementer og utfordringer"
+          }
+        }
+      }
+    },
+    "Remove": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern"
+          }
+        }
+      }
+    },
+    "Group": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppe"
+          }
+        }
+      }
+    },
+    "Delete Group": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett gruppe"
+          }
+        }
+      }
+    },
+    "Only the Owner can delete the group. Deleting it permanently removes messages, updates, events, challenges and memberships.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare eieren kan slette gruppen. Sletting fjerner meldinger, oppdateringer, arrangementer, utfordringer og medlemskap permanent."
+          }
+        }
+      }
+    },
+    "This cannot be undone. All group content will be permanently removed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette kan ikke angres. Alt gruppeinnhold fjernes permanent."
+          }
+        }
+      }
+    },
+    "Community Activity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fellesskapsaktivitet"
+          }
+        }
+      }
+    },
+    "Updates from groups you belong to.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdateringer fra grupper du er medlem av."
+          }
+        }
+      }
+    },
+    "Group joins, updates, events and challenges will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppemedlemskap, oppdateringer, arrangementer og utfordringer vises her."
+          }
+        }
+      }
+    },
+    "Club activity will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubbaktivitet vises her."
+          }
+        }
+      }
+    },
+    "Group notifications": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppevarsler"
+          }
+        }
+      }
+    },
+    "Direct @mentions use your global Mentions setting in Settings → Notifications. Turning this group off does not disable a direct mention.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direkte @omtaler bruker den globale Omtaler-innstillingen under Innstillinger → Varsler. Å slå av gruppen deaktiverer ikke direkte omtaler."
+          }
+        }
+      }
+    },
+    "Invited": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invitert"
+          }
+        }
+      }
+    },
+    "Invite": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inviter"
+          }
+        }
+      }
+    },
+    "Membership Requests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medlemsforespørsler"
+          }
+        }
+      }
+    },
+    "Members": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medlemmer"
+          }
+        }
+      }
+    },
+    "ATHLTH member": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-medlem"
+          }
+        }
+      }
+    },
+    "Group member": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppemedlem"
+          }
+        }
+      }
+    },
+    "Remove from Group": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern fra gruppe"
+          }
+        }
+      }
+    },
+    "Cover image": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forsidebilde"
+          }
+        }
+      }
+    },
+    "Only members of this group can see this event.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare medlemmer av denne gruppen kan se arrangementet."
+          }
+        }
+      }
+    },
+    "Challenge goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordringsmål"
+          }
+        }
+      }
+    },
+    "Only completed workouts matching the selected activity contribute to this challenge. The same workout is counted once.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare fullførte økter som matcher valgt aktivitet teller i utfordringen. Samme økt telles én gang."
+          }
+        }
+      }
+    },
+    "Create group": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett gruppe"
+          }
+        }
+      }
+    },
+    "Clear group search": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tøm gruppesøk"
+          }
+        }
+      }
+    },
+    "Change Club photo": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bytt klubbilde"
+          }
+        }
+      }
+    },
+    "Create Club": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett klubb"
+          }
+        }
+      }
+    },
+    "Invite Members": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inviter medlemmer"
+          }
+        }
+      }
+    },
+    "Invite group member": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inviter gruppemedlem"
+          }
+        }
+      }
+    },
+    "Group Event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppearrangement"
+          }
+        }
+      }
+    },
+    "Could Not Create Event": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke opprette arrangement"
+          }
+        }
+      }
+    },
+    "Group Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gruppeutfordring"
+          }
+        }
+      }
+    },
+    "Could Not Create Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke opprette utfordring"
+          }
+        }
+      }
+    },
+    "participating": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deltar"
+          }
+        }
+      }
+    },
+    "Start a community challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start en fellesskapsutfordring"
+          }
+        }
+      }
+    },
+    "Create a running, route or strength challenge and invite your people.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en løpe-, rute- eller styrkeutfordring og inviter folkene dine."
+          }
+        }
+      }
+    },
+    "Route Challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruteutfordringer"
+          }
+        }
+      }
+    },
+    "Take on shared routes and compare verified attempts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta fatt på delte ruter og sammenlign verifiserte forsøk."
+          }
+        }
+      }
+    },
+    "View all": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se alle"
+          }
+        }
+      }
+    },
+    "Open challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne utfordring"
+          }
+        }
+      }
+    },
+    "No route challenge is active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen ruteutfordring er aktiv"
+          }
+        }
+      }
+    },
+    "Browse community routes and turn one into your next challenge.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utforsk fellesskapsruter og gjør en av dem til din neste utfordring."
+          }
+        }
+      }
+    },
+    "Friends vs Friends": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venner mot venner"
+          }
+        }
+      }
+    },
+    "Running distance · last 7 days": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løpedistanse · siste 7 dager"
+          }
+        }
+      }
+    },
+    "Add friends to start comparing shared activity.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til venner for å begynne å sammenligne delt aktivitet."
+          }
+        }
+      }
+    },
+    "Club Activity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubbaktivitet"
+          }
+        }
+      }
+    },
+    "Latest updates from the clubs you belong to.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste oppdateringer fra klubbene du er medlem av."
+          }
+        }
+      }
+    },
+    "Popular Routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Populære ruter"
+          }
+        }
+      }
+    },
+    "Routes shared with the ATHLTH community.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruter delt med ATHLTH-fellesskapet."
+          }
+        }
+      }
+    },
+    "Public and shared routes will appear here when they become available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offentlige og delte ruter vises her når de blir tilgjengelige."
+          }
+        }
+      }
+    },
+    "Shared routes will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delte ruter vises her."
+          }
+        }
+      }
+    },
+    "Community Routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fellesskapsruter"
+          }
+        }
+      }
+    },
+    "COMMUNITY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FELLESSKAP"
+          }
+        }
+      }
+    },
+    "Better together.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bedre sammen."
+          }
+        }
+      }
+    },
+    "Find your people, show up, and keep moving.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn folkene dine, møt opp og hold deg i bevegelse."
+          }
+        }
+      }
+    },
+    "Find your club": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn klubben din"
+          }
+        }
+      }
+    },
+    "Join people who train, race or move like you do.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bli med folk som trener, konkurrerer eller beveger seg som deg."
+          }
+        }
+      }
+    },
+    "Create the next meetup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett neste samling"
+          }
+        }
+      }
+    },
+    "Run, lift, hike or train together.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løp, løft, gå tur eller tren sammen."
+          }
+        }
+      }
+    },
+    "Give yourself something to chase": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gi deg selv noe å jakte på"
+          }
+        }
+      }
+    },
+    "Create or join a challenge.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett eller bli med i en utfordring."
+          }
+        }
+      }
+    },
+    "Community should make training feel closer — not busier.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fellesskap skal gjøre treningen nærmere — ikke mer hektisk."
+          }
+        }
+      }
+    },
+    "Clubs, events and challenges stay connected to the people and workouts that matter.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubber, arrangementer og utfordringer holder deg koblet til menneskene og øktene som betyr noe."
+          }
+        }
+      }
+    },
+    "Train together.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tren sammen."
+          }
+        }
+      }
+    },
+    "Less feed. More people, competition and reasons to show up.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mindre feed. Flere mennesker, mer konkurranse og flere grunner til å møte opp."
+          }
+        }
+      }
+    },
+    "YOUR CIRCLE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DIN KRETS"
+          }
+        }
+      }
+    },
+    "No weekly challenge yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen ukentlig utfordring ennå"
+          }
+        }
+      }
+    },
+    "Open Challenges and pick the next target.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne Utfordringer og velg neste mål."
+          }
+        }
+      }
+    },
+    "Community should help you train more — not give you another feed to scroll.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fellesskapet skal hjelpe deg å trene mer — ikke gi deg enda en feed å scrolle."
+          }
+        }
+      }
+    },
+    "WEEKLY CHALLENGE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UKENS UTFORDRING"
+          }
+        }
+      }
+    },
+    "Join Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bli med i utfordringen"
+          }
+        }
+      }
+    },
+    "This challenge is no longer available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne utfordringen er ikke lenger tilgjengelig."
+          }
+        }
+      }
+    },
+    "done": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ferdig"
+          }
+        }
+      }
+    },
+    "MAKE THIS WEEK COUNT": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GJØR DENNE UKEN TELLENDE"
+          }
+        }
+      }
+    },
+    "How it works": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slik fungerer det"
+          }
+        }
+      }
+    },
+    "Challenge completed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordring fullført"
+          }
+        }
+      }
+    },
+    "Leave": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forlat"
+          }
+        }
+      }
+    },
+    "THIS WEEK'S FOCUS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DENNE UKENS FOKUS"
+          }
+        }
+      }
+    },
+    "Your progress": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Din fremgang"
+          }
+        }
+      }
+    },
+    "Community progress for this weekly challenge.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fellesskapets fremgang i denne ukentlige utfordringen."
+          }
+        }
+      }
+    },
+    "Progress appears here as participants complete qualifying workouts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fremgang vises her når deltakere fullfører kvalifiserende økter."
+          }
+        }
+      }
+    },
+    "Counted workouts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tellende økter"
+          }
+        }
+      }
+    },
+    "Qualifying activity during the challenge window.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kvalifiserende aktivitet i utfordringsperioden."
+          }
+        }
+      }
+    },
+    "Complete a qualifying workout and it will appear here after Health syncs.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør en kvalifiserende økt, så vises den her etter at Health er synkronisert."
+          }
+        }
+      }
+    },
+    "Current": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjeldende"
+          }
+        }
+      }
+    },
+    "Create or generate the next weekly running challenge.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett eller generer den neste ukentlige løpeutfordringen."
+          }
+        }
+      }
+    },
+    "Build from scratch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg fra bunnen av"
+          }
+        }
+      }
+    },
+    "Generate with AI": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generer med AI"
+          }
+        }
+      }
+    },
+    "Delete & build replacement": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett og bygg erstatning"
+          }
+        }
+      }
+    },
+    "Delete & generate replacement with AI": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett og generer erstatning med AI"
+          }
+        }
+      }
+    },
+    "Delete & move future challenges forward": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett og flytt fremtidige utfordringer frem"
+          }
+        }
+      }
+    },
+    "Delete and leave gap": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett og la plassen stå tom"
+          }
+        }
+      }
+    },
+    "Choose what should happen to this weekly slot after the challenge is deleted.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg hva som skal skje med denne ukesplassen etter at utfordringen slettes."
+          }
+        }
+      }
+    },
+    "Only ATHLTH administrators can manage official weekly challenges.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare ATHLTH-administratorer kan administrere offisielle ukentlige utfordringer."
+          }
+        }
+      }
+    },
+    "AI Cover": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-bilde"
+          }
+        }
+      }
+    },
+    "Challenge type": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordringstype"
+          }
+        }
+      }
+    },
+    "Schedule": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidsplan"
+          }
+        }
+      }
+    },
+    "Generate a new AI suggestion": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generer et nytt AI-forslag"
+          }
+        }
+      }
+    },
+    "Generate AI cover": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generer AI-bilde"
+          }
+        }
+      }
+    },
+    "AI can draft the challenge and create its cover image. The challenge text is not published until you review and save it.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI kan lage et utkast til utfordringen og generere et bilde. Teksten publiseres ikke før du har gjennomgått og lagret den."
+          }
+        }
+      }
+    },
+    "Weekly Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukentlig utfordring"
+          }
+        }
+      }
+    },
+    "Weekly Challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukentlige utfordringer"
+          }
+        }
+      }
+    },
+    "Compete, train together and settle it with data.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer, tren sammen og avgjør det med data."
+          }
+        }
+      }
+    },
+    "Challenge your friends": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordre vennene dine"
+          }
+        }
+      }
+    },
+    "Running, routes, strength and meet-up sessions.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løping, ruter, styrke og fellesøkter."
+          }
+        }
+      }
+    },
+    "people": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "personer"
+          }
+        }
+      }
+    },
+    "ATHLTH Challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-utfordringer"
+          }
+        }
+      }
+    },
+    "Weekly community goals, friend challenges and routes.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukentlige fellesskapsmål, venneutfordringer og ruter."
+          }
+        }
+      }
+    },
+    "The next ATHLTH Weekly challenge will appear here. You can also create a challenge with friends.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste ukentlige ATHLTH-utfordring vises her. Du kan også opprette en utfordring med venner."
+          }
+        }
+      }
+    },
+    "RULES LOCKED": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "REGLER LÅST"
+          }
+        }
+      }
+    },
+    "Challenge name": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navn på utfordring"
+          }
+        }
+      }
+    },
+    "Required · this is what participants will see.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Påkrevd · dette er det deltakerne ser."
+          }
+        }
+      }
+    },
+    "What are you competing in?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hva konkurrerer dere i?"
+          }
+        }
+      }
+    },
+    "Set the rules": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sett reglene"
+          }
+        }
+      }
+    },
+    "Rule detail": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regeldetaljer"
+          }
+        }
+      }
+    },
+    "Basic": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grunnleggende"
+          }
+        }
+      }
+    },
+    "Advanced": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avansert"
+          }
+        }
+      }
+    },
+    "Allow multiple attempts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat flere forsøk"
+          }
+        }
+      }
+    },
+    "Rules lock when the challenge starts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reglene låses når utfordringen starter"
+          }
+        }
+      }
+    },
+    "Once live, target, route, verification and scoring cannot be changed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når utfordringen er i gang, kan mål, rute, verifisering og poengberegning ikke endres."
+          }
+        }
+      }
+    },
+    "Course": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løype"
+          }
+        }
+      }
+    },
+    "GPS verification required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPS-verifisering kreves"
+          }
+        }
+      }
+    },
+    "Specific-route challenges must include GPS data.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordringer på spesifikk rute må inneholde GPS-data."
+          }
+        }
+      }
+    },
+    "Require GPS verification": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Krev GPS-verifisering"
+          }
+        }
+      }
+    },
+    "Verified running only": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun verifisert løping"
+          }
+        }
+      }
+    },
+    "Running results must come from ATHLTH or a qualifying Apple Health workout. Manual entries are not accepted.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løperesultater må komme fra ATHLTH eller en kvalifiserende Apple Health-økt. Manuelle registreringer godtas ikke."
+          }
+        }
+      }
+    },
+    "Timing": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidtaking"
+          }
+        }
+      }
+    },
+    "Distance tolerance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distanseavvik"
+          }
+        }
+      }
+    },
+    "Allowed route deviation": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillatt ruteavvik"
+          }
+        }
+      }
+    },
+    "Start & finish tolerance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toleranse ved start og mål"
+          }
+        }
+      }
+    },
+    "Route direction": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruteretning"
+          }
+        }
+      }
+    },
+    "Allow target ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat mål-Ghost"
+          }
+        }
+      }
+    },
+    "Allow treadmill": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat tredemølle"
+          }
+        }
+      }
+    },
+    "Attempt policy": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forsøksregel"
+          }
+        }
+      }
+    },
+    "Maximum attempts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maksimalt antall forsøk"
+          }
+        }
+      }
+    },
+    "Unlimited": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ubegrenset"
+          }
+        }
+      }
+    },
+    "Only the first qualifying attempt is recorded.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare det første kvalifiserende forsøket registreres."
+          }
+        }
+      }
+    },
+    "Reset to Recommended": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilbakestill til anbefalt"
+          }
+        }
+      }
+    },
+    "Change Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bytt rute"
+          }
+        }
+      }
+    },
+    "New Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ny rute"
+          }
+        }
+      }
+    },
+    "Choose a route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg en rute"
+          }
+        }
+      }
+    },
+    "My Routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mine ruter"
+          }
+        }
+      }
+    },
+    "Create New": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett ny"
+          }
+        }
+      }
+    },
+    "Heart-rate zone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulssone"
+          }
+        }
+      }
+    },
+    "Maximum heart rate required": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maksimalpuls kreves"
+          }
+        }
+      }
+    },
+    "Set Maximum Heart Rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angi maksimalpuls"
+          }
+        }
+      }
+    },
+    "Verified heart-rate data only": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun verifiserte pulsdata"
+          }
+        }
+      }
+    },
+    "Personal zones": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personlige soner"
+          }
+        }
+      }
+    },
+    "Require a specific weight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Krev en bestemt vekt"
+          }
+        }
+      }
+    },
+    "Result verification": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultatverifisering"
+          }
+        }
+      }
+    },
+    "Who are you challenging?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvem utfordrer du?"
+          }
+        }
+      }
+    },
+    "Route Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruteutfordring"
+          }
+        }
+      }
+    },
+    "SELECTED": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VALGT"
+          }
+        }
+      }
+    },
+    "FRIENDS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VENNER"
+          }
+        }
+      }
+    },
+    "Add friends before sending a challenge.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til venner før du sender en utfordring."
+          }
+        }
+      }
+    },
+    "Find Friends": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn venner"
+          }
+        }
+      }
+    },
+    "When does it count?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når teller det?"
+          }
+        }
+      }
+    },
+    "Set an end time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angi sluttid"
+          }
+        }
+      }
+    },
+    "Meet and train together": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Møt og tren sammen"
+          }
+        }
+      }
+    },
+    "Tap the map to set the meetup point.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trykk på kartet for å angi møtested."
+          }
+        }
+      }
+    },
+    "Use route start": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk rutestart"
+          }
+        }
+      }
+    },
+    "Check-in is explicit. ATHLTH does not continuously share participants’ live location.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Innsjekk er eksplisitt. ATHLTH deler ikke deltakernes live-posisjon kontinuerlig."
+          }
+        }
+      }
+    },
+    "Ready to challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klar til å utfordre"
+          }
+        }
+      }
+    },
+    "Fair-play rules": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regler for rettferdig konkurranse"
+          }
+        }
+      }
+    },
+    "Create a route first, then return here to use it in the challenge.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en rute først, og gå deretter tilbake hit for å bruke den i utfordringen."
+          }
+        }
+      }
+    },
+    "Create New Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett ny rute"
+          }
+        }
+      }
+    },
+    "ATHLTH CHALLENGE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-UTFORDRING"
+          }
+        }
+      }
+    },
+    "Submit Manual Strength Result": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send inn manuelt styrkeresultat"
+          }
+        }
+      }
+    },
+    "Keep Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Behold utfordring"
+          }
+        }
+      }
+    },
+    "Set your maximum heart rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angi maksimalpulsen din"
+          }
+        }
+      }
+    },
+    "Open Health Profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne helseprofil"
+          }
+        }
+      }
+    },
+    "You’ve been challenged": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du har blitt utfordret"
+          }
+        }
+      }
+    },
+    "Declining removes you from active competition.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvis du avslår, fjernes du fra aktiv konkurranse."
+          }
+        }
+      }
+    },
+    "Accept Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godta utfordring"
+          }
+        }
+      }
+    },
+    "LOCKED": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LÅST"
+          }
+        }
+      }
+    },
+    "No result yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen resultat ennå"
+          }
+        }
+      }
+    },
+    "Target Ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål-Ghost"
+          }
+        }
+      }
+    },
+    "Set your own finish time and follow a synthetic pacer around the challenge route.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sett din egen sluttid og følg en syntetisk pacer rundt utfordringsruten."
+          }
+        }
+      }
+    },
+    "Set target time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angi måltid"
+          }
+        }
+      }
+    },
+    "Rules": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regler"
+          }
+        }
+      }
+    },
+    "Meet & Train": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Møt og tren"
+          }
+        }
+      }
+    },
+    "Attempts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forsøk"
+          }
+        }
+      }
+    },
+    "No attempts yet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen forsøk ennå."
+          }
+        }
+      }
+    },
+    "Result": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultat"
+          }
+        }
+      }
+    },
+    "Manual verification": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manuell verifisering"
+          }
+        }
+      }
+    },
+    "Manual result": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manuelt resultat"
+          }
+        }
+      }
+    },
+    "This attempt will be visible in the leaderboard with a Manual label.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette forsøket vises på ledertavlen med etiketten Manuell."
+          }
+        }
+      }
+    },
+    "Submit": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send inn"
+          }
+        }
+      }
+    },
+    "Create challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett utfordring"
+          }
+        }
+      }
+    },
+    "Challenge could not be sent": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordringen kunne ikke sendes"
+          }
+        }
+      }
+    },
+    "Choose Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg rute"
+          }
+        }
+      }
+    },
+    "Cancel this challenge?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avbryte denne utfordringen?"
+          }
+        }
+      }
+    },
+    "Submit Result": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send inn resultat"
+          }
+        }
+      }
+    },
+    "Messages": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meldinger"
+          }
+        }
+      }
+    },
+    "Messages could not refresh": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meldinger kunne ikke oppdateres"
+          }
+        }
+      }
+    },
+    "Accept": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godta"
+          }
+        }
+      }
+    },
+    "Waiting for acceptance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venter på godkjenning"
+          }
+        }
+      }
+    },
+    "Voice note": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talemelding"
+          }
+        }
+      }
+    },
+    "Send a message or share a workout, plan, route or challenge.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send en melding eller del en økt, plan, rute eller utfordring."
+          }
+        }
+      }
+    },
+    "Accept this request before replying or sharing training.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Godta forespørselen før du svarer eller deler trening."
+          }
+        }
+      }
+    },
+    "Message request sent": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meldingsforespørsel sendt"
+          }
+        }
+      }
+    },
+    "You can send more messages and training items after it is accepted.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan sende flere meldinger og treningselementer etter at den er godkjent."
+          }
+        }
+      }
+    },
+    "Create a workout or add one to a training plan first.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en økt eller legg en til i en treningsplan først."
+          }
+        }
+      }
+    },
+    "Create or save a training plan first.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett eller lagre en treningsplan først."
+          }
+        }
+      }
+    },
+    "Create a running workout first.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en løpeøkt først."
+          }
+        }
+      }
+    },
+    "Save or import a route first.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre eller importer en rute først."
+          }
+        }
+      }
+    },
+    "Create or join a challenge first.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett eller bli med i en utfordring først."
+          }
+        }
+      }
+    },
+    "Pinned conversation": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Festet samtale"
+          }
+        }
+      }
+    },
+    "Saved to ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagret i ATHLTH"
+          }
+        }
+      }
+    },
+    "Open sender profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne avsenderprofil"
+          }
+        }
+      }
+    },
+    "Share with Athlete": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del med utøver"
+          }
+        }
+      }
+    },
+    "Could Not Share": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke dele"
+          }
+        }
+      }
+    },
+    "Start a conversation": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start en samtale"
+          }
+        }
+      }
+    },
+    "Mutual followers can chat immediately. Everyone else receives one message request to approve or decline before the conversation continues.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personer som følger hverandre kan chatte med én gang. Alle andre får én meldingsforespørsel som må godkjennes eller avslås før samtalen kan fortsette."
+          }
+        }
+      }
+    },
+    "Search by name or @username. If you do not follow each other, your first message is sent as a request for the other athlete to approve or decline.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søk etter navn eller @brukernavn. Hvis dere ikke følger hverandre, sendes den første meldingen som en forespørsel den andre utøveren må godkjenne eller avslå."
+          }
+        }
+      }
+    },
+    "Start typing in the search field above.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Begynn å skrive i søkefeltet over."
+          }
+        }
+      }
+    },
+    "• Mutual follow": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• Følger hverandre"
+          }
+        }
+      }
+    },
+    "• Request declined": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• Forespørsel avslått"
+          }
+        }
+      }
+    },
+    "• Message request": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• Meldingsforespørsel"
+          }
+        }
+      }
+    },
+    "New Message": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ny melding"
+          }
+        }
+      }
+    },
+    "See training from athletes you follow.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se trening fra utøvere du følger."
+          }
+        }
+      }
+    },
+    "Social": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sosialt"
+          }
+        }
+      }
+    },
+    "Find your training crew": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn treningsgjengen din"
+          }
+        }
+      }
+    },
+    "Search athletes and follow public profiles instantly.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søk etter utøvere og følg offentlige profiler med én gang."
+          }
+        }
+      }
+    },
+    "Find": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn"
+          }
+        }
+      }
+    },
+    "Live now": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live nå"
+          }
+        }
+      }
+    },
+    "Find people by their ATHLTH username.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn personer etter ATHLTH-brukernavn."
+          }
+        }
+      }
+    },
+    "Follow and workout requests will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Følge- og øktforespørsler vises her."
+          }
+        }
+      }
+    },
+    "Search by name or @username.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søk etter navn eller @brukernavn."
+          }
+        }
+      }
+    },
+    "No matching ATHLTH users.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen ATHLTH-brukere matcher søket."
+          }
+        }
+      }
+    },
+    "Requested": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forespurt"
+          }
+        }
+      }
+    },
+    "Respond": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Svar"
+          }
+        }
+      }
+    },
+    "Blocked": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blokkert"
+          }
+        }
+      }
+    },
+    "Follow": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Følg"
+          }
+        }
+      }
+    },
+    "Workouts, trophies, goals and challenges can appear here when athletes you follow choose to share them.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økter, trofeer, mål og utfordringer kan vises her når utøvere du følger velger å dele dem."
+          }
+        }
+      }
+    },
+    "This profile may be private or unavailable.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profilen kan være privat eller utilgjengelig."
+          }
+        }
+      }
+    },
+    "Report": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rapporter"
+          }
+        }
+      }
+    },
+    "Block User": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blokker bruker"
+          }
+        }
+      }
+    },
+    "This profile is private": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne profilen er privat"
+          }
+        }
+      }
+    },
+    "Send a follow request to unlock the profile sections this athlete shares with approved followers.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send en følgeforespørsel for å få tilgang til profilseksjoner utøveren deler med godkjente følgere."
+          }
+        }
+      }
+    },
+    "Nothing shared yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingenting delt ennå"
+          }
+        }
+      }
+    },
+    "Public workouts will appear here when this athlete shares them.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offentlige økter vises her når utøveren deler dem."
+          }
+        }
+      }
+    },
+    "Profile visibility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profilsynlighet"
+          }
+        }
+      }
+    },
+    "Followers": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Følgere"
+          }
+        }
+      }
+    },
+    "Allow follow requests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat følgeforespørsler"
+          }
+        }
+      }
+    },
+    "Show when I’m online": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis når jeg er pålogget"
+          }
+        }
+      }
+    },
+    "Who can message me": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvem kan sende meg meldinger"
+          }
+        }
+      }
+    },
+    "Mutual follows + requests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjensidig følge + forespørsler"
+          }
+        }
+      }
+    },
+    "Mutual follows only": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun gjensidig følge"
+          }
+        }
+      }
+    },
+    "Nobody": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen"
+          }
+        }
+      }
+    },
+    "Shared with allowed viewers": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delt med tillatte seere"
+          }
+        }
+      }
+    },
+    "Training now": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trener nå"
+          }
+        }
+      }
+    },
+    "Share live workout position": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del live-posisjon under økt"
+          }
+        }
+      }
+    },
+    "Live position audience": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvem kan se live-posisjon"
+          }
+        }
+      }
+    },
+    "Mutual follows": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjensidig følge"
+          }
+        }
+      }
+    },
+    "Share live heart rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del live-puls"
+          }
+        }
+      }
+    },
+    "Recent activity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nylig aktivitet"
+          }
+        }
+      }
+    },
+    "Running PRs": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løperekorder"
+          }
+        }
+      }
+    },
+    "Strength PRs": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrkerekorder"
+          }
+        }
+      }
+    },
+    "Workout totals": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økttotaler"
+          }
+        }
+      }
+    },
+    "Challenge invites": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordringsinvitasjoner"
+          }
+        }
+      }
+    },
+    "Everyone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle"
+          }
+        }
+      }
+    },
+    "Save Social Privacy": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre sosialt personvern"
+          }
+        }
+      }
+    },
+    "Unblock": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opphev blokkering"
+          }
+        }
+      }
+    },
+    "Reason": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Årsak"
+          }
+        }
+      }
+    },
+    "Spam": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spam"
+          }
+        }
+      }
+    },
+    "Harassment": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trakassering"
+          }
+        }
+      }
+    },
+    "Impersonation": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etterligning"
+          }
+        }
+      }
+    },
+    "Unsafe content": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utrygt innhold"
+          }
+        }
+      }
+    },
+    "Other": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annet"
+          }
+        }
+      }
+    },
+    "Submit Report": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send rapport"
+          }
+        }
+      }
+    },
+    "New message": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ny melding"
+          }
+        }
+      }
+    },
+    "Block this user?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blokkere denne brukeren?"
+          }
+        }
+      }
+    },
+    "Social Privacy": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sosialt personvern"
+          }
+        }
+      }
+    },
+    "Blocked Users": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blokkerte brukere"
+          }
+        }
+      }
+    },
+    "Report User": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rapporter bruker"
+          }
+        }
+      }
+    },
+    "Invite friends (optional)": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inviter venner (valgfritt)"
+          }
+        }
+      }
+    },
+    "Train solo": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tren alene"
+          }
+        }
+      }
+    },
+    "Friends are optional. You can start this workout by yourself.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venner er valgfritt. Du kan starte økten alene."
+          }
+        }
+      }
+    },
+    "Optional · create or pick a saved route before you start.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgfritt · opprett eller velg en lagret rute før du starter."
+          }
+        }
+      }
+    },
+    "Saved Routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagrede ruter"
+          }
+        }
+      }
+    },
+    "Your latest workouts, routes, and community activity.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dine siste økter, ruter og fellesskapsaktivitet."
+          }
+        }
+      }
+    },
+    "Your activity starts here": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiviteten din starter her"
+          }
+        }
+      }
+    },
+    "Completed workouts and shared activity will appear here automatically.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullførte økter og delt aktivitet vises automatisk her."
+          }
+        }
+      }
+    },
+    "Updating community activity…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdaterer fellesskapsaktivitet…"
+          }
+        }
+      }
+    },
+    "The workout could not be opened.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økten kunne ikke åpnes."
+          }
+        }
+      }
+    },
+    "Analyzing route, effort and heart-rate response…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyserer rute, innsats og pulsrespons…"
+          }
+        }
+      }
+    },
+    "Route Ribbon": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutebånd"
+          }
+        }
+      }
+    },
+    "Start → Finish": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start → mål"
+          }
+        }
+      }
+    },
+    "Coach analysis": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach-analyse"
+          }
+        }
+      }
+    },
+    "Focus Areas": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fokusområder"
+          }
+        }
+      }
+    },
+    "View muscle & exercise details": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis muskel- og øvelsesdetaljer"
+          }
+        }
+      }
+    },
+    "View workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis økt"
+          }
+        }
+      }
+    },
+    "No recent workouts are available to publish.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen nylige økter er tilgjengelige for publisering."
+          }
+        }
+      }
+    },
+    "Training Together": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trener sammen"
+          }
+        }
+      }
+    },
+    "Only friends who accepted the training invite are attached to this post.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare venner som godtok treningsinvitasjonen knyttes til innlegget."
+          }
+        }
+      }
+    },
+    "Post": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publiser"
+          }
+        }
+      }
+    },
+    "This workout is already published.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne økten er allerede publisert."
+          }
+        }
+      }
+    },
+    "View workout route details": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis rutdetaljer for økten"
+          }
+        }
+      }
+    },
+    "View pace-colored route details": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis tempofarget rute"
+          }
+        }
+      }
+    },
+    "Coach Insight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach-innsikt"
+          }
+        }
+      }
+    },
+    "Post Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publiser økt"
+          }
+        }
+      }
+    },
+    "Your latest completed workouts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dine siste fullførte økter."
+          }
+        }
+      }
+    },
+    "No workouts yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen økter ennå"
+          }
+        }
+      }
+    },
+    "Completed workouts will appear here automatically.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullførte økter vises automatisk her."
+          }
+        }
+      }
+    },
+    "Workout type": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økttype"
+          }
+        }
+      }
+    },
+    "Completed workouts from Apple Health and ATHLTH will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullførte økter fra Apple Health og ATHLTH vises her."
+          }
+        }
+      }
+    },
+    "Workout location unavailable": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktsted utilgjengelig"
+          }
+        }
+      }
+    },
+    "This strength workout did not contain a saved location in Apple Health.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne styrkeøkten hadde ikke lagret posisjon i Apple Health."
+          }
+        }
+      }
+    },
+    "Workout Review": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktgjennomgang"
+          }
+        }
+      }
+    },
+    "No description added.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen beskrivelse lagt til."
+          }
+        }
+      }
+    },
+    "Race this effort": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot denne innsatsen"
+          }
+        }
+      }
+    },
+    "Race": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer"
+          }
+        }
+      }
+    },
+    "How did it feel?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvordan føltes det?"
+          }
+        }
+      }
+    },
+    "Use this as your perceived effort for the session.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk dette som opplevd anstrengelse for økten."
+          }
+        }
+      }
+    },
+    "Description": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beskrivelse"
+          }
+        }
+      }
+    },
+    "Later": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senere"
+          }
+        }
+      }
+    },
+    "WORKOUT COMPLETE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ØKT FULLFØRT"
+          }
+        }
+      }
+    },
+    "Only you can see this workout in ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare du kan se denne økten i ATHLTH."
+          }
+        }
+      }
+    },
+    "Friends allowed by your social privacy settings can see it.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venner som er tillatt av personverninnstillingene dine kan se den."
+          }
+        }
+      }
+    },
+    "Visible on your ATHLTH profile to people allowed to view public activity.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synlig på ATHLTH-profilen din for personer som har tilgang til offentlig aktivitet."
+          }
+        }
+      }
+    },
+    "Workout Complete": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økt fullført"
           }
         }
       }
