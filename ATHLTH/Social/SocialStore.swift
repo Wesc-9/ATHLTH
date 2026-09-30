@@ -1338,6 +1338,57 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func shareTrophyUnlock(
+        _ unlock: TrophyUnlockRecord
+    ) async -> Bool {
+        errorMessage = nil
+
+        do {
+            let settings: SocialPrivacySettings
+            if let privacy {
+                settings = privacy
+            } else {
+                settings = try await service.loadPrivacySettings()
+                self.privacy = settings
+            }
+
+            guard let configuredVisibility =
+                    ProfileVisibility(
+                        rawValue:
+                            settings.trophyCabinetVisibility
+                    ),
+                  configuredVisibility != .privateOnly
+            else {
+                errorMessage =
+                    "Trophy sharing is disabled in your profile privacy settings."
+                return false
+            }
+
+            try await service.publishActivity(
+                eventKey: "trophy-\(unlock.stageKey)",
+                kind: "trophy",
+                title: "Unlocked \(unlock.title)",
+                subtitle: unlock.stageTitle,
+                metadata: [
+                    "trophy_id": unlock.trophyID,
+                    "rarity": unlock.rarity.title
+                ],
+                visibility: configuredVisibility
+            )
+
+            if let refreshed =
+                    try? await service.loadFeed() {
+                feed = scopedFeed(refreshed)
+            }
+
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func publishCompletedGoals(
         _ goals: [ATHLTHGoal],
         visibility: ProfileVisibility = .friends
