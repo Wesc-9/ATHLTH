@@ -101,10 +101,6 @@ struct WatchHomeView: View {
                 for: .navigationBar
             )
         }
-        .task {
-            await workoutManager
-                .recoverActiveWorkout()
-        }
         .onOpenURL { url in
             guard url.scheme ==
                     "athlth-watch"
