@@ -26,6 +26,17 @@ enum ATHLTHLocalization {
         )
     }
 
+    static func format(
+        _ key: String.LocalizationValue,
+        _ arguments: CVarArg...
+    ) -> String {
+        String(
+            format: string(key),
+            locale: selectedLocale,
+            arguments: arguments
+        )
+    }
+
     static var isNorwegian: Bool {
         let identifier =
             selectedLocale
