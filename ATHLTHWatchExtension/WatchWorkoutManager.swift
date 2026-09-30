@@ -743,6 +743,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil
     ) async {
+        prepareForLocalWorkoutStart()
+
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = activityType(for: kind)
         configuration.locationType = kind.usesOutdoorLocation ? .outdoor : .indoor
@@ -751,6 +753,27 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             configuration: configuration,
             kind: kind,
             route: route
+        )
+    }
+
+    private func prepareForLocalWorkoutStart() {
+        ghostRaceConfiguration = nil
+
+        publish {
+            self.audioCoachConfiguration = .disabled
+            self.structuredRunningWorkout = nil
+            self.structuredStepIndex = 0
+            self.routeAlertConfiguration = .standard
+            self.targetAlertConfiguration = nil
+            self.liveTargetStatus = nil
+            self.ghostRaceTitle = nil
+            self.ghostDistanceDeltaMeters = nil
+            self.ghostTimeDeltaSeconds = nil
+        }
+
+        resetAudioCoachThresholds()
+        resetGhostAnnouncementThresholds(
+            audio: nil
         )
     }
 
