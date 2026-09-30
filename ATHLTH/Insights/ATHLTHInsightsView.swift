@@ -110,27 +110,6 @@ struct ATHLTHInsightsView: View {
                 }
             }
 
-            Divider()
-                .padding(.vertical, 12)
-
-            HStack(spacing: 8) {
-                Label(
-                    "Based on your current signals",
-                    systemImage: "waveform.path.ecg"
-                )
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-                Spacer()
-
-                NavigationLink {
-                    ATHLTHRecoveryView(onSelectTab: onSelectTab)
-                } label: {
-                    Text("Why?")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
-            }
         }
     }
 
