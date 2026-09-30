@@ -10,6 +10,19 @@ private enum ATHLTHNotificationScope: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var localizedTitle: String {
+        switch self {
+        case .all:
+            return ATHLTHLocalization.string("All")
+        case .activity:
+            return ATHLTHLocalization.string("Activity")
+        case .goals:
+            return ATHLTHLocalization.string("Goals")
+        case .social:
+            return ATHLTHLocalization.string("Social")
+        }
+    }
+
     var icon: String {
         switch self {
         case .all:
@@ -105,7 +118,7 @@ struct ATHLTHNotificationCenterView: View {
                         Image(systemName: scope.icon)
                             .font(.system(size: 10, weight: .bold))
 
-                        Text(scope.rawValue)
+                        Text(scope.localizedTitle)
                             .lineLimit(1)
                     }
                     .font(.caption.weight(.semibold))
@@ -470,7 +483,11 @@ struct ATHLTHNotificationCenterView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
-                        "No \(selectedScope.rawValue.lowercased()) notifications"
+                        ATHLTHLocalization.format(
+                            english: "No %@ notifications",
+                            norwegian: "Ingen %@ varsler",
+                            selectedScope.localizedTitle.lowercased()
+                        )
                     )
                     .font(.headline)
 
