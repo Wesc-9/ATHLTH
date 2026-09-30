@@ -713,6 +713,7 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     let duration: TimeInterval
     let distanceMeters: Double?
     let activeEnergyKilocalories: Double?
+    let isIndoor: Bool?
     let strengthMuscleGroups: [String]?
     let strengthExerciseCount: Int?
     let strengthTotalVolumeKilograms: Double?
@@ -729,6 +730,7 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         duration = summary.duration
         distanceMeters = summary.distanceMeters
         activeEnergyKilocalories = summary.activeEnergyKilocalories
+        isIndoor = summary.isIndoor
         strengthMuscleGroups = nil
         strengthExerciseCount = nil
         strengthTotalVolumeKilograms = nil
@@ -750,6 +752,7 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         )
         distanceMeters = nil
         activeEnergyKilocalories = strengthWorkout.healthMetrics.activeCalories
+        isIndoor = true
 
         let performedExercises: [StrengthExerciseLog]
         if strengthWorkout.trackingMode == .advanced {
@@ -879,6 +882,23 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         activeEnergyKilocalories = watchResult.activeCalories > 0
             ? watchResult.activeCalories
             : nil
+
+        switch watchResult.kind {
+        case .running,
+             .walking,
+             .cycling:
+            isIndoor = false
+        case .strength,
+             .functional,
+             .hiit,
+             .rowing,
+             .stairClimbing,
+             .yoga:
+            isIndoor = true
+        case .other:
+            isIndoor = nil
+        }
+
         strengthMuscleGroups = nil
         strengthExerciseCount = nil
         strengthTotalVolumeKilograms = nil
@@ -913,12 +933,31 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         distanceMeters = wearableRecord.distanceMeters
         activeEnergyKilocalories =
             wearableRecord.activeEnergyKilocalories
+
+        switch wearableRecord.kind {
+        case .running,
+             .walking:
+            isIndoor = false
+        case .strength,
+             .mobility:
+            isIndoor = true
+        case .recovery,
+             .custom:
+            isIndoor = nil
+        }
+
         strengthMuscleGroups = nil
         strengthExerciseCount = nil
         strengthTotalVolumeKilograms = nil
         strengthHeaviestWeightKilograms = nil
         strengthTotalReps = nil
         source = wearableRecord.provider.title
+    }
+
+    var allowsTrainingPlaceCheckIn: Bool {
+        activity.allowsTrainingPlaceCheckIn(
+            isIndoor: isIndoor
+        )
     }
 
     var summaryText: String {
