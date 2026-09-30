@@ -138,7 +138,8 @@ final class SupabasePublicTrailDiscoveryService {
 
     func discover(
         near location: CLLocation,
-        radiusKilometers: Double
+        radiusKilometers: Double,
+        forceRefresh: Bool = false
     ) async throws ->
         PublicTrailDiscoveryResponse {
         let response:
@@ -155,7 +156,9 @@ final class SupabasePublicTrailDiscoveryService {
                                     location.coordinate
                                         .longitude,
                                 "radiusKilometers":
-                                    radiusKilometers
+                                    radiusKilometers,
+                                "forceRefresh":
+                                    forceRefresh
                             ]
                         )
                 )
@@ -291,7 +294,8 @@ final class PublicTrailDiscoveryStore:
                                 3
                             ),
                             20
-                        )
+                        ),
+                    forceRefresh: force
                 )
 
             guard !Task.isCancelled else {
@@ -329,7 +333,8 @@ final class PublicTrailDiscoveryStore:
                                     3
                                 ),
                                 20
-                            )
+                            ),
+                        forceRefresh: true
                     )
 
                 guard !Task.isCancelled else {
@@ -474,10 +479,7 @@ final class PublicTrailDiscoveryStore:
             response.trails
                 .filter(\.isUsable)
 
-        if !usable.isEmpty ||
-           trails.isEmpty {
-            trails = usable
-        }
+        trails = usable
 
         attribution =
             response.attribution
