@@ -194,7 +194,17 @@ struct RouteLibraryListView: View {
             if loading {
                 ProgressView("Loading routes…")
             }
-            Section("\(entries.count) routes\(hasMore ? " loaded" : "")") {
+            Section(
+                hasMore
+                    ? ATHLTHLocalization.format(
+                        "%d routes loaded",
+                        entries.count
+                    )
+                    : ATHLTHLocalization.format(
+                        "%d routes",
+                        entries.count
+                    )
+            ) {
                 ForEach(entries) { entry in
                     HStack(spacing: 8) {
                         NavigationLink {
@@ -224,7 +234,10 @@ struct RouteLibraryListView: View {
                                     if let elevation =
                                             entry.elevationGainMeters {
                                         Text(
-                                            "\(Int(elevation)) m ascent"
+                                            ATHLTHLocalization.format(
+                                                "%d m ascent",
+                                                Int(elevation)
+                                            )
                                         )
                                     }
                                 }
@@ -243,7 +256,15 @@ struct RouteLibraryListView: View {
                                     from: locationStore.location
                                    ) {
                                     Label(
-                                        "\(settings.measurementPreference.distance(fromKilometers: distance)) away",
+                                        ATHLTHLocalization.format(
+                                            "%@ away",
+                                            settings
+                                                .measurementPreference
+                                                .distance(
+                                                    fromKilometers:
+                                                        distance
+                                                )
+                                        ),
                                         systemImage: "location"
                                     )
                                     .font(.caption)
@@ -299,7 +320,15 @@ struct RouteLibraryListView: View {
                 }
             }
         }
-        .navigationTitle(source == .mine ? "My Routes" : "Route Database")
+        .navigationTitle(
+            source == .mine
+                ? ATHLTHLocalization.string(
+                    "My Routes"
+                )
+                : ATHLTHLocalization.string(
+                    "Route Database"
+                )
+        )
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Search route or place")
         .toolbar {
