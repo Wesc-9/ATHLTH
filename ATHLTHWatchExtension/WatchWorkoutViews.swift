@@ -699,7 +699,10 @@ struct WatchActiveWorkoutView: View {
                         ) { _, lap in
                             HStack {
                                 Text(
-                                    "Lap \(lap.number)"
+                                    ATHLTHLocalization.format(
+                                    "Lap %d",
+                                    lap.number
+                                )
                                 )
                                 .font(
                                     .system(
@@ -750,7 +753,10 @@ struct WatchActiveWorkoutView: View {
                                 result.automaticPauseCount,
                            count > 0 {
                             Label(
-                                "Auto-Pause \(count)x",
+                                ATHLTHLocalization.format(
+                                    "Auto-Pause %dx",
+                                    count
+                                ),
                                 systemImage:
                                     "pause.circle.fill"
                             )
@@ -812,7 +818,11 @@ struct WatchActiveWorkoutView: View {
                                 result
                                     .routeMaxDeviationMeters {
                             Text(
-                                "Avg \(Int(average.rounded())) m · Max \(Int(maximum.rounded())) m deviation"
+                                ATHLTHLocalization.format(
+                                    "Avg %d m · Max %d m deviation",
+                                    Int(average.rounded()),
+                                    Int(maximum.rounded())
+                                )
                             )
                             .font(
                                 .system(size: 8)
