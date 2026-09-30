@@ -155,21 +155,20 @@ struct ChallengeHubView: View {
     @EnvironmentObject private var officialChallenges: OfficialWeeklyChallengeStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var session: AppSessionStore
 
     @State private var showingCreate = false
 
     private var invitations: [ATHLTHChallenge] {
-        challenges.visibleChallenges.filter {
-            $0.status == .invited
-        }
+        challenges.incomingInvitations(
+            for: session.profile.userID
+        )
     }
 
     private var currentPersonal: [ATHLTHChallenge] {
-        challenges.visibleChallenges.filter {
-            $0.status != .completed &&
-            $0.status != .cancelled &&
-            $0.status != .invited
-        }
+        challenges.trainingChallenges(
+            for: session.profile.userID
+        )
     }
 
     private var finishedPersonal: [ATHLTHChallenge] {
