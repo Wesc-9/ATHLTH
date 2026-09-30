@@ -934,7 +934,13 @@ struct RunQuickStartSheet: View {
 
                 if let workout = selectedWorkout {
                     Label(
-                        "\(workout.blocks.count) blocks" +
+                        ATHLTHLocalization.counted(
+                                workout.blocks.count,
+                                englishSingular: "block",
+                                englishPlural: "blocks",
+                                norwegianSingular: "blokk",
+                                norwegianPlural: "blokker"
+                            ) +
                         workout.estimatedDistanceMeters.map {
                             String(
                                 format: " · %.1f km",
