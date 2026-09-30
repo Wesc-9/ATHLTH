@@ -764,6 +764,262 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         state == .running || state == .paused
     }
 
+    func recoverActiveWorkout() async {
+        guard workoutSession == nil else {
+            return
+        }
+
+        do {
+            guard let recovered =
+                    try await healthStore
+                        .recoverActiveWorkoutSession()
+            else {
+                clearPersistedWorkoutState()
+                return
+            }
+
+            let configuration =
+                recovered.workoutConfiguration
+            let recoveredKind =
+                kind(
+                    for:
+                        configuration
+                            .activityType
+                )
+            let builder =
+                recovered
+                    .associatedWorkoutBuilder()
+
+            recovered.delegate = self
+            builder.delegate = self
+            builder.dataSource =
+                HKLiveWorkoutDataSource(
+                    healthStore: healthStore,
+                    workoutConfiguration:
+                        configuration
+                )
+
+            workoutSession = recovered
+            workoutBuilder = builder
+            finishing = false
+            kind = recoveredKind
+            startedAt =
+                recovered.startDate ??
+                builder.startDate
+
+            restorePersistedWorkoutState(
+                expectedKind: recoveredKind
+            )
+
+            if configuration.locationType ==
+                .outdoor,
+               let seriesBuilder =
+                    builder.seriesBuilder(
+                        for:
+                            HKSeriesType
+                                .workoutRoute()
+                    ) as? HKWorkoutRouteBuilder {
+                routeBuilder = seriesBuilder
+                locationManager
+                    .requestWhenInUseAuthorization()
+                locationManager
+                    .startUpdatingLocation()
+            } else {
+                routeBuilder = nil
+            }
+
+            updateFinalStatistics(
+                from: builder
+            )
+            elapsedTime =
+                builder.elapsedTime
+
+            switch recovered.state {
+            case .running:
+                publishState(.running)
+            case .paused:
+                publishState(.paused)
+            case .stopped, .ended:
+                publishState(.ending)
+            default:
+                publishState(.preparing)
+            }
+
+            if recovered.state == .running ||
+                recovered.state == .paused {
+                startTimer()
+            }
+
+            persistWorkoutRecoveryState()
+
+            if recovered.state == .running ||
+                recovered.state == .paused {
+                do {
+                    try await recovered
+                        .startMirroringToCompanionDevice()
+                    mirroringActive = true
+                    mirroringRetryPending = false
+                } catch {
+                    mirroringActive = false
+                    mirroringRetryPending = true
+                }
+
+                await sendLiveSnapshot(
+                    stateOverride:
+                        recovered.state == .paused
+                            ? .paused
+                            : .running,
+                    force: true
+                )
+            }
+        } catch {
+            fail(
+                message:
+                    "ATHLTH couldn't recover the active workout: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    func startPreparedWorkout(
+        kind: WatchWorkoutKind,
+        route: WatchRouteTransfer? = nil
+    ) async {
+        let configuration =
+            HKWorkoutConfiguration()
+        configuration.activityType =
+            activityType(for: kind)
+        configuration.locationType =
+            kind.usesOutdoorLocation
+                ? .outdoor
+                : .indoor
+
+        await start(
+            configuration: configuration,
+            kind: kind,
+            route: route
+        )
+    }
+
+    private func persistWorkoutRecoveryState() {
+        guard state != .idle,
+              state != .completed
+        else {
+            return
+        }
+
+        let snapshot =
+            WatchPersistedWorkoutState(
+                kind: kind,
+                startedAt: startedAt,
+                plannedRoute: plannedRoute,
+                audioCoach:
+                    audioCoachConfiguration,
+                structuredRunningWorkout:
+                    structuredRunningWorkout,
+                structuredStepIndex:
+                    structuredStepIndex,
+                structuredStepStartElapsedTime:
+                    structuredStepStartElapsedTime,
+                structuredStepStartDistanceMeters:
+                    structuredStepStartDistanceMeters,
+                ghostRace:
+                    ghostRaceConfiguration,
+                lapSummaries:
+                    lapSummaries,
+                lapCount: lapCount,
+                lastLapElapsedTime:
+                    lastLapElapsedTime,
+                lastLapDistanceMeters:
+                    lastLapDistanceMeters,
+                automaticPauseCount:
+                    automaticPauseCount
+            )
+
+        guard let data =
+                try? JSONEncoder()
+                    .encode(snapshot)
+        else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey: recoveryDefaultsKey
+        )
+    }
+
+    private func restorePersistedWorkoutState(
+        expectedKind: WatchWorkoutKind
+    ) {
+        guard let data =
+                UserDefaults.standard.data(
+                    forKey:
+                        recoveryDefaultsKey
+                ),
+              let snapshot =
+                try? JSONDecoder().decode(
+                    WatchPersistedWorkoutState.self,
+                    from: data
+                ),
+              snapshot.kind == expectedKind
+        else {
+            return
+        }
+
+        startedAt =
+            startedAt ??
+            snapshot.startedAt
+        ghostRaceConfiguration =
+            snapshot.ghostRace
+        structuredStepStartElapsedTime =
+            snapshot
+                .structuredStepStartElapsedTime
+        structuredStepStartDistanceMeters =
+            snapshot
+                .structuredStepStartDistanceMeters
+        lastLapElapsedTime =
+            snapshot.lastLapElapsedTime
+        lastLapDistanceMeters =
+            snapshot.lastLapDistanceMeters
+
+        cachePlannedRouteGeometry(
+            snapshot.plannedRoute
+        )
+
+        publish {
+            self.plannedRoute =
+                snapshot.plannedRoute
+            self.audioCoachConfiguration =
+                snapshot.audioCoach
+            self.structuredRunningWorkout =
+                snapshot
+                    .structuredRunningWorkout
+            self.structuredStepIndex =
+                snapshot.structuredStepIndex
+            self.lapSummaries =
+                snapshot.lapSummaries
+            self.lapCount =
+                snapshot.lapCount
+            self.automaticPauseCount =
+                snapshot
+                    .automaticPauseCount
+            self.ghostRaceTitle =
+                snapshot.ghostRace?.title
+        }
+
+        resetAudioCoachThresholds()
+        resetGhostAnnouncementThresholds(
+            audio:
+                snapshot.ghostRace?.audio
+        )
+    }
+
+    private func clearPersistedWorkoutState() {
+        UserDefaults.standard.removeObject(
+            forKey: recoveryDefaultsKey
+        )
+    }
+
     func start(
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil
