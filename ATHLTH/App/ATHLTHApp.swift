@@ -182,7 +182,8 @@ struct AppRootView: View {
 
     private var lifecycleContent: some View {
         AnyView(
-            Group {
+            AnyView(
+                Group {
             if appSession.previewModeEnabled {
                 AnyView(ProductRootTabView())
             } else if appSession.signedIn && !startupAuthenticationResolved {
@@ -549,6 +550,7 @@ struct AppRootView: View {
             guard let workout else { return }
             handleStrengthWorkoutCompletion(workout)
         }
+        )
         .onChange(of: challengeStore.challenges) { _, updatedChallenges in
             notifications.syncChallengeEvents(
                 from: updatedChallenges,
