@@ -435,12 +435,7 @@ private struct CommunityChallengeRequestCard:
                         alignment: .leading,
                         spacing: 3
                     ) {
-                        Text(
-                            creator.map {
-                                "\($0.resolvedName) challenged you"
-                            } ??
-                            "Challenge invitation"
-                        )
+                        Text(challengerTitle)
                         .font(
                             .subheadline
                                 .weight(.semibold)
@@ -520,6 +515,15 @@ private struct CommunityChallengeRequestCard:
                 lineWidth: 0.8
             )
         }
+    }
+
+    private var challengerTitle: String {
+        guard let creator else {
+            return "Challenge invitation"
+        }
+
+        return creator.resolvedName +
+            " challenged you"
     }
 
     private var detailText: String {
