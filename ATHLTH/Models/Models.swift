@@ -489,6 +489,7 @@ struct WorkoutSummary: Identifiable, Hashable {
     let duration: TimeInterval
     let distanceMeters: Double?
     let activeEnergyKilocalories: Double?
+    let isIndoor: Bool?
 
     init(workout: HKWorkout) {
         id = workout.uuid
@@ -502,6 +503,22 @@ struct WorkoutSummary: Identifiable, Hashable {
         activeEnergyKilocalories =
             workout
                 .athlthActiveEnergyKilocalories
+
+        let locationType =
+            workout
+                .workoutActivities
+                .first?
+                .workoutConfiguration
+                .locationType
+
+        switch locationType {
+        case .indoor:
+            isIndoor = true
+        case .outdoor:
+            isIndoor = false
+        default:
+            isIndoor = nil
+        }
     }
 
     var distanceKilometers: Double? {
@@ -557,6 +574,29 @@ enum WorkoutActivity: String, Codable, CaseIterable, Hashable {
             self = .coreTraining
         default:
             self = .other
+        }
+    }
+
+    func allowsTrainingPlaceCheckIn(
+        isIndoor: Bool?
+    ) -> Bool {
+        switch self {
+        case .strength,
+             .hiit,
+             .rowing,
+             .elliptical,
+             .stairClimbing,
+             .yoga,
+             .coreTraining:
+            return true
+
+        case .running,
+             .walking,
+             .cycling,
+             .swimming,
+             .hiking,
+             .other:
+            return isIndoor == true
         }
     }
 
