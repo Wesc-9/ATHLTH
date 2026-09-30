@@ -4237,33 +4237,46 @@ final class HealthKitManager: ObservableObject {
         }
 
         let calendar = Calendar.current
+        let anchor =
+            calendar.startOfDay(
+                for: startDate
+            )
         let predicate =
             HKQuery.predicateForSamples(
                 withStart: startDate,
                 end: endDate,
                 options: .strictStartDate
             )
-        let sort = NSSortDescriptor(
-            key: HKSampleSortIdentifierEndDate,
-            ascending: true
-        )
 
-        let samples =
+        var values =
             try await withCheckedThrowingContinuation {
                 (
                     continuation:
                         CheckedContinuation<
-                            [HKQuantitySample],
+                            [Date: Double],
                             Error
                         >
                 ) in
 
-                let query = HKSampleQuery(
-                    sampleType: type,
-                    predicate: predicate,
-                    limit: HKObjectQueryNoLimit,
-                    sortDescriptors: [sort]
-                ) { _, samples, error in
+                let query =
+                    HKStatisticsCollectionQuery(
+                        quantityType: type,
+                        quantitySamplePredicate:
+                            predicate,
+                        options:
+                            .discreteAverage,
+                        anchorDate: anchor,
+                        intervalComponents:
+                            DateComponents(
+                                day: 1
+                            )
+                    )
+
+                query.initialResultsHandler = {
+                    _,
+                    results,
+                    error in
+
                     if let error {
                         continuation.resume(
                             throwing: error
@@ -4271,53 +4284,127 @@ final class HealthKitManager: ObservableObject {
                         return
                     }
 
+                    guard let results else {
+                        continuation.resume(
+                            returning: [:]
+                        )
+                        return
+                    }
+
+                    var collected:
+                        [Date: Double] = [:]
+
+                    results.enumerateStatistics(
+                        from: startDate,
+                        to: endDate
+                    ) {
+                        statistics,
+                        _ in
+
+                        guard let quantity =
+                                statistics
+                                    .averageQuantity(),
+                              let value =
+                                Self.safeDoubleValue(
+                                    quantity,
+                                    unit: unit
+                                ),
+                              value > 0
+                        else {
+                            return
+                        }
+
+                        let day =
+                            calendar.startOfDay(
+                                for:
+                                    statistics
+                                        .startDate
+                            )
+                        collected[day] =
+                            value
+                    }
+
                     continuation.resume(
-                        returning:
-                            samples
-                                as? [HKQuantitySample]
-                                ?? []
+                        returning: collected
                     )
                 }
 
                 healthStore.execute(query)
             }
 
-        var grouped:
-            [Date: [Double]] = [:]
+        // Preserve HealthKit's normal source-merging statistics. If a recent
+        // interval is unexpectedly empty, re-check only a few missing days
+        // with a single HKStatisticsQuery per day. This covers the intermittent
+        // iOS 27 collection-gap behavior without raw-summing multiple sources.
+        let rangeStart =
+            calendar.startOfDay(
+                for: startDate
+            )
+        let finalDay =
+            min(
+                calendar.startOfDay(
+                    for: endDate
+                ),
+                calendar.startOfDay(
+                    for: Date()
+                )
+            )
 
-        for sample in samples {
-            guard let value =
-                    Self.safeDoubleValue(
-                        sample.quantity,
-                        unit: unit
+        var missingDays:
+            [Date] = []
+        var cursor = rangeStart
+
+        while cursor <= finalDay {
+            if values[cursor] == nil {
+                missingDays.append(
+                    cursor
+                )
+            }
+
+            guard let next =
+                    calendar.date(
+                        byAdding: .day,
+                        value: 1,
+                        to: cursor
                     ),
-                  value > 0
+                  next > cursor
+            else {
+                break
+            }
+            cursor = next
+        }
+
+        for day in
+            missingDays.suffix(4) {
+            guard let dayEnd =
+                    calendar.date(
+                        byAdding: .day,
+                        value: 1,
+                        to: day
+                    )
             else {
                 continue
             }
 
-            let day =
-                calendar.startOfDay(
-                    for: sample.endDate
-                )
-            grouped[day, default: []]
-                .append(value)
-        }
-
-        return grouped.reduce(
-            into: [Date: Double]()
-        ) {
-            result,
-            pair in
-
-            guard !pair.value.isEmpty else {
-                return
+            if let fallback =
+                    try? await averageQuantity(
+                        identifier: identifier,
+                        unit: unit,
+                        start: max(
+                            day,
+                            startDate
+                        ),
+                        end: min(
+                            dayEnd,
+                            endDate
+                        )
+                    ),
+               fallback > 0 {
+                values[day] = fallback
             }
-
-            result[pair.key] =
-                pair.value.reduce(0, +) /
-                Double(pair.value.count)
         }
+
+        return values
     }
 
     private func dailyCumulativeQuantities(
@@ -4773,6 +4860,64 @@ final class HealthKitManager: ObservableObject {
         return values.reduce(0, +) / Double(values.count)
     }
 
+    private func averageQuantity(
+        identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        start: Date,
+        end: Date
+    ) async throws -> Double? {
+        guard start <= end,
+              let type =
+                HKObjectType.quantityType(
+                    forIdentifier: identifier
+                )
+        else {
+            return nil
+        }
+
+        let predicate =
+            HKQuery.predicateForSamples(
+                withStart: start,
+                end: end,
+                options: .strictStartDate
+            )
+
+        return try await withCheckedThrowingContinuation {
+            (
+                continuation:
+                    CheckedContinuation<
+                        Double?,
+                        Error
+                    >
+            ) in
+
+            let query = HKStatisticsQuery(
+                quantityType: type,
+                quantitySamplePredicate:
+                    predicate,
+                options: .discreteAverage
+            ) { _, result, error in
+                if let error {
+                    continuation.resume(
+                        throwing: error
+                    )
+                    return
+                }
+
+                continuation.resume(
+                    returning:
+                        Self.safeDoubleValue(
+                            result?
+                                .averageQuantity(),
+                            unit: unit
+                        )
+                )
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
     private func summedQuantity(
         identifier: HKQuantityTypeIdentifier,
         unit: HKUnit,
@@ -4932,125 +5077,60 @@ final class HealthKitManager: ObservableObject {
         lookbackDays: Int,
         now: Date = Date()
     ) async throws -> (Double, Date)? {
-        guard let type =
-                HKObjectType.quantityType(
-                    forIdentifier: identifier
-                )
-        else {
-            return nil
-        }
-
         let calendar = Calendar.current
         let start =
             calendar.date(
                 byAdding: .day,
-                value: -max(lookbackDays, 1),
+                value:
+                    -max(
+                        lookbackDays,
+                        1
+                    ),
                 to: now
             ) ??
             now.addingTimeInterval(
                 -Double(
-                    max(lookbackDays, 1)
+                    max(
+                        lookbackDays,
+                        1
+                    )
                 ) * 86_400
             )
 
-        let predicate =
-            HKQuery.predicateForSamples(
-                withStart: start,
-                end: now,
-                options: .strictStartDate
-            )
-        let sort = NSSortDescriptor(
-            key: HKSampleSortIdentifierEndDate,
-            ascending: false
-        )
-
-        let samples =
-            try await withCheckedThrowingContinuation {
-                (
-                    continuation:
-                        CheckedContinuation<
-                            [HKQuantitySample],
-                            Error
-                        >
-                ) in
-
-                let query = HKSampleQuery(
-                    sampleType: type,
-                    predicate: predicate,
-                    limit: HKObjectQueryNoLimit,
-                    sortDescriptors: [sort]
-                ) { _, samples, error in
-                    if let error {
-                        continuation.resume(
-                            throwing: error
-                        )
-                        return
-                    }
-
-                    continuation.resume(
-                        returning:
-                            samples
-                                as? [HKQuantitySample]
-                                ?? []
-                    )
-                }
-
-                healthStore.execute(query)
-            }
-
-        let valid =
-            samples.compactMap {
-                sample
-                    -> (
-                        day: Date,
-                        value: Double,
-                        date: Date
-                    )? in
-
-                guard let value =
-                        Self.safeDoubleValue(
-                            sample.quantity,
-                            unit: unit
-                        ),
-                      value > 0
-                else {
-                    return nil
-                }
-
-                return (
-                    calendar.startOfDay(
-                        for: sample.endDate
-                    ),
-                    value,
-                    sample.endDate
-                )
-            }
-
-        guard let newestDay =
-                valid.map { $0.day }.max()
+        guard let latest =
+                try await latestQuantity(
+                    identifier: identifier,
+                    unit: unit,
+                    startDate: start
+                ),
+              latest.0 > 0
         else {
             return nil
         }
 
-        let entries =
-            valid.filter {
-                $0.day == newestDay
-            }
-
-        guard !entries.isEmpty else {
-            return nil
+        let dayStart =
+            calendar.startOfDay(
+                for: latest.1
+            )
+        guard let dayEnd =
+                calendar.date(
+                    byAdding: .day,
+                    value: 1,
+                    to: dayStart
+                ),
+              let average =
+                try await averageQuantity(
+                    identifier: identifier,
+                    unit: unit,
+                    start: dayStart,
+                    end: min(dayEnd, now)
+                ),
+              average > 0
+        else {
+            return latest
         }
 
-        let average =
-            entries.reduce(0.0) {
-                $0 + $1.value
-            } /
-            Double(entries.count)
-        let latestDate =
-            entries.map { $0.date }.max() ??
-            newestDay
-
-        return (average, latestDate)
+        return (average, latest.1)
     }
 
     private func latestQuantity(
