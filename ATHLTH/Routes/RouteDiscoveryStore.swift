@@ -123,6 +123,51 @@ final class SupabaseRouteDiscoveryService {
             .value
     }
 
+    func searchRoutes(
+        _ query: String,
+        limit: Int = 24
+    ) async throws -> [CommunityRouteRecord] {
+        let clean = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard clean.count >= 2 else { return [] }
+
+        let boundedLimit = min(max(limit, 8), 40)
+        let pattern = "%\(clean)%"
+
+        async let titleRows: [CommunityRouteRecord] = client
+            .from("community_routes")
+            .select()
+            .ilike("title", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        async let startRows: [CommunityRouteRecord] = client
+            .from("community_routes")
+            .select()
+            .ilike("start_name", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        async let endRows: [CommunityRouteRecord] = client
+            .from("community_routes")
+            .select()
+            .ilike("end_name", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        let rows = try await titleRows + startRows + endRows
+        var seen = Set<UUID>()
+
+        return rows
+            .filter { seen.insert($0.id).inserted }
+            .prefix(boundedLimit)
+            .map { $0 }
+    }
+
     func publish(_ route: TrainingRoute) async throws {
         guard let center = route.discoveryCenterCoordinate else {
             return
@@ -164,6 +209,7 @@ final class SupabaseRouteDiscoveryService {
 @MainActor
 final class RouteDiscoveryStore: ObservableObject {
     @Published private(set) var routes: [CommunityRouteRecord] = []
+    @Published private(set) var searchResults: [CommunityRouteRecord] = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
@@ -208,6 +254,32 @@ final class RouteDiscoveryStore: ObservableObject {
             guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    func search(_ query: String) async {
+        let requestedQuery = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard requestedQuery.count >= 2 else {
+            searchResults = []
+            return
+        }
+
+        do {
+            let results = try await service.searchRoutes(requestedQuery)
+            guard !Task.isCancelled else { return }
+            searchResults = results
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            searchResults = []
+        }
+    }
+
+    func clearSearch() {
+        searchResults = []
     }
 
     func publish(_ route: TrainingRoute) async {
