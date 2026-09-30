@@ -5884,6 +5884,1946 @@
           }
         }
       }
+    },
+    "ATHLTH COACH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH COACH"
+          }
+        }
+      }
+    },
+    "What matters most today": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Det viktigste i dag"
+          }
+        }
+      }
+    },
+    "SUGGESTED TODAY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FORSLAG I DAG"
+          }
+        }
+      }
+    },
+    "Try asking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøv å spørre"
+          }
+        }
+      }
+    },
+    "Each factor is compared with your own recent baseline. The weights above are the same ones used for the readiness score shown on Home.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hver faktor sammenlignes med ditt eget nylige grunnlag. Vektingen over er den samme som brukes i dagsformscoren på Hjem."
+          }
+        }
+      }
+    },
+    "asleep": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sovet"
+          }
+        }
+      }
+    },
+    "Bed → wake": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seng → våken"
+          }
+        }
+      }
+    },
+    "Daily check-in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daglig innsjekk"
+          }
+        }
+      }
+    },
+    "How you feel can refine today's guidance without changing your wearable score.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvordan du føler deg kan finjustere dagens veiledning uten å endre scoren fra klokken."
+          }
+        }
+      }
+    },
+    "Add today's context": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til dagens kontekst"
+          }
+        }
+      }
+    },
+    "Energy, stress, soreness and motivation.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Energi, stress, stølhet og motivasjon."
+          }
+        }
+      }
+    },
+    "Recently trained areas": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nylig trente områder"
+          }
+        }
+      }
+    },
+    "Last 7 days · strength, running and walking all contribute.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste 7 dager · styrke, løping og gåturer teller med."
+          }
+        }
+      }
+    },
+    "Check in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekk inn"
+          }
+        }
+      }
+    },
+    "Complete a tracked strength workout, run or walk and ATHLTH will show which areas have carried the most recent training.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør en registrert styrkeøkt, løpetur eller gåtur, så viser ATHLTH hvilke områder som har fått mest belastning nylig."
+          }
+        }
+      }
+    },
+    "Your check-in can influence Today's Guidance and muscle-recovery suggestions. It never changes the wearable Readiness score.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Innsjekken kan påvirke Dagens veiledning og forslag til muskelrestitusjon. Den endrer aldri dagsformscoren fra klokken."
+          }
+        }
+      }
+    },
+    "How you feel": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvordan du føler deg"
+          }
+        }
+      }
+    },
+    "Muscle soreness": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muskelstølhet"
+          }
+        }
+      }
+    },
+    "ATHLTH compares your latest sleep, HRV and resting heart rate with your own recent baseline.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH sammenligner siste søvn, HRV og hvilepuls med ditt eget nylige grunnlag."
+          }
+        }
+      }
+    },
+    "Your baseline": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grunnlaget ditt"
+          }
+        }
+      }
+    },
+    "Training guidance, not a medical assessment": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsveiledning, ikke en medisinsk vurdering"
+          }
+        }
+      }
+    },
+    "Daily Check-in responses may refine Today's Guidance, but they do not alter the wearable readiness score.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Svar i Daglig innsjekk kan finjustere Dagens veiledning, men endrer ikke dagsformscoren fra klokken."
+          }
+        }
+      }
+    },
+    "Daily Check-in": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daglig innsjekk"
+          }
+        }
+      }
+    },
+    "How Recovery Works": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slik fungerer restitusjon"
+          }
+        }
+      }
+    },
+    "Recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon"
+          }
+        }
+      }
+    },
+    "ATHLTH Pulse": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Pulse"
+          }
+        }
+      }
+    },
+    "Your current signals, without making you interpret a dashboard first.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dine nåværende signaler, uten at du først må tolke et dashboard."
+          }
+        }
+      }
+    },
+    "Meaningful differences versus your previous 28 days.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Betydelige forskjeller sammenlignet med de foregående 28 dagene."
+          }
+        }
+      }
+    },
+    "No major shift detected": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen tydelig endring oppdaget"
+          }
+        }
+      }
+    },
+    "Trend": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trend"
+          }
+        }
+      }
+    },
+    "Last 28 days": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste 28 dager"
+          }
+        }
+      }
+    },
+    "All progress": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All fremgang"
+          }
+        }
+      }
+    },
+    "ATHLTH will show trends when comparable training data is available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH viser trender når sammenlignbare treningsdata er tilgjengelige."
+          }
+        }
+      }
+    },
+    "Why it matters": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvorfor det betyr noe"
+          }
+        }
+      }
+    },
+    "Use this in today's training": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk dette i dagens trening"
+          }
+        }
+      }
+    },
+    "What if?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hva om?"
+          }
+        }
+      }
+    },
+    "Model a training week before you commit to it.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simuler en treningsuke før du bestemmer deg."
+          }
+        }
+      }
+    },
+    "Scenario focus": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scenariofokus"
+          }
+        }
+      }
+    },
+    "Sessions per week": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økter per uke"
+          }
+        }
+      }
+    },
+    "Scenario only — this is not a prediction of future fitness or medical outcome.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun scenario — dette er ikke en prognose for fremtidig form eller medisinsk utfall."
+          }
+        }
+      }
+    },
+    "Build this in Train": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg dette i Trening"
+          }
+        }
+      }
+    },
+    "Race yourself": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot deg selv"
+          }
+        }
+      }
+    },
+    "Replay an outdoor run and compare yourself against your previous effort — the Ghost Race engine you already use, now surfaced as an insight tool.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spill av en utendørstur på nytt og sammenlign deg med tidligere innsats — Ghost Race-motoren du allerede bruker, nå som innsiktsverktøy."
+          }
+        }
+      }
+    },
+    "No comparison": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen sammenligning"
+          }
+        }
+      }
+    },
+    "Search": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søk"
+          }
+        }
+      }
+    },
+    "Clear": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tøm"
+          }
+        }
+      }
+    },
+    "DISCOVER": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UTFORSK"
+          }
+        }
+      }
+    },
+    "Start typing to narrow ATHLTH to this category.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Begynn å skrive for å avgrense ATHLTH til denne kategorien."
+          }
+        }
+      }
+    },
+    "Nothing found": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen treff"
+          }
+        }
+      }
+    },
+    "Try another name, place or training term — or switch category above.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøv et annet navn, sted eller treningsbegrep — eller bytt kategori over."
+          }
+        }
+      }
+    },
+    "Type at least two characters to search ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skriv minst to tegn for å søke i ATHLTH."
+          }
+        }
+      }
+    },
+    "Close search": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lukk søk"
+          }
+        }
+      }
+    },
+    "Clear search": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tøm søk"
+          }
+        }
+      }
+    },
+    "Around You": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rundt deg"
+          }
+        }
+      }
+    },
+    "Map filter": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kartfilter"
+          }
+        }
+      }
+    },
+    "Sort": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sorter"
+          }
+        }
+      }
+    },
+    "Search this area": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søk i dette området"
+          }
+        }
+      }
+    },
+    "Public Trail": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offentlig løype"
+          }
+        }
+      }
+    },
+    "Loading route times…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laster rutetider…"
+          }
+        }
+      }
+    },
+    "Fastest": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskest"
+          }
+        }
+      }
+    },
+    "No qualifying times yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen kvalifiserende tider ennå"
+          }
+        }
+      }
+    },
+    "Details": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detaljer"
+          }
+        }
+      }
+    },
+    "Open Around You map": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne kartet Rundt deg"
+          }
+        }
+      }
+    },
+    "Refresh current location": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdater gjeldende posisjon"
+          }
+        }
+      }
+    },
+    "Filter and sort routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrer og sorter ruter"
+          }
+        }
+      }
+    },
+    "Close route preview": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lukk ruteforhåndsvisning"
+          }
+        }
+      }
+    },
+    "NO ACTIVE PLAN": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "INGEN AKTIV PLAN"
+          }
+        }
+      }
+    },
+    "Build structure when you need it": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg struktur når du trenger det"
+          }
+        }
+      }
+    },
+    "Your completed workouts still appear here automatically.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullførte økter vises fortsatt automatisk her."
+          }
+        }
+      }
+    },
+    "GETTING STARTED": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KOM I GANG"
+          }
+        }
+      }
+    },
+    "Make ATHLTH yours": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjør ATHLTH til din"
+          }
+        }
+      }
+    },
+    "A few quick steps help ATHLTH tailor training, goals and your profile. You can always change these later.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noen raske steg hjelper ATHLTH med å tilpasse trening, mål og profilen din. Du kan alltid endre dette senere."
+          }
+        }
+      }
+    },
+    "Continue to ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett til ATHLTH"
+          }
+        }
+      }
+    },
+    "Getting started": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kom i gang"
+          }
+        }
+      }
+    },
+    "Complete a few essentials to make ATHLTH yours.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør noen grunnleggende valg for å gjøre ATHLTH til din."
+          }
+        }
+      }
+    },
+    "Happening": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "På gang"
+          }
+        }
+      }
+    },
+    "Things that can pull you back into training.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ting som kan få deg tilbake i trening."
+          }
+        }
+      }
+    },
+    "Welcome": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velkommen"
+          }
+        }
+      }
+    },
+    "Your Week": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uken din"
+          }
+        }
+      }
+    },
+    "A quick 7-day view of movement, training and sleep.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En rask 7-dagersoversikt over aktivitet, trening og søvn."
+          }
+        }
+      }
+    },
+    "7 DAYS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 DAGER"
+          }
+        }
+      }
+    },
+    "Loading your week…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laster uken din…"
+          }
+        }
+      }
+    },
+    "More than a map": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mer enn et kart"
+          }
+        }
+      }
+    },
+    "Explore connects places with people: routes and events stay on the map, while clubs, challenges and public activity live here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utforsk kobler steder med mennesker: ruter og arrangementer ligger på kartet, mens klubber, utfordringer og offentlig aktivitet finnes her."
+          }
+        }
+      }
+    },
+    "Clubs": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klubber"
+          }
+        }
+      }
+    },
+    "Groups visible to your account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grupper som er synlige for kontoen din"
+          }
+        }
+      }
+    },
+    "See all": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se alle"
+          }
+        }
+      }
+    },
+    "Challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordringer"
+          }
+        }
+      }
+    },
+    "Active, upcoming and location-aware challenges": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktive, kommende og stedsbaserte utfordringer"
+          }
+        }
+      }
+    },
+    "Public activity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offentlig aktivitet"
+          }
+        }
+      }
+    },
+    "A lightweight pulse from the ATHLTH community": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En enkel puls fra ATHLTH-fellesskapet"
+          }
+        }
+      }
+    },
+    "Discover": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdag"
+          }
+        }
+      }
+    },
+    "Gear": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utstyr"
+          }
+        }
+      }
+    },
+    "Manage": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Administrer"
+          }
+        }
+      }
+    },
+    "Add your first gear": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til ditt første utstyr"
+          }
+        }
+      }
+    },
+    "Shoes and other equipment can be linked to workouts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sko og annet utstyr kan kobles til økter."
+          }
+        }
+      }
+    },
+    "DEFAULT": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "STANDARD"
+          }
+        }
+      }
+    },
+    "Shown on profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vises på profil"
+          }
+        }
+      }
+    },
+    "Replacement target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål for utskifting"
+          }
+        }
+      }
+    },
+    "Last used": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sist brukt"
+          }
+        }
+      }
+    },
+    "Shoe Insights": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sko-innsikt"
+          }
+        }
+      }
+    },
+    "Based only on workouts linked to this pair.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basert kun på økter som er koblet til dette paret."
+          }
+        }
+      }
+    },
+    "Edit this item to add brand, color and more details.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger elementet for å legge til merke, farge og flere detaljer."
+          }
+        }
+      }
+    },
+    "Workout History": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økthistorikk"
+          }
+        }
+      }
+    },
+    "Usage is linked to the actual completed workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk knyttes til den faktiske fullførte økten."
+          }
+        }
+      }
+    },
+    "No workouts are linked to this gear yet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen økter er koblet til dette utstyret ennå."
+          }
+        }
+      }
+    },
+    "Performance Highlights": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prestasjonshøydepunkter"
+          }
+        }
+      }
+    },
+    "Verified from Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifisert fra Apple Health"
+          }
+        }
+      }
+    },
+    "View All": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se alle"
+          }
+        }
+      }
+    },
+    "Reading your performance…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leser prestasjonene dine…"
+          }
+        }
+      }
+    },
+    "Connect Apple Health to build verified performance highlights.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble til Apple Health for å bygge verifiserte prestasjonshøydepunkter."
+          }
+        }
+      }
+    },
+    "ATHLTH needs Apple Health workout data to build your Performance Passport.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH trenger øktdata fra Apple Health for å bygge Prestasjonspasset ditt."
+          }
+        }
+      }
+    },
+    "Performance Passport": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prestasjonspass"
+          }
+        }
+      }
+    },
+    "Verified performance from your training history": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifiserte prestasjoner fra treningshistorikken din"
+          }
+        }
+      }
+    },
+    "Verified Stats": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifisert statistikk"
+          }
+        }
+      }
+    },
+    "Fastest 1K, 5K and marathon require a recorded GPS route. ATHLTH does not estimate a segment time from the average pace of the full workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raskeste 1 km, 5 km og maraton krever registrert GPS-rute. ATHLTH estimerer ikke segmenttid fra gjennomsnittstempoet for hele økten."
+          }
+        }
+      }
+    },
+    "Performance Stats": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prestasjonsstatistikk"
+          }
+        }
+      }
+    },
+    "Make your profile yours": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjør profilen til din"
+          }
+        }
+      }
+    },
+    "Choose how you train, what you want to see on your own profile, and what other people are allowed to see.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg hvordan du trener, hva du vil se på egen profil og hva andre skal få se."
+          }
+        }
+      }
+    },
+    "What I want on my profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Det jeg vil ha på profilen"
+          }
+        }
+      }
+    },
+    "These controls only change your own profile layout. They do not give anyone else access to the data.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disse valgene endrer bare oppsettet på din egen profil. De gir ingen andre tilgang til dataene."
+          }
+        }
+      }
+    },
+    "Visible to others": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synlig for andre"
+          }
+        }
+      }
+    },
+    "Every section starts Off. Friends limits it to accepted friends. Public makes that section visible to other ATHLTH users who can open your profile.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle seksjoner starter som Av. Venner begrenser dem til godkjente venner. Offentlig gjør seksjonen synlig for andre ATHLTH-brukere som kan åpne profilen din."
+          }
+        }
+      }
+    },
+    "Save Profile Setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre profiloppsett"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Av"
+          }
+        }
+      }
+    },
+    "Friends": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venner"
+          }
+        }
+      }
+    },
+    "Public": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offentlig"
+          }
+        }
+      }
+    },
+    "Profile Setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profiloppsett"
+          }
+        }
+      }
+    },
+    "Turn the things that matter into measurable progress.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjør det som betyr noe til målbar fremgang."
+          }
+        }
+      }
+    },
+    "PRIMARY GOAL": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PRIMÆRMÅL"
+          }
+        }
+      }
+    },
+    "OTHER GOALS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ANDRE MÅL"
+          }
+        }
+      }
+    },
+    "Create a goal and ATHLTH can track milestones from Apple Health, ATHLTH workouts or manual check-ins.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett et mål, så kan ATHLTH følge milepæler fra Apple Health, ATHLTH-økter eller manuelle innsjekker."
+          }
+        }
+      }
+    },
+    "Primary": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primær"
+          }
+        }
+      }
+    },
+    "Edit Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediger mål"
+          }
+        }
+      }
+    },
+    "Make Primary": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjør til primær"
+          }
+        }
+      }
+    },
+    "Add Milestone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til milepæl"
+          }
+        }
+      }
+    },
+    "Delete Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett mål"
+          }
+        }
+      }
+    },
+    "Progress": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fremgang"
+          }
+        }
+      }
+    },
+    "Milestones": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Milepæler"
+          }
+        }
+      }
+    },
+    "No milestones yet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen milepæler ennå."
+          }
+        }
+      }
+    },
+    "Resume automatic tracking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenoppta automatisk sporing"
+          }
+        }
+      }
+    },
+    "Tracking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sporing"
+          }
+        }
+      }
+    },
+    "Linked plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koblet plan"
+          }
+        }
+      }
+    },
+    "Pause Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sett mål på pause"
+          }
+        }
+      }
+    },
+    "Resume Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenoppta mål"
+          }
+        }
+      }
+    },
+    "Mark Goal Complete": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marker mål som fullført"
+          }
+        }
+      }
+    },
+    "Milestone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Milepæl"
+          }
+        }
+      }
+    },
+    "This milestone is manual. You can check or uncheck it at any time.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne milepælen er manuell. Du kan krysse den av eller fjerne avkrysningen når som helst."
+          }
+        }
+      }
+    },
+    "What do you want to achieve?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hva vil du oppnå?"
+          }
+        }
+      }
+    },
+    "Choose the closest match. ATHLTH will configure safe tracking rules for that kind of goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg det som passer best. ATHLTH setter opp trygge sporingsregler for denne måltypen."
+          }
+        }
+      }
+    },
+    "Define the target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definer målet"
+          }
+        }
+      }
+    },
+    "Activity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktivitet"
+          }
+        }
+      }
+    },
+    "Running": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løping"
+          }
+        }
+      }
+    },
+    "Walking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gåing"
+          }
+        }
+      }
+    },
+    "Cycling": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sykling"
+          }
+        }
+      }
+    },
+    "Hiking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tur"
+          }
+        }
+      }
+    },
+    "Custom goals start with manual tracking. You can add and check milestones yourself.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Egendefinerte mål starter med manuell sporing. Du kan legge til og krysse av milepæler selv."
+          }
+        }
+      }
+    },
+    "Make it yours": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjør det til ditt"
+          }
+        }
+      }
+    },
+    "Deadline": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frist"
+          }
+        }
+      }
+    },
+    "Goal image": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Målbilde"
+          }
+        }
+      }
+    },
+    "Fallback cover": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standardbilde"
+          }
+        }
+      }
+    },
+    "Link training plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble treningsplan"
+          }
+        }
+      }
+    },
+    "You can add extra manual milestones after creating the goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan legge til ekstra manuelle milepæler etter at målet er opprettet."
+          }
+        }
+      }
+    },
+    "Ready to start": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klar til å starte"
+          }
+        }
+      }
+    },
+    "Make this my Primary Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjør dette til mitt primærmål"
+          }
+        }
+      }
+    },
+    "Privacy": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personvern"
+          }
+        }
+      }
+    },
+    "Safe automation": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trygg automatisering"
+          }
+        }
+      }
+    },
+    "Identity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identitet"
+          }
+        }
+      }
+    },
+    "Training plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsplan"
+          }
+        }
+      }
+    },
+    "Link current plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble gjeldende plan"
+          }
+        }
+      }
+    },
+    "Target rules and existing automatic milestones are kept unchanged when editing metadata. This prevents accidental changes to what counts as completion.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Målregler og eksisterende automatiske milepæler beholdes uendret når metadata redigeres. Det hindrer utilsiktede endringer i hva som teller som fullføring."
+          }
+        }
+      }
+    },
+    "Delete this goal?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette dette målet?"
+          }
+        }
+      }
+    },
+    "Create Goal": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett mål"
+          }
+        }
+      }
+    },
+    "Trophy Cabinet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troféskap"
+          }
+        }
+      }
+    },
+    "The achievements you choose to display.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prestasjonene du velger å vise."
+          }
+        }
+      }
+    },
+    "View Collection": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis samling"
+          }
+        }
+      }
+    },
+    "Your cabinet is waiting": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troféskapet ditt venter"
+          }
+        }
+      }
+    },
+    "Unlocked trophies can be pinned here from the collection.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opplåste trofeer kan festes her fra samlingen."
+          }
+        }
+      }
+    },
+    "Trophy Progress": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troféfremgang"
+          }
+        }
+      }
+    },
+    "What your next effort is building toward.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette bygger den neste innsatsen din mot."
+          }
+        }
+      }
+    },
+    "Your trophy progress will appear here as ATHLTH reads verified activity.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troféfremgangen vises her når ATHLTH leser verifisert aktivitet."
+          }
+        }
+      }
+    },
+    "Trophy view": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trofévisning"
+          }
+        }
+      }
+    },
+    "ATHLTH TROPHIES": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-TROFEER"
+          }
+        }
+      }
+    },
+    "Your Cabinet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troféskapet ditt"
+          }
+        }
+      }
+    },
+    "Choose up to five unlocked trophies to feature.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg opptil fem opplåste trofeer som skal vises."
+          }
+        }
+      }
+    },
+    "Your cabinet is empty": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troféskapet er tomt"
+          }
+        }
+      }
+    },
+    "Open an unlocked trophy in Collection and choose Show in Trophy Cabinet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne et opplåst trofé i Samling og velg Vis i troféskap."
+          }
+        }
+      }
+    },
+    "Browse Collection": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utforsk samlingen"
+          }
+        }
+      }
+    },
+    "To change your cabinet, open a trophy and add or remove it from your profile showcase.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For å endre skapet åpner du et trofé og legger det til eller fjerner det fra profilvisningen."
+          }
+        }
+      }
+    },
+    "Your cabinet can display up to five trophies.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troféskapet kan vise opptil fem trofeer."
+          }
+        }
+      }
+    },
+    "Verification": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifisering"
+          }
+        }
+      }
+    },
+    "Evolution": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utvikling"
+          }
+        }
+      }
+    },
+    "NEW ATHLTH TROPHY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NYTT ATHLTH-TROFÉ"
+          }
+        }
+      }
+    },
+    "Trophy": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trofé"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
