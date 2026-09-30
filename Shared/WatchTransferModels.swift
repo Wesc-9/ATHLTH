@@ -717,6 +717,11 @@ struct WatchTodayWorkoutTransfer: Codable, Hashable {
     var updatedAt: Date
 }
 
+struct WatchTodaySnapshot: Codable, Hashable {
+    var workout: WatchTodayWorkoutTransfer?
+    var updatedAt: Date
+}
+
 struct WatchWorkoutLapSummary: Codable, Hashable {
     var number: Int
     var endedAt: Date
