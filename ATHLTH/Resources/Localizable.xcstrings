@@ -21374,6 +21374,66 @@
           }
         }
       }
+    },
+    "Loading routes…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laster ruter…"
+          }
+        }
+      }
+    },
+    "%d routes loaded": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d ruter lastet"
+          }
+        }
+      }
+    },
+    "No routes found": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen ruter funnet"
+          }
+        }
+      }
+    },
+    "Create or save a route, or try another search or filter.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett eller lagre en rute, eller prøv et annet søk eller filter."
+          }
+        }
+      }
+    },
+    "Try another search or filter. Public routes appear here when shared.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøv et annet søk eller filter. Offentlige ruter vises her når de deles."
+          }
+        }
+      }
+    },
+    "Route Database": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutedatabase"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
