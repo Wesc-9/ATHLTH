@@ -552,92 +552,180 @@ struct HomeActivityCenterV2: View {
     private func ownLatestSection(
         _ workout: SocialPublishableWorkout
     ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack {
-                Text("YOUR LATEST")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.4)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
+        if workout.activity
+            .isActivityCenterOutdoor {
+            ownOutdoorFeatureCard(workout)
+        } else {
+            ownCompactFeatureCard(workout)
+        }
+    }
+
+    private func ownOutdoorFeatureCard(
+        _ workout: SocialPublishableWorkout
+    ) -> some View {
+        VStack(spacing: 0) {
+            NavigationLink {
+                ownWorkoutDestination(
+                    workout
+                )
+            } label: {
+                ZStack(
+                    alignment: .bottomLeading
+                ) {
+                    HomeActivityRoutePreviewV2(
+                        coordinates:
+                            ownRouteCoordinates,
+                        highestAltitudeMeters:
+                            ownHighestAltitude
+                    )
+                    .frame(height: 176)
+
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            Color.black
+                                .opacity(0.60)
+                        ],
+                        startPoint: .center,
+                        endPoint: .bottom
                     )
 
-                Spacer()
+                    VStack(
+                        alignment: .leading,
+                        spacing: 5
+                    ) {
+                        HStack(spacing: 6) {
+                            Label(
+                                workout.activity
+                                    .rawValue
+                                    .uppercased(),
+                                systemImage:
+                                    workout.activity.icon
+                            )
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .bold
+                                )
+                            )
+                            .tracking(1.0)
+                            .foregroundStyle(
+                                Color.white
+                                    .opacity(0.90)
+                            )
 
-                if isPublished(workout) {
-                    Label(
-                        "Shared",
-                        systemImage:
-                            "checkmark.circle.fill"
-                    )
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-                }
-            }
-            .padding(.horizontal, 2)
+                            if isPublished(workout) {
+                                Text("SHARED")
+                                    .font(
+                                        .system(
+                                            size: 8,
+                                            weight: .bold
+                                        )
+                                    )
+                                    .tracking(0.8)
+                                    .foregroundStyle(
+                                        Color.white
+                                    )
+                                    .padding(
+                                        .horizontal,
+                                        7
+                                    )
+                                    .frame(height: 22)
+                                    .background(
+                                        Color.black
+                                            .opacity(0.28),
+                                        in: Capsule()
+                                    )
+                            }
+                        }
 
-            HStack(spacing: 10) {
-                NavigationLink {
-                    ownWorkoutDestination(
-                        workout
-                    )
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(
-                            systemName:
-                                workout.activity.icon
-                        )
+                        Text(workout.title)
+                            .font(
+                                .system(
+                                    size: 21,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+                            .foregroundStyle(
+                                Color.white
+                            )
+                            .lineLimit(1)
+
+                        HStack(spacing: 10) {
+                            Text(
+                                ownDistanceText(
+                                    workout
+                                )
+                            )
+
+                            Text(
+                                HomeActivityRouteMetrics
+                                    .durationText(
+                                        workout.duration
+                                    )
+                            )
+
+                            if let heartRate =
+                                    latestWorkoutDetail?
+                                        .averageHeartRate,
+                               heartRate.isFinite,
+                               heartRate > 0 {
+                                Text(
+                                    "\(Int(heartRate.rounded())) bpm"
+                                )
+                            }
+                        }
                         .font(
-                            .system(
-                                size: 18,
-                                weight: .semibold
+                            .caption.weight(
+                                .semibold
                             )
                         )
                         .foregroundStyle(
-                            ATHLTHTheme.accentDeep
+                            Color.white
+                                .opacity(0.82)
                         )
-                        .frame(width: 42, height: 42)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 13,
-                                style: .continuous
-                            )
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-                            Text(workout.title)
-                                .font(
-                                    .subheadline
-                                        .weight(.semibold)
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-                                .lineLimit(1)
-
-                            Text(workout.summaryText)
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
-                                .lineLimit(1)
-                        }
-
-                        Spacer()
-
-                        Image(
-                            systemName: "chevron.right"
-                        )
-                        .font(.caption.bold())
-                        .foregroundStyle(.tertiary)
                     }
+                    .padding(14)
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 10) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        workout.startDate.formatted(
+                            date: .abbreviated,
+                            time: .shortened
+                        )
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                    Text(
+                        ownRouteCoordinates
+                            .count >= 2
+                            ? "GPS route · cached preview"
+                            : workout.summaryText
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .lineLimit(1)
+                }
+
+                Spacer()
 
                 Button {
                     selectedPublishWorkoutID =
@@ -652,16 +740,20 @@ struct HomeActivityCenterV2: View {
                     )
                     .font(
                         .system(
-                            size: 16,
+                            size: 15,
                             weight: .semibold
                         )
                     )
                     .foregroundStyle(
                         ATHLTHTheme.accentDeep
                     )
-                    .frame(width: 42, height: 42)
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
                     .background(
-                        Color.white.opacity(0.88),
+                        ATHLTHTheme
+                            .accentSoft,
                         in: Circle()
                     )
                 }
@@ -672,15 +764,292 @@ struct HomeActivityCenterV2: View {
                         : "Share workout"
                 )
             }
-            .padding(13)
+            .padding(12)
             .background(
-                Color.white.opacity(0.78),
-                in: RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
+                Color.white.opacity(0.96)
             )
         }
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.vitality
+                    .opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func ownCompactFeatureCard(
+        _ workout: SocialPublishableWorkout
+    ) -> some View {
+        HStack(spacing: 12) {
+            NavigationLink {
+                ownWorkoutDestination(
+                    workout
+                )
+            } label: {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            workout.activity.icon
+                    )
+                    .font(
+                        .system(
+                            size: 19,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme
+                                    .accentDeep,
+                                ATHLTHTheme
+                                    .vitality
+                            ],
+                            startPoint:
+                                .topLeading,
+                            endPoint:
+                                .bottomTrailing
+                        ),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(workout.title)
+                            .font(
+                                .subheadline
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(1)
+
+                        Text(
+                            workout.summaryText
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+
+                        Text(
+                            workout.startDate,
+                            style: .relative
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                selectedPublishWorkoutID =
+                    workout.id
+                showingPublish = true
+            } label: {
+                Image(
+                    systemName:
+                        isPublished(workout)
+                            ? "checkmark.circle.fill"
+                            : "square.and.arrow.up"
+                )
+                .font(
+                    .system(
+                        size: 18,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(
+                    width: 40,
+                    height: 40
+                )
+                .background(
+                    Color.white.opacity(0.88),
+                    in: Circle()
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(13)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+    }
+
+    private var ownEmptyState:
+        some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    "figure.run.circle"
+            )
+            .font(
+                .system(
+                    size: 22,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+            .frame(
+                width: 46,
+                height: 46
+            )
+            .background(
+                ATHLTHTheme
+                    .vitalitySoft,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text("Nothing here yet")
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Text(
+                    "Your latest completed workout will appear here automatically."
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Spacer()
+        }
+        .padding(13)
+        .background(
+            Color.white.opacity(0.88),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+        )
+    }
+
+    private var ownRouteCoordinates:
+        [CLLocationCoordinate2D] {
+        HomeActivityRouteSanitizer
+            .sampledCoordinates(
+                from:
+                    latestWorkoutDetail?
+                        .route ?? [],
+                maximumCount: 80
+            )
+    }
+
+    private var ownHighestAltitude:
+        Double? {
+        HomeActivityRouteMetrics
+            .highestAltitude(
+                in:
+                    HomeActivityRouteSanitizer
+                        .validLocations(
+                            latestWorkoutDetail?
+                                .route ?? []
+                        )
+            )
+    }
+
+    private func ownDistanceText(
+        _ workout:
+            SocialPublishableWorkout
+    ) -> String {
+        guard let distance =
+                workout.distanceMeters,
+              distance.isFinite,
+              distance > 0
+        else {
+            return workout.activity.rawValue
+        }
+
+        return String(
+            format: "%.2f km",
+            distance / 1_000
+        )
+    }
+
+    @MainActor
+    private func loadLatestWorkoutDetail()
+        async {
+        guard let latestWorkout,
+              latestWorkout.activity
+                .isActivityCenterOutdoor
+        else {
+            latestWorkoutDetail = nil
+            latestWorkoutDetailID = nil
+            return
+        }
+
+        guard latestWorkoutDetailID !=
+                latestWorkout.id
+        else {
+            return
+        }
+
+        latestWorkoutDetailID =
+            latestWorkout.id
+        latestWorkoutDetail =
+            await health.workoutDetail(
+                for: latestWorkout.id
+            )
     }
 
     @ViewBuilder
