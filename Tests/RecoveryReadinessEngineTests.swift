@@ -15,7 +15,8 @@ final class RecoveryReadinessEngineTests:
             RecoveryReadinessEngine.evaluate(
                 currentSleep:
                     SleepSummary(
-                        totalAsleep: 8 * 3_600
+                        totalAsleep: 8 * 3_600,
+                        sleepEnd: now
                     ),
                 currentHeart:
                     HeartSummary(
@@ -61,7 +62,8 @@ final class RecoveryReadinessEngineTests:
             RecoveryReadinessEngine.evaluate(
                 currentSleep:
                     SleepSummary(
-                        totalAsleep: 8 * 3_600
+                        totalAsleep: 8 * 3_600,
+                        sleepEnd: now
                     ),
                 currentHeart:
                     HeartSummary(
@@ -118,7 +120,8 @@ final class RecoveryReadinessEngineTests:
             RecoveryReadinessEngine.evaluate(
                 currentSleep:
                     SleepSummary(
-                        totalAsleep: 8 * 3_600
+                        totalAsleep: 8 * 3_600,
+                        sleepEnd: now
                     ),
                 currentHeart:
                     HeartSummary(
@@ -189,7 +192,8 @@ final class RecoveryReadinessEngineTests:
                 currentSleep:
                     SleepSummary(
                         totalAsleep:
-                            8 * 3_600
+                            8 * 3_600,
+                        sleepEnd: now
                     ),
                 currentHeart:
                     HeartSummary(
@@ -229,7 +233,8 @@ final class RecoveryReadinessEngineTests:
                 currentSleep:
                     SleepSummary(
                         totalAsleep:
-                            7.5 * 3_600
+                            7.5 * 3_600,
+                        sleepEnd: now
                     ),
                 currentHeart:
                     HeartSummary(
@@ -266,6 +271,109 @@ final class RecoveryReadinessEngineTests:
         XCTAssertEqual(
             result.baselineDays,
             5
+        )
+    }
+
+    func testStaleSleepDoesNotCreateReadinessScore() {
+        let now = Date()
+        let staleSleep =
+            now.addingTimeInterval(
+                -(49 * 3_600)
+            )
+        let days = baselineDays(
+            count: 7,
+            endingAt: now
+        )
+
+        let result =
+            RecoveryReadinessEngine.evaluate(
+                currentSleep:
+                    SleepSummary(
+                        totalAsleep:
+                            8 * 3_600,
+                        sleepEnd:
+                            staleSleep
+                    ),
+                currentHeart:
+                    HeartSummary(
+                        restingHeartRate: 60,
+                        restingHeartRateDate:
+                            now,
+                        hrvMilliseconds: 60,
+                        hrvDate: now
+                    ),
+                sleepDays:
+                    dictionary(
+                        days,
+                        value: 8 * 3_600
+                    ),
+                hrvDays:
+                    dictionary(
+                        days,
+                        value: 60
+                    ),
+                restingHeartRateDays:
+                    dictionary(
+                        days,
+                        value: 60
+                    ),
+                now: now
+            )
+
+        XCTAssertNil(result.score)
+        XCTAssertEqual(
+            result.state,
+            .buildingBaseline
+        )
+    }
+
+    func testFutureHeartSignalsDoNotCreateReadinessScore() {
+        let now = Date()
+        let future =
+            now.addingTimeInterval(60)
+        let days = baselineDays(
+            count: 7,
+            endingAt: now
+        )
+
+        let result =
+            RecoveryReadinessEngine.evaluate(
+                currentSleep:
+                    SleepSummary(
+                        totalAsleep:
+                            8 * 3_600,
+                        sleepEnd: now
+                    ),
+                currentHeart:
+                    HeartSummary(
+                        restingHeartRate: 60,
+                        restingHeartRateDate:
+                            future,
+                        hrvMilliseconds: 60,
+                        hrvDate: future
+                    ),
+                sleepDays:
+                    dictionary(
+                        days,
+                        value: 8 * 3_600
+                    ),
+                hrvDays:
+                    dictionary(
+                        days,
+                        value: 60
+                    ),
+                restingHeartRateDays:
+                    dictionary(
+                        days,
+                        value: 60
+                    ),
+                now: now
+            )
+
+        XCTAssertNil(result.score)
+        XCTAssertEqual(
+            result.state,
+            .buildingBaseline
         )
     }
 
