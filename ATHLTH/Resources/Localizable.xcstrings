@@ -14484,6 +14484,1386 @@
           }
         }
       }
+    },
+    "Rename Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gi ruten nytt navn"
+          }
+        }
+      }
+    },
+    "Create Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett utfordring"
+          }
+        }
+      }
+    },
+    "Delete Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett rute"
+          }
+        }
+      }
+    },
+    "The saved route will be removed. Planned workouts keep their workout data, but the deleted route will no longer be attached.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Den lagrede ruten fjernes. Planlagte økter beholder øktdataene sine, men den slettede ruten vil ikke lenger være tilknyttet."
+          }
+        }
+      }
+    },
+    "Choose the name shown in Routes and challenges.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg navnet som vises i Ruter og utfordringer."
+          }
+        }
+      }
+    },
+    "PUBLIC TRAIL": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OFFENTLIG LØYPE"
+          }
+        }
+      }
+    },
+    "ATHLTH VERIFIED": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-VERIFISERT"
+          }
+        }
+      }
+    },
+    "Elevation profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Høydeprofil"
+          }
+        }
+      }
+    },
+    "Route geometry and trail metadata: OpenStreetMap contributors.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutegeometri og løypemetadata: bidragsytere til OpenStreetMap."
+          }
+        }
+      }
+    },
+    "Loading trail details…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laster løypedetaljer…"
+          }
+        }
+      }
+    },
+    "Route visibility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutesynlighet"
+          }
+        }
+      }
+    },
+    "Choose who can discover this route and appear with you on its leaderboard.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg hvem som kan oppdage ruten og vises sammen med deg på ledertavlen."
+          }
+        }
+      }
+    },
+    "Only me": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare meg"
+          }
+        }
+      }
+    },
+    "Your performance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Din prestasjon"
+          }
+        }
+      }
+    },
+    "GPS route adherence from your latest matched attempt.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPS-rutesamsvar fra ditt siste matchede forsøk."
+          }
+        }
+      }
+    },
+    "Race Target Time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot måltid"
+          }
+        }
+      }
+    },
+    "No matched attempt yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen matchet forsøk ennå"
+          }
+        }
+      }
+    },
+    "Run or walk this route with GPS. ATHLTH will compare the recorded path with the saved route.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løp eller gå ruten med GPS. ATHLTH sammenligner registrert spor med den lagrede ruten."
+          }
+        }
+      }
+    },
+    "Leaderboard is not enabled for this public trail.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledertavle er ikke aktivert for denne offentlige løypen."
+          }
+        }
+      }
+    },
+    "Your attempts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dine forsøk"
+          }
+        }
+      }
+    },
+    "No attempts recorded on this route yet.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen forsøk registrert på denne ruten ennå."
+          }
+        }
+      }
+    },
+    "Show 10 Similar Routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis 10 lignende ruter"
+          }
+        }
+      }
+    },
+    "Race Your Best": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot din beste"
+          }
+        }
+      }
+    },
+    "Race Last Attempt": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot siste forsøk"
+          }
+        }
+      }
+    },
+    "Start Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start rute"
+          }
+        }
+      }
+    },
+    "Challenge Friends": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordre venner"
+          }
+        }
+      }
+    },
+    "Qualifying attempts need at least 85% route match.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kvalifiserende forsøk trenger minst 85 % rutesamsvar."
+          }
+        }
+      }
+    },
+    "Similar Routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lignende ruter"
+          }
+        }
+      }
+    },
+    "Sort by": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sorter etter"
+          }
+        }
+      }
+    },
+    "Route length": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutelengde"
+          }
+        }
+      }
+    },
+    "Any length": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle lengder"
+          }
+        }
+      }
+    },
+    "Under 5 km": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Under 5 km"
+          }
+        }
+      }
+    },
+    "5–10 km": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5–10 km"
+          }
+        }
+      }
+    },
+    "10–21.1 km": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10–21,1 km"
+          }
+        }
+      }
+    },
+    "21.1 km and more": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "21,1 km og mer"
+          }
+        }
+      }
+    },
+    "Favorites only": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun favoritter"
+          }
+        }
+      }
+    },
+    "Location is unavailable. Routes are shown by name until your position is available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posisjon er utilgjengelig. Ruter vises etter navn til posisjonen din er tilgjengelig."
+          }
+        }
+      }
+    },
+    "Use my location": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk posisjonen min"
+          }
+        }
+      }
+    },
+    "Nearest is the straight-line distance to the route's centre, not travel distance to its start.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nærmest er luftlinjen til rutens sentrum, ikke reiseavstanden til start."
+          }
+        }
+      }
+    },
+    "Load more routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last inn flere ruter"
+          }
+        }
+      }
+    },
+    "Create route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett rute"
+          }
+        }
+      }
+    },
+    "Route unavailable": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rute utilgjengelig"
+          }
+        }
+      }
+    },
+    "Building running route…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygger løperute…"
+          }
+        }
+      }
+    },
+    "ATHLTH ROUTE BUILDER": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH RUTEBYGGER"
+          }
+        }
+      }
+    },
+    "Build your route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg ruten din"
+          }
+        }
+      }
+    },
+    "A → B": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A → B"
+          }
+        }
+      }
+    },
+    "Swap": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bytt"
+          }
+        }
+      }
+    },
+    "Build Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg rute"
+          }
+        }
+      }
+    },
+    "Add Via points by search, or use Shape on the map and tap where you want the route to pass.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til via-punkter med søk, eller bruk Form på kartet og trykk der du vil at ruten skal gå."
+          }
+        }
+      }
+    },
+    "Tap the map to add a Via point": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trykk på kartet for å legge til et via-punkt"
+          }
+        }
+      }
+    },
+    "Route Details": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutedetaljer"
+          }
+        }
+      }
+    },
+    "Save Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre rute"
+          }
+        }
+      }
+    },
+    "Public routes can appear in Around You for nearby ATHLTH users and can be used in public challenges.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offentlige ruter kan vises i Rundt deg for ATHLTH-brukere i nærheten og brukes i offentlige utfordringer."
+          }
+        }
+      }
+    },
+    "Send to Apple Watch after saving": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send til Apple Watch etter lagring"
+          }
+        }
+      }
+    },
+    "Garmin route sync is prepared and will unlock after authorization approval.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garmin-rutesynk er klargjort og låses opp etter godkjent autorisasjon."
+          }
+        }
+      }
+    },
+    "The route will stay available on this iPhone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruten forblir tilgjengelig på denne iPhone-en."
+          }
+        }
+      }
+    },
+    "Save Running Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre løperute"
+          }
+        }
+      }
+    },
+    "Create Running Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett løperute"
+          }
+        }
+      }
+    },
+    "Create your first route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett din første rute"
+          }
+        }
+      }
+    },
+    "Choose a start and finish, compare route alternatives and save the route for future runs or Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg start og mål, sammenlign rutealternativer og lagre ruten for fremtidige løpeturer eller Apple Watch."
+          }
+        }
+      }
+    },
+    "Use This Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk denne ruten"
+          }
+        }
+      }
+    },
+    "Workout device": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktenhet"
+          }
+        }
+      }
+    },
+    "Record with": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrer med"
+          }
+        }
+      }
+    },
+    "iPhone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone"
+          }
+        }
+      }
+    },
+    "Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch"
+          }
+        }
+      }
+    },
+    "Incoming": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Innkommende"
+          }
+        }
+      }
+    },
+    "No active Ghost Race invites.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen aktive Ghost Race-invitasjoner."
+          }
+        }
+      }
+    },
+    "Challenge a friend": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordre en venn"
+          }
+        }
+      }
+    },
+    "Add a friend in Community before sending a Ghost Race.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til en venn i Fellesskap før du sender en Ghost Race."
+          }
+        }
+      }
+    },
+    "Friend": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venn"
+          }
+        }
+      }
+    },
+    "Choose friend": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg venn"
+          }
+        }
+      }
+    },
+    "Reference run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referanseløp"
+          }
+        }
+      }
+    },
+    "Choose run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg løpetur"
+          }
+        }
+      }
+    },
+    "Sending…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sender…"
+          }
+        }
+      }
+    },
+    "Send Ghost Race": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send Ghost Race"
+          }
+        }
+      }
+    },
+    "Sent": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sendt"
+          }
+        }
+      }
+    },
+    "No active sent Ghost Races.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen aktive sendte Ghost Races."
+          }
+        }
+      }
+    },
+    "Create a standard challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett en vanlig utfordring"
+          }
+        }
+      }
+    },
+    "Standard challenges still support distance, route and verification rules. Ghost Race is the live head-to-head mode.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vanlige utfordringer støtter fortsatt distanse-, rute- og verifiseringsregler. Ghost Race er live-modusen én mot én."
+          }
+        }
+      }
+    },
+    "Private by design": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privat som standard"
+          }
+        }
+      }
+    },
+    "A friend receives only the sampled route and timing needed to replay the ghost. Heart rate, calories, HealthKit identifiers and the original workout are never shared.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En venn mottar bare den nedprøvde ruten og tidsdataene som trengs for å spille av Ghost. Puls, kalorier, HealthKit-identifikatorer og originaløkten deles aldri."
+          }
+        }
+      }
+    },
+    "Your first and last 250 m are removed before the ghost is uploaded.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De første og siste 250 meterne fjernes før Ghost lastes opp."
+          }
+        }
+      }
+    },
+    "Hide route start/end is off. The full selected route will be shared with the chosen friend.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skjul rutestart/-slutt er av. Hele den valgte ruten deles med valgt venn."
+          }
+        }
+      }
+    },
+    "Trimmed": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trimmet"
+          }
+        }
+      }
+    },
+    "Open live Ghost Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne live Ghost-løp"
+          }
+        }
+      }
+    },
+    "Race this ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot denne Ghost"
+          }
+        }
+      }
+    },
+    "Race a Friend": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot en venn"
+          }
+        }
+      }
+    },
+    "Online": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pålogget"
+          }
+        }
+      }
+    },
+    "One race. Three ways to chase.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ett løp. Tre måter å jage på."
+          }
+        }
+      }
+    },
+    "Race someone live, chase one of your own previous runs, or create a target ghost for the exact finish time you want.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer live mot noen, jag en tidligere løpetur eller opprett en mål-Ghost for nøyaktig sluttid."
+          }
+        }
+      }
+    },
+    "Live Ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Ghost"
+          }
+        }
+      }
+    },
+    "Route-aware races ignore detours when calculating who is ahead.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutebevisste løp ignorerer omveier når ATHLTH beregner hvem som ligger foran."
+          }
+        }
+      }
+    },
+    "READY TO RACE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KLAR TIL LØP"
+          }
+        }
+      }
+    },
+    "Start Live Ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Live Ghost"
+          }
+        }
+      }
+    },
+    "Preview live runner": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forhåndsvis live-løper"
+          }
+        }
+      }
+    },
+    "Race a friend": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot en venn"
+          }
+        }
+      }
+    },
+    "Use an existing friend Ghost challenge when you want a shared head-to-head session.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk en eksisterende Ghost-utfordring med en venn når du vil ha en delt én-mot-én-økt."
+          }
+        }
+      }
+    },
+    "Watch a visible runner, or use their live distance as a lightweight Ghost while you run.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se en synlig løper, eller bruk live-distansen deres som en enkel Ghost mens du løper."
+          }
+        }
+      }
+    },
+    "Target time ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost på måltid"
+          }
+        }
+      }
+    },
+    "Choose a route and a finish time. ATHLTH creates a synthetic pacer to follow all the way to the finish.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg rute og sluttid. ATHLTH oppretter en syntetisk pacer du kan følge helt til mål."
+          }
+        }
+      }
+    },
+    "Choose route & target time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg rute og måltid"
+          }
+        }
+      }
+    },
+    "Race past self": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot tidligere deg"
+          }
+        }
+      }
+    },
+    "Choose a previous GPS run to use as the ghost.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg en tidligere GPS-løpetur som Ghost."
+          }
+        }
+      }
+    },
+    "Outdoor runs from Apple Health will appear here when a GPS route is available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utendørsløp fra Apple Health vises her når en GPS-rute er tilgjengelig."
+          }
+        }
+      }
+    },
+    "Race your best": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konkurrer mot din beste"
+          }
+        }
+      }
+    },
+    "Open one of your saved routes and race your best or latest matched attempt.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne en lagret rute og konkurrer mot din beste eller siste matchede innsats."
+          }
+        }
+      }
+    },
+    "All routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle ruter"
+          }
+        }
+      }
+    },
+    "Save or create a route first. ATHLTH will match your Apple Health attempts to it.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagre eller opprett en rute først. ATHLTH matcher Apple Health-forsøkene dine mot den."
+          }
+        }
+      }
+    },
+    "Send a privacy-filtered ghost from one of your runs, or accept a friend’s ghost and race it live.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send en personvernfiltrert Ghost fra en av løpeturene dine, eller godta en venns Ghost og konkurrer live."
+          }
+        }
+      }
+    },
+    "Open friend Ghost Races": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne Ghost Races med venner"
+          }
+        }
+      }
+    },
+    "Standard challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vanlig utfordring"
+          }
+        }
+      }
+    },
+    "Waiting for live GPS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venter på live-GPS"
+          }
+        }
+      }
+    },
+    "ATHLTH will place you and your ghost on the route as soon as Apple Watch sends the first GPS point.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH plasserer deg og Ghost på ruten så snart Apple Watch sender første GPS-punkt."
+          }
+        }
+      }
+    },
+    "Ghost Race": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost Race"
+          }
+        }
+      }
+    },
+    "Start the simulator to replay this route without going outside.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start simulatoren for å spille av ruten uten å gå ut."
+          }
+        }
+      }
+    },
+    "Internal developer tool": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Internt utviklerverktøy"
+          }
+        }
+      }
+    },
+    "This replays a saved GPS workout through the Ghost Race engine. It never starts HealthKit, Apple Watch or a real workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette spiller av en lagret GPS-økt gjennom Ghost Race-motoren. Det starter aldri HealthKit, Apple Watch eller en ekte økt."
+          }
+        }
+      }
+    },
+    "Choose an outdoor run from Apple Health.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg et utendørsløp fra Apple Health."
+          }
+        }
+      }
+    },
+    "Replay controls": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avspillingskontroller"
+          }
+        }
+      }
+    },
+    "Change playback speed and simulate a runner who is faster or slower than the ghost.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endre avspillingshastighet og simuler en løper som er raskere eller tregere enn Ghost."
+          }
+        }
+      }
+    },
+    "Playback": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avspilling"
+          }
+        }
+      }
+    },
+    "Virtual runner": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Virtuell løper"
+          }
+        }
+      }
+    },
+    "Simulator is locked while a real mirrored workout is active.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simulatoren er låst mens en ekte speilet økt er aktiv."
+          }
+        }
+      }
+    },
+    "Ghost Replay Simulator": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost Replay-simulator"
+          }
+        }
+      }
+    },
+    "Ghost Replay": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost Replay"
+          }
+        }
+      }
+    },
+    "Choose a saved route, set the finish time you want, and ATHLTH creates a synthetic ghost that follows the course at the required average pace.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg en lagret rute, angi ønsket sluttid, så oppretter ATHLTH en syntetisk Ghost som følger løypen i nødvendig gjennomsnittstempo."
+          }
+        }
+      }
+    },
+    "My routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mine ruter"
+          }
+        }
+      }
+    },
+    "Create or save a route first.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett eller lagre en rute først."
+          }
+        }
+      }
+    },
+    "TARGET GHOST": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MÅL-GHOST"
+          }
+        }
+      }
+    },
+    "Choose exactly how hard your ghost should be. Set any finish time, match a previous run, or make your best effort a little faster.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg nøyaktig hvor krevende Ghost skal være. Sett ønsket sluttid, match et tidligere løp eller gjør beste innsats litt raskere."
+          }
+        }
+      }
+    },
+    "Choose your target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg målet ditt"
+          }
+        }
+      }
+    },
+    "Exact finish time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eksakt sluttid"
+          }
+        }
+      }
+    },
+    "Use MM:SS or H:MM:SS.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk MM:SS eller T:MM:SS."
+          }
+        }
+      }
+    },
+    "Required average pace": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nødvendig gjennomsnittstempo"
+          }
+        }
+      }
+    },
+    "Fine tune": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finjuster"
+          }
+        }
+      }
+    },
+    "Your history": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historikken din"
+          }
+        }
+      }
+    },
+    "Matched runs on this course": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matchede løp på denne løypen"
+          }
+        }
+      }
+    },
+    "Start Target Ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start mål-Ghost"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
