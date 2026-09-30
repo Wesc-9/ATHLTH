@@ -7,6 +7,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var incomingRequests: [SocialFriendRequestDisplay] = []
     @Published private(set) var outgoingRequests: [SocialFriendRequestDisplay] = []
     @Published private(set) var discoverResults: [SocialProfileCard] = []
+    @Published private(set) var challengeSearchResults: [ATHLTHChallenge] = []
     @Published private(set) var visibleProfiles: [SocialProfileCard] = []
     @Published private(set) var feed: [SocialFeedItem] = []
     @Published private(set) var blockedUsers: [SocialBlockedUser] = []
@@ -370,6 +371,37 @@ final class SocialStore: ObservableObject {
 
     func clearSearch() {
         discoverResults = []
+    }
+
+    func searchChallenges(_ query: String) async {
+        let requestedQuery = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard requestedQuery.count >= 2 else {
+            challengeSearchResults = []
+            return
+        }
+
+        do {
+            let results =
+                try await service.searchRemoteChallenges(
+                    requestedQuery
+                )
+
+            guard !Task.isCancelled else { return }
+
+            challengeSearchResults = results
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            challengeSearchResults = []
+        }
+    }
+
+    func clearChallengeSearch() {
+        challengeSearchResults = []
     }
 
     func follow(_ profile: SocialProfileCard) async {
@@ -1499,6 +1531,7 @@ final class SocialStore: ObservableObject {
         incomingRequests = []
         outgoingRequests = []
         discoverResults = []
+        challengeSearchResults = []
         visibleProfiles = []
         feed = []
         blockedUsers = []
