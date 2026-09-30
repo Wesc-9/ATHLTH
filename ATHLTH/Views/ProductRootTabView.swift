@@ -5260,7 +5260,8 @@ struct ATHLTHRecoveryView: View {
     var body: some View {
         NavigationStack {
             ATHLTHExclusiveHomeHeroLayout(
-                accent: Color.blue.opacity(0.36)
+                accent: Color.blue.opacity(0.36),
+                showsTopSheen: false
             ) {
                 ATHLTHExclusiveHomeHero(
                     imageName: "RecoveryHero",
