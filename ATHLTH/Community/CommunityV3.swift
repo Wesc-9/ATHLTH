@@ -20,23 +20,30 @@ struct ATHLTHCommunityV3View: View {
     @State private var refreshError: String?
 
     private var activeChallenges: [ATHLTHChallenge] {
-        challenges.visibleChallenges
-            .filter {
-                $0.status == .active ||
-                $0.status == .upcoming ||
-                $0.status == .invited
+        challenges.trainingChallenges(
+            for: session.profile.userID
+        )
+        .sorted {
+            if $0.status == .active &&
+                $1.status != .active {
+                return true
             }
-            .sorted {
-                if $0.status == .active && $1.status != .active {
-                    return true
-                }
 
-                if $1.status == .active && $0.status != .active {
-                    return false
-                }
-
-                return $0.rules.startsAt < $1.rules.startsAt
+            if $1.status == .active &&
+                $0.status != .active {
+                return false
             }
+
+            return $0.rules.startsAt <
+                $1.rules.startsAt
+        }
+    }
+
+    private var challengeRequests:
+        [ATHLTHChallenge] {
+        challenges.incomingInvitations(
+            for: session.profile.userID
+        )
     }
 
     private var pulseSummary: String {
@@ -74,6 +81,10 @@ struct ATHLTHCommunityV3View: View {
                     )
 
                     weeklyChallengeSection
+
+                    if !challengeRequests.isEmpty {
+                        challengeRequestsSection
+                    }
 
                     friendsVsFriendsSection
 
@@ -162,6 +173,125 @@ struct ATHLTHCommunityV3View: View {
         }
     }
 
+    private var challengeRequestsSection:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            CommunityV3SectionTitle(
+                eyebrow: "REQUESTS",
+                title:
+                    challengeRequests.count == 1
+                        ? "Someone challenged you."
+                        : "\(challengeRequests.count) challenges waiting.",
+                subtitle:
+                    "Accept or decline here. The same request also appears in Inbox."
+            )
+
+            VStack(spacing: 10) {
+                ForEach(
+                    challengeRequests.prefix(3)
+                ) { challenge in
+                    CommunityChallengeRequestCard(
+                        challenge: challenge,
+                        creator:
+                            profile(
+                                for:
+                                    challenge.creatorID
+                            ),
+                        onAccept: {
+                            respondToChallenge(
+                                challenge,
+                                accept: true
+                            )
+                        },
+                        onDecline: {
+                            respondToChallenge(
+                                challenge,
+                                accept: false
+                            )
+                        }
+                    )
+                }
+            }
+
+            if challengeRequests.count > 3 {
+                NavigationLink {
+                    ChallengeHubView()
+                } label: {
+                    Label(
+                        "View all challenge requests",
+                        systemImage:
+                            "arrow.up.right"
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func profile(
+        for userID: UUID
+    ) -> SocialProfileCard? {
+        social.visibleProfiles.first {
+            $0.userID == userID
+        } ??
+        social.friends.first {
+            $0.userID == userID
+        } ??
+        social.following.first {
+            $0.userID == userID
+        }
+    }
+
+    private func respondToChallenge(
+        _ challenge: ATHLTHChallenge,
+        accept: Bool
+    ) {
+        guard let participant =
+                challenges
+                    .invitationParticipant(
+                        in: challenge,
+                        userID:
+                            session.profile.userID
+                    )
+        else {
+            return
+        }
+
+        challenges.setParticipantState(
+            challengeID: challenge.id,
+            participantID: participant.id,
+            state:
+                accept
+                    ? .accepted
+                    : .declined
+        )
+
+        guard let updated =
+                challenges.challenge(
+                    id: challenge.id
+                )
+        else {
+            return
+        }
+
+        Task {
+            _ = await social.syncChallenge(
+                updated
+            )
+        }
+    }
+
     private var friendsVsFriendsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             CommunityV3SectionTitle(
@@ -238,6 +368,167 @@ struct ATHLTHCommunityV3View: View {
             community.errorMessage ??
             groups.errorMessage ??
             officialChallenges.errorMessage
+    }
+}
+
+private struct CommunityChallengeRequestCard:
+    View {
+    let challenge: ATHLTHChallenge
+    let creator: SocialProfileCard?
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        VStack(spacing: 13) {
+            NavigationLink {
+                ChallengeDetailView(
+                    challengeID: challenge.id
+                )
+            } label: {
+                HStack(spacing: 12) {
+                    if let creator {
+                        SocialAvatar(
+                            profile: creator,
+                            size: 48
+                        )
+                    } else {
+                        Image(
+                            systemName:
+                                challenge.sport
+                                    .systemImage
+                        )
+                        .font(
+                            .system(
+                                size: 19,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .frame(
+                            width: 48,
+                            height: 48
+                        )
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: Circle()
+                        )
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            creator?.resolvedName
+                                .map {
+                                    "\($0) challenged you"
+                                } ??
+                            "Challenge invitation"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+
+                        Text(challenge.title)
+                            .font(
+                                .headline
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                            .lineLimit(1)
+
+                        Text(detailText)
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(.caption.bold())
+                    .foregroundStyle(
+                        .tertiary
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 9) {
+                Button(
+                    "Decline",
+                    action: onDecline
+                )
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+
+                Button(
+                    "Accept",
+                    action: onAccept
+                )
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(15)
+        .background(
+            Color.white.opacity(0.84),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var detailText: String {
+        var parts = [
+            challenge.sport.title,
+            challenge.rules.scoring.title
+        ]
+
+        if challenge.rules.startsAt > Date() {
+            parts.append(
+                challenge.rules.startsAt
+                    .formatted(
+                        date: .abbreviated,
+                        time: .omitted
+                    )
+            )
+        } else {
+            parts.append("Open now")
+        }
+
+        return parts.joined(
+            separator: " · "
+        )
     }
 }
 
