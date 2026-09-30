@@ -947,114 +947,311 @@ struct ATHLTHNotificationCenterView: View {
         _ item: ATHLTHNotificationItem,
         showsChevron: Bool
     ) -> some View {
-        HStack(alignment: .top, spacing: 13) {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: item.kind.systemImage)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(iconTint(item.kind))
-                    .frame(width: 44, height: 44)
-                    .background(
-                        iconTint(item.kind).opacity(0.09),
-                        in: RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
-                    )
+        let tint = notificationTint(item)
 
-                if item.isUnread {
-                    Circle()
-                        .fill(ATHLTHTheme.vitality)
-                        .frame(width: 9, height: 9)
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white,
-                                    lineWidth: 1.5
-                                )
-                        }
-                        .offset(x: 2, y: -2)
-                }
-            }
+        return HStack(alignment: .top, spacing: 13) {
+            notificationLeading(item, tint: tint)
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(item.title)
-                        .font(
-                            .subheadline.weight(
-                                item.isUnread
-                                    ? .bold
-                                    : .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText
-                        )
-                        .lineLimit(2)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 7) {
+                    Text(notificationCategoryTitle(item))
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.0)
+                        .foregroundStyle(tint)
+
+                    if item.isUnread {
+                        Circle()
+                            .fill(tint)
+                            .frame(width: 4, height: 4)
+                    }
 
                     Spacer(minLength: 8)
 
-                    Text(
-                        item.createdAt,
-                        style: .relative
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    Text(relativeTimeText(item.createdAt))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
                 }
 
-                Text(item.message)
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
+                Text(item.title)
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: item.isUnread
+                                ? .bold
+                                : .semibold
+                        )
                     )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                    .multilineTextAlignment(.leading)
-            }
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(2)
 
-            if showsChevron {
-                Image(systemName: "chevron.right")
-                    .font(.caption2.bold())
-                    .foregroundStyle(.tertiary)
-                    .padding(.top, 3)
+                if !item.message
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    .isEmpty {
+                    Text(item.message)
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(1)
+                }
+
+                if isActionable(item) || showsChevron {
+                    HStack(spacing: 5) {
+                        Text(
+                            isActionable(item)
+                                ? "Review"
+                                : destinationActionTitle(item)
+                        )
+                        .font(.caption2.weight(.semibold))
+
+                        Image(systemName: "arrow.right")
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .bold
+                                )
+                            )
+                    }
+                    .foregroundStyle(tint)
+                    .padding(.top, 1)
+                }
             }
         }
-        .padding(14)
-        .background(
-            ATHLTHTheme.card.opacity(
-                item.isUnread ? 1.0 : 0.92
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
+        .padding(15)
+        .background {
+            ZStack {
+                ATHLTHTheme.card.opacity(
+                    item.isUnread ? 0.99 : 0.93
+                )
+
+                if item.isUnread {
+                    LinearGradient(
+                        colors: [
+                            tint.opacity(0.055),
+                            .clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            }
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
             )
-        )
+        }
+        .overlay(alignment: .leading) {
+            if item.isUnread {
+                Capsule()
+                    .fill(tint.opacity(0.75))
+                    .frame(width: 3, height: 38)
+                    .padding(.leading, 1)
+            }
+        }
         .overlay {
             RoundedRectangle(
-                cornerRadius: 20,
+                cornerRadius: 22,
                 style: .continuous
             )
             .stroke(
                 item.isUnread
-                    ? ATHLTHTheme.accent.opacity(0.12)
+                    ? tint.opacity(0.12)
                     : Color.primary.opacity(0.045),
                 lineWidth: 1
             )
         }
         .shadow(
             color: Color.black.opacity(
-                item.isUnread ? 0.035 : 0.02
+                item.isUnread ? 0.035 : 0.018
             ),
             radius: 10,
             y: 4
         )
         .contentShape(
             RoundedRectangle(
-                cornerRadius: 20,
+                cornerRadius: 22,
                 style: .continuous
             )
+        )
+    }
+
+    @ViewBuilder
+    private func notificationLeading(
+        _ item: ATHLTHNotificationItem,
+        tint: Color
+    ) -> some View {
+        ZStack(alignment: .topTrailing) {
+            if let profile = notificationProfile(item) {
+                SocialAvatar(
+                    profile: profile,
+                    size: 46
+                )
+            } else {
+                Image(systemName: notificationIcon(item))
+                    .font(.system(size: 18, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(tint)
+                    .frame(width: 46, height: 46)
+                    .background(
+                        tint.opacity(0.09),
+                        in: RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
+                    )
+            }
+
+            if item.isUnread {
+                Circle()
+                    .fill(ATHLTHTheme.vitality)
+                    .frame(width: 9, height: 9)
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.white,
+                                lineWidth: 1.5
+                            )
+                    }
+                    .offset(x: 2, y: -2)
+            }
+        }
+    }
+
+    private func notificationProfile(
+        _ item: ATHLTHNotificationItem
+    ) -> SocialProfileCard? {
+        guard let entityID = item.socialEntityID else {
+            return nil
+        }
+
+        if let request = social.incomingRequests.first(where: {
+            $0.request.id == entityID
+        }) {
+            return request.profile
+        }
+
+        return nil
+    }
+
+    private func notificationCategoryTitle(
+        _ item: ATHLTHNotificationItem
+    ) -> String {
+        if isChallengeItem(item) {
+            return "CHALLENGE"
+        }
+
+        switch item.kind {
+        case .milestoneReached,
+             .goalCompleted:
+            return "PROGRESS"
+        case .personalRecord:
+            return "PERFORMANCE"
+        case .achievement:
+            return "ACHIEVEMENT"
+        case .social:
+            return "SOCIAL"
+        case .system:
+            return "ATHLTH"
+        case .challenge:
+            return "CHALLENGE"
+        case .workoutCompleted:
+            return "ACTIVITY"
+        }
+    }
+
+    private func notificationIcon(
+        _ item: ATHLTHNotificationItem
+    ) -> String {
+        if isChallengeItem(item) {
+            return "trophy.fill"
+        }
+
+        switch item.socialEventKind?.lowercased() {
+        case "friend_request",
+             "follow_request":
+            return "person.crop.circle.badge.plus"
+        case "friend_accepted",
+             "follow_accepted":
+            return "person.crop.circle.badge.checkmark"
+        case "reaction":
+            return "heart.fill"
+        default:
+            return item.kind.systemImage
+        }
+    }
+
+    private func notificationTint(
+        _ item: ATHLTHNotificationItem
+    ) -> Color {
+        if isChallengeItem(item) {
+            return .orange
+        }
+
+        return iconTint(item.kind)
+    }
+
+    private func destinationActionTitle(
+        _ item: ATHLTHNotificationItem
+    ) -> String {
+        if item.challengeID != nil {
+            return "View challenge"
+        }
+
+        if item.goalID != nil {
+            return "View goal"
+        }
+
+        if item.kind == .achievement {
+            return "View trophies"
+        }
+
+        switch item.socialEventKind?.lowercased() {
+        case "reaction":
+            return "View activity"
+        case "friend_accepted",
+             "follow_accepted":
+            return "View following"
+        default:
+            return "Open"
+        }
+    }
+
+    private func relativeTimeText(
+        _ date: Date
+    ) -> String {
+        let interval =
+            max(Date().timeIntervalSince(date), 0)
+
+        if interval < 60 {
+            return "Now"
+        }
+
+        if interval < 3_600 {
+            return "\(max(Int(interval / 60), 1))m"
+        }
+
+        if interval < 86_400 {
+            return "\(max(Int(interval / 3_600), 1))h"
+        }
+
+        if Calendar.current.isDateInYesterday(date) {
+            return "Yesterday"
+        }
+
+        return date.formatted(
+            .dateTime
+                .day()
+                .month(.abbreviated)
         )
     }
 
@@ -1150,6 +1347,8 @@ struct ATHLTHNotificationCenterView: View {
             return .orange
         case .achievement:
             return .purple
+        case .challenge:
+            return .orange
         case .social:
             return .blue
         case .system:
