@@ -360,6 +360,16 @@
           }
         }
       }
+    },
+    "Next:": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste:"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
