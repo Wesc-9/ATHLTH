@@ -2,8 +2,6 @@ import Foundation
 
 @MainActor
 final class SocialStore: ObservableObject {
-    @Published private(set) var friends: [SocialProfileCard] = []
-    @Published private(set) var friendships: [SocialFriendshipRecord] = []
     @Published private(set) var followerIDs: Set<UUID> = []
     @Published private(set) var followingIDs: Set<UUID> = []
     @Published private(set) var incomingRequests: [SocialFriendRequestDisplay] = []
@@ -95,9 +93,7 @@ final class SocialStore: ObservableObject {
     }
 
     /// People who can be invited into a shared workout.
-    /// Workout invitation RLS requires a mutual follow relationship, so this
-    /// deliberately follows the current Follow/Following model instead of the
-    /// legacy friendships table.
+    /// Workout invitation RLS requires a mutual follow relationship.
     var trainingPartners: [SocialProfileCard] {
         mutualFollows
     }
@@ -137,7 +133,6 @@ final class SocialStore: ObservableObject {
 
         do {
             async let cardsTask = service.loadVisibleProfileCards()
-            async let friendshipsTask = service.loadFriendships()
             async let followersTask = service.loadFollowers(for: currentUserID)
             async let followingTask = service.loadFollowing(for: currentUserID)
             async let requestsTask = service.loadFriendRequests()
@@ -150,7 +145,6 @@ final class SocialStore: ObservableObject {
             async let workoutParticipantsTask = service.loadWorkoutParticipants()
 
             let cards = try await cardsTask
-            let friendships = try await friendshipsTask
             let followerRows = try await followersTask
             let followingRows = try await followingTask
             let requests = try await requestsTask
@@ -175,7 +169,6 @@ final class SocialStore: ObservableObject {
 
             applyRelationships(
                 cards: visibleCards,
-                friendships: friendships,
                 requests: requests
             )
 
@@ -407,26 +400,6 @@ final class SocialStore: ObservableObject {
         await resolve(request, status: .cancelled)
     }
 
-    func removeFriend(_ userID: UUID) async {
-        guard let currentUserID,
-              let friendship = friendships.first(where: {
-                  $0.otherUserID(for: currentUserID) == userID
-              })
-        else {
-            return
-        }
-
-        errorMessage = nil
-
-        do {
-            try await service.removeFriendship(friendship.id)
-            profileCache[userID] = nil
-            await refresh()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     @discardableResult
     func block(_ userID: UUID) async -> Bool {
         errorMessage = nil
@@ -480,8 +453,8 @@ final class SocialStore: ObservableObject {
             return .selfUser
         }
 
-        if friends.contains(where: { $0.userID == userID }) {
-            return .friends
+        if isMutualFollow(userID) {
+            return .mutualFollow
         }
 
         if incomingRequests.contains(where: { $0.profile.userID == userID }) {
@@ -1420,32 +1393,15 @@ final class SocialStore: ObservableObject {
 
     private func applyRelationships(
         cards: [SocialProfileCard],
-        friendships: [SocialFriendshipRecord],
         requests: [SocialFriendRequestRecord]
     ) {
         guard let currentUserID else {
-            friends = []
-            self.friendships = []
             incomingRequests = []
             outgoingRequests = []
             return
         }
 
         let cardByID = Dictionary(uniqueKeysWithValues: cards.map { ($0.userID, $0) })
-
-        self.friendships = friendships
-
-        // Keep the legacy friendship rows loaded for old challenge records,
-        // but the product relationship is now follow-only. Two athletes are
-        // treated as a direct connection only when they follow each other.
-        let mutualFollowIDs =
-            followerIDs.intersection(followingIDs)
-
-        friends = mutualFollowIDs
-            .compactMap { cardByID[$0] }
-            .sorted {
-                $0.resolvedName.localizedCaseInsensitiveCompare($1.resolvedName) == .orderedAscending
-            }
 
         incomingRequests = requests
             .filter {
@@ -1507,8 +1463,6 @@ final class SocialStore: ObservableObject {
     }
 
     private func reset() {
-        friends = []
-        friendships = []
         followerIDs = []
         followingIDs = []
         incomingRequests = []
@@ -1545,6 +1499,6 @@ enum SocialRelationshipState: Hashable {
     case none
     case outgoingPending
     case incomingPending
-    case friends
+    case mutualFollow
     case blocked
 }
