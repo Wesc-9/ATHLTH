@@ -20020,7 +20020,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aktivitet, mål, tidsvindu, forsøk og verifisering er låst fordi utfordringen har startet. Navn, beskrivelse, arrangør, medarrangører og status kan fortsatt endres."
+            "value": "Aktivitet, mål, tidsperiode, forsøk og verifisering er låst fordi utfordringen har startet. Navn, beskrivelse, arrangør, medarrangører og status kan fortsatt administreres."
           }
         }
       }
@@ -20040,7 +20040,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dette resultatet merkes tydelig som manuelt i utfordringen."
+            "value": "Dette resultatet merkes tydelig som Manuell i utfordringen."
           }
         }
       }
@@ -20090,7 +20090,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hovedmål"
+            "value": "Primærmål"
           }
         }
       }
@@ -20100,7 +20100,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Angi ATHLTH_LEGAL_OPERATOR_NAME og ATHLTH_PRIVACY_CONTACT_EMAIL før en offentlig App Store-lansering."
+            "value": "Angi ATHLTH_LEGAL_OPERATOR_NAME og ATHLTH_PRIVACY_CONTACT_EMAIL før offentlig App Store-lansering."
           }
         }
       }
@@ -20120,7 +20120,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ingen tilknyttet spilleliste"
+            "value": "Ingen koblet spilleliste"
           }
         }
       }
@@ -20380,7 +20380,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dette tilpasser ATHLTH. Treningsfokuset ditt deles ikke automatisk."
+            "value": "Dette tilpasser ATHLTH til deg. Treningsfokuset ditt deles ikke automatisk."
           }
         }
       }
@@ -20771,6 +20771,606 @@
           "stringUnit": {
             "state": "translated",
             "value": "+%d ekstra økter planlagt i dag"
+          }
+        }
+      }
+    },
+    "Automatic milestones only use qualifying data recorded after the goal or milestone was created. Every milestone can also be checked manually.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatiske milepæler bruker bare kvalifiserende data registrert etter at målet eller milepælen ble opprettet. Alle milepæler kan også krysses av manuelt."
+          }
+        }
+      }
+    },
+    "The event itself stays manual. Training-distance milestones can be verified automatically from Apple Health.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selve arrangementet forblir manuelt. Milepæler for treningsdistanse kan verifiseres automatisk fra Apple Health."
+          }
+        }
+      }
+    },
+    "A distance milestone is only completed by a qualifying workout recorded after this goal is created.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En distansemilepæl fullføres bare av en kvalifiserende økt registrert etter at målet ble opprettet."
+          }
+        }
+      }
+    },
+    "Only sets logged in ATHLTH after goal creation can complete strength milestones.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare sett registrert i ATHLTH etter at målet ble opprettet kan fullføre styrkemilepæler."
+          }
+        }
+      }
+    },
+    "No Apple Health baseline is available yet. The goal can still be created, but weight milestones will stay manual until a baseline exists.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen grunnverdi fra Apple Health er tilgjengelig ennå. Målet kan fortsatt opprettes, men vektmilepæler forblir manuelle til en grunnverdi finnes."
+          }
+        }
+      }
+    },
+    "Counts qualifying workouts from the moment this goal is created.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teller kvalifiserende økter fra øyeblikket målet opprettes."
+          }
+        }
+      }
+    },
+    "Completes when Apple Health records a qualifying sleep after this goal is created.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullføres når Apple Health registrerer kvalifiserende søvn etter at målet ble opprettet."
+          }
+        }
+      }
+    },
+    "ATHLTH proposes milestones from your target. You can always check them manually. Automatic rules never use evidence from before the goal was created.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH foreslår milepæler ut fra målet ditt. Du kan alltid krysse dem av manuelt. Automatiske regler bruker aldri data fra før målet ble opprettet."
+          }
+        }
+      }
+    },
+    "ATHLTH will only auto-complete a milestone when its exact rule is satisfied by the configured source after this goal was created. Manual check and uncheck always remain available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH fullfører bare en milepæl automatisk når den nøyaktige regelen er oppfylt av den konfigurerte kilden etter at målet ble opprettet. Manuell av- og påkryssing er alltid tilgjengelig."
+          }
+        }
+      }
+    },
+    "Choose a start date after the existing plan ends. ATHLTH allows only one active plan on any date.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg en startdato etter at den eksisterende planen slutter. ATHLTH tillater bare én aktiv plan på en gitt dato."
+          }
+        }
+      }
+    },
+    "Simple creates a complete starting rhythm, not a locked template. Open Plan afterwards to add exercises, structured runs, routes, target distance, time and notes.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enkel oppretter en komplett startrytme, ikke en låst mal. Åpne Plan etterpå for å legge til øvelser, strukturerte løpeturer, ruter, måldistanse, tid og notater."
+          }
+        }
+      }
+    },
+    "Adjust the dates before creating this plan. ATHLTH keeps a maximum of one active plan for each date.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Juster datoene før planen opprettes. ATHLTH tillater maksimalt én aktiv plan per dato."
+          }
+        }
+      }
+    },
+    "Changing a program creates a new local version. Shared-program sync can use this version number later.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endring av et program oppretter en ny lokal versjon. Synkronisering av delte programmer kan bruke dette versjonsnummeret senere."
+          }
+        }
+      }
+    },
+    "Deleting the program removes its remaining plan and schedule. Completed workout history is kept.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sletting av programmet fjerner gjenværende plan og tidsplan. Historikk for fullførte økter beholdes."
+          }
+        }
+      }
+    },
+    "This removes the program and its remaining schedule. Completed workout history is kept.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette fjerner programmet og gjenværende tidsplan. Historikk for fullførte økter beholdes."
+          }
+        }
+      }
+    },
+    "Add a known maximum heart rate or date of birth in Health Profile to calculate zones, or choose Custom BPM.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg inn kjent maksimalpuls eller fødselsdato i Helseprofil for å beregne soner, eller velg Egendefinert BPM."
+          }
+        }
+      }
+    },
+    "The next prescription can use this rule after all planned sets are completed. ATHLTH keeps the rule separate from the recorded workout history.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste planlagte belastning kan bruke denne regelen etter at alle planlagte sett er fullført. ATHLTH holder regelen adskilt fra registrert økthistorikk."
+          }
+        }
+      }
+    },
+    "Coach uses the context available in ATHLTH and your note above. It does not assume missing health data means you skipped training.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach bruker konteksten som er tilgjengelig i ATHLTH og notatet ditt over. Manglende helsedata tolkes ikke som at du hoppet over trening."
+          }
+        }
+      }
+    },
+    "You can start anyway, but ATHLTH will mark your route progress only when you reach the course.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan starte likevel, men ATHLTH registrerer rutefremgang først når du når løypen."
+          }
+        }
+      }
+    },
+    "Build only as much as you want. Every exercise can still be changed or added after the workout starts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bygg bare så mye du ønsker. Alle øvelser kan fortsatt endres eller legges til etter at økten har startet."
+          }
+        }
+      }
+    },
+    "Target Ghost compares your live progress against a finish time on the selected route. It works with iPhone and Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål-Ghost sammenligner live-fremgangen din mot en sluttid på valgt rute. Det fungerer med iPhone og Apple Watch."
+          }
+        }
+      }
+    },
+    "Older workouts on this device have no account identifier. Only restore them if they belong to you.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eldre økter på denne enheten har ingen kontoidentifikator. Gjenopprett dem bare hvis de tilhører deg."
+          }
+        }
+      }
+    },
+    "A block can repeat work + recovery several times. This structure is ready for wearable workout guidance as supported providers are connected.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En blokk kan gjenta arbeid + pause flere ganger. Strukturen er klar for øktveiledning på wearables når støttede leverandører kobles til."
+          }
+        }
+      }
+    },
+    "ATHLTH will automatically revoke its Sign in with Apple authorization when your account is deleted. If Apple revocation cannot be completed, ATHLTH will show the manual fallback steps before returning you to sign-in.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH tilbakekaller automatisk Logg på med Apple-autorisasjonen når kontoen slettes. Hvis tilbakekalling ikke kan fullføres, viser ATHLTH manuelle trinn før du sendes tilbake til innlogging."
+          }
+        }
+      }
+    },
+    "Your ATHLTH account has been deleted, but Apple authorization could not be revoked automatically. On your iPhone, open Settings → [your name] → Sign in with Apple → ATHLTH, then choose Delete.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-kontoen din er slettet, men Apple-autorisasjonen kunne ikke tilbakekalles automatisk. På iPhone åpner du Innstillinger → [navnet ditt] → Logg på med Apple → ATHLTH og velger deretter Slett."
+          }
+        }
+      }
+    },
+    "These values are used only for ATHLTH health and training calculations. A known maximum heart rate becomes the source of truth for heart-rate zones and workout alerts. They are not shown on your public profile.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disse verdiene brukes bare til helse- og treningsberegninger i ATHLTH. En kjent maksimalpuls blir fasiten for pulssoner og øktvarsler. Verdiene vises ikke på den offentlige profilen din."
+          }
+        }
+      }
+    },
+    "These are the same master alert controls shown under Workout Guidance. They affect Route Guardian, target and Ghost alerts on iPhone and Apple Watch; Audio Coach remains separately configurable.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette er de samme hovedkontrollene for varsler som vises under Øktveiledning. De påvirker Route Guardian-, mål- og Ghost-varsler på iPhone og Apple Watch; Audio Coach konfigureres fortsatt separat."
+          }
+        }
+      }
+    },
+    "Audio Coach reports your workout. Route Guardian keeps you on course. Ghost Updates compares you with a reference run. ATHLTH prioritizes safety and workout instructions when several signals happen together.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio Coach rapporterer økten din. Route Guardian holder deg på ruten. Ghost-oppdateringer sammenligner deg med et referanseløp. ATHLTH prioriterer sikkerhet og øktinstruksjoner når flere signaler skjer samtidig."
+          }
+        }
+      }
+    },
+    "Online status is shown only to people who follow you. It turns off when ATHLTH is no longer active and expires automatically if the app cannot update it.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pålogget-status vises bare til personer som følger deg. Den slås av når ATHLTH ikke lenger er aktiv og utløper automatisk hvis appen ikke kan oppdatere den."
+          }
+        }
+      }
+    },
+    "Message requests let people you do not mutually follow send one text message. They cannot send another message or share workouts, plans, routes or challenges until you accept. Blocking always stops messaging.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meldingsforespørsler lar personer du ikke følger gjensidig sende én tekstmelding. De kan ikke sende en ny melding eller dele økter, planer, ruter eller utfordringer før du godtar. Blokkering stopper alltid meldinger."
+          }
+        }
+      }
+    },
+    "Strength PRs use manually entered reps and weight and are labeled Manual in Activity. Running PRs use qualifying Apple Health workout data.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrkerekorder bruker manuelt registrerte repetisjoner og vekt og merkes Manuell i Aktivitet. Løperekorder bruker kvalifiserende øktdata fra Apple Health."
+          }
+        }
+      }
+    },
+    "Manual and verified challenge results always keep their verification label.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manuelle og verifiserte utfordringsresultater beholder alltid verifiseringsetiketten."
+          }
+        }
+      }
+    },
+    "Follow unavailable": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Følg utilgjengelig"
+          }
+        }
+      }
+    },
+    "Just train. ATHLTH keeps the workout timer running until you press Finish. Sets, reps, weight and rest are not required.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare tren. ATHLTH lar økttimeren gå til du trykker Avslutt. Sett, repetisjoner, vekt og pause er ikke påkrevd."
+          }
+        }
+      }
+    },
+    "Weight, reps, RPE and rest are optional even in Advanced mode.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vekt, repetisjoner, RPE og pause er valgfritt selv i Avansert-modus."
+          }
+        }
+      }
+    },
+    "You can log actual reps, weight and RPE set by set. The exercise is added immediately to the running workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan registrere faktiske repetisjoner, vekt og RPE sett for sett. Øvelsen legges umiddelbart til den aktive økten."
+          }
+        }
+      }
+    },
+    "Capability tests run on-device. ATHLTH account and social features use the configured backend, but this screen does not display passwords, Health values, access tokens or other secrets.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funksjonstester kjøres på enheten. ATHLTH-konto og sosiale funksjoner bruker konfigurert backend, men denne skjermen viser ikke passord, Health-verdier, access tokens eller andre hemmeligheter."
+          }
+        }
+      }
+    },
+    "Start or create a program to see today's sessions, times and completed workouts here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start eller opprett et program for å se dagens økter, tidspunkter og fullførte økter her."
+          }
+        }
+      }
+    },
+    "ATHLTH Coach health insights are off": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helseinnsikt for ATHLTH Coach er av"
+          }
+        }
+      }
+    },
+    "Enable health-data use in Settings → Privacy & Data only if you want Coach to use sleep, HRV, heart-rate and workout context. Recovery scoring continues locally either way.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiver bruk av helsedata under Innstillinger → Personvern og data bare hvis du vil at Coach skal bruke søvn, HRV, puls og øktkontekst. Restitusjonsscoren beregnes lokalt uansett."
+          }
+        }
+      }
+    },
+    "Enable it in Settings → Privacy & Data before sharing recovery health context with ATHLTH Coach.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiver dette under Innstillinger → Personvern og data før restitusjonsrelatert helsekontekst deles med ATHLTH Coach."
+          }
+        }
+      }
+    },
+    "Today vs planned workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I dag mot planlagt økt"
+          }
+        }
+      }
+    },
+    "Recovery context applied to what you already planned.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjonskontekst brukt på det du allerede har planlagt."
+          }
+        }
+      }
+    },
+    "No workout planned today": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen økt planlagt i dag"
+          }
+        }
+      }
+    },
+    "ATHLTH can still use your recovery and muscle load when you choose a quick-start workout.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH kan fortsatt bruke restitusjon og muskelbelastning når du velger en hurtigstartøkt."
+          }
+        }
+      }
+    },
+    "Recent 7 days compared with the previous 7.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste 7 dager sammenlignet med de foregående 7."
+          }
+        }
+      }
+    },
+    "No clear shift yet, or there are not enough comparable days. ATHLTH will surface only changes large enough to be useful.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen tydelig endring ennå, eller det finnes ikke nok sammenlignbare dager. ATHLTH viser bare endringer som er store nok til å være nyttige."
+          }
+        }
+      }
+    },
+    "Last 7 days · strength, run, walk and other tracked workouts.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste 7 dager · styrke, løping, gåing og andre registrerte økter."
+          }
+        }
+      }
+    },
+    "28d weekly avg": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "28 d ukesnitt"
+          }
+        }
+      }
+    },
+    "No tracked workout load was found in the last 7 days.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen registrert treningsbelastning ble funnet de siste 7 dagene."
+          }
+        }
+      }
+    },
+    "This load view is currently duration-based. It combines tracked activity without pretending that a minute of walking and a minute of hard intervals create identical stress.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denne belastningsvisningen er foreløpig basert på varighet. Den kombinerer registrert aktivitet uten å late som ett minutt gåing og ett minutt harde intervaller gir samme belastning."
+          }
+        }
+      }
+    },
+    "Observed in your recent data when enough days exist.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observert i nylige data når det finnes nok dager."
+          }
+        }
+      }
+    },
+    "ATHLTH is still building enough comparable history to show useful personal patterns.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH bygger fortsatt nok sammenlignbar historikk til å vise nyttige personlige mønstre."
+          }
+        }
+      }
+    },
+    "Observed associations only — not proof that one signal caused another.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun observerte sammenhenger — ikke bevis på at ett signal forårsaket et annet."
+          }
+        }
+      }
+    },
+    "Recovery session": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjonsøkt"
+          }
+        }
+      }
+    },
+    "Tap a metric to explore the selected period.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trykk på en måling for å utforske valgt periode."
+          }
+        }
+      }
+    },
+    "Your verified best performances.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dine verifiserte beste prestasjoner."
+          }
+        }
+      }
+    },
+    "ATHLTH will surface verified records from Apple Health and strength workouts you log in ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH viser verifiserte rekorder fra Apple Health og styrkeøkter du registrerer i ATHLTH."
+          }
+        }
+      }
+    },
+    "Create and manage your goals": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opprett og administrer målene dine"
+          }
+        }
+      }
+    },
+    "How ATHLTH calculates recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slik beregner ATHLTH restitusjon"
           }
         }
       }
