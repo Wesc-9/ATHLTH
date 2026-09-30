@@ -952,8 +952,8 @@ struct ATHLTHNotificationCenterView: View {
                 )
             case "friend_accepted",
                  "follow_accepted":
-                SocialHubView(
-                    initialTab: .friends
+                ProfileFollowListView(
+                    mode: .following
                 )
             case "reaction":
                 SocialHubView(
