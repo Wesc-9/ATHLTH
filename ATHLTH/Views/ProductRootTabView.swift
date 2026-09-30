@@ -2814,8 +2814,6 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
-    @EnvironmentObject private var ghostRace: GhostRaceStore
-    @EnvironmentObject private var challenges: ChallengeStore
 
     @State private var selectedSection = 0
     @State private var watchTransferMessage: String?
@@ -2829,9 +2827,6 @@ struct ATHLTHTrainView: View {
     @State private var pendingStrengthStartSession: PlannedSession?
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
-    @State private var showingSimplePlanCreation = false
-    @State private var showingAdvancedPlanCreation = false
-    @State private var showingPlanWorkspace = false
     @State private var showingGhostHub = false
 
     init(
@@ -2843,65 +2838,69 @@ struct ATHLTHTrainView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(
+        let useImmersiveTrainHero =
+            UIDevice.current.userInterfaceIdiom == .pad ||
+            UIScreen.main.bounds.width >= 390
+
+        return NavigationStack {
+            ATHLTHPinnedHeroLayout(
+                accent: Color.green.opacity(0.55),
+                softTransition: true,
+                immersiveTransition: useImmersiveTrainHero,
+                scrollFadeTransition: true
+            ) {
+                ATHLTHTabHero(
+                    imageName: "TrainHero",
+                    title: "Train",
+                    subtitle: "Build a stronger, healthier you.",
+                    height:
+                        useImmersiveTrainHero
+                            ? 232
+                            : 190,
                     alignment: .leading,
-                    spacing: 20
-                ) {
-                    trainHeader
-                    quickTrainSection
-                    trainingPlanSection
-                    ghostTrainingSection
+                    focalOffsetX:
+                        useImmersiveTrainHero
+                            ? -10
+                            : -18,
+                    focalOffsetY:
+                        useImmersiveTrainHero
+                            ? 10
+                            : 18,
+                    titleFontSize:
+                        useImmersiveTrainHero
+                            ? 31
+                            : 30,
+                    copyWidthFraction:
+                        useImmersiveTrainHero
+                            ? 0.70
+                            : 0.80,
+                    immersiveCopy: useImmersiveTrainHero
+                )
+            } content: {
+                VStack(spacing: 18) {
+                    ATHLTHTrainSectionSwitcher(
+                        titles: ["Today", "Plan", "Library"],
+                        selection: $selectedSection
+                    )
 
-                    if let challenge =
-                            relevantTrainingChallenge {
-                        trainingChallengeSection(
-                            challenge
-                        )
-                    }
-
-                    trainingToolsSection
-
-                    if !session.savedWorkoutTemplates.isEmpty {
-                        savedWorkoutPreview
+                    switch selectedSection {
+                    case 1:
+                        TrainingPlanManagerView()
+                        AdvancedPlannerView(showsEmptyState: false)
+                    case 2:
+                        libraryContent
+                    default:
+                        todayContent
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
-            }
-            .scrollIndicators(.hidden)
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: Color.green.opacity(0.16)
-                )
-            )
-            .toolbarBackground(
-                .hidden,
-                for: .navigationBar
-            )
-            .navigationDestination(
-                isPresented: $showingPlanWorkspace
-            ) {
-                ATHLTHTrainPlanWorkspaceView()
             }
             .navigationDestination(
                 isPresented: $showingGhostHub
             ) {
                 GhostRaceHubView()
-            }
-            .sheet(
-                isPresented: $showingSimplePlanCreation
-            ) {
-                SimpleTrainingPlanCreationView()
-            }
-            .sheet(
-                isPresented: $showingAdvancedPlanCreation
-            ) {
-                AdvancedTrainingPlanCreationView()
             }
             .sheet(item: $selectedPlanWorkout) { selection in
                 PlannedWorkoutDetailView(
@@ -3076,1180 +3075,6 @@ struct ATHLTHTrainView: View {
                 )
             }
         }
-    }
-
-    private var trainHeader: some View {
-        ZStack(alignment: .bottomLeading) {
-            Image("TrainHero")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 178)
-                .frame(maxWidth: .infinity)
-                .clipped()
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.08),
-                    Color.black.opacity(0.58)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("TRAIN")
-                        .font(.caption2.weight(.bold))
-                        .tracking(2.4)
-
-                    Spacer()
-
-                    Label(
-                        watchConnection.isReady
-                            ? "Watch ready"
-                            : "iPhone ready",
-                        systemImage:
-                            watchConnection.isReady
-                                ? "applewatch"
-                                : "iphone"
-                    )
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background(
-                        Color.white.opacity(0.16),
-                        in: Capsule()
-                    )
-                }
-
-                Text("Ready when you are.")
-                    .font(
-                        .system(
-                            size: 31,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-
-                Text(
-                    session.activePlan == nil
-                        ? "Train freely now, or build a plan that grows with you."
-                        : "Start today's work, train freely, or adjust the plan."
-                )
-                .font(.subheadline)
-                .lineLimit(2)
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
-            }
-            .foregroundStyle(.white)
-            .padding(18)
-        }
-        .frame(height: 178)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.30),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color: Color.black.opacity(0.08),
-            radius: 18,
-            y: 8
-        )
-    }
-
-    private var quickTrainSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            trainSectionHeader(
-                eyebrow: "QUICK TRAIN",
-                title: "Start in seconds",
-                detail:
-                    "No plan required. Choose Watch or iPhone, then add routes, gear, Audio Coach or friends when you want more control."
-            )
-
-            LazyVGrid(
-                columns: [
-                    GridItem(
-                        .adaptive(minimum: 145),
-                        spacing: 10
-                    )
-                ],
-                spacing: 10
-            ) {
-                quickTrainAction(
-                    title: "Run",
-                    detail: quickStartSubtitle(.running),
-                    icon: "figure.run",
-                    enabled: quickStartAvailable(.running),
-                    emphasized: true
-                ) {
-                    handleQuickStart(.running)
-                }
-
-                quickTrainAction(
-                    title: "Strength",
-                    detail: "Gym or home",
-                    icon: "dumbbell.fill",
-                    enabled: quickStartAvailable(.strength),
-                    emphasized: true
-                ) {
-                    handleQuickStart(.strength)
-                }
-
-                quickTrainAction(
-                    title: "Walk",
-                    detail: quickStartSubtitle(.walking),
-                    icon: "figure.walk",
-                    enabled: quickStartAvailable(.walking),
-                    emphasized: false
-                ) {
-                    handleQuickStart(.walking)
-                }
-
-                quickTrainAction(
-                    title: "Custom",
-                    detail: quickStartCustomSubtitle,
-                    icon: "plus",
-                    enabled: customQuickStartAvailable,
-                    emphasized: false
-                ) {
-                    showingCustomQuickStart = true
-                }
-            }
-
-            HStack(spacing: 12) {
-                Label(
-                    "Audio Coach",
-                    systemImage: "waveform"
-                )
-                Label(
-                    "Routes & gear",
-                    systemImage: "map.fill"
-                )
-                Label(
-                    "Train together",
-                    systemImage: "person.2.fill"
-                )
-            }
-            .font(.system(size: 10.5, weight: .semibold))
-            .foregroundStyle(
-                ATHLTHTheme.mutedText
-            )
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-        }
-    }
-
-    private func quickTrainAction(
-        title: String,
-        detail: String,
-        icon: String,
-        enabled: Bool,
-        emphasized: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 13) {
-                Image(systemName: icon)
-                    .font(
-                        .system(
-                            size: 22,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        emphasized
-                            ? Color.white
-                            : ATHLTHTheme.accentDeep
-                    )
-                    .frame(width: 46, height: 46)
-                    .background(
-                        emphasized
-                            ? Color.white.opacity(0.16)
-                            : ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 15,
-                            style: .continuous
-                        )
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(
-                            emphasized
-                                ? Color.white
-                                : ATHLTHTheme.primaryText
-                        )
-
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(
-                            emphasized
-                                ? Color.white.opacity(0.72)
-                                : ATHLTHTheme.mutedText
-                        )
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.74)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 78)
-            .background(
-                emphasized
-                    ? ATHLTHTheme.accentDeep
-                    : Color.white.opacity(0.82),
-                in: RoundedRectangle(
-                    cornerRadius: 22,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 22,
-                    style: .continuous
-                )
-                .stroke(
-                    emphasized
-                        ? Color.white.opacity(0.08)
-                        : Color.white.opacity(0.92),
-                    lineWidth: 0.8
-                )
-            }
-            .opacity(enabled ? 1 : 0.48)
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-    }
-
-    @ViewBuilder
-    private var trainingPlanSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            trainSectionHeader(
-                eyebrow: "TRAINING PLAN",
-                title: "Structure when you want it",
-                detail:
-                    "Start simple and let ATHLTH create the rhythm, or take full control of every week and workout."
-            )
-
-            if let plan = session.activePlan {
-                activePlanPreview(plan)
-            }
-
-            LazyVGrid(
-                columns: [
-                    GridItem(
-                        .adaptive(minimum: 150),
-                        spacing: 10
-                    )
-                ],
-                spacing: 10
-            ) {
-                planModeCard(
-                    title: "Simple",
-                    detail:
-                        "Choose focus, frequency and length. ATHLTH builds the starting schedule.",
-                    icon: "wand.and.stars",
-                    badge: "FAST"
-                ) {
-                    showingSimplePlanCreation = true
-                }
-
-                planModeCard(
-                    title: "Advanced",
-                    detail:
-                        "Control weeks, sessions, routes, exercises, targets and details yourself.",
-                    icon: "slider.horizontal.3",
-                    badge: "PRO"
-                ) {
-                    showingAdvancedPlanCreation = true
-                }
-            }
-
-            NavigationLink {
-                ATHLTHTrainPlanWorkspaceView()
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .frame(width: 38, height: 38)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 12,
-                                style: .continuous
-                            )
-                        )
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(
-                            session.activePlan == nil
-                                ? "Plan Studio"
-                                : "Manage current plan"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText
-                        )
-
-                        Text(
-                            "Calendar, ATHLTH Coach, editing and saved programs"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                        .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.bold())
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(13)
-                .background(
-                    Color.white.opacity(0.76),
-                    in: RoundedRectangle(
-                        cornerRadius: 19,
-                        style: .continuous
-                    )
-                )
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func activePlanPreview(
-        _ plan: TrainingPlan
-    ) -> some View {
-        let sessions = todaySessions(in: plan)
-
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label(
-                    "ACTIVE PLAN",
-                    systemImage: "checkmark.circle.fill"
-                )
-                .font(.caption2.weight(.bold))
-                .tracking(1.1)
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-
-                Spacer()
-
-                Text("\(plan.weeks.count) weeks")
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-            }
-
-            Text(plan.title)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-
-            if let next = sessions.first {
-                Button {
-                    selectedPlanWorkout =
-                        PlannedWorkoutSelection(
-                            planID: plan.id,
-                            workout: next,
-                            isHealthCompleted: false
-                        )
-                } label: {
-                    HStack(spacing: 11) {
-                        Image(
-                            systemName:
-                                next.kind.systemImage
-                        )
-                        .font(
-                            .system(
-                                size: 17,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .frame(width: 38, height: 38)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 12,
-                                style: .continuous
-                            )
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-                            Text("Today · \(next.title)")
-                                .font(
-                                    .subheadline
-                                        .weight(.semibold)
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-                                .lineLimit(1)
-
-                            Text(todaySessionSummary(next))
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
-                                .lineLimit(1)
-                        }
-
-                        Spacer()
-
-                        Image(
-                            systemName: "chevron.right"
-                        )
-                        .font(.caption.bold())
-                        .foregroundStyle(.tertiary)
-                    }
-                }
-                .buttonStyle(.plain)
-            } else {
-                HStack(spacing: 10) {
-                    Image(systemName: "moon.stars.fill")
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-
-                    Text(
-                        "Nothing scheduled today. Train freely or use the day for recovery."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                }
-            }
-        }
-        .padding(16)
-        .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.accentSoft.opacity(0.88),
-                    Color.white.opacity(0.82)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.90),
-                lineWidth: 0.8
-            )
-        }
-    }
-
-    private func planModeCard(
-        title: String,
-        detail: String,
-        icon: String,
-        badge: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: icon)
-                        .font(
-                            .system(
-                                size: 18,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-
-                    Spacer()
-
-                    Text(badge)
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1.0)
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .padding(.horizontal, 7)
-                        .frame(height: 22)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: Capsule()
-                        )
-                }
-
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-
-                Spacer(minLength: 0)
-
-                Label(
-                    "Create plan",
-                    systemImage: "arrow.up.right"
-                )
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-            }
-            .padding(15)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 172)
-            .background(
-                Color.white.opacity(0.82),
-                in: RoundedRectangle(
-                    cornerRadius: 22,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 22,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white.opacity(0.92),
-                    lineWidth: 0.8
-                )
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var ghostTrainingSection: some View {
-        NavigationLink {
-            GhostRaceHubView()
-        } label: {
-            ZStack(alignment: .leading) {
-                LinearGradient(
-                    colors: [
-                        ATHLTHTheme.primaryText,
-                        ATHLTHTheme.accentDeep
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("GHOST TRAINING")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.8)
-                            .foregroundStyle(
-                                Color.white.opacity(0.70)
-                            )
-
-                        Text(ghostTrainingTitle)
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(.white)
-
-                        Text(ghostTrainingDetail)
-                        .font(.caption)
-                        .foregroundStyle(
-                            Color.white.opacity(0.74)
-                        )
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(
-                            horizontal: false,
-                            vertical: true
-                        )
-                    }
-
-                    Spacer(minLength: 8)
-
-                    ZStack {
-                        Circle()
-                            .fill(
-                                Color.white.opacity(0.13)
-                            )
-                            .frame(width: 62, height: 62)
-
-                        Image(
-                            systemName:
-                                "figure.run.circle.fill"
-                        )
-                        .font(.system(size: 32))
-                        .foregroundStyle(.white)
-                    }
-                }
-                .padding(18)
-            }
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 26,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 26,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white.opacity(0.10),
-                    lineWidth: 0.8
-                )
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var ghostTrainingTitle: String {
-        if let comparison = ghostRace.comparison {
-            let meters = abs(
-                comparison.signedDistanceMeters
-            )
-            let position =
-                comparison.userIsAhead
-                    ? "ahead"
-                    : "behind"
-
-            return String(
-                format: "%.0f m %@",
-                meters,
-                position
-            )
-        }
-
-        if let result = ghostRace.result,
-           let beatGhost = result.beatGhost {
-            return beatGhost
-                ? "You beat your ghost."
-                : "Ghost finished ahead."
-        }
-
-        if let reference = ghostRace.reference {
-            return "Ghost ready · \(reference.title)"
-        }
-
-        return "Compete with yourself."
-    }
-
-    private var ghostTrainingDetail: String {
-        if ghostRace.comparison != nil {
-            return
-                "Live comparison is active. Open Ghost Training for route position, time gap and progress."
-        }
-
-        if let result = ghostRace.result,
-           let seconds = result.signedTimeSeconds {
-            let value = abs(seconds)
-            return String(
-                format:
-                    result.beatGhost == true
-                        ? "Finished %.0f seconds ahead of your reference."
-                        : "Finished %.0f seconds behind your reference.",
-                value
-            )
-        }
-
-        if ghostRace.reference != nil {
-            return
-                "Your reference is prepared. Start when you are ready to race it."
-        }
-
-        return
-            "Replay a previous run, chase a target time, race a route or challenge a friend."
-    }
-
-    private func handleNavigationRequest() {
-        guard let request = navigationRequest else {
-            return
-        }
-
-        switch request {
-        case .plan:
-            showingPlanWorkspace = true
-
-        case let .workout(planID, workoutID):
-            if let plan =
-                    session.trainingPlan(
-                        withID: planID
-                    ),
-               let workout =
-                    plan.weeks
-                        .flatMap(\.days)
-                        .flatMap(\.sessions)
-                        .first(
-                            where: {
-                                $0.id == workoutID
-                            }
-                        ) {
-                selectedPlanWorkout =
-                    PlannedWorkoutSelection(
-                        planID: planID,
-                        workout: workout,
-                        isHealthCompleted:
-                            healthCompletedTodaySessionIDs(
-                                [workout]
-                            )
-                            .contains(workout.id)
-                    )
-            } else {
-                showingPlanWorkspace = true
-            }
-
-        case let .quick(kind):
-            handleQuickStart(kind)
-
-        case .customQuick:
-            if customQuickStartAvailable {
-                showingCustomQuickStart = true
-            } else {
-                watchTransferError =
-                    "Connect Apple Watch to use Custom Quick Train."
-            }
-
-        case .ghost:
-            showingGhostHub = true
-        }
-
-        navigationRequest = nil
-    }
-
-    private var relevantTrainingChallenge:
-        ATHLTHChallenge? {
-        let available =
-            challenges.trainingChallenges(
-                for: session.profile.userID
-            )
-
-        if let active =
-                available.first(
-                    where: {
-                        $0.status == .active
-                    }
-                ) {
-            return active
-        }
-
-        let cutoff =
-            Date().addingTimeInterval(
-                48 * 3_600
-            )
-
-        return available
-            .filter {
-                $0.status == .upcoming &&
-                $0.rules.startsAt <= cutoff
-            }
-            .sorted {
-                $0.rules.startsAt <
-                    $1.rules.startsAt
-            }
-            .first
-    }
-
-    private func trainingChallengeSection(
-        _ challenge: ATHLTHChallenge
-    ) -> some View {
-        NavigationLink {
-            ChallengeDetailView(
-                challengeID: challenge.id
-            )
-        } label: {
-            HStack(spacing: 14) {
-                Image(
-                    systemName:
-                        challenge.sport.systemImage
-                )
-                .font(
-                    .system(
-                        size: 22,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(.white)
-                .frame(width: 50, height: 50)
-                .background(
-                    Color.white.opacity(0.14),
-                    in: RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
-                    Text(
-                        challenge.status == .active
-                            ? "CHALLENGE READY"
-                            : "UPCOMING CHALLENGE"
-                    )
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.4)
-                    .foregroundStyle(
-                        Color.white.opacity(0.66)
-                    )
-
-                    Text(challenge.title)
-                        .font(
-                            .headline.weight(
-                                .bold
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-
-                    Text(
-                        challenge.status == .active
-                            ? challenge.sport.title +
-                                " · " +
-                                challenge.rules.scoring.title
-                            : "Starts " +
-                                challenge.rules.startsAt
-                                    .formatted(
-                                        date: .abbreviated,
-                                        time: .shortened
-                                    )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        Color.white.opacity(0.72)
-                    )
-                    .lineLimit(1)
-                }
-
-                Spacer()
-
-                Image(
-                    systemName:
-                        "arrow.up.right"
-                )
-                .font(.caption.bold())
-                .foregroundStyle(
-                    Color.white.opacity(0.80)
-                )
-            }
-            .padding(16)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color.orange.opacity(0.88),
-                        ATHLTHTheme.accentDeep
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var trainingToolsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            trainSectionHeader(
-                eyebrow: "TOOLS",
-                title: "Build your training",
-                detail:
-                    "Everything deeper stays close, without crowding the main screen."
-            )
-
-            LazyVGrid(
-                columns: [
-                    GridItem(
-                        .adaptive(minimum: 100),
-                        spacing: 10
-                    )
-                ],
-                spacing: 10
-            ) {
-                trainToolCard(
-                    title: "Library",
-                    detail: "Workouts & exercises",
-                    icon: "books.vertical.fill"
-                ) {
-                    TrainingLibraryHomeView { workout in
-                        pendingRunningTemplate = workout
-                    }
-                }
-
-                trainToolCard(
-                    title: "Routes",
-                    detail: "Saved routes",
-                    icon: "map.fill"
-                ) {
-                    RouteLibraryListView(
-                        source: .mine
-                    )
-                }
-
-                trainToolCard(
-                    title: "Plan",
-                    detail: "Coach & calendar",
-                    icon: "calendar"
-                ) {
-                    ATHLTHTrainPlanWorkspaceView()
-                }
-            }
-        }
-    }
-
-    private func trainToolCard<Destination: View>(
-        title: String,
-        detail: String,
-        icon: String,
-        @ViewBuilder destination: () -> Destination
-    ) -> some View {
-        NavigationLink {
-            destination()
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: icon)
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-                    .frame(width: 38, height: 38)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 12,
-                            style: .continuous
-                        )
-                    )
-
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-            }
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 116,
-                alignment: .topLeading
-            )
-            .padding(12)
-            .background(
-                Color.white.opacity(0.78),
-                in: RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var savedWorkoutPreview: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            trainSectionHeader(
-                eyebrow: "SAVED",
-                title: "Your shortcuts",
-                detail:
-                    "Recent saved workouts stay available for repeat sessions."
-            )
-
-            VStack(spacing: 8) {
-                ForEach(
-                    session.savedWorkoutTemplates.prefix(3)
-                ) { workout in
-                    if workout.kind == .strength {
-                        Button {
-                            selectedStrengthSession = workout
-                        } label: {
-                            savedWorkoutRow(
-                                workout,
-                                trailingIcon: "play.fill"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        NavigationLink {
-                            TrainingLibraryHomeView { template in
-                                pendingRunningTemplate = template
-                            }
-                        } label: {
-                            savedWorkoutRow(
-                                workout,
-                                trailingIcon: "chevron.right"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    private func savedWorkoutRow(
-        _ workout: PlannedSession,
-        trailingIcon: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(
-                systemName:
-                    workout.kind.systemImage
-            )
-            .font(
-                .system(
-                    size: 16,
-                    weight: .semibold
-                )
-            )
-            .foregroundStyle(
-                ATHLTHTheme.accentDeep
-            )
-            .frame(width: 38, height: 38)
-            .background(
-                ATHLTHTheme.accentSoft,
-                in: RoundedRectangle(
-                    cornerRadius: 12,
-                    style: .continuous
-                )
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text(workout.title)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .lineLimit(1)
-
-                Text(
-                    todaySessionSummary(
-                        workout
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .lineLimit(1)
-            }
-
-            Spacer()
-
-            Image(systemName: trailingIcon)
-                .font(.caption.bold())
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-        }
-        .padding(12)
-        .background(
-            Color.white.opacity(0.74),
-            in: RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
-        )
-    }
-
-    private func trainSectionHeader(
-        eyebrow: String,
-        title: String,
-        detail: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(eyebrow)
-                .font(.caption2.weight(.bold))
-                .tracking(1.8)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-
-            Text(title)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
-        }
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
     }
 
     @ViewBuilder
@@ -4634,32 +3459,82 @@ struct ATHLTHTrainView: View {
     private func startRunQuickWorkout(
         _ configuration: RunQuickStartConfiguration
     ) {
-        Task { @MainActor in
+        if configuration.captureDevice == .iPhone {
+            guard configuration.mode == .free else { return }
+            gear.prepareNextWorkoutGear(configuration.gearIDs)
+            phoneWorkout.start(walking: false)
+            return
+        }
+
+        guard watchConnection.isReady else {
+            watchTransferError =
+                "Apple Watch is not ready to start this run."
+            return
+        }
+
+        do {
+            if let route = configuration.route {
+                try watchConnection.sendRoute(route)
+                watchConnection.sendWorkoutRouteSelection(route.id)
+            } else if let workout = configuration.workout,
+                      let routeID = workout.routeID,
+                      let route = session.savedRoutes.first(
+                        where: { $0.id == routeID }
+                      ) {
+                try watchConnection.sendRoute(route)
+                watchConnection.sendWorkoutRouteSelection(route.id)
+            } else {
+                watchConnection.sendWorkoutRouteSelection(nil)
+            }
+        } catch {
+            Task { @MainActor in
+                await social.cancelActiveWorkout()
+            }
+            watchTransferError = error.localizedDescription
+            return
+        }
+
+        Task {
             do {
-                try await WorkoutLaunchCoordinator
-                    .startRunQuick(
-                        configuration: configuration,
-                        session: session,
-                        settings: settings,
-                        gear: gear,
-                        phoneWorkout: phoneWorkout,
-                        watchConnection:
-                            watchConnection,
-                        ghostRace: ghostRace
+                try await watchConnection
+                    .startWorkoutOnWatch(.running)
+
+                gear.prepareNextWorkoutGear(
+                    configuration.gearIDs
+                )
+
+                watchConnection.sendAudioCoachConfiguration(
+                    configuration.audioCoach
+                )
+
+                if let workout = configuration.workout {
+                    var watchTransfer =
+                        watchRunningWorkoutTransfer(
+                            from: workout
+                        )
+                    watchTransfer.routeAlerts =
+                        settings
+                            .routeAlertConfiguration
+                    watchConnection.sendRunningWorkout(
+                        watchTransfer
                     )
+                } else {
+                    watchConnection.sendRunningWorkout(
+                        WatchRunningWorkoutTransfer(
+                            title: "",
+                            steps: [],
+                            routeAlerts:
+                                settings
+                                    .routeAlertConfiguration
+                        )
+                    )
+                }
 
                 watchTransferMessage =
-                    "\(configuration.title) started" +
-                    (
-                        configuration.captureDevice ==
-                            .appleWatch
-                            ? " on Apple Watch."
-                            : " on iPhone."
-                    )
+                    "\(configuration.title) started on Apple Watch."
             } catch {
                 await social.cancelActiveWorkout()
-                watchTransferError =
-                    error.localizedDescription
+                watchTransferError = error.localizedDescription
             }
         }
     }
@@ -4668,15 +3543,8 @@ struct ATHLTHTrainView: View {
         _ configuration: WalkQuickStartConfiguration
     ) {
         if configuration.captureDevice == .iPhone {
-            gear.prepareNextWorkoutGear(
-                configuration.gearIDs
-            )
-            phoneWorkout.start(
-                walking: true,
-                title: "Free Walk",
-                audioCoach:
-                    configuration.audioCoach
-            )
+            gear.prepareNextWorkoutGear(configuration.gearIDs)
+            phoneWorkout.start(walking: true)
             return
         }
 
@@ -5235,6 +4103,65 @@ struct ATHLTHTrainView: View {
     }
 
 
+
+
+    private func handleNavigationRequest() {
+        guard let request = navigationRequest else {
+            return
+        }
+
+        switch request {
+        case .plan:
+            selectedSection = 1
+
+        case let .workout(planID, workoutID):
+            if let plan =
+                    session.trainingPlan(
+                        withID: planID
+                    ),
+               let workout =
+                    plan.weeks
+                        .flatMap(\.days)
+                        .flatMap(\.sessions)
+                        .first(
+                            where: {
+                                $0.id == workoutID
+                            }
+                        ) {
+                selectedPlanWorkout =
+                    PlannedWorkoutSelection(
+                        planID: planID,
+                        workout: workout,
+                        isHealthCompleted:
+                            healthCompletedTodaySessionIDs(
+                                [workout]
+                            )
+                            .contains(workout.id)
+                    )
+            } else {
+                selectedSection = 1
+            }
+
+        case let .quick(kind):
+            selectedSection = 0
+            handleQuickStart(kind)
+
+        case .customQuick:
+            selectedSection = 0
+            if customQuickStartAvailable {
+                showingCustomQuickStart = true
+            } else {
+                watchTransferError =
+                    "Connect Apple Watch to use Custom Quick Train."
+            }
+
+        case .ghost:
+            selectedSection = 0
+            showingGhostHub = true
+        }
+
+        navigationRequest = nil
+    }
 
 }
 
