@@ -956,7 +956,11 @@ struct GoalCreationView: View {
 
                         if let rule = milestone.automationRule {
                             Label(
-                                "Auto · \(rule.dataSource.title) · only new data",
+                                ATHLTHLocalization.format(
+                                    english: "Auto · %@ · only new data",
+                                    norwegian: "Auto · %@ · bare nye data",
+                                    rule.dataSource.title
+                                ),
                                 systemImage: rule.dataSource.systemImage
                             )
                             .font(.caption2)
