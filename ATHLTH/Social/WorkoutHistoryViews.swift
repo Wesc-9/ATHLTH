@@ -947,6 +947,7 @@ struct PostWorkoutReviewView: View {
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var workoutCompletion: WorkoutCompletionCoordinator
 
     let workout: SocialPublishableWorkout
     let wasAutoPublished: Bool
@@ -977,6 +978,14 @@ struct PostWorkoutReviewView: View {
                 VStack(spacing: 16) {
                     summaryCard
                     resultStrip
+
+                    if let impact = workoutCompletion.impact(
+                        for: workout.id
+                    ),
+                    !impact.items.isEmpty {
+                        impactCard(impact)
+                    }
+
                     reflectionCard
 
                     sectionLabel(
@@ -1331,6 +1340,170 @@ struct PostWorkoutReviewView: View {
                 ATHLTHTheme.divider.opacity(0.80)
             )
             .frame(width: 1, height: 42)
+    }
+
+    private func impactCard(
+        _ impact: WorkoutCompletionImpact
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            HStack(
+                alignment: .top,
+                spacing: 12
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text("WHAT THIS WORKOUT CHANGED")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.65)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text("Your session is already connected across ATHLTH.")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(completionAccent)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        completionAccent.opacity(0.09),
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
+            }
+
+            VStack(spacing: 0) {
+                ForEach(
+                    Array(impact.items.prefix(5))
+                ) { item in
+                    HStack(
+                        alignment: .top,
+                        spacing: 12
+                    ) {
+                        Image(
+                            systemName:
+                                item.systemImage
+                        )
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            impactTint(
+                                item.kind
+                            )
+                        )
+                        .frame(
+                            width: 36,
+                            height: 36
+                        )
+                        .background(
+                            impactTint(
+                                item.kind
+                            )
+                            .opacity(0.09),
+                            in: RoundedRectangle(
+                                cornerRadius: 11,
+                                style: .continuous
+                            )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(item.title)
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+
+                            Text(item.detail)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                                .fixedSize(
+                                    horizontal: false,
+                                    vertical: true
+                                )
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 10)
+
+                    if item.id !=
+                        impact.items
+                            .prefix(5)
+                            .last?
+                            .id {
+                        Divider()
+                            .opacity(0.58)
+                            .padding(.leading, 48)
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    completionAccent.opacity(0.055),
+                    Color.white.opacity(0.95)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                completionAccent.opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func impactTint(
+        _ kind: WorkoutCompletionImpactKind
+    ) -> Color {
+        switch kind {
+        case .goal:
+            return ATHLTHTheme.vitality
+        case .challenge:
+            return .orange
+        case .gear:
+            return .blue
+        case .achievement:
+            return .purple
+        }
     }
 
     private var reflectionCard: some View {
