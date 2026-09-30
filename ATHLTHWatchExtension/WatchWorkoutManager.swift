@@ -183,6 +183,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         speechSynthesizer.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 3
+        locationManager.activityType = .fitness
+        locationManager.pausesLocationUpdatesAutomatically = false
     }
 
     func configurePlannedRoute(
@@ -915,6 +917,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 locationManager
                     .requestWhenInUseAuthorization()
                 locationManager
+                    .allowsBackgroundLocationUpdates =
+                    true
+                locationManager
                     .startUpdatingLocation()
             } else {
                 routeBuilder = nil
@@ -1401,6 +1406,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             locationManager.requestWhenInUseAuthorization()
 
             if configuration.locationType == .outdoor {
+                locationManager.allowsBackgroundLocationUpdates = true
                 locationManager.startUpdatingLocation()
             } else if kind == .strength,
                       locationManager.authorizationStatus == .authorizedWhenInUse ||
@@ -2935,6 +2941,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         finishing = true
         stopTimer()
         locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
 
         updateFinalStatistics(from: builder)
 
@@ -3580,6 +3587,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         stopTimer()
         locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
         errorMessage = message
         state = .failed(message)
         clearPersistedWorkoutState()
@@ -3595,6 +3603,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func fail(_ error: Error) {
         stopTimer()
         locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
         publish {
             self.errorMessage = error.localizedDescription
             self.state = .failed(error.localizedDescription)
@@ -3839,6 +3848,9 @@ extension WatchWorkoutManager:
             }
 
             if self.kind.usesOutdoorLocation {
+                self.locationManager
+                    .allowsBackgroundLocationUpdates =
+                    true
                 // The initial call can happen while the permission sheet is
                 // unresolved. Starting again here makes outdoor tracking
                 // deterministic after authorization changes.
