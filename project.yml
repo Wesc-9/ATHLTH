@@ -147,6 +147,9 @@ targets:
           - Info.plist
           - ATHLTHWatchExtension.entitlements
       - path: Shared
+    dependencies:
+      - target: ATHLTHWatchWidgets
+        embed: true
     info:
       path: ATHLTHWatchExtension/Info.plist
       properties:
@@ -159,6 +162,10 @@ targets:
         NSHealthShareUsageDescription: "ATHLTH reads live heart rate, energy, distance and workout data to show your training metrics on Apple Watch."
         NSHealthUpdateUsageDescription: "ATHLTH saves workouts and workout routes from Apple Watch to Apple Health so your training history stays complete."
         NSLocationWhenInUseUsageDescription: "ATHLTH uses your location during outdoor workouts to record your route and, when available, to save the place where an indoor workout such as strength was performed."
+        CFBundleURLTypes:
+          - CFBundleURLName: com.wesc9.athlth.watch
+            CFBundleURLSchemes:
+              - athlth-watch
         WKBackgroundModes:
           - workout-processing
           - audio
@@ -182,3 +189,29 @@ targets:
           /usr/libexec/PlistBuddy -c "Set :WKApplication true" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :WKApplication bool true" "$PLIST"
           /usr/libexec/PlistBuddy -c "Set :WKCompanionAppBundleIdentifier com.wesc9.athlth" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :WKCompanionAppBundleIdentifier string com.wesc9.athlth" "$PLIST"
           /usr/libexec/PlistBuddy -c "Set :WKRunsIndependentlyOfCompanionApp false" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :WKRunsIndependentlyOfCompanionApp bool false" "$PLIST"
+
+  ATHLTHWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: ATHLTHWatchWidgets
+        excludes:
+          - Info.plist
+    info:
+      path: ATHLTHWatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: ATHLTH
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.watchkitapp.widgets
+        PRODUCT_NAME: ATHLTHWatchWidgets
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+
