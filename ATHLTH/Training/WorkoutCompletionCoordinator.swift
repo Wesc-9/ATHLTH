@@ -83,6 +83,7 @@ final class WorkoutCompletionCoordinator: ObservableObject {
 
     func begin(
         workout: SocialPublishableWorkout,
+        baselineKey: UUID? = nil,
         sourceIDs: Set<UUID>,
         goals: GoalStore,
         challenges: ChallengeStore,
@@ -93,10 +94,12 @@ final class WorkoutCompletionCoordinator: ObservableObject {
     ) {
         cleanupBaselines()
 
-        if var existing = baselines[workout.id] {
+        let key = baselineKey ?? workout.id
+
+        if var existing = baselines[key] {
             existing.sourceIDs.formUnion(sourceIDs)
             existing.sourceIDs.insert(workout.id)
-            baselines[workout.id] = existing
+            baselines[key] = existing
             return
         }
 
@@ -173,7 +176,7 @@ final class WorkoutCompletionCoordinator: ObservableObject {
         var resolvedSourceIDs = sourceIDs
         resolvedSourceIDs.insert(workout.id)
 
-        baselines[workout.id] =
+        baselines[key] =
             Baseline(
                 startedAt: Date(),
                 sourceIDs: resolvedSourceIDs,
@@ -194,6 +197,7 @@ final class WorkoutCompletionCoordinator: ObservableObject {
     /// add a Trophy that becomes available after trophy refresh completes.
     func finalize(
         workout: SocialPublishableWorkout,
+        baselineKey: UUID? = nil,
         sourceIDs: Set<UUID>,
         userID: UUID,
         goals: GoalStore,
@@ -203,9 +207,12 @@ final class WorkoutCompletionCoordinator: ObservableObject {
         gear: ProfileGearStore,
         trophies: TrophyStore
     ) {
-        guard var baseline = baselines[workout.id] else {
+        let key = baselineKey ?? workout.id
+
+        guard var baseline = baselines[key] else {
             begin(
                 workout: workout,
+                baselineKey: key,
                 sourceIDs: sourceIDs,
                 goals: goals,
                 challenges: challenges,
@@ -219,7 +226,7 @@ final class WorkoutCompletionCoordinator: ObservableObject {
 
         baseline.sourceIDs.formUnion(sourceIDs)
         baseline.sourceIDs.insert(workout.id)
-        baselines[workout.id] = baseline
+        baselines[key] = baseline
 
         var items: [WorkoutCompletionImpactItem] = []
 
