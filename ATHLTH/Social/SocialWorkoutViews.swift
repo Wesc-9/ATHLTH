@@ -10,7 +10,7 @@ struct WorkoutFriendPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Invite friends (optional)", systemImage: "person.2.fill")
+                Label("Train together (optional)", systemImage: "person.2.fill")
                     .font(.headline)
 
                 Spacer()
@@ -22,24 +22,28 @@ struct WorkoutFriendPicker: View {
                 }
             }
 
-            if social.friends.isEmpty {
+            if social.trainingPartners.isEmpty {
                 HStack(spacing: 11) {
                     Image(systemName: "person.badge.plus")
                         .foregroundStyle(ATHLTHTheme.accent)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Train solo")
+                        Text("No training partners available")
                             .font(.subheadline.weight(.semibold))
-                        Text("Friends are optional. You can start this workout by yourself.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            social.following.isEmpty && social.followers.isEmpty
+                                ? "Follow athletes to connect. Workout invites become available when you follow each other."
+                                : "Workout invites are available when you and the other athlete follow each other."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.vertical, 4)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 13) {
-                        ForEach(social.friends) { friend in
+                        ForEach(social.trainingPartners) { friend in
                             Button {
                                 if selectedFriendIDs.contains(friend.userID) {
                                     selectedFriendIDs.remove(friend.userID)
@@ -81,8 +85,8 @@ struct WorkoutFriendPicker: View {
 
             Text(
                 selectedFriendIDs.isEmpty
-                    ? "No invite is required to start."
-                    : "Selected friends receive an invite and appear as training partners after they accept."
+                    ? "You can always start the workout solo."
+                    : "Selected training partners receive an invite and appear on the workout after they accept."
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -90,7 +94,7 @@ struct WorkoutFriendPicker: View {
     }
 
     var selectedFriends: [SocialProfileCard] {
-        social.friends.filter { selectedFriendIDs.contains($0.userID) }
+        social.trainingPartners.filter { selectedFriendIDs.contains($0.userID) }
     }
 }
 
@@ -234,7 +238,7 @@ struct QuickWorkoutStartSheet: View {
                     }
 
                     Button {
-                        let selected = social.friends.filter {
+                        let selected = social.trainingPartners.filter {
                             selectedFriendIDs.contains($0.userID)
                         }
 
@@ -248,7 +252,7 @@ struct QuickWorkoutStartSheet: View {
                         Label(
                             selectedFriendIDs.isEmpty
                                 ? "Start Solo"
-                                : "Start with \(selectedFriendIDs.count) Friend\(selectedFriendIDs.count == 1 ? "" : "s")",
+                                : "Start with \(selectedFriendIDs.count) Partner\(selectedFriendIDs.count == 1 ? "" : "s")",
                             systemImage: "play.fill"
                         )
                         .font(.headline)
@@ -276,7 +280,7 @@ struct QuickWorkoutStartSheet: View {
                     audioCoachLoaded = true
                 }
 
-                if social.friends.isEmpty {
+                if social.trainingPartners.isEmpty {
                     await social.refresh()
                 }
 
