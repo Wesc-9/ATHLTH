@@ -1467,7 +1467,11 @@ private struct HomeActivityFriendFeatureCardV3:
                         .metadata?["with_names"],
                    !names.isEmpty {
                     Label(
-                        "with \(names)",
+                        ATHLTHLocalization.format(
+                            english: "with %@",
+                            norwegian: "med %@",
+                            names
+                        ),
                         systemImage:
                             "person.2.fill"
                     )
