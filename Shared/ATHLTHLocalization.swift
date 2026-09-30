@@ -25,4 +25,66 @@ enum ATHLTHLocalization {
             locale: selectedLocale
         )
     }
+
+    static var isNorwegian: Bool {
+        let identifier =
+            selectedLocale
+                .language
+                .languageCode?
+                .identifier
+                .lowercased()
+
+        return identifier == "nb" ||
+            identifier == "no" ||
+            identifier == "nn"
+    }
+
+    static func choose(
+        english: String,
+        norwegian: String
+    ) -> String {
+        isNorwegian
+            ? norwegian
+            : english
+    }
+
+    static func format(
+        english: String,
+        norwegian: String,
+        _ arguments: CVarArg...
+    ) -> String {
+        String(
+            format:
+                isNorwegian
+                    ? norwegian
+                    : english,
+            locale: selectedLocale,
+            arguments: arguments
+        )
+    }
+
+    static func counted(
+        _ count: Int,
+        englishSingular: String,
+        englishPlural: String,
+        norwegianSingular: String,
+        norwegianPlural: String
+    ) -> String {
+        let noun =
+            count == 1
+                ? choose(
+                    english:
+                        englishSingular,
+                    norwegian:
+                        norwegianSingular
+                )
+                : choose(
+                    english:
+                        englishPlural,
+                    norwegian:
+                        norwegianPlural
+                )
+
+        return "\(count) \(noun)"
+    }
 }
