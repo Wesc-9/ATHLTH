@@ -3306,10 +3306,10 @@ private final class
             )
 
         guard !sampled.isEmpty else {
-            return "activity-v2-empty"
+            return "activity-v3-empty"
         }
 
-        return "activity-v2|" +
+        return "activity-v3|" +
             sampled.map {
                 String(
                     format: "%.4f,%.4f",
