@@ -46,6 +46,23 @@ private struct WatchLocationSample: Sendable {
     }
 }
 
+private struct WatchPersistedWorkoutState: Codable {
+    var kind: WatchWorkoutKind
+    var startedAt: Date?
+    var plannedRoute: WatchRouteTransfer?
+    var audioCoach: WatchAudioCoachConfiguration
+    var structuredRunningWorkout: WatchRunningWorkoutTransfer?
+    var structuredStepIndex: Int
+    var structuredStepStartElapsedTime: TimeInterval
+    var structuredStepStartDistanceMeters: Double
+    var ghostRace: WatchGhostRaceTransfer?
+    var lapSummaries: [WatchWorkoutLapSummary]
+    var lapCount: Int
+    var lastLapElapsedTime: TimeInterval
+    var lastLapDistanceMeters: Double
+    var automaticPauseCount: Int
+}
+
 enum WatchWorkoutState: Equatable {
     case idle
     case preparing
@@ -83,6 +100,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var lapCount = 0
     @Published private(set) var currentLapElapsedTime: TimeInterval = 0
     @Published private(set) var currentLapDistanceMeters: Double = 0
+    @Published private(set) var lapSummaries: [WatchWorkoutLapSummary] = []
+    @Published private(set) var automaticPauseActive = false
+    @Published private(set) var automaticPauseCount = 0
     @Published private(set) var averageHeartRate: Double?
     @Published private(set) var maxHeartRate: Double?
     @Published private(set) var routePoints: [WatchRoutePoint] = []
@@ -150,6 +170,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastAcceptedOutdoorLocation: CLLocation?
     private var healthKitDistanceMeters: Double = 0
     private var healthKitDistanceLastUpdatedAt: Date?
+
+    private var capturedRouteLocations: [CLLocation] = []
+    private var lastRenderedRouteLocation: CLLocation?
+    private let recoveryDefaultsKey =
+        "athlth.watch.activeWorkoutRecovery.v1"
 
     private override init() {
         super.init()
