@@ -2792,6 +2792,8 @@ struct ATHLTHTrainView: View {
     @State private var pendingStrengthStartSession: PlannedSession?
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
+    @State private var selectedStructuredWorkout:
+        PlannedSession?
     @State private var showingGhostHub = false
     @State private var showingLibrary = false
 
@@ -3049,6 +3051,14 @@ struct ATHLTHTrainView: View {
                 ActiveStrengthWorkoutView()
                     .environmentObject(strengthWorkout)
                     .environmentObject(session)
+            }
+            .fullScreenCover(
+                item: $selectedStructuredWorkout
+            ) { workout in
+                StructuredWorkoutSessionView(
+                    workout: workout
+                )
+                .environmentObject(session)
             }
             .task {
                 session.refreshActivePlanForToday()
@@ -3344,7 +3354,15 @@ struct ATHLTHTrainView: View {
 
                             Spacer()
 
-                            if workout.kind == .strength {
+                            if workout.isStructuredWorkout {
+                                Button("Start") {
+                                    selectedStructuredWorkout =
+                                        workout
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .tint(ATHLTHTheme.accentDeep)
+                            } else if workout.kind == .strength {
                                 Button("Start") {
                                     selectedStrengthSession = workout
                                 }
