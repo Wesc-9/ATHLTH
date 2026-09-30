@@ -9,70 +9,371 @@ struct HomeThisWeekCard: View {
     private let calendar = Calendar.current
 
     var body: some View {
-        ATHLTHCard {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("This Week")
+        VStack(alignment: .leading, spacing: 14) {
+            header
+
+            HStack(spacing: 14) {
+                progressRing
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(plan?.title ?? "Your week")
                         .font(.title3.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+
                     Text(weekSummary)
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .background(
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accentSoft.opacity(0.78),
+                        Color.white.opacity(0.86)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+            )
+
+            weekStrip
+
+            nextUpCard
+
+            summaryRow
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.78),
+            in: RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.90),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.035),
+            radius: 14,
+            y: 6
+        )
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("ACTIVITY PLAN")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.8)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                Text(weekRangeText)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+            }
+
+            Spacer()
+
+            Button {
+                onOpenProgress()
+            } label: {
+                HStack(spacing: 5) {
+                    Text("Details")
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .padding(.horizontal, 11)
+                .frame(height: 32)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: Capsule()
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var progressRing: some View {
+        ZStack {
+            Circle()
+                .stroke(
+                    ATHLTHTheme.accent.opacity(0.12),
+                    lineWidth: 7
+                )
+
+            Circle()
+                .trim(
+                    from: 0,
+                    to: max(
+                        planProgress,
+                        planProgress > 0 ? 0.04 : 0
+                    )
+                )
+                .stroke(
+                    ATHLTHTheme.accentDeep,
+                    style: StrokeStyle(
+                        lineWidth: 7,
+                        lineCap: .round
+                    )
+                )
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: 0) {
+                Text(progressValue)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Text(progressCaption)
+                    .font(.system(size: 8.5, weight: .semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+            }
+        }
+        .frame(width: 66, height: 66)
+    }
+
+    private var weekStrip: some View {
+        HStack(spacing: 6) {
+            ForEach(weekDates, id: \.self) { date in
+                dayCell(date)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var nextUpCard: some View {
+        if let next = nextPlannedSession {
+            HStack(spacing: 12) {
+                Image(systemName: next.kind.systemImage)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("NEXT UP")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text(next.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+
+                    Text(nextSessionDetail(next))
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .lineLimit(1)
                 }
 
                 Spacer()
 
-                Button("Progress") {
-                    onOpenProgress()
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .buttonStyle(.plain)
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
             }
-
-            HStack(spacing: 7) {
-                ForEach(weekDates, id: \.self) { date in
-                    dayCell(date)
-                }
-            }
-            .padding(.top, 14)
-
-            HStack(spacing: 10) {
-                summaryPill(
-                    value: "\(completedWorkoutCount)",
-                    title: plannedWorkoutCount > 0
-                        ? "of \(plannedWorkoutCount) workouts"
-                        : "workouts",
-                    icon: "checkmark.circle.fill",
-                    tint: ATHLTHTheme.vitality
+            .padding(13)
+            .background(
+                Color.primary.opacity(0.025),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
                 )
+            )
+        } else if plan != nil {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.vitalitySoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                    )
 
-                if runningDistanceKilometers > 0 {
-                    summaryPill(
-                        value: String(
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("WEEK STATUS")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text(
+                        plannedWorkoutCount > 0
+                            ? "No more planned sessions"
+                            : "Flexible week"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                    Text(
+                        plannedWorkoutCount > 0
+                            ? "Use Quick Train if you want to add something extra."
+                            : "Nothing is locked in. Train when it fits."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+            }
+            .padding(13)
+            .background(
+                Color.primary.opacity(0.025),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+        } else {
+            HStack(spacing: 12) {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("NO ACTIVE PLAN")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Text("Build structure when you need it")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+
+                    Text(
+                        "Your completed workouts still appear here automatically."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+            }
+            .padding(13)
+            .background(
+                Color.primary.opacity(0.025),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+        }
+    }
+
+    private var summaryRow: some View {
+        HStack(spacing: 8) {
+            compactMetric(
+                value: "\(completedWorkoutCount)",
+                title: "Sessions",
+                icon: "checkmark.circle.fill",
+                tint: ATHLTHTheme.vitality
+            )
+
+            compactMetric(
+                value:
+                    runningDistanceKilometers > 0
+                        ? String(
                             format: "%.1f km",
                             runningDistanceKilometers
-                        ),
-                        title: "distance",
-                        icon: "figure.run",
-                        tint: .green
-                    )
-                }
+                        )
+                        : "—",
+                title: "Run",
+                icon: "figure.run",
+                tint: .green
+            )
 
-                if streakCount > 0 {
-                    summaryPill(
-                        value: "\(streakCount)",
-                        title: "day streak",
-                        icon: "flame.fill",
-                        tint: .orange
-                    )
-                }
-            }
-            .padding(.top, 13)
+            compactMetric(
+                value:
+                    streakCount > 0
+                        ? "\(streakCount)"
+                        : "—",
+                title: "Streak",
+                icon: "flame.fill",
+                tint: .orange
+            )
         }
     }
 
     private var weekInterval: DateInterval {
-        calendar.dateInterval(of: .weekOfYear, for: Date()) ??
+        calendar.dateInterval(
+            of: .weekOfYear,
+            for: Date()
+        ) ??
             DateInterval(
                 start: calendar.startOfDay(for: Date()),
                 duration: 7 * 86_400
@@ -82,7 +383,11 @@ struct HomeThisWeekCard: View {
     private var weekDates: [Date] {
         let start = weekInterval.start
         return (0..<7).compactMap {
-            calendar.date(byAdding: .day, value: $0, to: start)
+            calendar.date(
+                byAdding: .day,
+                value: $0,
+                to: start
+            )
         }
     }
 
@@ -93,13 +398,38 @@ struct HomeThisWeekCard: View {
             .flatMap(\.days)
             .flatMap(\.sessions)
             .filter {
-                guard let start = $0.scheduledStart else { return false }
+                guard let start = $0.scheduledStart else {
+                    return false
+                }
+
                 return weekInterval.contains(start)
+            }
+            .sorted {
+                ($0.scheduledStart ?? .distantFuture) <
+                    ($1.scheduledStart ?? .distantFuture)
             }
     }
 
     private var completedWorkouts: [WorkoutSummary] {
-        workouts.filter { weekInterval.contains($0.startDate) }
+        workouts
+            .filter {
+                weekInterval.contains($0.startDate)
+            }
+            .sorted {
+                $0.startDate < $1.startDate
+            }
+    }
+
+    private var nextPlannedSession: PlannedSession? {
+        let now = Date()
+
+        return plannedSessions.first {
+            guard let start = $0.scheduledStart else {
+                return false
+            }
+
+            return start >= now
+        }
     }
 
     private var completedWorkoutCount: Int {
@@ -112,120 +442,328 @@ struct HomeThisWeekCard: View {
 
     private var runningDistanceKilometers: Double {
         completedWorkouts
-            .filter { $0.activity == .running }
+            .filter {
+                $0.activity == .running
+            }
             .compactMap(\.distanceMeters)
             .reduce(0, +) / 1_000
     }
 
+    private var planProgress: Double {
+        guard plannedWorkoutCount > 0 else {
+            return completedWorkoutCount > 0
+                ? min(
+                    Double(completedWorkoutCount) / 5.0,
+                    1
+                )
+                : 0
+        }
+
+        return min(
+            Double(completedWorkoutCount) /
+                Double(plannedWorkoutCount),
+            1
+        )
+    }
+
+    private var progressValue: String {
+        if plannedWorkoutCount > 0 {
+            return "\(min(completedWorkoutCount, plannedWorkoutCount))/\(plannedWorkoutCount)"
+        }
+
+        return "\(completedWorkoutCount)"
+    }
+
+    private var progressCaption: String {
+        plannedWorkoutCount > 0
+            ? "DONE"
+            : "SESSIONS"
+    }
+
     private var weekSummary: String {
         if plannedWorkoutCount > 0 {
-            return "\(completedWorkoutCount) completed · \(plannedWorkoutCount) planned"
+            let remaining = max(
+                plannedWorkoutCount - completedWorkoutCount,
+                0
+            )
+
+            if remaining == 0 {
+                return "Your planned training for this week is covered."
+            }
+
+            return "\(remaining) planned session\(remaining == 1 ? "" : "s") remaining this week."
         }
 
         if completedWorkoutCount > 0 {
-            return "\(completedWorkoutCount) workout\(completedWorkoutCount == 1 ? "" : "s") completed"
+            return "\(completedWorkoutCount) session\(completedWorkoutCount == 1 ? "" : "s") completed so far."
         }
 
-        return "Your completed training will build the week here."
+        return "A clean view of your training rhythm, planned or spontaneous."
+    }
+
+    private var weekRangeText: String {
+        guard let first = weekDates.first,
+              let last = weekDates.last
+        else {
+            return "This week"
+        }
+
+        return first.formatted(
+            .dateTime.day().month(.abbreviated)
+        ) +
+            " – " +
+            last.formatted(
+                .dateTime.day().month(.abbreviated)
+            )
     }
 
     @ViewBuilder
-    private func dayCell(_ date: Date) -> some View {
+    private func dayCell(
+        _ date: Date
+    ) -> some View {
         let actual = completedWorkouts.filter {
-            calendar.isDate($0.startDate, inSameDayAs: date)
+            calendar.isDate(
+                $0.startDate,
+                inSameDayAs: date
+            )
         }
         let planned = plannedSessions.filter {
-            guard let start = $0.scheduledStart else { return false }
-            return calendar.isDate(start, inSameDayAs: date)
+            guard let start = $0.scheduledStart else {
+                return false
+            }
+
+            return calendar.isDate(
+                start,
+                inSameDayAs: date
+            )
         }
         let isToday = calendar.isDateInToday(date)
         let hasActual = !actual.isEmpty
+        let hasPlanned = !planned.isEmpty
 
-        VStack(spacing: 7) {
-            Text(date.formatted(.dateTime.weekday(.narrow)))
-                .font(.caption2.weight(isToday ? .bold : .semibold))
-                .foregroundStyle(
-                    isToday
-                        ? ATHLTHTheme.primaryText
-                        : ATHLTHTheme.mutedText
+        VStack(spacing: 6) {
+            Text(
+                date.formatted(
+                    .dateTime.weekday(.narrow)
                 )
+            )
+            .font(
+                .caption2.weight(
+                    isToday ? .bold : .semibold
+                )
+            )
+            .foregroundStyle(
+                isToday
+                    ? ATHLTHTheme.primaryText
+                    : ATHLTHTheme.mutedText
+            )
+
+            Text(
+                date.formatted(
+                    .dateTime.day()
+                )
+            )
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
 
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(
-                        hasActual
-                            ? ATHLTHTheme.vitalitySoft
-                            : isToday
-                                ? ATHLTHTheme.champagneSoft
-                                : Color.primary.opacity(0.025)
-                    )
+                RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+                .fill(
+                    hasActual
+                        ? ATHLTHTheme.vitalitySoft
+                        : hasPlanned
+                            ? ATHLTHTheme.accentSoft
+                            : Color.primary.opacity(0.025)
+                )
 
                 if let workout = actual.first {
-                    Image(systemName: workout.activity.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.vitality)
+                    Image(
+                        systemName:
+                            workout.activity.icon
+                    )
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
                 } else if let session = planned.first {
-                    Image(systemName: session.kind.systemImage)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    Image(
+                        systemName:
+                            session.kind.systemImage
+                    )
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
                 } else {
                     Circle()
                         .fill(
-                            isToday
-                                ? ATHLTHTheme.premiumGold.opacity(0.55)
-                                : Color.primary.opacity(0.10)
+                            Color.primary.opacity(0.10)
                         )
                         .frame(width: 5, height: 5)
                 }
             }
-            .frame(height: 40)
+            .frame(height: 38)
             .overlay {
                 if isToday {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(
-                            ATHLTHTheme.premiumGold.opacity(0.50),
-                            lineWidth: 1
-                        )
+                    RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme.accentDeep.opacity(0.42),
+                        lineWidth: 1
+                    )
                 }
             }
 
-            if hasActual {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(ATHLTHTheme.vitality)
-            } else {
-                Color.clear.frame(height: 8)
-            }
+            Circle()
+                .fill(
+                    hasActual
+                        ? ATHLTHTheme.vitality
+                        : hasPlanned
+                            ? ATHLTHTheme.accentDeep.opacity(0.55)
+                            : Color.clear
+                )
+                .frame(width: 5, height: 5)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(
+            children: .ignore
+        )
+        .accessibilityLabel(
+            dayAccessibilityLabel(
+                date: date,
+                actualCount: actual.count,
+                plannedCount: planned.count
+            )
+        )
     }
 
-    private func summaryPill(
+    private func nextSessionDetail(
+        _ session: PlannedSession
+    ) -> String {
+        var parts: [String] = []
+
+        if let start = session.scheduledStart {
+            if calendar.isDateInToday(start) {
+                parts.append(
+                    start.formatted(
+                        date: .omitted,
+                        time: .shortened
+                    )
+                )
+            } else {
+                parts.append(
+                    start.formatted(
+                        .dateTime
+                            .weekday(.abbreviated)
+                            .hour()
+                            .minute()
+                    )
+                )
+            }
+        }
+
+        if let minutes = session.durationMinutes {
+            parts.append("\(minutes) min")
+        }
+
+        if session.routeID != nil {
+            parts.append("Route")
+        }
+
+        return parts.isEmpty
+            ? session.kind.title
+            : parts.joined(separator: " · ")
+    }
+
+    private func compactMetric(
         value: String,
         title: String,
         icon: String,
         tint: Color
     ) -> some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 8) {
             Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(value)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
                 Text(title)
                     .font(.system(size: 9.5))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .lineLimit(1)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
             }
+
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 9)
-        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity)
+        .frame(height: 45)
         .background(
             tint.opacity(0.07),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            in: RoundedRectangle(
+                cornerRadius: 13,
+                style: .continuous
+            )
         )
+    }
+
+    private func dayAccessibilityLabel(
+        date: Date,
+        actualCount: Int,
+        plannedCount: Int
+    ) -> String {
+        var parts = [
+            date.formatted(
+                .dateTime
+                    .weekday(.wide)
+                    .day()
+                    .month(.wide)
+            )
+        ]
+
+        if actualCount > 0 {
+            parts.append(
+                "\(actualCount) completed"
+            )
+        }
+
+        if plannedCount > 0 {
+            parts.append(
+                "\(plannedCount) planned"
+            )
+        }
+
+        if actualCount == 0 && plannedCount == 0 {
+            parts.append("No activity")
+        }
+
+        return parts.joined(separator: ", ")
     }
 }
 
