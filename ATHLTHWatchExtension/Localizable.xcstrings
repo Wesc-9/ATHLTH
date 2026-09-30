@@ -900,6 +900,66 @@
           }
         }
       }
+    },
+    "%d saved": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d lagret"
+          }
+        }
+      }
+    },
+    "Set %d of %d · %d/%d total": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sett %d av %d · %d/%d totalt"
+          }
+        }
+      }
+    },
+    "Lap %d": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runde %d"
+          }
+        }
+      }
+    },
+    "Auto-Pause %dx": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-pause %d×"
+          }
+        }
+      }
+    },
+    "Avg %d m · Max %d m deviation": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Snitt %d m · Maks %d m avvik"
+          }
+        }
+      }
+    },
+    "Free %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fri %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
