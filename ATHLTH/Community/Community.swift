@@ -1157,7 +1157,11 @@ private struct CommunityEventListRow: View {
                 .lineLimit(1)
 
                 Label(
-                    "\(item.participantCount) joined",
+                    ATHLTHLocalization.format(
+                            english: "%d joined",
+                            norwegian: "%d deltar",
+                            item.participantCount
+                        ),
                     systemImage: "person.2.fill"
                 )
                 .font(.caption2)
@@ -1224,7 +1228,11 @@ struct CommunityEventDetailView: View {
                 Spacer()
 
                 Label(
-                    "\(item.participantCount) joined",
+                    ATHLTHLocalization.format(
+                            english: "%d joined",
+                            norwegian: "%d deltar",
+                            item.participantCount
+                        ),
                     systemImage: "person.2.fill"
                 )
             }
