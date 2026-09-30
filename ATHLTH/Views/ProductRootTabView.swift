@@ -2828,6 +2828,7 @@ struct ATHLTHTrainView: View {
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
     @State private var showingGhostHub = false
+    @State private var showingLibrary = false
 
     init(
         navigationRequest:
@@ -2849,46 +2850,69 @@ struct ATHLTHTrainView: View {
                 immersiveTransition: useImmersiveTrainHero,
                 scrollFadeTransition: true
             ) {
-                ATHLTHTabHero(
-                    imageName: "TrainHero",
-                    title: "Train",
-                    subtitle: "Build a stronger, healthier you.",
-                    height:
-                        useImmersiveTrainHero
-                            ? 232
-                            : 190,
-                    alignment: .leading,
-                    focalOffsetX:
-                        useImmersiveTrainHero
-                            ? -10
-                            : -18,
-                    focalOffsetY:
-                        useImmersiveTrainHero
-                            ? 10
-                            : 18,
-                    titleFontSize:
-                        useImmersiveTrainHero
-                            ? 31
-                            : 30,
-                    copyWidthFraction:
-                        useImmersiveTrainHero
-                            ? 0.70
-                            : 0.80,
-                    immersiveCopy: useImmersiveTrainHero
-                )
+                ZStack(alignment: .topTrailing) {
+                    ATHLTHTabHero(
+                        imageName: "TrainHero",
+                        title: "Train",
+                        subtitle: "Build a stronger, healthier you.",
+                        height:
+                            useImmersiveTrainHero
+                                ? 232
+                                : 190,
+                        alignment: .leading,
+                        focalOffsetX:
+                            useImmersiveTrainHero
+                                ? -10
+                                : -18,
+                        focalOffsetY:
+                            useImmersiveTrainHero
+                                ? 10
+                                : 18,
+                        titleFontSize:
+                            useImmersiveTrainHero
+                                ? 31
+                                : 30,
+                        copyWidthFraction:
+                            useImmersiveTrainHero
+                                ? 0.70
+                                : 0.80,
+                        immersiveCopy: useImmersiveTrainHero
+                    )
+
+                    Button {
+                        showingLibrary = true
+                    } label: {
+                        Image(systemName: "square.grid.2x2.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 38, height: 38)
+                            .background(
+                                Color.black.opacity(0.22),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white.opacity(0.32),
+                                        lineWidth: 0.8
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Training Library")
+                    .padding(.top, 64)
+                    .padding(.trailing, 16)
+                }
             } content: {
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     ATHLTHTrainSectionSwitcher(
-                        titles: ["Today", "Plan", "Library"],
+                        titles: ["Today", "Plan"],
                         selection: $selectedSection
                     )
 
                     switch selectedSection {
                     case 1:
-                        TrainingPlanManagerView()
-                        AdvancedPlannerView(showsEmptyState: false)
-                    case 2:
-                        libraryContent
+                        planContent
                     default:
                         todayContent
                     }
@@ -2896,6 +2920,26 @@ struct ATHLTHTrainView: View {
                 .padding()
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
+            }
+            .navigationDestination(
+                isPresented: $showingLibrary
+            ) {
+                ScrollView {
+                    libraryContent
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+                        .padding(.bottom, 32)
+                        .frame(maxWidth: 900)
+                        .frame(maxWidth: .infinity)
+                }
+                .scrollIndicators(.hidden)
+                .background(
+                    ATHLTHPremiumCanvas(
+                        accent: Color.green.opacity(0.12)
+                    )
+                )
+                .navigationTitle("Library")
+                .navigationBarTitleDisplayMode(.inline)
             }
             .navigationDestination(
                 isPresented: $showingGhostHub
@@ -3274,6 +3318,135 @@ struct ATHLTHTrainView: View {
         }
 
 
+    }
+
+    @ViewBuilder
+    private var planContent: some View {
+        if session.activePlan != nil {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("YOUR PLAN")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.8)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+
+                        Text("Plan first. Tools second.")
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showingLibrary = true
+                    } label: {
+                        Label(
+                            "Library",
+                            systemImage: "square.grid.2x2.fill"
+                        )
+                        .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                }
+
+                AdvancedPlannerView(
+                    showsEmptyState: false
+                )
+
+                HStack(spacing: 10) {
+                    Rectangle()
+                        .fill(
+                            ATHLTHTheme.accent.opacity(0.12)
+                        )
+                        .frame(height: 1)
+
+                    Text("PLAN TOOLS")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+
+                    Rectangle()
+                        .fill(
+                            ATHLTHTheme.accent.opacity(0.12)
+                        )
+                        .frame(height: 1)
+                }
+                .padding(.vertical, 2)
+
+                TrainingPlanManagerView()
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                TrainingPlanManagerView()
+
+                Button {
+                    showingLibrary = true
+                } label: {
+                    HStack(spacing: 13) {
+                        Image(
+                            systemName:
+                                "square.grid.2x2.fill"
+                        )
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .frame(width: 44, height: 44)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text("Browse the Library")
+                                .font(.headline)
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+
+                            Text(
+                                "Find a plan, workout, exercise or route."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName: "chevron.right"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(.tertiary)
+                    }
+                    .padding(15)
+                    .background(
+                        Color.white.opacity(0.72),
+                        in: RoundedRectangle(
+                            cornerRadius: 20,
+                            style: .continuous
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private var libraryContent: some View {
@@ -3750,7 +3923,7 @@ struct ATHLTHTrainView: View {
                 Spacer()
 
                 Button {
-                    selectedSection = 2
+                    showingLibrary = true
                 } label: {
                     HStack(spacing: 5) {
                         Text("Choose Plan")
@@ -3788,7 +3961,7 @@ struct ATHLTHTrainView: View {
             .padding(.top, 12)
 
             Button {
-                selectedSection = 2
+                showingLibrary = true
             } label: {
                 Text("Explore Programs")
                     .font(.subheadline.weight(.semibold))
