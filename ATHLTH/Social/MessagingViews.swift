@@ -17,10 +17,9 @@ struct MessageInboxDestinationView: View {
     }
 }
 
-struct MessageInboxView: View {struct MessageInboxView: View {
+struct MessageInboxView: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var social: SocialStore
-    @EnvironmentObject private var session: AppSessionStore
 
     var onNewMessage: () -> Void = {}
 
@@ -252,7 +251,7 @@ struct MessageInboxView: View {struct MessageInboxView: View {
             : "\(activeConversations.count) conversations"
     }
 
-    private func headerAction(    private func headerAction(
+    private func headerAction(
         systemImage: String,
         accessibilityLabel: String,
         action: @escaping () -> Void
@@ -278,7 +277,7 @@ struct MessageInboxView: View {struct MessageInboxView: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
-    private var inboxSearch: some View {    private var inboxSearch: some View {
+    private var inboxSearch: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -407,7 +406,7 @@ struct MessageInboxView: View {struct MessageInboxView: View {
         )
     }
 
-    private func inboxErrorCard(    private func inboxErrorCard(
+    private func inboxErrorCard(
         _ message: String
     ) -> some View {
         HStack(spacing: 12) {
@@ -555,7 +554,7 @@ struct MessageInboxView: View {struct MessageInboxView: View {
             .filter { $0.lastMessage != nil }
     }
 
-    private func conversationRequestLabel(    private func conversationRequestLabel(
+    private func conversationRequestLabel(
         _ conversation: DirectConversationRecord
     ) -> String? {
         guard conversation.requestStatus == .pending else {
