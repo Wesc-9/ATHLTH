@@ -395,6 +395,9 @@ struct ATHLTHHomeView: View {
             }
             .sheet(isPresented: $showingGlobalSearch) {
                 ATHLTHGlobalSearchView()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.hidden)
+                    .presentationCornerRadius(30)
             }
             .sheet(item: $selectedHomeStrengthSession) { workout in
                 WorkoutStartOptionsView(
