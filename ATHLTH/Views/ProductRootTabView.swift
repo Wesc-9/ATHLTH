@@ -1379,7 +1379,7 @@ struct ATHLTHHomeView: View {
 
                 if session.activePlan != nil {
                     Button("Train") {
-                        onOpenTrain(.plan)
+                        onSelectTab(1)
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
