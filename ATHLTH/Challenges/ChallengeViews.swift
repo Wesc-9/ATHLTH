@@ -2772,6 +2772,7 @@ private struct ChallengeReviewCard: View {
 
 struct ChallengeDetailView: View {
     @EnvironmentObject private var challenges: ChallengeStore
+    @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
@@ -2972,22 +2973,18 @@ struct ChallengeDetailView: View {
 
             HStack(spacing: 10) {
                 Button("Decline") {
-                    guard let currentParticipant else { return }
-                    challenges.setParticipantState(
-                        challengeID: challenge.id,
-                        participantID: currentParticipant.id,
-                        state: .declined
+                    respondToInvitation(
+                        challenge,
+                        accept: false
                     )
                 }
                 .buttonStyle(.bordered)
                 .frame(maxWidth: .infinity)
 
                 Button("Accept Challenge") {
-                    guard let currentParticipant else { return }
-                    challenges.setParticipantState(
-                        challengeID: challenge.id,
-                        participantID: currentParticipant.id,
-                        state: .accepted
+                    respondToInvitation(
+                        challenge,
+                        accept: true
                     )
                 }
                 .buttonStyle(.borderedProminent)
@@ -2997,6 +2994,51 @@ struct ChallengeDetailView: View {
         }
         .padding()
         .challengeCard()
+    }
+
+    private func respondToInvitation(
+        _ challenge: ATHLTHChallenge,
+        accept: Bool
+    ) {
+        guard let participant =
+                currentParticipant,
+              participant.state == .invited
+        else {
+            return
+        }
+
+        challenges.setParticipantState(
+            challengeID: challenge.id,
+            participantID: participant.id,
+            state:
+                accept
+                    ? .accepted
+                    : .declined
+        )
+
+        guard let updated =
+                challenges.challenge(
+                    id: challenge.id
+                )
+        else {
+            return
+        }
+
+        Task {
+            let synced =
+                await social.syncChallenge(
+                    updated
+                )
+
+            if !synced {
+                challenges.setParticipantState(
+                    challengeID: challenge.id,
+                    participantID:
+                        participant.id,
+                    state: .invited
+                )
+            }
+        }
     }
 
     private func detailHero(_ challenge: ATHLTHChallenge) -> some View {
