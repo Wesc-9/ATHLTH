@@ -1324,7 +1324,11 @@ struct HomeGettingStartedCard: View {
                 .buttonStyle(.plain)
                 .offset(x: 6, y: -6)
                 .accessibilityLabel(
-                    "Dismiss \(title) tip"
+                    ATHLTHLocalization.format(
+                    english: "Dismiss %@ tip",
+                    norwegian: "Lukk %@-tipset",
+                    title
+                )
                 )
             }
         }
