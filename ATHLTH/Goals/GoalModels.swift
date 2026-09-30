@@ -13,25 +13,25 @@ enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .event: return "Event"
-        case .endurance: return "Running & Endurance"
-        case .strength: return "Strength"
-        case .body: return "Body"
-        case .consistency: return "Consistency"
-        case .recovery: return "Recovery & Health"
-        case .custom: return "Custom Goal"
+        case .event: return String(localized: "Event")
+        case .endurance: return String(localized: "Running & Endurance")
+        case .strength: return String(localized: "Strength")
+        case .body: return String(localized: "Body")
+        case .consistency: return String(localized: "Consistency")
+        case .recovery: return String(localized: "Recovery & Health")
+        case .custom: return String(localized: "Custom Goal")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .event: return "Prepare for a race, HYROX, ride or custom event."
-        case .endurance: return "Distance, pace and endurance targets."
-        case .strength: return "Exercise-specific weight and rep goals."
-        case .body: return "Weight and body-composition goals."
-        case .consistency: return "Workouts, steps and repeatable habits."
-        case .recovery: return "Sleep and recovery-related targets."
-        case .custom: return "Define a goal that does not fit a template."
+        case .event: return String(localized: "Prepare for a race, HYROX, ride or custom event.")
+        case .endurance: return String(localized: "Distance, pace and endurance targets.")
+        case .strength: return String(localized: "Exercise-specific weight and rep goals.")
+        case .body: return String(localized: "Weight and body-composition goals.")
+        case .consistency: return String(localized: "Workouts, steps and repeatable habits.")
+        case .recovery: return String(localized: "Sleep and recovery-related targets.")
+        case .custom: return String(localized: "Define a goal that does not fit a template.")
         }
     }
 
@@ -64,9 +64,9 @@ enum GoalPrivacy: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .privateOnly: return "Private"
-        case .friends: return "Followers"
-        case .publicVisible: return "Public"
+        case .privateOnly: return String(localized: "Private")
+        case .friends: return String(localized: "Followers")
+        case .publicVisible: return String(localized: "Public")
         }
     }
 }
@@ -80,9 +80,9 @@ enum GoalDataSource: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .appleHealth: return "Apple Health"
-        case .athlth: return "ATHLTH"
-        case .manual: return "Manual"
+        case .appleHealth: return String(localized: "Apple Health")
+        case .athlth: return String(localized: "ATHLTH")
+        case .manual: return String(localized: "Manual")
         }
     }
 
@@ -122,11 +122,11 @@ enum GoalActivityFilter: String, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .any: return "Any workout"
-        case .running: return "Running"
-        case .walking: return "Walking"
-        case .cycling: return "Cycling"
-        case .hiking: return "Hiking"
+        case .any: return String(localized: "Any workout")
+        case .running: return String(localized: "Running")
+        case .walking: return String(localized: "Walking")
+        case .cycling: return String(localized: "Cycling")
+        case .hiking: return String(localized: "Hiking")
         }
     }
 }
@@ -154,11 +154,11 @@ enum GoalCoverStyle: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .forest: return "Forest"
-        case .summit: return "Summit"
-        case .track: return "Track"
-        case .strength: return "Strength"
-        case .calm: return "Calm"
+        case .forest: return String(localized: "Forest")
+        case .summit: return String(localized: "Summit")
+        case .track: return String(localized: "Track")
+        case .strength: return String(localized: "Strength")
+        case .calm: return String(localized: "Calm")
         }
     }
 }
