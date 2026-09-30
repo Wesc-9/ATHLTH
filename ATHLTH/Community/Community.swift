@@ -652,15 +652,6 @@ final class CommunityEventStore: ObservableObject {
             guard !Task.isCancelled else { return }
 
             searchResults = results
-
-            let existingIDs = Set(events.map(\.id))
-            let newItems = results.filter {
-                !existingIDs.contains($0.id)
-            }
-
-            if !newItems.isEmpty {
-                events.append(contentsOf: newItems)
-            }
         } catch is CancellationError {
             return
         } catch {
@@ -727,7 +718,8 @@ final class CommunityEventStore: ObservableObject {
     }
 
     func item(id: UUID) -> CommunityEventItem? {
-        events.first { $0.id == id }
+        events.first { $0.id == id } ??
+            searchResults.first { $0.id == id }
     }
 
     func attendance(
