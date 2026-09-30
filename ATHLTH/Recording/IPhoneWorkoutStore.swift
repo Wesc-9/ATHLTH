@@ -135,6 +135,7 @@ final class IPhoneWorkoutStore:
     @Published var showingWorkout = false
     @Published private(set) var message: String?
     @Published private(set) var saving = false
+    @Published private(set) var completionStartedWorkout: PhoneWorkout?
     @Published private(set) var lastCompletedWorkout: PhoneWorkout?
     @Published private(set)
     var lastRouteCompletion: PhoneRouteCompletionSummary?
@@ -200,6 +201,7 @@ final class IPhoneWorkoutStore:
         pendingGhostAudio = nil
         resetRouteRuntime()
         lastRouteCompletion = nil
+        completionStartedWorkout = nil
         lastCompletedWorkout = nil
         active = userID.flatMap { AccountLocalStorage.read(PhoneWorkout.self, name: "phoneActive", userID: $0) }
         if var workout = active, workout.resumedAt != nil {
@@ -488,6 +490,11 @@ final class IPhoneWorkoutStore:
         persistActiveCheckpoint(force: true)
         persistHistory()
         deactivateCoachAudioSession()
+
+        // Publish a stable pre-save completion checkpoint. The app captures
+        // Goals/Challenge/Gear state here, before HealthKit can change the
+        // workout identity or downstream progress.
+        completionStartedWorkout = workout
 
         await saveToHealth(
             workout,
