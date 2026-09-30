@@ -3120,7 +3120,15 @@ struct ChallengeDetailView: View {
                 Text("Leaderboard")
                     .font(.title3.bold())
                 Spacer()
-                Text("\(board.count) competitors")
+                Text(
+                                ATHLTHLocalization.counted(
+                                    board.count,
+                                    englishSingular: "competitor",
+                                    englishPlural: "competitors",
+                                    norwegianSingular: "deltaker",
+                                    norwegianPlural: "deltakere"
+                                )
+                            )
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -3152,7 +3160,16 @@ struct ChallengeDetailView: View {
                                     systemImage: attempt.verification.systemImage
                                 )
                                 if entry.attemptCount > 1 {
-                                    Text("· \(entry.attemptCount) attempts")
+                                    Text(
+                                            "· " +
+                                            ATHLTHLocalization.counted(
+                                                entry.attemptCount,
+                                                englishSingular: "attempt",
+                                                englishPlural: "attempts",
+                                                norwegianSingular: "forsøk",
+                                                norwegianPlural: "forsøk"
+                                            )
+                                        )
                                 }
                             }
                             .font(.caption2)
