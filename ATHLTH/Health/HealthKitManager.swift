@@ -92,6 +92,7 @@ final class HealthKitManager: ObservableObject {
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
+    private var refreshRequestedWhileRunning = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var profilePerformanceCache: (stats: ProfilePerformanceStats, generatedAt: Date)?
     private var runningRoutePerformanceCache:
@@ -706,9 +707,13 @@ final class HealthKitManager: ObservableObject {
         }
 
         guard healthDataAvailable,
-              !isRefreshing,
               !shouldDeferAutomaticHealthWork
         else {
+            return
+        }
+
+        if isRefreshing {
+            refreshRequestedWhileRunning = true
             return
         }
 
@@ -720,7 +725,20 @@ final class HealthKitManager: ObservableObject {
         recoveryTrendCache.removeAll()
         defer {
             isRefreshing = false
-            defaults.set(false, forKey: refreshInProgressKey)
+            defaults.set(
+                false,
+                forKey:
+                    refreshInProgressKey
+            )
+
+            if refreshRequestedWhileRunning {
+                refreshRequestedWhileRunning =
+                    false
+
+                Task { @MainActor [weak self] in
+                    await self?.refreshAll()
+                }
+            }
         }
 
         let end = Date()
