@@ -13,13 +13,13 @@ enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .signature: return "Signature"
-        case .endurance: return "Endurance"
-        case .strength: return "Strength"
-        case .consistency: return "Consistency"
-        case .goals: return "Goals"
-        case .recovery: return "Recovery"
-        case .challenges: return "Challenges"
+        case .signature: return String(localized: "Signature")
+        case .endurance: return String(localized: "Endurance")
+        case .strength: return String(localized: "Strength")
+        case .consistency: return String(localized: "Consistency")
+        case .goals: return String(localized: "Goals")
+        case .recovery: return String(localized: "Recovery")
+        case .challenges: return String(localized: "Challenges")
         }
     }
 
@@ -48,10 +48,10 @@ enum TrophyRarity: Int, CaseIterable, Codable, Hashable, Comparable {
 
     var title: String {
         switch self {
-        case .core: return "Core"
-        case .rare: return "Rare"
-        case .epic: return "Epic"
-        case .signature: return "Signature"
+        case .core: return String(localized: "Core")
+        case .rare: return String(localized: "Rare")
+        case .epic: return String(localized: "Epic")
+        case .signature: return String(localized: "Signature")
         }
     }
 }
@@ -67,9 +67,9 @@ enum TrophyVerificationSource: String, Codable, Hashable {
         switch self {
         case .appleHealth: return "Apple Health"
         case .athlth: return "ATHLTH"
-        case .goal: return "ATHLTH Goal"
-        case .challenge: return "ATHLTH Challenge"
-        case .mixed: return "Verified"
+        case .goal: return String(localized: "ATHLTH Goal")
+        case .challenge: return String(localized: "ATHLTH Challenge")
+        case .mixed: return String(localized: "Verified")
         }
     }
 
@@ -173,7 +173,7 @@ struct TrophyProgressItem: Identifiable, Hashable {
             return currentStage.title
         }
 
-        return "Locked"
+        return String(localized: "Locked")
     }
 }
 
