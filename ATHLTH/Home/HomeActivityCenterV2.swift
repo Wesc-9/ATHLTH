@@ -19,6 +19,8 @@ struct HomeActivityCenterV2: View {
 
     @State private var showingPublish = false
     @State private var selectedPublishWorkoutID: UUID?
+    @State private var latestWorkoutDetail: WorkoutDetail?
+    @State private var latestWorkoutDetailID: UUID?
 
     private var workouts: [SocialPublishableWorkout] {
         let localStrength =
@@ -85,36 +87,65 @@ struct HomeActivityCenterV2: View {
         VStack(alignment: .leading, spacing: 14) {
             header
 
-            if social.pendingRequestCount > 0 {
-                pendingRequests
-            }
+            activitySectionShell(
+                title: "Following",
+                subtitle:
+                    followingSectionSubtitle,
+                icon: "person.2.fill",
+                tint:
+                    ATHLTHTheme.recoveryBlue
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 11
+                ) {
+                    if social.pendingRequestCount > 0 {
+                        pendingRequests
+                    }
 
-            if !liveFriendSessions.isEmpty {
-                liveNowSection
-            }
+                    if !liveFriendSessions.isEmpty {
+                        liveNowSection
+                    }
 
-            if let featured = friendActivity.first {
-                HomeActivityFriendFeatureCardV3(
-                    item: featured
-                )
+                    if let featured =
+                            friendActivity.first {
+                        HomeActivityFriendFeatureCardV3(
+                            item: featured
+                        )
 
-                ForEach(
-                    Array(
-                        friendActivity
-                            .dropFirst()
-                            .prefix(2)
-                    )
-                ) { item in
-                    HomeActivityFriendCompactCardV3(
-                        item: item
-                    )
+                        ForEach(
+                            Array(
+                                friendActivity
+                                    .dropFirst()
+                                    .prefix(2)
+                            )
+                        ) { item in
+                            HomeActivityFriendCompactCardV3(
+                                item: item
+                            )
+                        }
+                    } else {
+                        quietFriendsState
+                    }
                 }
-            } else {
-                quietFriendsState
             }
 
-            if let latestWorkout {
-                ownLatestSection(latestWorkout)
+            activitySectionShell(
+                title: "You",
+                subtitle:
+                    "Your latest training, kept close.",
+                icon:
+                    "figure.run.circle.fill",
+                tint:
+                    ATHLTHTheme.vitality
+            ) {
+                if let latestWorkout {
+                    ownLatestSection(
+                        latestWorkout
+                    )
+                } else {
+                    ownEmptyState
+                }
             }
         }
         .sheet(
@@ -128,11 +159,13 @@ struct HomeActivityCenterV2: View {
                     selectedPublishWorkoutID
             )
         }
-        .task {
-            // Home already refreshes the social feed. Activity Center only
-            // asks for the live-session data it actually renders.
-            await realtime
-                .refreshVisibleLiveSessions()
+        .task(id: latestWorkout?.id) {
+            async let liveRefresh: Void =
+                realtime
+                    .refreshVisibleLiveSessions()
+
+            await loadLatestWorkoutDetail()
+            _ = await liveRefresh
         }
     }
 
@@ -141,21 +174,26 @@ struct HomeActivityCenterV2: View {
             alignment: .firstTextBaseline,
             spacing: 12
         ) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
                 Text("Activity Center")
                     .font(
                         .system(
-                            size: 26,
+                            size: 27,
                             weight: .bold,
                             design: .rounded
                         )
                     )
 
-                Text(headerSubtitle)
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
+                Text(
+                    "Your training circle, without the noise."
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
             }
 
             Spacer()
@@ -165,43 +203,152 @@ struct HomeActivityCenterV2: View {
                     initialTab: .feed
                 )
             } label: {
-                HStack(spacing: 5) {
-                    Text("See all")
-                    Image(
-                        systemName:
-                            "arrow.up.right"
-                    )
-                }
+                Image(
+                    systemName:
+                        "arrow.up.right"
+                )
                 .font(
-                    .caption.weight(.semibold)
+                    .system(
+                        size: 13,
+                        weight: .bold
+                    )
                 )
                 .foregroundStyle(
                     ATHLTHTheme.accentDeep
                 )
+                .frame(
+                    width: 36,
+                    height: 36
+                )
+                .background(
+                    ATHLTHTheme
+                        .accentSoft
+                        .opacity(0.86),
+                    in: Circle()
+                )
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(
+                "Open activity feed"
+            )
         }
         .padding(.horizontal, 2)
     }
 
-    private var headerSubtitle: String {
+    private var followingSectionSubtitle:
+        String {
         if !liveFriendSessions.isEmpty {
             return
                 "\(liveFriendSessions.count) " +
                 (
                     liveFriendSessions.count == 1
-                        ? "athlete is training now."
-                        : "athletes are training now."
+                        ? "person training now"
+                        : "people training now"
                 )
         }
 
         if !friendActivity.isEmpty {
-            return
-                "What the people you follow are doing."
+            return "Latest from people you follow"
         }
 
-        return
-            "Training from the people you follow."
+        return "Shared training from your circle"
+    }
+
+    private func activitySectionShell<
+        Content: View
+    >(
+        title: String,
+        subtitle: String,
+        icon: String,
+        tint: Color,
+        @ViewBuilder content:
+            () -> Content
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(tint)
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
+                    .background(
+                        tint.opacity(0.10),
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 1
+                ) {
+                    Text(title)
+                        .font(
+                            .headline.weight(
+                                .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+                }
+
+                Spacer()
+            }
+
+            content()
+        }
+        .padding(13)
+        .background(
+            LinearGradient(
+                colors: [
+                    tint.opacity(0.065),
+                    Color.white.opacity(0.96)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 27,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 27,
+                style: .continuous
+            )
+            .stroke(
+                tint.opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.035),
+            radius: 12,
+            y: 5
+        )
     }
 
     private var pendingRequests: some View {
