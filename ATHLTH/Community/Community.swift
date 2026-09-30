@@ -283,15 +283,36 @@ final class SupabaseCommunityService {
             .execute()
             .value
 
-        let (titles, meetings, summaries, routes) = try await (
+        async let detailRows: [CommunityEventRecord] = client
+            .from("community_events")
+            .select()
+            .ilike("meeting_details", pattern: pattern)
+            .limit(boundedLimit)
+            .execute()
+            .value
+
+        let (
+            titles,
+            meetings,
+            summaries,
+            routes,
+            details
+        ) = try await (
             titleRows,
             meetingRows,
             summaryRows,
-            routeRows
+            routeRows,
+            detailRows
         )
 
         var seen = Set<UUID>()
-        let matchedEvents = (titles + meetings + summaries + routes)
+        let matchedEvents = (
+            titles +
+            meetings +
+            summaries +
+            routes +
+            details
+        )
             .filter { seen.insert($0.id).inserted }
             .sorted { lhs, rhs in
                 let lhsUpcoming =
