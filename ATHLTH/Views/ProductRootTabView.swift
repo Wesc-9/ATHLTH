@@ -358,8 +358,32 @@ struct ATHLTHHomeView: View {
                     .padding(.trailing, 16)
                 }
             } content: {
-                LazyVStack(spacing: 18) {
+                LazyVStack(spacing: 20) {
                     homeTodayCard
+
+                    HomeThisWeekCard(
+                        plan: session.activePlan,
+                        workouts: health.workouts,
+                        streakCount: homeStreakCount,
+                        onOpenPlan: {
+                            onOpenTrain(.plan)
+                        },
+                        onOpenWorkout: { workoutID in
+                            guard let planID =
+                                    session.activePlan?.id
+                            else {
+                                onOpenTrain(.plan)
+                                return
+                            }
+
+                            onOpenTrain(
+                                .workout(
+                                    planID: planID,
+                                    workoutID: workoutID
+                                )
+                            )
+                        }
+                    )
 
                     HomeActivityCenterV2()
 
@@ -470,30 +494,6 @@ struct ATHLTHHomeView: View {
                             }
                         }
                     }
-
-                    HomeThisWeekCard(
-                        plan: session.activePlan,
-                        workouts: health.workouts,
-                        streakCount: homeStreakCount,
-                        onOpenPlan: {
-                            onOpenTrain(.plan)
-                        },
-                        onOpenWorkout: { workoutID in
-                            guard let planID =
-                                    session.activePlan?.id
-                            else {
-                                onOpenTrain(.plan)
-                                return
-                            }
-
-                            onOpenTrain(
-                                .workout(
-                                    planID: planID,
-                                    workoutID: workoutID
-                                )
-                            )
-                        }
-                    )
 
                     HomeHappeningCard(
                         challenges: challenges.visibleChallenges,
@@ -1377,14 +1377,82 @@ struct ATHLTHHomeView: View {
 
                 Spacer()
 
-                if session.activePlan != nil {
-                    Button("Train") {
-                        onSelectTab(1)
+                Menu {
+                    Button {
+                        onOpenTrain(
+                            .quick(.running)
+                        )
+                    } label: {
+                        Label(
+                            "Run",
+                            systemImage: "figure.run"
+                        )
                     }
+
+                    Button {
+                        onOpenTrain(
+                            .quick(.strength)
+                        )
+                    } label: {
+                        Label(
+                            "Strength",
+                            systemImage: "dumbbell.fill"
+                        )
+                    }
+
+                    Button {
+                        onOpenTrain(
+                            .quick(.walking)
+                        )
+                    } label: {
+                        Label(
+                            "Walk",
+                            systemImage: "figure.walk"
+                        )
+                    }
+
+                    Button {
+                        onOpenTrain(
+                            .customQuick
+                        )
+                    } label: {
+                        Label(
+                            "Custom",
+                            systemImage: "plus.circle"
+                        )
+                    }
+
+                    if session.activePlan != nil {
+                        Divider()
+
+                        Button {
+                            onOpenTrain(.plan)
+                        } label: {
+                            Label(
+                                "Open Training Plan",
+                                systemImage:
+                                    "calendar.badge.clock"
+                            )
+                        }
+                    }
+                } label: {
+                    Label(
+                        "Quick Train",
+                        systemImage: "bolt.fill"
+                    )
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .buttonStyle(.plain)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .padding(.horizontal, 10)
+                    .frame(height: 32)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: Capsule()
+                    )
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quick Train")
             }
 
             if workoutMirroring.hasActiveMirroredWorkout,
@@ -3833,6 +3901,9 @@ struct ATHLTHTrainView: View {
         case .customQuick:
             if customQuickStartAvailable {
                 showingCustomQuickStart = true
+            } else {
+                watchTransferError =
+                    "Connect Apple Watch to use Custom Quick Train."
             }
 
         case .ghost:
