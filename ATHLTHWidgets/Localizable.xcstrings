@@ -340,6 +340,26 @@
           }
         }
       }
+    },
+    "Next: %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste: %@"
+          }
+        }
+      }
+    },
+    "Recovery %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
