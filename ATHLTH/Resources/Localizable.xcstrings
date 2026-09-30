@@ -20414,6 +20414,326 @@
           }
         }
       }
+    },
+    "%d of %d completed today": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d av %d fullført i dag"
+          }
+        }
+      }
+    },
+    "Nothing is scheduled in %@ today.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingenting er planlagt i %@ i dag."
+          }
+        }
+      }
+    },
+    "%d more session": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d ekstra økt"
+          }
+        }
+      }
+    },
+    "%d more sessions": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d ekstra økter"
+          }
+        }
+      }
+    },
+    "%d%% complete · Open Goal Hub": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d%% fullført · Åpne målsenter"
+          }
+        }
+      }
+    },
+    "%d recent": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d nylige"
+          }
+        }
+      }
+    },
+    "Week %d": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uke %d"
+          }
+        }
+      }
+    },
+    "Choose %d days": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg %d dager"
+          }
+        }
+      }
+    },
+    "%d skipped": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d hoppet over"
+          }
+        }
+      }
+    },
+    "%d routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d ruter"
+          }
+        }
+      }
+    },
+    "%d m ascent": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d m stigning"
+          }
+        }
+      }
+    },
+    "%@ away": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ unna"
+          }
+        }
+      }
+    },
+    "%d blocks": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d blokker"
+          }
+        }
+      }
+    },
+    "%d Following": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d følger"
+          }
+        }
+      }
+    },
+    "%d selected": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d valgt"
+          }
+        }
+      }
+    },
+    "%d sets": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d sett"
+          }
+        }
+      }
+    },
+    "Exercise %d of %d": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øvelse %d av %d"
+          }
+        }
+      }
+    },
+    "Target: %d reps": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mål: %d repetisjoner"
+          }
+        }
+      }
+    },
+    "Subscribe · %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abonner · %@"
+          }
+        }
+      }
+    },
+    "Save about %d%% compared with Monthly": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spar omtrent %d%% sammenlignet med Månedlig"
+          }
+        }
+      }
+    },
+    "%d unlocked": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d låst opp"
+          }
+        }
+      }
+    },
+    "Next · %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste · %@"
+          }
+        }
+      }
+    },
+    "%d milestones": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d milepæler"
+          }
+        }
+      }
+    },
+    "%d total": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d totalt"
+          }
+        }
+      }
+    },
+    "Best: %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Best: %@"
+          }
+        }
+      }
+    },
+    "Open %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne %@"
+          }
+        }
+      }
+    },
+    "Backup · %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sikkerhetskopi · %@"
+          }
+        }
+      }
+    },
+    "Latest: %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siste: %@"
+          }
+        }
+      }
+    },
+    "Linked to %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koblet til %@"
+          }
+        }
+      }
+    },
+    "Search %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søk i %@"
+          }
+        }
+      }
+    },
+    "Active %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiv %@"
+          }
+        }
+      }
+    },
+    "Delivery: %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Levering: %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
