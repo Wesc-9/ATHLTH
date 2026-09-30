@@ -47,11 +47,11 @@ struct ATHLTHCommunityV3View: View {
     }
 
     private var pulseSummary: String {
-        if !social.friends.isEmpty && !activeChallenges.isEmpty {
+        if !social.mutualFollows.isEmpty && !activeChallenges.isEmpty {
             return "Your circle is moving. Keep the week competitive."
         }
 
-        if !social.friends.isEmpty {
+        if !social.mutualFollows.isEmpty {
             return "Your people are here. Give the week something to rally around."
         }
 
@@ -73,7 +73,7 @@ struct ATHLTHCommunityV3View: View {
                     )
 
                     CommunityV3PulseCard(
-                        friendCount: social.friends.count,
+                        friendCount: social.mutualFollows.count,
                         clubCount: groups.joinedGroups.count,
                         eventCount: community.upcomingEvents.count,
                         challengeCount: activeChallenges.count,
@@ -160,7 +160,7 @@ struct ATHLTHCommunityV3View: View {
                     challenge: weeklyChallenge,
                     profiles:
                         social.visibleProfiles +
-                        social.friends
+                        social.mutualFollows
                 )
             } else {
                 NavigationLink {
@@ -245,7 +245,7 @@ struct ATHLTHCommunityV3View: View {
         social.visibleProfiles.first {
             $0.userID == userID
         } ??
-        social.friends.first {
+        social.mutualFollows.first {
             $0.userID == userID
         } ??
         social.following.first {
@@ -322,7 +322,7 @@ struct ATHLTHCommunityV3View: View {
                     session.profile.displayName,
                 currentAvatarURL:
                     session.profile.avatarURL,
-                friends: social.friends,
+                friends: social.mutualFollows,
                 feed: social.feed,
                 ownWorkouts: health.workouts
             )
