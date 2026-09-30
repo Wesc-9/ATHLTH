@@ -1003,6 +1003,18 @@ struct ATHLTHNotificationCenterView: View {
                         .lineSpacing(1)
                 }
 
+                if let context = challengeContextText(item) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 9, weight: .semibold))
+
+                        Text(context)
+                            .font(.caption2.weight(.medium))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(tint.opacity(0.86))
+                }
+
                 if isActionable(item) || showsChevron {
                     HStack(spacing: 5) {
                         Text(
@@ -1198,6 +1210,43 @@ struct ATHLTHNotificationCenterView: View {
         }
 
         return iconTint(item.kind)
+    }
+
+    private func challengeContextText(
+        _ item: ATHLTHNotificationItem
+    ) -> String? {
+        guard let challengeID = item.challengeID,
+              let challenge = challenges.challenge(id: challengeID)
+        else {
+            return nil
+        }
+
+        let status: String
+        switch challenge.status {
+        case .draft:
+            status = "Draft"
+        case .invited:
+            status = "Invitation"
+        case .upcoming:
+            status = "Upcoming"
+        case .active:
+            status = "Active"
+        case .completed:
+            status = "Completed"
+        case .cancelled:
+            status = "Cancelled"
+        }
+
+        if challenge.status == .completed ||
+            challenge.status == .cancelled {
+            return status
+        }
+
+        if let endsAt = challenge.rules.endsAt {
+            return "\(status) · ends \(endsAt.formatted(.dateTime.day().month(.abbreviated)))"
+        }
+
+        return status
     }
 
     private func destinationActionTitle(
