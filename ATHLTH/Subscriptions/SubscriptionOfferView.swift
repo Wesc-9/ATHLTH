@@ -265,7 +265,11 @@ struct SubscriptionOfferView: View {
         VStack(spacing: 5) {
             if session.subscriptionAccess.trialIsActive {
                 if let trialEndsAt = session.subscriptionAccess.trialEndsAt {
-                    Text("Your ATHLTH+ trial stays active through \(trialEndsAt.formatted(date: .abbreviated, time: .omitted)).")
+                    Text(ATHLTHLocalization.format(
+                            english: "Your ATHLTH+ trial stays active through %@.",
+                            norwegian: "ATHLTH+ prøveperioden din er aktiv til og med %@.",
+                            trialEndsAt.formatted(date: .abbreviated, time: .omitted)
+                        ))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(OnboardingTheme.mutedText)
                         .multilineTextAlignment(.center)
@@ -397,7 +401,11 @@ struct SubscriptionOfferView: View {
                         }
 
                         if let saving = yearlySavingsPercent {
-                            Text("Save about \(saving)% compared with Monthly")
+                            Text(ATHLTHLocalization.format(
+                            english: "Save about %d%% compared with Monthly",
+                            norwegian: "Spar omtrent %d %% sammenlignet med månedlig",
+                            saving
+                        ))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(OnboardingTheme.accent)
                         }
