@@ -20,25 +20,22 @@ struct HomeActivityCenterV2: View {
     @State private var showingPublish = false
     @State private var selectedPublishWorkoutID: UUID?
 
-    private var latestWorkout: SocialPublishableWorkout? {
-        let finishedStrength =
-            strength.workoutHistory.lazy
+    private var workouts: [SocialPublishableWorkout] {
+        let localStrength =
+            strength.workoutHistory
                 .filter(\.isFinished)
+                .map(
+                    SocialPublishableWorkout.init
+                )
 
-        let localStrengthIDs = Set(
-            finishedStrength.map(\.id)
-        )
+        let localStrengthIDs =
+            Set(localStrength.map(\.id))
 
-        let latestStrength =
-            finishedStrength
-                .map(SocialPublishableWorkout.init)
-                .max {
-                    $0.startDate < $1.startDate
-                }
-
-        let latestHealth =
-            health.workouts.lazy
-                .map(SocialPublishableWorkout.init)
+        let healthWorkouts =
+            health.workouts
+                .map(
+                    SocialPublishableWorkout.init
+                )
                 .filter {
                     !(
                         $0.activity == .strength &&
@@ -47,22 +44,16 @@ struct HomeActivityCenterV2: View {
                         )
                     )
                 }
-                .max {
-                    $0.startDate < $1.startDate
-                }
 
-        switch (latestStrength, latestHealth) {
-        case let (strength?, health?):
-            return strength.startDate >= health.startDate
-                ? strength
-                : health
-        case let (strength?, nil):
-            return strength
-        case let (nil, health?):
-            return health
-        case (nil, nil):
-            return nil
-        }
+        return (healthWorkouts + localStrength)
+            .sorted {
+                $0.startDate > $1.startDate
+            }
+    }
+
+    private var latestWorkout:
+        SocialPublishableWorkout? {
+        workouts.first
     }
 
     private var friendActivity: [SocialFeedItem] {
