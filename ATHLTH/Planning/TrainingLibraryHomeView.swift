@@ -218,7 +218,11 @@ struct TrainingLibraryHomeView: View {
 
                 Spacer()
 
-                Text("\(min(recents.items.count, 4)) recent")
+                Text(ATHLTHLocalization.format(
+                            english: "%d recent",
+                            norwegian: "%d nylige",
+                            min(recents.items.count, 4)
+                        ))
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.mutedText)
             }
@@ -2011,7 +2015,11 @@ struct TrainingPlanCatalogDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(
-                "\(entry.title) is now saved as a reusable plan. Open My Plans when you are ready to schedule it."
+                ATHLTHLocalization.format(
+                            english: "%@ is now saved as a reusable plan. Open My Plans when you are ready to schedule it.",
+                            norwegian: "%@ er nå lagret som en gjenbrukbar plan. Åpne Mine planer når du er klar til å planlegge den.",
+                            entry.title
+                        )
             )
         }
     }
@@ -2127,7 +2135,11 @@ struct TrainingPlanCatalogDetailView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
-                Text("Week \(week)")
+                Text(ATHLTHLocalization.format(
+                                english: "Week %d",
+                                norwegian: "Uke %d",
+                                week
+                            ))
                     .font(.subheadline.weight(.bold))
 
                 Spacer()
@@ -2940,7 +2952,11 @@ struct MyTrainingPlansLibraryView: View {
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
                     Text(
-                        "\(template.weeks.count) weeks · ready to schedule"
+                        ATHLTHLocalization.format(
+                                english: "%d weeks · ready to schedule",
+                                norwegian: "%d uker · klar til planlegging",
+                                template.weeks.count
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -3130,7 +3146,11 @@ struct MyTrainingPlansLibraryView: View {
 
                     if progress.skippedSessions > 0 {
                         Text(
-                            "\(progress.skippedSessions) skipped"
+                            ATHLTHLocalization.format(
+                                english: "%d skipped",
+                                norwegian: "%d hoppet over",
+                                progress.skippedSessions
+                            )
                         )
                         .font(.caption2)
                         .foregroundStyle(
@@ -3515,7 +3535,12 @@ struct MissedWorkoutsReviewView: View {
                         )
 
                     Text(
-                        "Week \(occurrence.weekNumber) · \(sessionSummary(occurrence.session))"
+                        ATHLTHLocalization.format(
+                                english: "Week %d · %@",
+                                norwegian: "Uke %d · %@",
+                                occurrence.weekNumber,
+                                sessionSummary(occurrence.session)
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(
