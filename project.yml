@@ -168,6 +168,7 @@ targets:
               - athlth-watch
         WKBackgroundModes:
           - workout-processing
+        UIBackgroundModes:
           - audio
         WKSupportsAlwaysOnDisplay: true
     settings:
