@@ -59,6 +59,10 @@ struct PlannedWorkoutDetailView: View {
                         )
                     }
 
+                    if currentWorkout.isStructuredWorkout {
+                        structuredWorkoutCard
+                    }
+
                     if let notes = cleanNotes {
                         notesCard(notes)
                     }
@@ -308,6 +312,80 @@ struct PlannedWorkoutDetailView: View {
                     }
 
                     if index < runningWorkouts.count - 1 {
+                        Divider()
+                    }
+                }
+            }
+        }
+    }
+
+
+    private var structuredWorkoutCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionTitle("Workout blocks")
+
+                ForEach(
+                    currentWorkout.resolvedWorkoutBlocks
+                ) { block in
+                    HStack(alignment: .top, spacing: 11) {
+                        Text("\(block.sequence)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(
+                                ATHLTHTheme.accent
+                            )
+                            .frame(width: 28, height: 28)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: Circle()
+                            )
+
+                        Image(
+                            systemName:
+                                block.kind.systemImage
+                        )
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(
+                            block.kind == .run
+                                ? ATHLTHTheme.vitality
+                                : ATHLTHTheme.accentDeep
+                        )
+                        .frame(width: 28, height: 28)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(block.title)
+                                .font(
+                                    .subheadline.weight(
+                                        .semibold
+                                    )
+                                )
+
+                            if let target = block.targetText {
+                                Text(target)
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.mutedText
+                                    )
+                            }
+
+                            if let notes = block.notes,
+                               !notes.isEmpty {
+                                Text(notes)
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.mutedText
+                                    )
+                            }
+                        }
+
+                        Spacer()
+                    }
+
+                    if block.id !=
+                        currentWorkout
+                            .resolvedWorkoutBlocks
+                            .last?
+                            .id {
                         Divider()
                     }
                 }
