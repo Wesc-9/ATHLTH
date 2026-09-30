@@ -160,24 +160,24 @@ struct RunGuidanceSetupView: View {
                     )
                 }
 
-                NavigationLink {
-                    PerWorkoutRouteGuardianView(
-                        draft:
-                            $routeGuardian
-                    )
-                } label: {
-                    guidanceRow(
-                        title: "Route Guardian",
-                        subtitle:
-                            routeGuardian.enabled
-                                ? "Alert at \(Int(routeGuardian.deviationMeters.rounded())) m"
-                                : "Off for this workout",
-                        icon:
-                            "location.fill"
-                    )
-                }
-
                 if route != nil {
+                    NavigationLink {
+                        PerWorkoutRouteGuardianView(
+                            draft:
+                                $routeGuardian
+                        )
+                    } label: {
+                        guidanceRow(
+                            title: "Route Guardian",
+                            subtitle:
+                                routeGuardian.enabled
+                                    ? "Alert at \(Int(routeGuardian.deviationMeters.rounded())) m"
+                                    : "Off for this workout",
+                            icon:
+                                "location.fill"
+                        )
+                    }
+
                     NavigationLink {
                         PerWorkoutGhostView(
                             draft: $ghost,
