@@ -16,6 +16,17 @@
     <string>ATHLTH saves workouts and workout routes from Apple Watch to Apple Health.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>ATHLTH uses your location during outdoor workouts to record your route and distance.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.wesc9.athlth.watch</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>athlth-watch</string>
+            </array>
+        </dict>
+    </array>
     <key>WKBackgroundModes</key>
     <array>
         <string>workout-processing</string>
