@@ -4528,41 +4528,46 @@ final class HealthKitManager: ObservableObject {
         option: HKStatisticsOptions,
         workout: HKWorkout
     ) async throws -> Double? {
-        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else {
+        guard let type =
+                HKObjectType.quantityType(
+                    forIdentifier: identifier
+                ),
+              let statistics =
+                workout.statistics(
+                    for: type
+                )
+        else {
             return nil
         }
 
-        let predicate = HKQuery.predicateForObjects(from: workout)
+        let quantity: HKQuantity?
 
-        return try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Double?, Error>) in
-
-            let query = HKStatisticsQuery(
-                quantityType: type,
-                quantitySamplePredicate: predicate,
-                options: option
-            ) { _, result, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                let quantity: HKQuantity?
-                if option.contains(.cumulativeSum) {
-                    quantity = result?.sumQuantity()
-                } else if option.contains(.discreteAverage) {
-                    quantity = result?.averageQuantity()
-                } else {
-                    quantity = nil
-                }
-
-                continuation.resume(
-                    returning: Self.safeDoubleValue(quantity, unit: unit)
-                )
-            }
-
-            healthStore.execute(query)
+        if option.contains(.cumulativeSum) {
+            quantity =
+                statistics.sumQuantity()
+        } else if option.contains(
+            .discreteAverage
+        ) {
+            quantity =
+                statistics.averageQuantity()
+        } else if option.contains(
+            .discreteMax
+        ) {
+            quantity =
+                statistics.maximumQuantity()
+        } else if option.contains(
+            .discreteMin
+        ) {
+            quantity =
+                statistics.minimumQuantity()
+        } else {
+            quantity = nil
         }
+
+        return Self.safeDoubleValue(
+            quantity,
+            unit: unit
+        )
     }
 
     private func latestDailyAverageQuantity(
@@ -4730,8 +4735,21 @@ final class HealthKitManager: ObservableObject {
                     return
                 }
 
+                guard let value =
+                        Self.safeDoubleValue(
+                            sample.quantity,
+                            unit: unit
+                        )
+                else {
+                    continuation.resume(
+                        returning: nil
+                    )
+                    return
+                }
+
                 continuation.resume(
-                    returning: (Self.safeDoubleValue(sample.quantity, unit: unit) ?? 0, sample.endDate)
+                    returning:
+                        (value, sample.endDate)
                 )
             }
 
@@ -4768,8 +4786,21 @@ final class HealthKitManager: ObservableObject {
                     return
                 }
 
+                guard let value =
+                        Self.safeDoubleValue(
+                            sample.quantity,
+                            unit: unit
+                        )
+                else {
+                    continuation.resume(
+                        returning: nil
+                    )
+                    return
+                }
+
                 continuation.resume(
-                    returning: (Self.safeDoubleValue(sample.quantity, unit: unit) ?? 0, sample.endDate)
+                    returning:
+                        (value, sample.endDate)
                 )
             }
 
@@ -4777,39 +4808,43 @@ final class HealthKitManager: ObservableObject {
         }
     }
 
-    private func fetchHeartRateStats(for workout: HKWorkout) async throws -> (Double?, Double?) {
-        guard let type = HKObjectType.quantityType(forIdentifier: .heartRate) else {
+    private func fetchHeartRateStats(
+        for workout: HKWorkout
+    ) async throws -> (Double?, Double?) {
+        guard let type =
+                HKObjectType.quantityType(
+                    forIdentifier: .heartRate
+                ),
+              let statistics =
+                workout.statistics(
+                    for: type
+                )
+        else {
             return (nil, nil)
         }
 
-        let predicate = HKQuery.predicateForObjects(from: workout)
-        let unit = HKUnit.count().unitDivided(by: .minute())
+        let unit =
+            HKUnit.count()
+                .unitDivided(by: .minute())
 
-        let samples = try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<[HKQuantitySample], Error>) in
-
-            let query = HKSampleQuery(
-                sampleType: type,
-                predicate: predicate,
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: nil
-            ) { _, samples, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: (samples as? [HKQuantitySample]) ?? [])
-                }
-            }
-
-            healthStore.execute(query)
-        }
-
-        let values = samples.map { Self.safeDoubleValue($0.quantity, unit: unit) ?? 0 }
-        guard !values.isEmpty else { return (nil, nil) }
+        let average =
+            Self.safeDoubleValue(
+                statistics.averageQuantity(),
+                unit: unit
+            )
+        let maximum =
+            Self.safeDoubleValue(
+                statistics.maximumQuantity(),
+                unit: unit
+            )
 
         return (
-            values.reduce(0, +) / Double(values.count),
-            values.max()
+            average.flatMap {
+                $0 > 0 ? $0 : nil
+            },
+            maximum.flatMap {
+                $0 > 0 ? $0 : nil
+            }
         )
     }
 
