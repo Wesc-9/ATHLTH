@@ -120,6 +120,646 @@
           }
         }
       }
+    },
+    "Ready on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klar på Apple Watch"
+          }
+        }
+      }
+    },
+    "Start Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start rute"
+          }
+        }
+      }
+    },
+    "Run or walk this route with live GPS, heart rate and distance.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løp eller gå denne ruten med live GPS, puls og distanse."
+          }
+        }
+      }
+    },
+    "Route unavailable": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rute utilgjengelig"
+          }
+        }
+      }
+    },
+    "End Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslutt økt"
+          }
+        }
+      }
+    },
+    "Keep Going": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett"
+          }
+        }
+      }
+    },
+    "ATHLTH will finish and save the workout to Apple Health.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH avslutter og lagrer økten i Apple Health."
+          }
+        }
+      }
+    },
+    "PACE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TEMPO"
+          }
+        }
+      }
+    },
+    "CURRENT PACE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NÅVÆRENDE TEMPO"
+          }
+        }
+      }
+    },
+    "NEXT": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NESTE"
+          }
+        }
+      }
+    },
+    "Average pace": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjennomsnittstempo"
+          }
+        }
+      }
+    },
+    "Swipe for route, Ghost and controls": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sveip for rute, Ghost og kontroller"
+          }
+        }
+      }
+    },
+    "Free run · the Watch records your live route.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fri løpetur · Watch registrerer ruten din live."
+          }
+        }
+      }
+    },
+    "GHOST": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GHOST"
+          }
+        }
+      }
+    },
+    "Audio Coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio Coach"
+          }
+        }
+      }
+    },
+    "Swipe up/down between live metrics, workout, route and controls.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sveip opp/ned mellom live-målinger, økt, rute og kontroller."
+          }
+        }
+      }
+    },
+    "End workout?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslutte økten?"
+          }
+        }
+      }
+    },
+    "Next Exercise": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste øvelse"
+          }
+        }
+      }
+    },
+    "Use the red stop button below when you're finished.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk den røde stoppknappen nedenfor når du er ferdig."
+          }
+        }
+      }
+    },
+    "Complete Set": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør sett"
+          }
+        }
+      }
+    },
+    "Add an exercise on iPhone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til en øvelse på iPhone"
+          }
+        }
+      }
+    },
+    "The Watch will update automatically.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch oppdateres automatisk."
+          }
+        }
+      }
+    },
+    "Syncing strength workout…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synkroniserer styrkeøkt…"
+          }
+        }
+      }
+    },
+    "Sync": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synkroniser"
+          }
+        }
+      }
+    },
+    "Workout Saved": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økt lagret"
+          }
+        }
+      }
+    },
+    "Laps": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runder"
+          }
+        }
+      }
+    },
+    "Route match": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutesamsvar"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferdig"
+          }
+        }
+      }
+    },
+    "REST": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PAUSE"
+          }
+        }
+      }
+    },
+    "Skip": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hopp over"
+          }
+        }
+      }
+    },
+    "Next set": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste sett"
+          }
+        }
+      }
+    },
+    "GHOST RACE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GHOST RACE"
+          }
+        }
+      }
+    },
+    "YOU": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DU"
+          }
+        }
+      }
+    },
+    "Finding both runners on the route…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finner begge løperne på ruten…"
+          }
+        }
+      }
+    },
+    "TARGET": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MÅL"
+          }
+        }
+      }
+    },
+    "ACTUAL": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FAKTISK"
+          }
+        }
+      }
+    },
+    "Live targets": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-mål"
+          }
+        }
+      }
+    },
+    "Pace alerts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempovarsler"
+          }
+        }
+      }
+    },
+    "Lap": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runde"
+          }
+        }
+      }
+    },
+    "Coach settings": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coach-innstillinger"
+          }
+        }
+      }
+    },
+    "Finish Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslutt økt"
+          }
+        }
+      }
+    },
+    "Enabled": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktivert"
+          }
+        }
+      }
+    },
+    "Changes apply immediately to this workout only.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endringer gjelder umiddelbart og bare for denne økten."
+          }
+        }
+      }
+    },
+    "When to speak": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når Coach skal snakke"
+          }
+        }
+      }
+    },
+    "Distance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distanse"
+          }
+        }
+      }
+    },
+    "Time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tid"
+          }
+        }
+      }
+    },
+    "Workout updates": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktoppdateringer"
+          }
+        }
+      }
+    },
+    "Elapsed time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forløpt tid"
+          }
+        }
+      }
+    },
+    "Current time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjeldende klokkeslett"
+          }
+        }
+      }
+    },
+    "Heart rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puls"
+          }
+        }
+      }
+    },
+    "Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rute"
+          }
+        }
+      }
+    },
+    "Remaining distance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående distanse"
+          }
+        }
+      }
+    },
+    "Estimated time left": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimert tid igjen"
+          }
+        }
+      }
+    },
+    "Structured workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strukturert økt"
+          }
+        }
+      }
+    },
+    "Current / next step": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjeldende / neste steg"
+          }
+        }
+      }
+    },
+    "Remaining step time": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående tid i steg"
+          }
+        }
+      }
+    },
+    "Remaining step distance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående distanse i steg"
+          }
+        }
+      }
+    },
+    "Music": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Musikk"
+          }
+        }
+      }
+    },
+    "Lower music for coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demp musikken for Coach"
+          }
+        }
+      }
+    },
+    "Voice": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stemme"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Språk"
+          }
+        }
+      }
+    },
+    "BPM": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BPM"
+          }
+        }
+      }
+    },
+    "LIVE CHALLENGE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LIVE UTFORDRING"
+          }
+        }
+      }
+    },
+    "LIVE SHARE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LIVE DELING"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
