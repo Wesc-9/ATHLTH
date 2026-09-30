@@ -606,7 +606,7 @@ private struct LibraryDestinationTile: View {
     }
 }
 
-private struct LibraryPremiumIntro<Accessory: View>: View {
+struct LibraryPremiumIntro<Accessory: View>: View {
     let eyebrow: String
     let title: String
     let subtitle: String
@@ -716,7 +716,7 @@ private struct LibraryPremiumIntro<Accessory: View>: View {
     }
 }
 
-private struct LibraryStatPill: View {
+struct LibraryStatPill: View {
     let value: String
     let label: String
     let icon: String
