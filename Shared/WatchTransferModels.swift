@@ -286,16 +286,16 @@ enum WatchWorkoutKind: String, Codable, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .running: return "Run"
-        case .walking: return "Walk"
-        case .strength: return "Strength"
-        case .hiit: return "HIIT"
-        case .functional: return "Functional"
-        case .cycling: return "Cycling"
-        case .rowing: return "Rowing"
-        case .stairClimbing: return "Stairs"
-        case .yoga: return "Yoga"
-        case .other: return "Workout"
+        case .running: return String(localized: "Run")
+        case .walking: return String(localized: "Walk")
+        case .strength: return String(localized: "Strength")
+        case .hiit: return String(localized: "HIIT")
+        case .functional: return String(localized: "Functional")
+        case .cycling: return String(localized: "Cycling")
+        case .rowing: return String(localized: "Rowing")
+        case .stairClimbing: return String(localized: "Stairs")
+        case .yoga: return String(localized: "Yoga")
+        case .other: return String(localized: "Workout")
         }
     }
 
@@ -340,9 +340,9 @@ enum WatchAudioCoachLanguage: String, Codable, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .system: return "System"
-        case .english: return "English"
-        case .norwegian: return "Norsk"
+        case .system: return String(localized: "System")
+        case .english: return String(localized: "English")
+        case .norwegian: return String(localized: "Norsk")
         }
     }
 }
@@ -537,9 +537,9 @@ enum WatchAlertDelivery: String, Codable, CaseIterable, Hashable, Identifiable {
 
     var title: String {
         switch self {
-        case .haptic: return "Haptic"
-        case .voice: return "Voice"
-        case .both: return "Haptic + Voice"
+        case .haptic: return String(localized: "Haptic")
+        case .voice: return String(localized: "Voice")
+        case .both: return String(localized: "Haptic + Voice")
         }
     }
 
