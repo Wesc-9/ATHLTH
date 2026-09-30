@@ -4579,18 +4579,95 @@ final class HealthKitManager: ObservableObject {
         var durations: [Date: TimeInterval] = [:]
 
         for session in sessions {
-            guard let wakeTime = session.map(\.endDate).max(),
+            let sourceGroups =
+                Dictionary(
+                    grouping: session,
+                    by: {
+                        $0.sourceRevision
+                            .source
+                            .bundleIdentifier
+                    }
+                )
+
+            func detailedStageDuration(
+                _ group:
+                    [HKCategorySample]
+            ) -> TimeInterval {
+                mergedDuration(
+                    group.filter {
+                        sample in
+
+                        guard let value =
+                                HKCategoryValueSleepAnalysis(
+                                    rawValue:
+                                        sample.value
+                                )
+                        else {
+                            return false
+                        }
+
+                        switch value {
+                        case .asleepCore,
+                             .asleepDeep,
+                             .asleepREM:
+                            return true
+                        default:
+                            return false
+                        }
+                    }
+                )
+            }
+
+            let preferred =
+                sourceGroups.values.max {
+                    lhs,
+                    rhs in
+
+                    let leftDetailed =
+                        detailedStageDuration(
+                            lhs
+                        )
+                    let rightDetailed =
+                        detailedStageDuration(
+                            rhs
+                        )
+
+                    if abs(
+                        leftDetailed -
+                        rightDetailed
+                    ) > 60 {
+                        return leftDetailed <
+                            rightDetailed
+                    }
+
+                    return mergedDuration(lhs) <
+                        mergedDuration(rhs)
+                } ??
+                session
+
+            guard let wakeTime =
+                    preferred
+                        .map(\.endDate)
+                        .max(),
                   wakeTime >= startDate,
                   wakeTime <= endDate
             else {
                 continue
             }
 
-            let wakeDay = calendar.startOfDay(for: wakeTime)
-            let duration = mergedDuration(session)
+            let wakeDay =
+                calendar.startOfDay(
+                    for: wakeTime
+                )
+            let duration =
+                mergedDuration(
+                    preferred
+                )
 
-            if duration > (durations[wakeDay] ?? 0) {
-                durations[wakeDay] = duration
+            if duration >
+                (durations[wakeDay] ?? 0) {
+                durations[wakeDay] =
+                    duration
             }
         }
 
