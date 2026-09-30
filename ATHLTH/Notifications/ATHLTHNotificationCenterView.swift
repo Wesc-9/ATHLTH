@@ -512,8 +512,12 @@ struct ATHLTHNotificationCenterView: View {
         let eventKind =
             item.socialEventKind?.lowercased() ?? ""
 
-        return eventKind.contains("request") ||
-            eventKind.contains("invite")
+        if eventKind == "friend_request" ||
+            eventKind == "follow_request" {
+            return followRequest(for: item) != nil
+        }
+
+        return eventKind.contains("invite")
     }
 
     private var emptyState: some View {
@@ -895,20 +899,8 @@ struct ATHLTHNotificationCenterView: View {
     private func notificationCard(
         _ item: ATHLTHNotificationItem
     ) -> some View {
-        Group {
-            if hasDestination(item) {
-                NavigationLink {
-                    notificationDestination(item)
-                        .onAppear {
-                            markOpened(item)
-                        }
-                } label: {
-                    notificationLabel(
-                        item,
-                        showsChevron: true
-                    )
-                }
-            } else {
+        if let request = followRequest(for: item) {
+            VStack(spacing: 8) {
                 Button {
                     markOpened(item)
                 } label: {
@@ -917,29 +909,153 @@ struct ATHLTHNotificationCenterView: View {
                         showsChevron: false
                     )
                 }
-            }
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            if item.isUnread {
-                Button {
-                    notifications.markRead(item.id)
-                } label: {
-                    Label(
-                        "Mark as Read",
-                        systemImage: "checkmark.circle"
+                .buttonStyle(.plain)
+
+                HStack(spacing: 9) {
+                    Button {
+                        Task {
+                            await social.decline(request)
+                            markOpened(item)
+                        }
+                    } label: {
+                        Text("Decline")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                            .background(
+                                Color.primary.opacity(0.045),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        Task {
+                            await social.accept(request)
+                            markOpened(item)
+                        }
+                    } label: {
+                        Text("Accept")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    ATHLTHTheme.card.opacity(0.92),
+                    in: RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.primary.opacity(0.045),
+                        lineWidth: 1
                     )
                 }
             }
+            .contextMenu {
+                if item.isUnread {
+                    Button {
+                        notifications.markRead(item.id)
+                    } label: {
+                        Label(
+                            "Mark as Read",
+                            systemImage: "checkmark.circle"
+                        )
+                    }
+                }
 
-            Button(role: .destructive) {
-                notifications.delete(item.id)
-            } label: {
-                Label(
-                    "Delete",
-                    systemImage: "trash"
-                )
+                Button(role: .destructive) {
+                    notifications.delete(item.id)
+                } label: {
+                    Label(
+                        "Delete",
+                        systemImage: "trash"
+                    )
+                }
             }
+        } else {
+            Group {
+                if hasDestination(item) {
+                    NavigationLink {
+                        notificationDestination(item)
+                            .onAppear {
+                                markOpened(item)
+                            }
+                    } label: {
+                        notificationLabel(
+                            item,
+                            showsChevron: true
+                        )
+                    }
+                } else {
+                    Button {
+                        markOpened(item)
+                    } label: {
+                        notificationLabel(
+                            item,
+                            showsChevron: false
+                        )
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                if item.isUnread {
+                    Button {
+                        notifications.markRead(item.id)
+                    } label: {
+                        Label(
+                            "Mark as Read",
+                            systemImage: "checkmark.circle"
+                        )
+                    }
+                }
+
+                Button(role: .destructive) {
+                    notifications.delete(item.id)
+                } label: {
+                    Label(
+                        "Delete",
+                        systemImage: "trash"
+                    )
+                }
+            }
+        }
+    }
+
+    private func followRequest(
+        for item: ATHLTHNotificationItem
+    ) -> SocialFriendRequestDisplay? {
+        let eventKind =
+            item.socialEventKind?.lowercased() ?? ""
+
+        guard eventKind == "friend_request" ||
+                eventKind == "follow_request",
+              let entityID = item.socialEntityID
+        else {
+            return nil
+        }
+
+        return social.incomingRequests.first {
+            $0.request.id == entityID
         }
     }
 
