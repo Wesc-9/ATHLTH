@@ -98,14 +98,133 @@ struct ATHLTHSettingsView: View {
 
                             SettingsDivider()
 
-                            PremiumSettingsRow(
-                                icon: "globe",
-                                title: "Language",
-                                subtitle: "More languages are planned"
-                            ) {
-                                Text("English")
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            Menu {
+                                ForEach(
+                                    AppLanguage
+                                        .currentlySupported
+                                ) { language in
+                                    Button {
+                                        settings.language =
+                                            language
+                                    } label: {
+                                        if settings.language ==
+                                            language {
+                                            Label(
+                                                language.title,
+                                                systemImage:
+                                                    "checkmark"
+                                            )
+                                        } else {
+                                            Text(
+                                                language.title
+                                            )
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(
+                                        systemName: "globe"
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 18,
+                                            weight: .medium
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                    .frame(
+                                        width: 44,
+                                        height: 44
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .accentSoft,
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius: 14,
+                                                style:
+                                                    .continuous
+                                            )
+                                    )
+
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 3
+                                    ) {
+                                        Text("Language")
+                                            .font(
+                                                .system(
+                                                    size: 16.5,
+                                                    weight:
+                                                        .medium
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                ATHLTHTheme
+                                                    .primaryText
+                                            )
+
+                                        Text(
+                                            "Choose English or Norwegian"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                    }
+
+                                    Spacer(
+                                        minLength: 12
+                                    )
+
+                                    HStack(spacing: 8) {
+                                        Text(
+                                            settings
+                                                .language
+                                                .title
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+
+                                        Image(
+                                            systemName:
+                                                "chevron.up.chevron.down"
+                                        )
+                                        .font(
+                                            .caption2
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                                .opacity(
+                                                    0.72
+                                                )
+                                        )
+                                    }
+                                }
+                                .padding(
+                                    .horizontal,
+                                    16
+                                )
+                                .padding(
+                                    .vertical,
+                                    13
+                                )
+                                .contentShape(
+                                    Rectangle()
+                                )
                             }
+                            .buttonStyle(.plain)
 
                             SettingsDivider()
 
