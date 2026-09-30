@@ -281,7 +281,12 @@ struct PlannedWorkoutDetailView: View {
                                 .font(.subheadline.weight(.semibold))
 
                             Text(
-                                "\(runningWorkout.type.title) · \(runningWorkout.blocks.count) blocks"
+                                ATHLTHLocalization.format(
+                                    english: "%@ · %d blocks",
+                                    norwegian: "%@ · %d blokker",
+                                    runningWorkout.type.title,
+                                    runningWorkout.blocks.count
+                                )
                             )
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
