@@ -7,16 +7,18 @@ struct WatchHomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 10) {
+                VStack(spacing: 9) {
                     header
+                    quickRunCard
 
                     NavigationLink {
                         WatchWorkoutStartView(route: nil)
                     } label: {
-                        primaryCard(
-                            title: "Start Workout",
-                            subtitle: "Run · Walk · Strength",
-                            icon: "play.fill"
+                        menuCard(
+                            title: "Other workouts",
+                            subtitle: "Walk · Strength",
+                            icon: "figure.mixed.cardio",
+                            accent: false
                         )
                     }
                     .buttonStyle(.plain)
@@ -24,178 +26,321 @@ struct WatchHomeView: View {
                     NavigationLink {
                         WatchRoutesListView()
                     } label: {
-                        compactCard(
+                        menuCard(
                             title: "Routes",
                             subtitle:
                                 routeStore.routes.isEmpty
-                                    ? "No saved routes"
+                                    ? "Send a route from iPhone"
                                     : "\(routeStore.routes.count) saved",
-                            icon: "point.topleft.down.to.point.bottomright.curvepath",
-                            showsChevron: true
+                            icon: "map.fill",
+                            accent: false
                         )
                     }
                     .buttonStyle(.plain)
 
-                    compactCard(
-                        title: "iPhone",
-                        subtitle: connectionSubtitle,
-                        icon:
-                            routeStore.companionLinked
-                                ? "iphone.radiowaves.left.and.right"
-                                : "iphone.slash",
-                        showsChevron: false
-                    )
+                    connectionRow
                 }
                 .padding(.horizontal, 8)
-                .padding(.bottom, 10)
+                .padding(.bottom, 12)
             }
-            .background(WatchTheme.canvas.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
+            .background(
+                WatchTheme.canvas
+                    .ignoresSafeArea()
+            )
+            .foregroundStyle(
+                WatchTheme.textPrimary
+            )
+            .toolbar(
+                .hidden,
+                for: .navigationBar
+            )
         }
         .sheet(
             isPresented: Binding(
-                get: { workoutManager.isWorkoutPresented },
+                get: {
+                    workoutManager
+                        .isWorkoutPresented
+                },
                 set: { presented in
                     if !presented,
-                       workoutManager.state == .completed {
+                       workoutManager.state ==
+                        .completed {
                         workoutManager.reset()
                     }
                 }
             )
         ) {
             WatchActiveWorkoutView()
-                .environmentObject(workoutManager)
+                .environmentObject(
+                    workoutManager
+                )
         }
     }
 
     private var header: some View {
-        VStack(spacing: 5) {
-            ATHLTHBrandMark(size: .watch)
-
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(
-                        routeStore.companionLinked
-                            ? WatchTheme.green
-                            : Color.secondary
+        HStack {
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text("ATHLTH")
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .black,
+                            design: .rounded
+                        )
                     )
-                    .frame(width: 6, height: 6)
+                    .tracking(1.2)
 
-                Text(
-                    routeStore.companionLinked
-                        ? "Connected"
-                        : "Watch ready"
-                )
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(WatchTheme.muted)
+                Text("READY TO MOVE")
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(1.1)
+                    .foregroundStyle(
+                        WatchTheme.muted
+                    )
             }
+
+            Spacer()
+
+            Circle()
+                .fill(
+                    routeStore.companionLinked
+                        ? WatchTheme.accent
+                        : WatchTheme.muted
+                )
+                .frame(
+                    width: 8,
+                    height: 8
+                )
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 2)
+        .padding(.horizontal, 3)
+        .padding(.top, 3)
         .padding(.bottom, 2)
     }
 
-    private var connectionSubtitle: String {
-        if routeStore.companionLinked {
-            return "Connected to ATHLTH on iPhone"
-        }
-
-        return routeStore.connectionText
-    }
-
-    private func primaryCard(
-        title: String,
-        subtitle: String,
-        icon: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(
-                    cornerRadius: 14,
-                    style: .continuous
+    private var quickRunCard: some View {
+        Button {
+            Task {
+                await workoutManager.start(
+                    kind: .running
                 )
-                .fill(WatchTheme.green.opacity(0.12))
-                .frame(width: 46, height: 46)
-
-                Image(systemName: icon)
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(WatchTheme.green)
             }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            WatchTheme.accent
+                        )
+                        .frame(
+                            width: 48,
+                            height: 48
+                        )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.primary)
+                    Image(
+                        systemName:
+                            "figure.run"
+                    )
+                    .font(
+                        .system(
+                            size: 23,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        .black
+                    )
+                }
 
-                Text(subtitle)
-                    .font(.system(size: 10))
-                    .foregroundStyle(WatchTheme.muted)
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text("Quick Run")
+                        .font(
+                            .system(
+                                size: 17,
+                                weight: .bold
+                            )
+                        )
+
+                    Text(
+                        "Outdoor · GPS · Heart rate"
+                    )
+                    .font(
+                        .system(size: 9)
+                    )
+                    .foregroundStyle(
+                        WatchTheme
+                            .textSecondary
+                    )
                     .lineLimit(1)
+                }
+
+                Spacer(
+                    minLength: 2
+                )
+
+                Image(
+                    systemName:
+                        "play.fill"
+                )
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    WatchTheme.accent
+                )
             }
-
-            Spacer(minLength: 4)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(WatchTheme.muted)
+            .padding(12)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 76
+            )
+            .watchSurface(
+                radius: 20
+            )
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 72)
-        .watchSurface(radius: 18)
+        .buttonStyle(.plain)
+        .disabled(
+            workoutManager.state ==
+                .preparing
+        )
+        .opacity(
+            workoutManager.state ==
+                .preparing
+                ? 0.55
+                : 1
+        )
     }
 
-    private func compactCard(
+    private func menuCard(
         title: String,
         subtitle: String,
         icon: String,
-        showsChevron: Bool
+        accent: Bool
     ) -> some View {
-        HStack(spacing: 11) {
+        HStack(spacing: 10) {
             ZStack {
-                Circle()
-                    .fill(Color.black.opacity(0.035))
-                    .frame(width: 38, height: 38)
+                RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+                .fill(
+                    WatchTheme
+                        .cardRaised
+                )
+                .frame(
+                    width: 38,
+                    height: 38
+                )
 
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(
-                        title == "iPhone" &&
-                        !routeStore.companionLinked
-                            ? WatchTheme.muted
-                            : WatchTheme.green
+                Image(
+                    systemName: icon
+                )
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .semibold
                     )
+                )
+                .foregroundStyle(
+                    accent
+                        ? WatchTheme.accent
+                        : WatchTheme
+                            .textPrimary
+                )
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .semibold
+                        )
+                    )
 
                 Text(subtitle)
-                    .font(.system(size: 9))
-                    .foregroundStyle(WatchTheme.muted)
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 4)
-
-            if showsChevron {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(WatchTheme.muted)
-            } else {
-                Circle()
-                    .fill(
-                        routeStore.companionLinked
-                            ? WatchTheme.green
-                            : Color.secondary
+                    .font(
+                        .system(size: 9)
                     )
-                    .frame(width: 7, height: 7)
+                    .foregroundStyle(
+                        WatchTheme.muted
+                    )
+                    .lineLimit(1)
             }
+
+            Spacer()
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(
+                .system(
+                    size: 9,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                WatchTheme.muted
+            )
         }
-        .padding(11)
-        .frame(maxWidth: .infinity, minHeight: 60)
-        .watchSurface(radius: 17)
+        .padding(10)
+        .watchSurface(
+            radius: 17
+        )
+    }
+
+    private var connectionRow: some View {
+        HStack(spacing: 6) {
+            Image(
+                systemName:
+                    routeStore
+                        .companionLinked
+                    ? "iphone.radiowaves.left.and.right"
+                    : "iphone.slash"
+            )
+            .font(
+                .system(size: 10)
+            )
+
+            Text(
+                routeStore
+                    .companionLinked
+                    ? "iPhone connected"
+                    : "Watch can record independently"
+            )
+            .font(
+                .system(
+                    size: 9,
+                    weight: .medium
+                )
+            )
+            .lineLimit(1)
+        }
+        .foregroundStyle(
+            WatchTheme.muted
+        )
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(.horizontal, 4)
+        .padding(.top, 2)
     }
 }
 
@@ -207,53 +352,120 @@ private struct WatchRoutesListView: View {
             VStack(spacing: 8) {
                 if routeStore.routes.isEmpty {
                     VStack(spacing: 8) {
-                        Image(systemName: "map")
-                            .font(.title2)
-                            .foregroundStyle(WatchTheme.green)
+                        Image(
+                            systemName: "map"
+                        )
+                        .font(.title2)
+                        .foregroundStyle(
+                            WatchTheme.accent
+                        )
 
                         Text("No routes yet")
                             .font(.headline)
 
-                        Text("Send a route from ATHLTH on iPhone.")
-                            .font(.caption2)
-                            .foregroundStyle(WatchTheme.muted)
-                            .multilineTextAlignment(.center)
+                        Text(
+                            "Send a route from ATHLTH on iPhone."
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            WatchTheme.muted
+                        )
+                        .multilineTextAlignment(
+                            .center
+                        )
                     }
                     .padding(14)
                     .watchSurface()
                 } else {
-                    ForEach(routeStore.routes) { route in
+                    ForEach(
+                        routeStore.routes
+                    ) { route in
                         NavigationLink {
-                            WatchRouteDetailView(route: route)
+                            WatchRouteDetailView(
+                                route: route
+                            )
                         } label: {
-                            HStack(spacing: 10) {
+                            HStack(
+                                spacing: 10
+                            ) {
                                 ZStack {
                                     Circle()
-                                        .fill(WatchTheme.green.opacity(0.10))
-                                        .frame(width: 34, height: 34)
+                                        .fill(
+                                            WatchTheme
+                                                .accent
+                                                .opacity(
+                                                    0.14
+                                                )
+                                        )
+                                        .frame(
+                                            width: 36,
+                                            height: 36
+                                        )
 
-                                    Image(systemName: "map")
-                                        .foregroundStyle(WatchTheme.green)
+                                    Image(
+                                        systemName:
+                                            "map.fill"
+                                    )
+                                    .foregroundStyle(
+                                        WatchTheme
+                                            .accent
+                                    )
                                 }
 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(route.title)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        route.title
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 13,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                    .lineLimit(1)
 
-                                    Text(String(format: "%.1f km", route.distanceKilometers))
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(WatchTheme.muted)
+                                    Text(
+                                        String(
+                                            format:
+                                                "%.1f km",
+                                            route
+                                                .distanceKilometers
+                                        )
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 10
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        WatchTheme
+                                            .muted
+                                    )
                                 }
 
                                 Spacer()
 
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(WatchTheme.muted)
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(
+                                    .system(
+                                        size: 9,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    WatchTheme.muted
+                                )
                             }
-                            .padding(11)
+                            .padding(10)
                             .watchSurface()
                         }
                         .buttonStyle(.plain)
@@ -263,7 +475,13 @@ private struct WatchRoutesListView: View {
             .padding(.horizontal, 8)
             .padding(.bottom, 10)
         }
-        .background(WatchTheme.canvas.ignoresSafeArea())
+        .background(
+            WatchTheme.canvas
+                .ignoresSafeArea()
+        )
+        .foregroundStyle(
+            WatchTheme.textPrimary
+        )
         .navigationTitle("Routes")
     }
 }
