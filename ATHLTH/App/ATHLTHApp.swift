@@ -313,6 +313,14 @@ struct AppRootView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                spotifyPlayback
+                    .applicationDidBecomeActive()
+            } else {
+                spotifyPlayback
+                    .applicationWillResignActive()
+            }
+
             phoneWorkout.checkpoint()
             if phase != .active {
                 strengthWorkout.checkpoint()
