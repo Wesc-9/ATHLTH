@@ -1428,7 +1428,8 @@ struct ATHLTHNotificationCenterView: View {
             return true
         }
 
-        if item.kind == .achievement {
+        if item.kind == .achievement ||
+            isActionable(item) {
             return true
         }
 
@@ -1459,22 +1460,29 @@ struct ATHLTHNotificationCenterView: View {
         } else if item.kind == .achievement {
             TrophyCollectionView()
         } else {
-            switch item.socialEventKind {
-            case "friend_request",
-                 "follow_request":
+            let eventKind =
+                item.socialEventKind?.lowercased() ?? ""
+
+            if eventKind == "friend_request" ||
+                eventKind == "follow_request" ||
+                eventKind.contains("workout_invite") {
                 SocialHubView(
                     initialTab: .requests
                 )
-            case "friend_accepted",
-                 "follow_accepted":
+            } else if eventKind == "friend_accepted" ||
+                eventKind == "follow_accepted" {
                 ProfileFollowListView(
                     mode: .following
                 )
-            case "reaction":
+            } else if eventKind == "reaction" {
                 SocialHubView(
                     initialTab: .feed
                 )
-            default:
+            } else if eventKind.contains("invite") ||
+                eventKind.hasPrefix("group_") ||
+                eventKind.contains("event") {
+                ATHLTHCommunityV4View()
+            } else {
                 SocialHubView(
                     initialTab: .feed
                 )
