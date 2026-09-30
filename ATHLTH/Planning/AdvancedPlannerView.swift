@@ -4825,7 +4825,13 @@ struct SessionEditorView: View {
             targetAlertConfiguration:
                 (kind == .running || kind == .walking)
                     ? workoutTargetAlertConfigurationForSave
-                    : nil
+                    : nil,
+            workoutTemplateID:
+                existingWorkout?.workoutTemplateID,
+            workoutBlocks:
+                existingWorkout?.workoutBlocks,
+            workoutCategory:
+                existingWorkout?.workoutCategory
         )
 
         if existingWorkout != nil,
