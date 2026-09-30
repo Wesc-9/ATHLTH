@@ -1468,21 +1468,7 @@ struct OfficialWeeklyChallengeCard: View {
 
                     Spacer(minLength: 8)
 
-                    if joined {
-                        NavigationLink {
-                            OfficialWeeklyChallengeDetailView(
-                                challengeID: challenge.id
-                            )
-                        } label: {
-                            Text("Continue")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .padding(.horizontal, 17)
-                                .frame(height: 42)
-                                .background(.white, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    } else {
+                    if !joined {
                         HStack(spacing: 9) {
                             NavigationLink {
                                 OfficialWeeklyChallengeDetailView(
