@@ -12,6 +12,23 @@ enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var localizedTitle: String {
+        switch self {
+        case .all:
+            return ATHLTHLocalization.string("All")
+        case .users:
+            return ATHLTHLocalization.string("People")
+        case .routes:
+            return ATHLTHLocalization.string("Routes")
+        case .groups:
+            return ATHLTHLocalization.string("Clubs")
+        case .events:
+            return ATHLTHLocalization.string("Events")
+        case .challenges:
+            return ATHLTHLocalization.string("Challenges")
+        }
+    }
+
     var icon: String {
         switch self {
         case .all: return "sparkles"
@@ -389,7 +406,7 @@ struct ATHLTHGlobalSearchView: View {
     @ViewBuilder
     private var categoryLanding: some View {
         VStack(alignment: .leading, spacing: 10) {
-            searchSectionTitle(scope.rawValue)
+            searchSectionTitle(scope.localizedTitle)
 
             ATHLTHCard {
                 HStack(spacing: 14) {
@@ -406,7 +423,13 @@ struct ATHLTHGlobalSearchView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Search \(scope.rawValue.lowercased())")
+                        Text(
+                            ATHLTHLocalization.format(
+                                english: "Search %@",
+                                norwegian: "Søk i %@",
+                                scope.localizedTitle.lowercased()
+                            )
+                        )
                             .font(.headline)
                         Text("Start typing to narrow ATHLTH to this category.")
                             .font(.caption)
