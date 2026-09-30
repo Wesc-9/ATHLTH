@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 // Community V4 is intentionally a social overview rather than another
@@ -869,22 +870,53 @@ private struct CommunityV4SocialSnapshot: View {
             }
 
             HStack(spacing: 8) {
-                metric(
-                    followers,
-                    "Followers"
-                )
-                metric(
-                    following,
-                    "Following"
-                )
-                metric(
-                    mutuals,
-                    "Mutual"
-                )
-                metric(
-                    online,
-                    "Online"
-                )
+                NavigationLink {
+                    ProfileFollowListView(
+                        mode: .followers
+                    )
+                } label: {
+                    metric(
+                        followers,
+                        "Followers"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    ProfileFollowListView(
+                        mode: .following
+                    )
+                } label: {
+                    metric(
+                        following,
+                        "Following"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    SocialHubView(
+                        initialTab: .friends
+                    )
+                } label: {
+                    metric(
+                        mutuals,
+                        "Mutual"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    SocialHubView(
+                        initialTab: .friends
+                    )
+                } label: {
+                    metric(
+                        online,
+                        "Online"
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(18)
