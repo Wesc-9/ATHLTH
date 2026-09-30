@@ -760,6 +760,146 @@
           }
         }
       }
+    },
+    "Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Løp"
+          }
+        }
+      }
+    },
+    "Walk": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gåtur"
+          }
+        }
+      }
+    },
+    "Strength": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrke"
+          }
+        }
+      }
+    },
+    "Functional": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funksjonell"
+          }
+        }
+      }
+    },
+    "Cycling": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sykling"
+          }
+        }
+      }
+    },
+    "Rowing": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Roing"
+          }
+        }
+      }
+    },
+    "Stairs": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trapper"
+          }
+        }
+      }
+    },
+    "Yoga": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yoga"
+          }
+        }
+      }
+    },
+    "Workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Økt"
+          }
+        }
+      }
+    },
+    "System": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        }
+      }
+    },
+    "English": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engelsk"
+          }
+        }
+      }
+    },
+    "Norsk": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Norsk"
+          }
+        }
+      }
+    },
+    "Haptic": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haptisk"
+          }
+        }
+      }
+    },
+    "Haptic + Voice": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haptisk + stemme"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
