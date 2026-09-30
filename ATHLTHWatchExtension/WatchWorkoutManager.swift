@@ -1089,6 +1089,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             toShare: shareTypes,
             read: readTypes
         )
+
+        if healthStore.authorizationStatus(
+            for: HKObjectType.workoutType()
+        ) == .sharingDenied {
+            throw WatchWorkoutError
+                .workoutAuthorizationDenied
+        }
     }
 
     private func startTimer() {
@@ -3553,6 +3560,7 @@ private extension WatchWorkoutManager {
 
 enum WatchWorkoutError: LocalizedError {
     case healthDataUnavailable
+    case workoutAuthorizationDenied
     case collectionCouldNotStart
     case collectionCouldNotEnd
     case workoutCouldNotSave
@@ -3561,6 +3569,8 @@ enum WatchWorkoutError: LocalizedError {
         switch self {
         case .healthDataUnavailable:
             return "HealthKit isn't available on this Apple Watch."
+        case .workoutAuthorizationDenied:
+            return "Allow ATHLTH to save workouts in Health on Apple Watch, then try again."
         case .collectionCouldNotStart:
             return "ATHLTH couldn't start workout data collection."
         case .collectionCouldNotEnd:
