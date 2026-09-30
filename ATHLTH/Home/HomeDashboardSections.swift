@@ -367,7 +367,15 @@ struct HomeThisWeekCard: View {
     }
 
     private var summaryRow: some View {
-        HStack(spacing: 8) {
+        LazyVGrid(
+            columns: [
+                GridItem(
+                    .adaptive(minimum: 88),
+                    spacing: 8
+                )
+            ],
+            spacing: 8
+        ) {
             compactMetric(
                 value: "\(completedWorkoutCount)",
                 title: "Sessions",
