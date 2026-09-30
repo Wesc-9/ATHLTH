@@ -1283,6 +1283,36 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func markChallengeInviteRead(
+        challengeID: UUID
+    ) async {
+        let matching = inboxEvents.filter {
+            $0.kind == "challenge_invite" &&
+            $0.entityID == challengeID &&
+            $0.readAt == nil
+        }
+
+        guard !matching.isEmpty else {
+            return
+        }
+
+        do {
+            for event in matching {
+                try await service
+                    .markInboxEventRead(
+                        event.id
+                    )
+            }
+
+            inboxEvents =
+                try await service
+                    .loadInboxEvents()
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
     private func resolveWorkoutInvite(
         _ invite: SocialWorkoutInviteDisplay,
         state: SocialWorkoutParticipantState
