@@ -1136,7 +1136,15 @@ final class SocialStore: ObservableObject {
                 subtitle: volume,
                 metadata: [
                     "workout_id": workout.id.uuidString,
-                    "kind": "strength"
+                    "kind": "strength",
+                    "duration_seconds": String(
+                        max(
+                            endedAt.timeIntervalSince(
+                                workout.startedAt
+                            ),
+                            0
+                        )
+                    )
                 ],
                 visibility: configuredVisibility
             )
@@ -1173,7 +1181,13 @@ final class SocialStore: ObservableObject {
                 subtitle: distance,
                 metadata: [
                     "workout_id": result.id.uuidString,
-                    "kind": result.kind.rawValue
+                    "kind": result.kind.rawValue,
+                    "distance_meters": String(
+                        max(result.distanceMeters, 0)
+                    ),
+                    "duration_seconds": String(
+                        max(result.duration, 0)
+                    )
                 ],
                 visibility: configuredVisibility
             )
