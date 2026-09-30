@@ -9,8 +9,19 @@ final class ATHLTHNotificationStore: ObservableObject {
     private let activationDate: Date
 
     init() {
-        items = Self.loadItems()
         activationDate = Self.loadOrCreateActivationDate()
+
+        // Raw workout-completion rows are activity history, not useful
+        // notifications. Purge legacy rows from older builds on first load.
+        let loadedItems = Self.loadItems()
+        items = loadedItems.filter {
+            $0.kind != .workoutCompleted
+        }
+
+        if items.count != loadedItems.count {
+            persist()
+        }
+
         Task {
             await refreshAuthorizationStatus()
         }
@@ -23,7 +34,10 @@ final class ATHLTHNotificationStore: ObservableObject {
     /// Direct-message events belong to the Messages inbox. Keeping them out of
     /// the bell prevents one request/message from producing two unread badges.
     var notificationCenterItems: [ATHLTHNotificationItem] {
-        items.filter { !isMessageInboxOwned($0) }
+        items.filter {
+            $0.kind != .workoutCompleted &&
+            !isMessageInboxOwned($0)
+        }
     }
 
     var notificationCenterUnreadCount: Int {
@@ -59,8 +73,12 @@ final class ATHLTHNotificationStore: ObservableObject {
             return preferenceEnabled("settings.challengeNotifications")
         }
 
+        if item.kind == .challenge {
+            return preferenceEnabled("settings.challengeNotifications")
+        }
+
         if item.kind == .workoutCompleted {
-            return preferenceEnabled("settings.workoutReminders")
+            return false
         }
 
         if item.kind == .social {
@@ -200,7 +218,7 @@ final class ATHLTHNotificationStore: ObservableObject {
                 add(
                     ATHLTHNotificationDraft(
                         eventKey: "challenge-\(challenge.id.uuidString)-created",
-                        kind: .social,
+                        kind: .challenge,
                         title: "Challenge created",
                         message: "\(challenge.title) is ready. Rules lock when it starts.",
                         createdAt: challenge.createdAt,
@@ -220,7 +238,7 @@ final class ATHLTHNotificationStore: ObservableObject {
                 add(
                     ATHLTHNotificationDraft(
                         eventKey: "challenge-\(challenge.id.uuidString)-attempt-\(attempt.id.uuidString)",
-                        kind: .social,
+                        kind: .challenge,
                         title: "New challenge result",
                         message: "\(attempt.participantName) posted \(attempt.detail) in \(challenge.title).",
                         createdAt: attempt.submittedAt,
@@ -236,7 +254,7 @@ final class ATHLTHNotificationStore: ObservableObject {
                 add(
                     ATHLTHNotificationDraft(
                         eventKey: "challenge-\(challenge.id.uuidString)-completed",
-                        kind: .social,
+                        kind: .challenge,
                         title: "Challenge completed",
                         message: "\(challenge.title) has finished. View the final leaderboard.",
                         createdAt: end,
@@ -255,46 +273,17 @@ final class ATHLTHNotificationStore: ObservableObject {
     }
 
     func recordWatchWorkout(_ result: WatchWorkoutResult) {
-        let distanceText: String
-        if result.distanceMeters >= 1 {
-            distanceText = String(format: " · %.2f km", result.distanceMeters / 1_000)
-        } else {
-            distanceText = ""
-        }
-
-        add(
-            ATHLTHNotificationDraft(
-                eventKey: "watch-workout-\(result.id.uuidString)-complete",
-                kind: .workoutCompleted,
-                title: "\(result.kind.title) completed",
-                message: "\(Self.durationText(result.duration))\(distanceText) · \(Int(result.activeCalories.rounded())) active kcal",
-                createdAt: result.endedAt,
-                workoutID: result.id
-            )
-        )
+        // Completion belongs in workout history / Activity Center. Keep this
+        // hook so existing call sites stay stable, but do not create a bell
+        // notification just because HealthKit/Watch finished a workout.
+        _ = result
     }
 
     func recordStrengthWorkout(_ workout: StrengthWorkoutLog) {
-        guard workout.captureDevice == .iPhone,
-              let endedAt = workout.endedAt
-        else {
-            return
-        }
-
-        let volumeText = workout.totalVolumeKilograms > 0
-            ? " · \(Self.kilogramsText(workout.totalVolumeKilograms)) kg volume"
-            : ""
-
-        add(
-            ATHLTHNotificationDraft(
-                eventKey: "strength-workout-\(workout.id.uuidString)-complete",
-                kind: .workoutCompleted,
-                title: "Strength workout completed",
-                message: "\(workout.title) · \(workout.totalCompletedSets) sets\(volumeText)",
-                createdAt: endedAt,
-                workoutID: workout.id
-            )
-        )
+        // Strength completion is handled by workout history and post-workout
+        // review. Notifications are reserved for meaningful follow-up such as
+        // PRs, milestones, challenges or issues that need attention.
+        _ = workout
     }
 
     func syncGearUsageAlerts(
