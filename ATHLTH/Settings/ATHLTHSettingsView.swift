@@ -2135,7 +2135,7 @@ private struct ATHLTHTrainingSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Guidance & alerts") {
+            Section {
                 NavigationLink {
                     ATHLTHWorkoutGuidanceSettingsView()
                 } label: {
@@ -2171,6 +2171,8 @@ private struct ATHLTHTrainingSettingsView: View {
                         .foregroundStyle(.secondary)
                     }
                 }
+            } header: {
+                Text("Guidance & alerts")
             } footer: {
                 Text(
                     "Open a guidance category to adjust it. Training no longer expands all route and audio controls into one long page."
