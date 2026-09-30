@@ -960,17 +960,26 @@ struct RunQuickStartSheet: View {
             onStart(
                 RunQuickStartConfiguration(
                     mode: mode,
-                    route: selectedRoute,
-                    workout: selectedWorkout,
+                    route:
+                        mode == .route
+                            ? selectedRoute
+                            : nil,
+                    workout:
+                        mode == .structured
+                            ? selectedWorkout
+                            : nil,
                     captureDevice: captureDevice,
                     audioCoach: audioCoachConfiguration,
                     routeAlerts:
                         routeGuardianDraft
                             .configuration,
                     ghostTargetDurationSeconds:
-                        ghostDraft
-                            .targetDuration,
+                        guidanceRoute != nil
+                            ? ghostDraft
+                                .targetDuration
+                            : nil,
                     ghostUpdates:
+                        guidanceRoute != nil &&
                         ghostDraft.enabled &&
                         ghostDraft.updatesEnabled
                             ? settings
@@ -1068,21 +1077,11 @@ struct RunQuickStartSheet: View {
             return .disabled
         }
 
-        let routeDistanceMeters: Double? = {
-            if let route = selectedRoute {
-                return route.distanceKilometers * 1_000
+        let routeDistanceMeters =
+            guidanceRoute.map {
+                $0.distanceKilometers *
+                    1_000
             }
-
-            if let workout = selectedWorkout,
-               let routeID = workout.routeID,
-               let route = session.savedRoutes.first(
-                    where: { $0.id == routeID }
-               ) {
-                return route.distanceKilometers * 1_000
-            }
-
-            return nil
-        }()
 
         return audioCoachDraft.configuration(
             routeDistanceMeters: routeDistanceMeters
