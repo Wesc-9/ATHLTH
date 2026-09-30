@@ -170,6 +170,7 @@ targets:
           - workout-processing
         UIBackgroundModes:
           - audio
+          - location
         WKSupportsAlwaysOnDisplay: true
     settings:
       base:
