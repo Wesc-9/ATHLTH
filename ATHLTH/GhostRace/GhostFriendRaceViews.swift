@@ -75,7 +75,7 @@ struct GhostFriendRaceHubView: View {
             }
 
             Section("Challenge a friend") {
-                if social.friends.isEmpty {
+                if social.mutualFollows.isEmpty {
                     ContentUnavailableView(
                         "No friends yet",
                         systemImage: "person.2",
@@ -91,7 +91,7 @@ struct GhostFriendRaceHubView: View {
                         Text("Choose friend")
                             .tag(UUID?.none)
 
-                        ForEach(social.friends) { friend in
+                        ForEach(social.mutualFollows) { friend in
                             Text(friend.resolvedName)
                                 .tag(Optional(friend.userID))
                         }
@@ -486,7 +486,7 @@ struct GhostFriendRaceHubView: View {
         guard let friendID =
                 selectedFriendID,
               let friend =
-                social.friends.first(
+                social.mutualFollows.first(
                     where: {
                         $0.userID == friendID
                     }
@@ -625,7 +625,7 @@ struct GhostFriendRaceHubView: View {
     private func profileName(
         _ userID: UUID
     ) -> String {
-        social.friends.first(
+        social.mutualFollows.first(
             where: {
                 $0.userID == userID
             }
