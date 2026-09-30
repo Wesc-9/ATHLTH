@@ -81,6 +81,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     private let pkceKeychainAccount = "spotify-pkce-session"
 
     private var pendingPlaybackURI: String?
+    private var pendingPlaybackPlaylist: SpotifyPlaylistReference?
     private var pkceSession: SpotifyPKCESession?
     private var webAuthenticationSession: ASWebAuthenticationSession?
     private var pkceCodeVerifier: String?
@@ -220,7 +221,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     func applicationDidBecomeActive() {
         guard let appRemote,
               !appRemote.isConnected,
-              pendingPlaybackURI != nil ||
+              pendingPlaybackPlaylist != nil ||
                 activePlaylist != nil
         else {
             return
@@ -263,6 +264,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         deleteStoredPKCESession()
         playlists = []
         activePlaylist = nil
+        pendingPlaybackURI = nil
+        pendingPlaybackPlaylist = nil
         lastStartedAt = nil
         lastErrorMessage = nil
         connectionState = isConfigured ? .disconnected : .unavailable
@@ -383,6 +386,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         lastStartedAt = nil
         lastErrorMessage = nil
         pendingPlaybackURI = playlist.uri
+        pendingPlaybackPlaylist = playlist
 
         guard let appRemote else {
             return
@@ -395,6 +399,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             lastErrorMessage =
                 "Reconnect Spotify before starting linked playback."
             pendingPlaybackURI = nil
+            pendingPlaybackPlaylist = nil
             return
         }
 
@@ -479,6 +484,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                         self?.lastStartedAt = Date()
                     }
                     self?.pendingPlaybackURI = nil
+                    self?.pendingPlaybackPlaylist = nil
                     continuation.resume()
                 }
             }
@@ -1173,11 +1179,11 @@ extension SpotifyPlaybackStore: SPTAppRemoteDelegate {
     ) {
         Task { @MainActor in
             self.connectionState = .connected
+            self.lastErrorMessage = nil
 
-            guard let uri = self.pendingPlaybackURI,
-                  let playlist =
-                    self.playlists.first(where: { $0.uri == uri })
-                        ?? self.activePlaylist
+            guard let playlist =
+                    self.pendingPlaybackPlaylist ??
+                    self.activePlaylist
             else {
                 return
             }
