@@ -5291,6 +5291,7 @@ struct ATHLTHRecoveryView: View {
                             )
                         } else {
                             recoveryScoreCard
+                            todaysSignalsCard
 
                             RecoveryReadinessBreakdownCard(
                                 recovery: health.recovery,
@@ -5624,6 +5625,18 @@ struct ATHLTHRecoveryView: View {
                     comparison: restingHRComparisonText,
                     icon: "heart.fill",
                     tint: .red
+                )
+
+                recoverySignalDivider
+
+                recoverySignalMetric(
+                    title: "Load",
+                    value:
+                        "\(Int(recoverySnapshot.trainingLoad.acuteMinutes.rounded())) min",
+                    comparison:
+                        "7d · strength + walk + run",
+                    icon: "chart.bar.fill",
+                    tint: .green
                 )
             }
             .padding(.top, 14)
