@@ -211,6 +211,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         // playback transport after ATHLTH has obtained a valid access token.
         connectionState = .connecting
         lastErrorMessage = nil
+        sessionManager?.session = nil
+        deleteStoredSession()
         pkceAuthorizationStarted = false
         beginPKCEAuthorizationIfNeeded()
     }
@@ -550,10 +552,17 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         pkceAuthorizationState = state
 
         guard let challenge = Self.codeChallenge(for: verifier),
-              let callbackScheme = URL(string: redirectURI)?.scheme
+              let callbackScheme =
+                URL(string: redirectURI)?
+                    .scheme
         else {
-            connectionState = .error("Could not prepare Spotify login.")
-            lastErrorMessage = "Could not prepare Spotify login."
+            pkceAuthorizationStarted = false
+            connectionState =
+                .error(
+                    "Could not prepare Spotify login."
+                )
+            lastErrorMessage =
+                "Could not prepare Spotify login."
             return
         }
 
@@ -579,9 +588,16 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             URLQueryItem(name: "state", value: state)
         ]
 
-        guard let authorizationURL = components?.url else {
-            connectionState = .error("Could not prepare Spotify login.")
-            lastErrorMessage = "Could not prepare Spotify login."
+        guard let authorizationURL =
+                components?.url
+        else {
+            pkceAuthorizationStarted = false
+            connectionState =
+                .error(
+                    "Could not prepare Spotify login."
+                )
+            lastErrorMessage =
+                "Could not prepare Spotify login."
             return
         }
 
@@ -698,7 +714,12 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                     TimeInterval(token.expiresIn)
                 )
             )
-            applyPKCESession(session, connectRemote: true)
+            // Account authorization is complete here. App Remote is connected
+            // lazily only when ATHLTH actually needs playback control.
+            applyPKCESession(
+                session,
+                connectRemote: false
+            )
             await refreshPlaylists()
         } catch {
             connectionState = .error(error.localizedDescription)
