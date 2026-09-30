@@ -14,8 +14,8 @@ enum CommunityGroupOrganizerKind:
 
     var title: String {
         switch self {
-        case .person: return String(localized: "Person")
-        case .group: return String(localized: "Group")
+        case .person: return ATHLTHLocalization.string( "Person")
+        case .group: return ATHLTHLocalization.string( "Group")
         }
     }
 
@@ -63,22 +63,22 @@ enum CommunityGroupScoringMode:
     var title: String {
         switch self {
         case .cumulative:
-            return String(localized: "Cumulative")
+            return ATHLTHLocalization.string( "Cumulative")
         case .bestAttempt:
-            return String(localized: "Best Attempt")
+            return ATHLTHLocalization.string( "Best Attempt")
         case .completeTarget:
-            return String(localized: "Complete Target")
+            return ATHLTHLocalization.string( "Complete Target")
         }
     }
 
     var subtitle: String {
         switch self {
         case .cumulative:
-            return String(localized: "All qualifying workouts add to the result.")
+            return ATHLTHLocalization.string( "All qualifying workouts add to the result.")
         case .bestAttempt:
-            return String(localized: "Only the participant's best qualifying attempt counts.")
+            return ATHLTHLocalization.string( "Only the participant's best qualifying attempt counts.")
         case .completeTarget:
-            return String(localized: "Progress counts until the target is completed.")
+            return ATHLTHLocalization.string( "Progress counts until the target is completed.")
         }
     }
 }
@@ -103,21 +103,21 @@ enum CommunityGroupChallengeGoalPreset:
     var title: String {
         switch self {
         case .mostDistance:
-            return String(localized: "Most Distance")
+            return ATHLTHLocalization.string( "Most Distance")
         case .fastestTime:
-            return String(localized: "Fastest Time")
+            return ATHLTHLocalization.string( "Fastest Time")
         case .mostCompletions:
-            return String(localized: "Most Completions")
+            return ATHLTHLocalization.string( "Most Completions")
         case .mostActiveMinutes:
-            return String(localized: "Most Active Minutes")
+            return ATHLTHLocalization.string( "Most Active Minutes")
         case .strengthVolume:
-            return String(localized: "Total Volume")
+            return ATHLTHLocalization.string( "Total Volume")
         case .heaviestWeight:
-            return String(localized: "Heaviest Weight")
+            return ATHLTHLocalization.string( "Heaviest Weight")
         case .strengthReps:
-            return String(localized: "Total Reps")
+            return ATHLTHLocalization.string( "Total Reps")
         case .completeTarget:
-            return String(localized: "Complete Target")
+            return ATHLTHLocalization.string( "Complete Target")
         }
     }
 
