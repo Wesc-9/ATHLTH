@@ -20734,6 +20734,46 @@
           }
         }
       }
+    },
+    "1 workout completed today.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 økt fullført i dag."
+          }
+        }
+      }
+    },
+    "%d workouts completed today.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d økter fullført i dag."
+          }
+        }
+      }
+    },
+    "+%d more session planned today": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%d ekstra økt planlagt i dag"
+          }
+        }
+      }
+    },
+    "+%d more sessions planned today": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%d ekstra økter planlagt i dag"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
