@@ -12034,6 +12034,2456 @@
           }
         }
       }
+    },
+    "A healthier\nyou, further": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Et sunnere\ndeg, videre"
+          }
+        }
+      }
+    },
+    "Turning sync off keeps the calendar and its current events. Removing the calendar deletes the dedicated ATHLTH calendar.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Å slå av synkronisering beholder kalenderen og eksisterende hendelser. Å fjerne kalenderen sletter den dedikerte ATHLTH-kalenderen."
+          }
+        }
+      }
+    },
+    "This removes the dedicated ATHLTH calendar and all workout events synced into it. Your ATHLTH training plan is not changed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette fjerner den dedikerte ATHLTH-kalenderen og alle økter som er synkronisert til den. Treningsplanen din i ATHLTH endres ikke."
+          }
+        }
+      }
+    },
+    "APPLE WATCH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "APPLE WATCH"
+          }
+        }
+      }
+    },
+    "iPhone and Apple Watch are chosen for each workout when you press Start. This screen only manages your Watch connection.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone eller Apple Watch velges for hver økt når du trykker Start. Denne skjermen administrerer bare Watch-tilkoblingen."
+          }
+        }
+      }
+    },
+    "Garmin Connect": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garmin Connect"
+          }
+        }
+      }
+    },
+    "Garmin integration is coming soon": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garmin-integrasjon kommer snart"
+          }
+        }
+      }
+    },
+    "When Garmin access is enabled, this screen will guide you through account authorization, permissions and the data ATHLTH can sync.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når Garmin-tilgang aktiveres, veileder denne skjermen deg gjennom kontoautorisasjon, tillatelser og hvilke data ATHLTH kan synkronisere."
+          }
+        }
+      }
+    },
+    "Planned sync": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planlagt synkronisering"
+          }
+        }
+      }
+    },
+    "Strength tracking": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Styrkeregistrering"
+          }
+        }
+      }
+    },
+    "Open a guidance category to adjust it. Training no longer expands all route and audio controls into one long page.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Åpne en veiledningskategori for å justere den. Trening viser ikke lenger alle rute- og lydkontroller på én lang side."
+          }
+        }
+      }
+    },
+    "Share completed workouts by default": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del fullførte økter som standard"
+          }
+        }
+      }
+    },
+    "Automatic visibility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisk synlighet"
+          }
+        }
+      }
+    },
+    "ATHLTH preselects your sharing visibility, but Workout Complete always opens before anything is published.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH forhåndsvelger delingssynlighet, men Økt fullført åpnes alltid før noe publiseres."
+          }
+        }
+      }
+    },
+    "Completed workouts default to private. Workout Complete still opens after every session so you can choose what to share.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullførte økter er private som standard. Økt fullført åpnes fortsatt etter hver økt slik at du kan velge hva som skal deles."
+          }
+        }
+      }
+    },
+    "Workout updates": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktoppdateringer"
+          }
+        }
+      }
+    },
+    "Friend activity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venneaktivitet"
+          }
+        }
+      }
+    },
+    "Mentions": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Omtaler"
+          }
+        }
+      }
+    },
+    "These switches control system alerts. Events can still appear in the ATHLTH notification center so you do not lose your activity history.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disse bryterne styrer systemvarsler. Hendelser kan fortsatt vises i ATHLTH-varslingssenteret slik at du ikke mister aktivitetshistorikken."
+          }
+        }
+      }
+    },
+    "Remove ATHLTH Calendar?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjerne ATHLTH-kalender?"
+          }
+        }
+      }
+    },
+    "Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klokke"
+          }
+        }
+      }
+    },
+    "Garmin Setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garmin-oppsett"
+          }
+        }
+      }
+    },
+    "Included": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inkludert"
+          }
+        }
+      }
+    },
+    "ATHLTH profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-profil"
+          }
+        }
+      }
+    },
+    "Training plans and templates": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsplaner og maler"
+          }
+        }
+      }
+    },
+    "Saved workout templates": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagrede øktmaler"
+          }
+        }
+      }
+    },
+    "Saved routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagrede ruter"
+          }
+        }
+      }
+    },
+    "Social privacy settings": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sosiale personverninnstillinger"
+          }
+        }
+      }
+    },
+    "App preferences": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appinnstillinger"
+          }
+        }
+      }
+    },
+    "Apple Health / HealthKit and third-party wearable source data are not included. Source health data remains under the connected provider’s permissions and export controls.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health / HealthKit og kildedata fra tredjeparts wearables er ikke inkludert. Helsekildedata forblir under den tilkoblede leverandørens tillatelser og eksportkontroller."
+          }
+        }
+      }
+    },
+    "Share ATHLTH Export": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del ATHLTH-eksport"
+          }
+        }
+      }
+    },
+    "Prepare Export": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klargjør eksport"
+          }
+        }
+      }
+    },
+    "Export Data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eksporter data"
+          }
+        }
+      }
+    },
+    "Enable by default": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiver som standard"
+          }
+        }
+      }
+    },
+    "Every distance interval": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvert distanseintervall"
+          }
+        }
+      }
+    },
+    "Every time interval": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvert tidsintervall"
+          }
+        }
+      }
+    },
+    "Announce current / next step": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les opp gjeldende / neste steg"
+          }
+        }
+      }
+    },
+    "Remaining time in step": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående tid i steg"
+          }
+        }
+      }
+    },
+    "Remaining distance in step": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstående distanse i steg"
+          }
+        }
+      }
+    },
+    "System uses the recording device language when an appropriate voice is available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Systemet bruker språket på registreringsenheten når en passende stemme er tilgjengelig."
+          }
+        }
+      }
+    },
+    "Delete ATHLTH account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett ATHLTH-konto"
+          }
+        }
+      }
+    },
+    "This permanently deletes your ATHLTH account and cloud data associated with it. This action cannot be undone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette sletter ATHLTH-kontoen din og tilknyttede skydata permanent. Handlingen kan ikke angres."
+          }
+        }
+      }
+    },
+    "Health data stored in Apple Health is managed by Apple Health and is not deleted by ATHLTH.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helsedata lagret i Apple Health administreres av Apple Health og slettes ikke av ATHLTH."
+          }
+        }
+      }
+    },
+    "If you have an active App Store subscription, deleting your ATHLTH account does not automatically cancel that subscription.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvis du har et aktivt App Store-abonnement, blir det ikke automatisk kansellert når ATHLTH-kontoen slettes."
+          }
+        }
+      }
+    },
+    "Sign in with Apple": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logg på med Apple"
+          }
+        }
+      }
+    },
+    "Apple access is revoked with account deletion": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple-tilgang tilbakekalles når kontoen slettes"
+          }
+        }
+      }
+    },
+    "Delete account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett konto"
+          }
+        }
+      }
+    },
+    "Delete account permanently": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett konto permanent"
+          }
+        }
+      }
+    },
+    "Your ATHLTH cloud account and associated ATHLTH data will be deleted. This cannot be undone.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-skykontoen og tilknyttede ATHLTH-data slettes. Dette kan ikke angres."
+          }
+        }
+      }
+    },
+    "Delete Account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett konto"
+          }
+        }
+      }
+    },
+    "Permanently delete your ATHLTH account?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette ATHLTH-kontoen permanent?"
+          }
+        }
+      }
+    },
+    "ATHLTH account deleted": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH-konto slettet"
+          }
+        }
+      }
+    },
+    "Display name, username, bio and profile photo are social profile data. Health details remain private and are managed separately.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visningsnavn, brukernavn, bio og profilbilde er sosiale profildata. Helsedetaljer forblir private og håndteres separat."
+          }
+        }
+      }
+    },
+    "Public identity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offentlig identitet"
+          }
+        }
+      }
+    },
+    "Your photo follows your profile visibility settings.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildet følger innstillingene for profilsynlighet."
+          }
+        }
+      }
+    },
+    "Username": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukernavn"
+          }
+        }
+      }
+    },
+    "Bio": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bio"
+          }
+        }
+      }
+    },
+    "Not set": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke angitt"
+          }
+        }
+      }
+    },
+    "Manage gear": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Administrer utstyr"
+          }
+        }
+      }
+    },
+    "Current username": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjeldende brukernavn"
+          }
+        }
+      }
+    },
+    "Use at least 3 characters.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruk minst 3 tegn."
+          }
+        }
+      }
+    },
+    "Checking availability…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekker tilgjengelighet…"
+          }
+        }
+      }
+    },
+    "Username available": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukernavn tilgjengelig"
+          }
+        }
+      }
+    },
+    "Username unavailable or invalid": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brukernavn utilgjengelig eller ugyldig"
+          }
+        }
+      }
+    },
+    "Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health"
+          }
+        }
+      }
+    },
+    "ATHLTH uses only profile values Apple Health makes available. You can add or edit missing values below.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH bruker bare profilverdier Apple Health gjør tilgjengelig. Du kan legge til eller redigere manglende verdier nedenfor."
+          }
+        }
+      }
+    },
+    "Private health profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privat helseprofil"
+          }
+        }
+      }
+    },
+    "Date of birth, sex, weight, height and maximum heart rate stay private. Sharing health metrics always requires a separate explicit action.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fødselsdato, kjønn, vekt, høyde og maksimalpuls forblir private. Deling av helsemålinger krever alltid en separat, eksplisitt handling."
+          }
+        }
+      }
+    },
+    "Sex for health calculations": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kjønn for helseberegninger"
+          }
+        }
+      }
+    },
+    "If you know your tested or measured maximum heart rate, enter it here. ATHLTH will use this value instead of an estimated max when calculating heart-rate zones.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvis du kjenner testet eller målt maksimalpuls, legg den inn her. ATHLTH bruker denne verdien i stedet for estimert maks ved beregning av pulssoner."
+          }
+        }
+      }
+    },
+    "Remove value": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern verdi"
+          }
+        }
+      }
+    },
+    "Social & Messages": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sosialt og meldinger"
+          }
+        }
+      }
+    },
+    "Allow friend requests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat venneforespørsler"
+          }
+        }
+      }
+    },
+    "Friends + requests": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venner + forespørsler"
+          }
+        }
+      }
+    },
+    "Friends only": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kun venner"
+          }
+        }
+      }
+    },
+    "Message requests allow one initial message from people who are not yet your friends. Blocking always stops messaging.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meldingsforespørsler tillater én første melding fra personer som ennå ikke er vennene dine. Blokkering stopper alltid meldinger."
+          }
+        }
+      }
+    },
+    "What Others Can See": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette kan andre se"
+          }
+        }
+      }
+    },
+    "Performance stats": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prestasjonsstatistikk"
+          }
+        }
+      }
+    },
+    "Trophy cabinet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troféskap"
+          }
+        }
+      }
+    },
+    "Completed goals": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullførte mål"
+          }
+        }
+      }
+    },
+    "These controls decide which profile sections are shared with viewers allowed by your profile visibility.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disse valgene bestemmer hvilke profilseksjoner som deles med personer som har tilgang i henhold til profilsynligheten din."
+          }
+        }
+      }
+    },
+    "Changes could not be saved": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endringene kunne ikke lagres"
+          }
+        }
+      }
+    },
+    "Retry": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prøv igjen"
+          }
+        }
+      }
+    },
+    "Changes save automatically": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endringer lagres automatisk"
+          }
+        }
+      }
+    },
+    "Activities": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiviteter"
+          }
+        }
+      }
+    },
+    "Default activity visibility": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard synlighet for aktivitet"
+          }
+        }
+      }
+    },
+    "You can still change visibility during post-workout review before an activity is shared.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kan fortsatt endre synlighet i gjennomgangen etter økten før en aktivitet deles."
+          }
+        }
+      }
+    },
+    "Leaderboards only use activity that is already visible to the viewer.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ledertavler bruker bare aktivitet som allerede er synlig for seeren."
+          }
+        }
+      }
+    },
+    "Routes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruter"
+          }
+        }
+      }
+    },
+    "Hide route start & end": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skjul rutestart og -slutt"
+          }
+        }
+      }
+    },
+    "Routes are shared only when you explicitly choose to share them.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ruter deles bare når du eksplisitt velger å dele dem."
+          }
+        }
+      }
+    },
+    "Health Data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helsedata"
+          }
+        }
+      }
+    },
+    "Health data is private by default": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helsedata er private som standard"
+          }
+        }
+      }
+    },
+    "Heart rate, sleep, weight and other Apple Health values are never attached automatically when you share a workout, route or plan.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puls, søvn, vekt og andre Apple Health-verdier legges aldri automatisk ved når du deler en økt, rute eller plan."
+          }
+        }
+      }
+    },
+    "ATHLTH Coach & AI": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach og AI"
+          }
+        }
+      }
+    },
+    "Allow Coach to use health data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat at Coach bruker helsedata"
+          }
+        }
+      }
+    },
+    "This is separate from Apple Health permission, cloud backup and personalized offers.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette er separat fra Apple Health-tillatelse, sikkerhetskopiering i skyen og personlige tilbud."
+          }
+        }
+      }
+    },
+    "Personalization": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personalisering"
+          }
+        }
+      }
+    },
+    "Personalized ATHLTH offers": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personlige ATHLTH-tilbud"
+          }
+        }
+      }
+    },
+    "Uses only goals and interests you choose in ATHLTH. Apple Health / HealthKit data is excluded from offer targeting.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bruker bare mål og interesser du velger i ATHLTH. Apple Health / HealthKit-data brukes ikke til målretting av tilbud."
+          }
+        }
+      }
+    },
+    "Safety": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sikkerhet"
+          }
+        }
+      }
+    },
+    "Blocked users": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blokkerte brukere"
+          }
+        }
+      }
+    },
+    "Account": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto"
+          }
+        }
+      }
+    },
+    "Security": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sikkerhet"
+          }
+        }
+      }
+    },
+    "Change Password": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endre passord"
+          }
+        }
+      }
+    },
+    "ATHLTH sends a secure password-reset link to your account email.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH sender en sikker lenke for tilbakestilling av passord til kontoens e-postadresse."
+          }
+        }
+      }
+    },
+    "Secured with Sign in with Apple": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sikret med Logg på med Apple"
+          }
+        }
+      }
+    },
+    "Your Apple ID controls authentication for this ATHLTH account.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple-ID-en din styrer autentisering for denne ATHLTH-kontoen."
+          }
+        }
+      }
+    },
+    "Your data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dine data"
+          }
+        }
+      }
+    },
+    "Export ATHLTH Data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eksporter ATHLTH-data"
+          }
+        }
+      }
+    },
+    "Sign Out": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logg ut"
+          }
+        }
+      }
+    },
+    "Deleting your account is permanent. Signing out keeps your account and clears account-specific cached data from this device.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sletting av kontoen er permanent. Utlogging beholder kontoen, men tømmer kontospesifikke hurtigbufferdata fra denne enheten."
+          }
+        }
+      }
+    },
+    "Developer Setup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utvikleroppsett"
+          }
+        }
+      }
+    },
+    "Spotify client ID is not configured for this build.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spotify-klient-ID er ikke konfigurert for denne builden."
+          }
+        }
+      }
+    },
+    "Workout Playback": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avspilling under økt"
+          }
+        }
+      }
+    },
+    "Start linked playlist with workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start koblet spilleliste med økten"
+          }
+        }
+      }
+    },
+    "Browse Spotify playlists": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utforsk Spotify-spillelister"
+          }
+        }
+      }
+    },
+    "A program can link one Spotify playlist. On iPhone, ATHLTH can wake Spotify and start that playlist when the workout begins. Apple Watch workouts never wait for Spotify.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Et program kan kobles til én Spotify-spilleliste. På iPhone kan ATHLTH vekke Spotify og starte spillelisten når økten begynner. Apple Watch-økter venter aldri på Spotify."
+          }
+        }
+      }
+    },
+    "Refresh Playlists": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oppdater spillelister"
+          }
+        }
+      }
+    },
+    "Disconnect Spotify": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koble fra Spotify"
+          }
+        }
+      }
+    },
+    "ATHLTH signs in with Spotify using Authorization Code + PKCE, then keeps the refresh token securely in Keychain. App Remote is used only when playback control is needed.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH logger på Spotify med Authorization Code + PKCE og lagrer deretter refresh-tokenet sikkert i Keychain. App Remote brukes bare når avspillingskontroll er nødvendig."
+          }
+        }
+      }
+    },
+    "Status": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
+    "Spotify redirect URI": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spotify redirect-URI"
+          }
+        }
+      }
+    },
+    "If Spotify reports a redirect or authorization error, this value must match the Redirect URI in Spotify Developer Dashboard exactly.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hvis Spotify rapporterer en redirect- eller autorisasjonsfeil, må denne verdien samsvare nøyaktig med Redirect URI i Spotify Developer Dashboard."
+          }
+        }
+      }
+    },
+    "Watch-only training stays independent. ATHLTH will not show an “open Spotify first” prompt and will never block Start Workout because Spotify is unavailable.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trening kun på Watch forblir uavhengig. ATHLTH viser ikke en «åpne Spotify først»-melding og blokkerer aldri Start økt fordi Spotify er utilgjengelig."
+          }
+        }
+      }
+    },
+    "Change profile photo": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bytt profilbilde"
+          }
+        }
+      }
+    },
+    "Health Profile": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helseprofil"
+          }
+        }
+      }
+    },
+    "Privacy & Data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personvern og data"
+          }
+        }
+      }
+    },
+    "Account & Security": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto og sikkerhet"
+          }
+        }
+      }
+    },
+    "Sign out of ATHLTH?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logge ut av ATHLTH?"
+          }
+        }
+      }
+    },
+    "Share training history with Coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del treningshistorikk med Coach"
+          }
+        }
+      }
+    },
+    "Cloud backup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sikkerhetskopi i skyen"
+          }
+        }
+      }
+    },
+    "Allow cloud backup of my training data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat sikkerhetskopiering av treningsdata i skyen"
+          }
+        }
+      }
+    },
+    "Back up now": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sikkerhetskopier nå"
+          }
+        }
+      }
+    },
+    "Stop backup on all devices": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopp sikkerhetskopiering på alle enheter"
+          }
+        }
+      }
+    },
+    "Find cloud backups": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finn sikkerhetskopier i skyen"
+          }
+        }
+      }
+    },
+    "Delete cloud backups": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett sikkerhetskopier i skyen"
+          }
+        }
+      }
+    },
+    "Finish your active workout before restoring a backup.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullfør den aktive økten før du gjenoppretter en sikkerhetskopi."
+          }
+        }
+      }
+    },
+    "Older data on this phone": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eldre data på denne telefonen"
+          }
+        }
+      }
+    },
+    "Older goals and strength logs have no recorded account owner. Restore them only if they belong to you.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eldre mål og styrkelogger har ingen registrert kontoeier. Gjenopprett dem bare hvis de tilhører deg."
+          }
+        }
+      }
+    },
+    "These are my goals and workouts — restore": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette er mine mål og økter — gjenopprett"
+          }
+        }
+      }
+    },
+    "This turns off automatic backup. Training data on your phone stays unchanged.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette slår av automatisk sikkerhetskopiering. Treningsdata på telefonen forblir uendret."
+          }
+        }
+      }
+    },
+    "Restore my data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenopprett dataene mine"
+          }
+        }
+      }
+    },
+    "Restore backup": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenopprett sikkerhetskopi"
+          }
+        }
+      }
+    },
+    "Training data & Coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsdata og Coach"
+          }
+        }
+      }
+    },
+    "Delete all cloud backups for this account?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette alle sikkerhetskopier i skyen for denne kontoen?"
+          }
+        }
+      }
+    },
+    "Restore older data to this account?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenopprette eldre data til denne kontoen?"
+          }
+        }
+      }
+    },
+    "Replace this phone’s saved training data with the selected backup?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erstatte lagrede treningsdata på denne telefonen med valgt sikkerhetskopi?"
+          }
+        }
+      }
+    },
+    "Live Workout Display": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-visning av økt"
+          }
+        }
+      }
+    },
+    "Choose what ATHLTH can surface during an active workout. Smart Priority automatically shows the most useful signal right now.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg hva ATHLTH kan vise under en aktiv økt. Smart prioritet viser automatisk det mest nyttige signalet akkurat nå."
+          }
+        }
+      }
+    },
+    "Dynamic Island & Live Activity": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dynamic Island og Live Activity"
+          }
+        }
+      }
+    },
+    "Apple Watch Live Info": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-info på Apple Watch"
+          }
+        }
+      }
+    },
+    "Smart Priority": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart prioritet"
+          }
+        }
+      }
+    },
+    "Guidance haptics": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haptiske veiledningsvarsler"
+          }
+        }
+      }
+    },
+    "Guidance voice alerts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talevarsler for veiledning"
+          }
+        }
+      }
+    },
+    "ATHLTH EVERYWHERE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH OVERALT"
+          }
+        }
+      }
+    },
+    "Widgets & Surfaces": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Widgets og flater"
+          }
+        }
+      }
+    },
+    "This is the home for how ATHLTH appears outside the app — on your Home Screen, during live workouts, through Siri and on the Lock Screen.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her styrer du hvordan ATHLTH vises utenfor appen — på Hjem-skjermen, under live-økter, via Siri og på låseskjermen."
+          }
+        }
+      }
+    },
+    "Good": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bra"
+          }
+        }
+      }
+    },
+    "Outdoor Run": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utendørsløp"
+          }
+        }
+      }
+    },
+    "Recovery 82": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon 82"
+          }
+        }
+      }
+    },
+    "In progress": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pågår"
+          }
+        }
+      }
+    },
+    "Available in iOS": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilgjengelig i iOS"
+          }
+        }
+      }
+    },
+    "Workout guidance": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktveiledning"
+          }
+        }
+      }
+    },
+    "Off-route alerts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsler ved ruteavvik"
+          }
+        }
+      }
+    },
+    "Route Guardian is independent from Audio Coach and Ghost Updates. Critical route warnings have the highest guidance priority.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Route Guardian er uavhengig av Audio Coach og Ghost-oppdateringer. Kritiske rutevarsler har høyest prioritet."
+          }
+        }
+      }
+    },
+    "Repeat while off route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenta mens du er utenfor ruten"
+          }
+        }
+      }
+    },
+    "Ghost remains visible even when spoken updates are off. These settings apply to iPhone and Apple Watch.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost forblir synlig selv når taleoppdateringer er slått av. Disse innstillingene gjelder iPhone og Apple Watch."
+          }
+        }
+      }
+    },
+    "Periodic race status": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Periodisk løpsstatus"
+          }
+        }
+      }
+    },
+    "Periodic delivery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Periodisk levering"
+          }
+        }
+      }
+    },
+    "Lead changes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endringer i ledelse"
+          }
+        }
+      }
+    },
+    "Meaningful lead changes": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Betydelige endringer i ledelse"
+          }
+        }
+      }
+    },
+    "Change threshold": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terskel for endring"
+          }
+        }
+      }
+    },
+    "Normal lead change": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normal endring i ledelse"
+          }
+        }
+      }
+    },
+    "Important change": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viktig endring"
+          }
+        }
+      }
+    },
+    "Important delivery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viktig varsling"
+          }
+        }
+      }
+    },
+    "A switch from ahead to behind is always treated as important. Important Ghost events can use voice; smaller changes can stay haptic-only.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Et skifte fra foran til bak behandles alltid som viktig. Viktige Ghost-hendelser kan bruke tale; mindre endringer kan kun bruke haptikk."
+          }
+        }
+      }
+    },
+    "Master delivery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hovedvarsling"
+          }
+        }
+      }
+    },
+    "Haptic alerts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haptiske varsler"
+          }
+        }
+      }
+    },
+    "Voice alerts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talevarsler"
+          }
+        }
+      }
+    },
+    "These master switches control Route Guardian, target and Ghost alerts. Routine Audio Coach has its own on/off setting.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disse hovedbryterne styrer Route Guardian-, mål- og Ghost-varsler. Vanlige Audio Coach-varsler har egen av/på-innstilling."
+          }
+        }
+      }
+    },
+    "Priority order": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prioritetsrekkefølge"
+          }
+        }
+      }
+    },
+    "After an important cue": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etter et viktig varsel"
+          }
+        }
+      }
+    },
+    "Quiet period": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stilleperiode"
+          }
+        }
+      }
+    },
+    "Routine Audio Coach and periodic Ghost updates are dropped during this period instead of being queued and played late.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vanlige Audio Coach-varsler og periodiske Ghost-oppdateringer droppes i denne perioden i stedet for å bli lagt i kø og spilt av for sent."
+          }
+        }
+      }
+    },
+    "Alert Priority": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varslingsprioritet"
+          }
+        }
+      }
+    },
+    "Read all": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marker alle som lest"
+          }
+        }
+      }
+    },
+    "Import All": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer alle"
+          }
+        }
+      }
+    },
+    "Ignore Selected": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignorer valgte"
+          }
+        }
+      }
+    },
+    "Ignore All": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignorer alle"
+          }
+        }
+      }
+    },
+    "More": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mer"
+          }
+        }
+      }
+    },
+    "All quiet for now": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alt er rolig foreløpig"
+          }
+        }
+      }
+    },
+    "Completed workouts, milestones, goal updates and community activity will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullførte økter, milepæler, måloppdateringer og fellesskapsaktivitet vises her."
+          }
+        }
+      }
+    },
+    "New updates in this category will appear here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nye oppdateringer i denne kategorien vises her."
+          }
+        }
+      }
+    },
+    "Import": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer"
+          }
+        }
+      }
+    },
+    "Ignore": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignorer"
+          }
+        }
+      }
+    },
+    "Mark as Read": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marker som lest"
+          }
+        }
+      }
+    },
+    "Stay connected to your progress": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold kontakten med fremgangen din"
+          }
+        }
+      }
+    },
+    "ATHLTH can let you know when a workout is ready, a goal moves forward, you reach a milestone or something important happens in your community.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH kan varsle deg når en økt er klar, et mål beveger seg fremover, du når en milepæl eller noe viktig skjer i fellesskapet."
+          }
+        }
+      }
+    },
+    "Allow notifications": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat varsler"
+          }
+        }
+      }
+    },
+    "Not now": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke nå"
+          }
+        }
+      }
+    },
+    "Dismiss alert prompt": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lukk varslingsspørsmål"
+          }
+        }
+      }
+    },
+    "Smarter training with ATHLTH AI and Audio Coach.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smartere trening med ATHLTH AI og Audio Coach."
+          }
+        }
+      }
+    },
+    "Your 7-day free access is already active.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Din 7-dagers gratis tilgang er allerede aktiv."
+          }
+        }
+      }
+    },
+    "Included with ATHLTH+": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inkludert med ATHLTH+"
+          }
+        }
+      }
+    },
+    "Choose a plan": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg abonnement"
+          }
+        }
+      }
+    },
+    "No subscription starts automatically. If you subscribe now, the App Store subscription starts now and auto-renews until canceled.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen abonnement starter automatisk. Hvis du abonnerer nå, starter App Store-abonnementet nå og fornyes automatisk til det avsluttes."
+          }
+        }
+      }
+    },
+    "Restoring…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenoppretter…"
+          }
+        }
+      }
+    },
+    "Restore Purchases": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenopprett kjøp"
+          }
+        }
+      }
+    },
+    "Plans aren’t available yet": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abonnementer er ikke tilgjengelige ennå"
+          }
+        }
+      }
+    },
+    "Monthly and Yearly App Store plans will appear here when they are available.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Måneds- og årsabonnementer fra App Store vises her når de er tilgjengelige."
+          }
+        }
+      }
+    },
+    "BEST VALUE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BEST VERDI"
+          }
+        }
+      }
+    },
+    "Flexible monthly billing": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fleksibel månedlig fakturering"
+          }
+        }
+      }
+    },
+    "Install ATHLTH on Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installer ATHLTH på Apple Watch"
+          }
+        }
+      }
+    },
+    "Your Watch is paired — only the ATHLTH app is missing.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klokken din er paret — bare ATHLTH-appen mangler."
+          }
+        }
+      }
+    },
+    "When you return to ATHLTH, installation status is checked automatically.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Når du går tilbake til ATHLTH, sjekkes installasjonsstatus automatisk."
+          }
+        }
+      }
+    },
+    "Check Apple Watch again": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sjekk Apple Watch på nytt"
+          }
+        }
+      }
+    },
+    "How the check works": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slik fungerer sjekken"
+          }
+        }
+      }
+    },
+    "“Background” is normal when the Watch app is not open. Apple only reports immediate reachability while the counterpart app is active; background transfers can still work.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«Bakgrunn» er normalt når Watch-appen ikke er åpen. Apple rapporterer bare umiddelbar tilgjengelighet når motpartens app er aktiv; bakgrunnsoverføringer kan fortsatt fungere."
+          }
+        }
+      }
+    },
+    "Start an ATHLTH workout on Apple Watch to mirror it here.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start en ATHLTH-økt på Apple Watch for å speile den her."
+          }
+        }
+      }
+    },
+    "LIVE GHOST": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LIVE GHOST"
+          }
+        }
+      }
+    },
+    "LIVE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LIVE"
+          }
+        }
+      }
+    },
+    "EST. GAP": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EST. AVSTAND"
+          }
+        }
+      }
+    },
+    "approx.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ca."
+          }
+        }
+      }
+    },
+    "Waiting for the runner's next live position…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venter på løperens neste live-posisjon…"
+          }
+        }
+      }
+    },
+    "Live map": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-kart"
+          }
+        }
+      }
+    },
+    "Stop Ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopp Ghost"
+          }
+        }
+      }
+    },
+    "Live from Apple Watch": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live fra Apple Watch"
+          }
+        }
+      }
+    },
+    "Finish & save": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslutt og lagre"
+          }
+        }
+      }
+    },
+    "Keep your iPhone with you throughout the workout. GPS measures distance and pace outdoors. Heart rate and calories are not estimated.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ha iPhone med deg gjennom hele økten. GPS måler distanse og tempo utendørs. Puls og kalorier estimeres ikke."
+          }
+        }
+      }
+    },
+    "Resume workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortsett økt"
+          }
+        }
+      }
+    },
+    "Pause workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sett økt på pause"
+          }
+        }
+      }
+    },
+    "Live comparison": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-sammenligning"
+          }
+        }
+      }
+    },
+    "Ghost Updates active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost-oppdateringer aktive"
+          }
+        }
+      }
+    },
+    "Next route segment": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste rutesegment"
+          }
+        }
+      }
+    },
+    "Workout step": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Øktsteg"
+          }
+        }
+      }
+    },
+    "Live": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live"
+          }
+        }
+      }
+    },
+    "Show route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vis rute"
+          }
+        }
+      }
+    },
+    "Route complete": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rute fullført"
+          }
+        }
+      }
+    },
+    "New personal best": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ny personlig rekord"
+          }
+        }
+      }
+    },
+    "Saved iPhone workouts": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagrede iPhone-økter"
+          }
+        }
+      }
+    },
+    "Copy to Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopier til Apple Health"
+          }
+        }
+      }
+    },
+    "Saved to Apple Health": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagret i Apple Health"
+          }
+        }
+      }
+    },
+    "iPhone workout": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone-økt"
+          }
+        }
+      }
+    },
+    "Finish this workout?": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avslutte denne økten?"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
