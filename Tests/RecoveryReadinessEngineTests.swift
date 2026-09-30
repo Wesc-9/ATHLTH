@@ -153,6 +153,122 @@ final class RecoveryReadinessEngineTests:
         XCTAssertEqual(result.baselineDays, 7)
     }
 
+    func testInvalidSignalDayDoesNotCountTowardBaseline() {
+        let now = Date()
+        let days = baselineDays(
+            count: 5,
+            endingAt: now
+        )
+
+        var sleep =
+            dictionary(
+                days,
+                value: 8 * 3_600
+            )
+        var hrv =
+            dictionary(
+                days,
+                value: 60
+            )
+        var resting =
+            dictionary(
+                days,
+                value: 60
+            )
+
+        if let invalidDay = days.first {
+            hrv[invalidDay] = 0
+            resting[invalidDay] =
+                .nan
+            sleep[invalidDay] =
+                8 * 3_600
+        }
+
+        let result =
+            RecoveryReadinessEngine.evaluate(
+                currentSleep:
+                    SleepSummary(
+                        totalAsleep:
+                            8 * 3_600
+                    ),
+                currentHeart:
+                    HeartSummary(
+                        restingHeartRate: 60,
+                        restingHeartRateDate:
+                            now,
+                        hrvMilliseconds: 60,
+                        hrvDate: now
+                    ),
+                sleepDays: sleep,
+                hrvDays: hrv,
+                restingHeartRateDays:
+                    resting,
+                now: now
+            )
+
+        XCTAssertNil(result.score)
+        XCTAssertEqual(
+            result.baselineDays,
+            4
+        )
+        XCTAssertEqual(
+            result.state,
+            .buildingBaseline
+        )
+    }
+
+    func testValidFiveDayBaselineStillProducesScore() throws {
+        let now = Date()
+        let days = baselineDays(
+            count: 5,
+            endingAt: now
+        )
+
+        let result =
+            RecoveryReadinessEngine.evaluate(
+                currentSleep:
+                    SleepSummary(
+                        totalAsleep:
+                            7.5 * 3_600
+                    ),
+                currentHeart:
+                    HeartSummary(
+                        restingHeartRate: 60,
+                        restingHeartRateDate:
+                            now,
+                        hrvMilliseconds: 60,
+                        hrvDate: now
+                    ),
+                sleepDays:
+                    dictionary(
+                        days,
+                        value:
+                            7.5 * 3_600
+                    ),
+                hrvDays:
+                    dictionary(
+                        days,
+                        value: 60
+                    ),
+                restingHeartRateDays:
+                    dictionary(
+                        days,
+                        value: 60
+                    ),
+                now: now
+            )
+
+        XCTAssertNotNil(
+            try XCTUnwrap(
+                result.score
+            )
+        )
+        XCTAssertEqual(
+            result.baselineDays,
+            5
+        )
+    }
+
     private func baselineDays(
         count: Int,
         endingAt date: Date
