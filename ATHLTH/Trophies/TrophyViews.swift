@@ -581,8 +581,13 @@ private enum TrophyHubTab: String, CaseIterable, Identifiable {
 
 struct TrophyDetailView: View {
     @EnvironmentObject private var trophies: TrophyStore
+    @EnvironmentObject private var social: SocialStore
 
     let trophyID: String
+
+    @State private var sharingToATHLTH = false
+    @State private var shareSucceeded = false
+    @State private var shareError: String?
 
     private var trophy: TrophyProgressItem? {
         trophies.trophies.first { $0.id == trophyID }
@@ -651,6 +656,67 @@ struct TrophyDetailView: View {
                                 trophies.showcaseIDs.count >= 5
                             )
 
+                            if let unlock = history.first {
+                                Button {
+                                    Task {
+                                        sharingToATHLTH = true
+                                        defer {
+                                            sharingToATHLTH = false
+                                        }
+
+                                        let shared =
+                                            await social
+                                                .shareTrophyUnlock(
+                                                    unlock
+                                                )
+
+                                        shareSucceeded = shared
+                                        shareError =
+                                            shared
+                                                ? nil
+                                                : social.errorMessage
+                                    }
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        if sharingToATHLTH {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                        } else {
+                                            Image(
+                                                systemName:
+                                                    shareSucceeded ||
+                                                    isSharedInFeed(unlock)
+                                                        ? "checkmark.circle.fill"
+                                                        : "person.2.fill"
+                                            )
+                                        }
+
+                                        Text(
+                                            shareSucceeded ||
+                                            isSharedInFeed(unlock)
+                                                ? "Shared to ATHLTH"
+                                                : "Share to ATHLTH"
+                                        )
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(ATHLTHTheme.accentDeep)
+                                .disabled(
+                                    sharingToATHLTH ||
+                                    shareSucceeded ||
+                                    isSharedInFeed(unlock)
+                                )
+                            }
+
+                            if let shareError {
+                                Text(shareError)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
+                            }
+
                             if !trophies.isShowcased(trophy.id) &&
                                trophies.showcaseIDs.count >= 5 {
                                 Text("Your cabinet can display up to five trophies.")
@@ -667,6 +733,15 @@ struct TrophyDetailView: View {
             } else {
                 ContentUnavailableView("Trophy unavailable", systemImage: "trophy")
             }
+        }
+    }
+
+    private func isSharedInFeed(
+        _ unlock: TrophyUnlockRecord
+    ) -> Bool {
+        social.feed.contains {
+            $0.activity.actorID == social.currentUserID &&
+            $0.activity.eventKey == "trophy-\(unlock.stageKey)"
         }
     }
 
