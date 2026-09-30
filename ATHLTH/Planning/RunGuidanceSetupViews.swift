@@ -73,6 +73,8 @@ struct GhostQuickStartDraft {
     var updatesEnabled = true
     private var loadedRouteID: UUID?
 
+    init() {}
+
     @MainActor
     mutating func load(
         route: TrainingRoute?,
