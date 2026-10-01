@@ -1895,8 +1895,73 @@ struct GhostRaceLivePanel: View {
                 )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+
+                if result.maximumLeadMeters > 0 ||
+                    result.maximumDeficitMeters > 0 ||
+                    result.leadChangeCount > 0 {
+                    Divider()
+
+                    HStack(spacing: 10) {
+                        resultMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Best lead",
+                                    norwegian: "Største ledelse"
+                                ),
+                            value:
+                                "\(Int(result.maximumLeadMeters.rounded())) m"
+                        )
+
+                        resultMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Largest gap",
+                                    norwegian: "Største etterslep"
+                                ),
+                            value:
+                                "\(Int(result.maximumDeficitMeters.rounded())) m"
+                        )
+
+                        resultMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Lead changes",
+                                    norwegian: "Lederskifter"
+                                ),
+                            value:
+                                "\(result.leadChangeCount)"
+                        )
+                    }
+                }
             }
         }
+    }
+
+    private func resultMetric(
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 3
+        ) {
+            Text(value)
+                .font(
+                    .subheadline
+                        .weight(.bold)
+                )
+                .monospacedDigit()
+
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
     }
 
     private var mainStatus: String {
