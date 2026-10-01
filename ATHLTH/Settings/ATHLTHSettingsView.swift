@@ -698,8 +698,14 @@ struct ATHLTHSettingsView: View {
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "person.badge.key",
-                                    title: "Account & Security",
-                                    subtitle: "Sign-in, security, privacy and your data"
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Account & Security",
+                                        norwegian: "Konto og sikkerhet"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Sign-in, security, privacy and your data",
+                                        norwegian: "Innlogging, sikkerhet, personvern og data"
+                                    )
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
