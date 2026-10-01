@@ -6191,9 +6191,6 @@ struct CommunityGroupCreateView: View {
     @State private var membersCanCreateContent = true
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
-    @State private var selectedHeaderPhoto: PhotosPickerItem?
-    @State private var selectedHeaderImageData: Data?
-    @State private var selectedFeaturedChallengeID: UUID?
     @State private var saving = false
 
     var body: some View {
@@ -6540,32 +6537,6 @@ struct CommunityGroupCreateView: View {
         )
     }
 
-    private var availableFeaturedChallenges:
-        [CommunityGroupChallengeRecord] {
-        let now = Date()
-
-        return groups.challenges(in: currentGroup.id)
-            .filter {
-                $0.status != "draft" &&
-                $0.status != "cancelled" &&
-                $0.endsAt >= now
-            }
-            .sorted { lhs, rhs in
-                let lhsActive =
-                    lhs.startsAt <= now &&
-                    lhs.endsAt >= now
-                let rhsActive =
-                    rhs.startsAt <= now &&
-                    rhs.endsAt >= now
-
-                if lhsActive != rhsActive {
-                    return lhsActive
-                }
-
-                return lhs.startsAt < rhs.startsAt
-            }
-    }
-
     private var joinModeDescription: String {
         switch joinMode {
         case "open":
@@ -6591,6 +6562,9 @@ struct CommunityGroupSettingsView: View {
     @State private var membersCanCreateContent: Bool
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
+    @State private var selectedHeaderPhoto: PhotosPickerItem?
+    @State private var selectedHeaderImageData: Data?
+    @State private var selectedFeaturedChallengeID: UUID?
     @State private var saving = false
     @State private var deleting = false
     @State private var showingDeleteConfirmation = false
@@ -6965,6 +6939,32 @@ struct CommunityGroupSettingsView: View {
                 )
             }
         }
+    }
+
+    private var availableFeaturedChallenges:
+        [CommunityGroupChallengeRecord] {
+        let now = Date()
+
+        return groups.challenges(in: currentGroup.id)
+            .filter {
+                $0.status != "draft" &&
+                $0.status != "cancelled" &&
+                $0.endsAt >= now
+            }
+            .sorted { lhs, rhs in
+                let lhsActive =
+                    lhs.startsAt <= now &&
+                    lhs.endsAt >= now
+                let rhsActive =
+                    rhs.startsAt <= now &&
+                    rhs.endsAt >= now
+
+                if lhsActive != rhsActive {
+                    return lhsActive
+                }
+
+                return lhs.startsAt < rhs.startsAt
+            }
     }
 
     private var joinModeDescription: String {
