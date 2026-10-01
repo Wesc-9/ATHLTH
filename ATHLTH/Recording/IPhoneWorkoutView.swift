@@ -1050,7 +1050,22 @@ struct IPhoneWorkoutView: View {
                         workout.walking
                             ? "walking"
                             : "running",
-                    visibility: visibility
+                    visibility: visibility,
+                    routeKey:
+                        workout
+                            .plannedComparisonRouteID,
+                    routeDistanceMeters:
+                        workout
+                            .plannedRouteDistanceKilometers
+                            .map {
+                                max(
+                                    $0 * 1_000,
+                                    0
+                                )
+                            },
+                    routeTitle:
+                        workout
+                            .plannedRouteTitle
                 )
         }
 
@@ -1059,7 +1074,11 @@ struct IPhoneWorkoutView: View {
             distanceMeters:
                 workout.distanceMeters,
             elapsedSeconds:
-                workout.elapsed(at: Date())
+                workout.elapsed(at: Date()),
+            routeProgressPercent:
+                workout.routeProgressPercent,
+            routeDeviationMeters:
+                workout.routeDeviationMeters
         )
     }
 }
