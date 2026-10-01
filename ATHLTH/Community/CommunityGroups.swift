@@ -3746,7 +3746,7 @@ struct CommunityGroupDetailView: View {
         GeometryReader { geometry in
             ZStack {
                 ATHLTHPremiumCanvas(
-                    accent: Color.indigo.opacity(0.30)
+                    accent: ATHLTHTheme.accentDeep.opacity(0.18)
                 )
 
                 if isMember && selectedTab == .chat {
@@ -3862,16 +3862,58 @@ struct CommunityGroupDetailView: View {
     }
 
     private var groupAreaPicker: some View {
-        Picker(
-            "Group area",
-            selection: $selectedTab
-        ) {
-            ForEach(CommunityGroupsTab.allCases) {
-                Text($0.rawValue)
-                    .tag($0)
+        HStack(spacing: 4) {
+            ForEach(CommunityGroupsTab.allCases) { tab in
+                Button {
+                    withAnimation(
+                        .easeInOut(duration: 0.18)
+                    ) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    Text(tab.rawValue)
+                        .font(
+                            .subheadline
+                                .weight(
+                                    selectedTab == tab
+                                        ? .semibold
+                                        : .medium
+                                )
+                        )
+                        .foregroundStyle(
+                            selectedTab == tab
+                                ? Color.white
+                                : ATHLTHTheme.primaryText
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            selectedTab == tab
+                                ? ATHLTHTheme.accentDeep
+                                : Color.clear,
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
             }
         }
-        .pickerStyle(.segmented)
+        .padding(4)
+        .background(
+            ATHLTHTheme.card.opacity(0.96),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    ATHLTHTheme.border,
+                    lineWidth: 1
+                )
+        }
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.06),
+            radius: 12,
+            y: 5
+        )
     }
 
     private var membershipAccessCard: some View {
@@ -3984,33 +4026,21 @@ struct CommunityGroupDetailView: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(
-                        currentGroup.imageURL == nil
-                            ? 0.18
-                            : 0.92
-                    ),
-                    ATHLTHTheme.cardWarm.opacity(
-                        currentGroup.imageURL == nil
-                            ? 0.16
-                            : 0.72
-                    ),
-                    ATHLTHTheme.cardWarm.opacity(
-                        currentGroup.imageURL == nil
-                            ? 0.08
-                            : 0.22
-                    )
+                    Color.black.opacity(0.08),
+                    Color.black.opacity(0.22),
+                    Color.black.opacity(0.68)
                 ],
-                startPoint: .leading,
-                endPoint: .trailing
+                startPoint: .top,
+                endPoint: .bottom
             )
 
             LinearGradient(
                 colors: [
-                    Color.clear,
-                    ATHLTHTheme.canvasBottom.opacity(0.38)
+                    ATHLTHTheme.accentDeep.opacity(0.34),
+                    Color.clear
                 ],
-                startPoint: .top,
-                endPoint: .bottom
+                startPoint: .leading,
+                endPoint: .trailing
             )
 
             HStack(alignment: .bottom, spacing: 14) {
@@ -4028,7 +4058,7 @@ struct CommunityGroupDetailView: View {
                                         )
                                     )
                                     .foregroundStyle(.white)
-                                    .frame(width: 22, height: 22)
+                                    .frame(width: 24, height: 24)
                                     .background(
                                         ATHLTHTheme.accentDeep,
                                         in: Circle()
@@ -4043,29 +4073,28 @@ struct CommunityGroupDetailView: View {
                             }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Change Club photo")
+                    .accessibilityLabel("Change Club image")
                 } else {
                     detailGroupImage
                 }
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("CLUB")
                         .font(.caption2.weight(.bold))
-                        .tracking(1.6)
+                        .tracking(1.8)
                         .foregroundStyle(
-                            ATHLTHTheme.accentDeep.opacity(0.62)
+                            ATHLTHTheme.champagne
                         )
 
                     Text(currentGroup.name)
                         .font(
                             .system(
-                                size: 27,
-                                weight: .bold
+                                size: 29,
+                                weight: .bold,
+                                design: .rounded
                             )
                         )
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText
-                        )
+                        .foregroundStyle(.white)
                         .lineLimit(2)
                         .minimumScaleFactor(0.76)
 
@@ -4077,28 +4106,17 @@ struct CommunityGroupDetailView: View {
                         Text(currentGroup.summary)
                             .font(.subheadline)
                             .foregroundStyle(
-                                ATHLTHTheme.primaryText.opacity(0.72)
+                                .white.opacity(0.84)
                             )
                             .lineLimit(2)
                     }
 
-                    HStack(spacing: 10) {
-                        if !currentGroup.locationName
-                            .trimmingCharacters(
-                                in: .whitespacesAndNewlines
-                            )
-                            .isEmpty {
-                            Label(
-                                currentGroup.locationName,
-                                systemImage: "location.fill"
-                            )
-                        }
-
-                        Label(
+                    HStack(spacing: 7) {
+                        clubHeaderChip(
                             currentGroup.visibility == "private"
                                 ? "Private"
                                 : "Public",
-                            systemImage:
+                            icon:
                                 currentGroup.visibility == "private"
                                     ? "lock.fill"
                                     : "globe"
@@ -4107,51 +4125,63 @@ struct CommunityGroupDetailView: View {
                         if isMember ||
                             currentGroup.creatorID ==
                                 session.profile.userID {
-                            Text(memberCountText)
+                            clubHeaderChip(
+                                memberCountText,
+                                icon: "person.2.fill"
+                            )
+                        }
+
+                        if !currentGroup.locationName
+                            .trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
+                            .isEmpty {
+                            clubHeaderChip(
+                                currentGroup.locationName,
+                                icon: "location.fill"
+                            )
                         }
                     }
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
                 }
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 22)
 
-                if isMember ||
-                    currentGroup.creatorID ==
-                        session.profile.userID {
-                    HStack(spacing: 8) {
+            VStack {
+                HStack(spacing: 10) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        headerCircleButton(
+                            icon: "chevron.left"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back")
+
+                    Spacer()
+
+                    if isMember ||
+                        currentGroup.creatorID ==
+                            session.profile.userID {
                         NavigationLink {
                             CommunityGroupMembersView(
                                 group: currentGroup
                             )
                         } label: {
-                            Image(
-                                systemName: "person.2.fill"
-                            )
-                            .font(
-                                .system(
-                                    size: 14,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-                            .frame(width: 36, height: 36)
-                            .background(
-                                Color.white.opacity(0.70),
-                                in: Circle()
+                            headerCircleButton(
+                                icon: "person.2.fill"
                             )
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(
                             ATHLTHLocalization.format(
-                            english: "Members, %@",
-                            norwegian: "Medlemmer, %@",
-                            memberCountText
-                        )
+                                english: "Members, %@",
+                                norwegian: "Medlemmer, %@",
+                                memberCountText
+                            )
                         )
 
                         if groups.canManage(currentGroup) {
@@ -4190,7 +4220,9 @@ struct CommunityGroupDetailView: View {
                                     }
                                 }
                             } label: {
-                                groupMenuButton
+                                headerCircleButton(
+                                    icon: "ellipsis"
+                                )
                             }
                         } else {
                             Menu {
@@ -4215,47 +4247,12 @@ struct CommunityGroupDetailView: View {
                                     }
                                 }
                             } label: {
-                                groupMenuButton
+                                headerCircleButton(
+                                    icon: "ellipsis"
+                                )
                             }
                         }
                     }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-
-            VStack {
-                HStack {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(
-                                .system(
-                                    size: 14,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-                            .frame(width: 38, height: 38)
-                            .background(
-                                Color.white.opacity(0.76),
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        Color.white.opacity(0.88),
-                                        lineWidth: 1
-                                    )
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Back")
-
-                    Spacer()
                 }
                 .padding(.horizontal, 16)
                 .padding(
@@ -4267,34 +4264,78 @@ struct CommunityGroupDetailView: View {
             }
         }
         .frame(
-            height: 224 + max(topInset, 0)
+            height: 286 + max(topInset, 0)
         )
         .frame(maxWidth: .infinity)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
-                bottomLeadingRadius: 28,
-                bottomTrailingRadius: 28,
+                bottomLeadingRadius: 30,
+                bottomTrailingRadius: 30,
                 topTrailingRadius: 0,
                 style: .continuous
             )
         )
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.white.opacity(0.58))
-                .frame(height: 1)
-        }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.07),
-            radius: 18,
+            color: ATHLTHTheme.accentDeep.opacity(0.11),
+            radius: 22,
             x: 0,
-            y: 8
+            y: 9
         )
+    }
+
+    private func headerCircleButton(
+        icon: String
+    ) -> some View {
+        Image(systemName: icon)
+            .font(
+                .system(
+                    size: 15,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(.white)
+            .frame(width: 40, height: 40)
+            .background(
+                Color.black.opacity(0.28),
+                in: Circle()
+            )
+            .overlay {
+                Circle()
+                    .stroke(
+                        Color.white.opacity(0.28),
+                        lineWidth: 0.8
+                    )
+            }
+    }
+
+    private func clubHeaderChip(
+        _ title: String,
+        icon: String
+    ) -> some View {
+        Label(title, systemImage: icon)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.92))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                Color.black.opacity(0.24),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.white.opacity(0.18),
+                        lineWidth: 0.7
+                    )
+            }
     }
 
     @ViewBuilder
     private var groupHeroBackground: some View {
-        if let value = currentGroup.imageURL,
+        if let value =
+            currentGroup.headerImageURL ??
+            currentGroup.imageURL,
            let url = URL(string: value) {
             AsyncImage(url: url) { phase in
                 switch phase {
@@ -4320,37 +4361,29 @@ struct CommunityGroupDetailView: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color.indigo.opacity(0.24),
-                    ATHLTHTheme.cardWarm.opacity(0.92),
-                    ATHLTHTheme.canvasTop
+                    ATHLTHTheme.accentDeep,
+                    ATHLTHTheme.accent,
+                    ATHLTHTheme.vitality.opacity(0.88)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
-            Circle()
-                .fill(Color.white.opacity(0.30))
-                .frame(width: 190, height: 190)
-                .offset(x: 230, y: -74)
-        }
-    }
+            RadialGradient(
+                colors: [
+                    ATHLTHTheme.champagne.opacity(0.28),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 280
+            )
 
-    private var groupMenuButton: some View {
-        Image(systemName: "ellipsis")
-            .font(
-                .system(
-                    size: 16,
-                    weight: .bold
-                )
-            )
-            .foregroundStyle(
-                ATHLTHTheme.primaryText
-            )
-            .frame(width: 36, height: 36)
-            .background(
-                Color.white.opacity(0.56),
-                in: Circle()
-            )
+            Circle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 220, height: 220)
+                .offset(x: 190, y: -80)
+        }
     }
 
     @ViewBuilder
@@ -4372,29 +4405,44 @@ struct CommunityGroupDetailView: View {
                 detailGroupImageFallback
             }
         }
-        .frame(width: 72, height: 72)
+        .frame(width: 82, height: 82)
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 21,
+                cornerRadius: 23,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 21,
+                cornerRadius: 23,
                 style: .continuous
             )
-            .stroke(Color.white.opacity(0.92), lineWidth: 2)
+            .stroke(
+                Color.white.opacity(0.90),
+                lineWidth: 2
+            )
         }
+        .shadow(
+            color: Color.black.opacity(0.20),
+            radius: 12,
+            y: 5
+        )
     }
 
     private var detailGroupImageFallback: some View {
         Image(systemName: "person.3.fill")
-            .font(.system(size: 27, weight: .semibold))
-            .foregroundStyle(.indigo)
+            .font(.system(size: 29, weight: .semibold))
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
-                Color.indigo.opacity(0.10)
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accent,
+                        ATHLTHTheme.vitality
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             )
     }
 
@@ -4406,10 +4454,16 @@ struct CommunityGroupDetailView: View {
     }
 
     private var overview: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
             if groups.canPublishUpdates(currentGroup) {
                 groupUpdateComposer
             }
+
+            if let challenge = featuredClubChallenge {
+                clubChallengeCard(challenge)
+            }
+
+            comingUpCard
 
             let pinned = groups.pinnedAnnouncement(
                 in: group.id
@@ -4440,13 +4494,19 @@ struct CommunityGroupDetailView: View {
 
             if !updates.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Club Posts")
-                        .font(.headline)
-                        .frame(
-                            maxWidth: .infinity,
-                            alignment: .leading
-                        )
-                        .padding(.horizontal, 4)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Club Posts")
+                                .font(.title3.weight(.bold))
+                            Text(
+                                "Latest from \(currentGroup.name)"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+                    }
 
                     ForEach(updates) { update in
                         groupUpdateCard(update)
@@ -4454,11 +4514,185 @@ struct CommunityGroupDetailView: View {
                 }
             }
 
-            comingUpCard
-            recentGroupActivityCard
-
             clubLeaderboardCard
+            recentGroupActivityCard
         }
+    }
+
+    private var featuredClubChallenge:
+        CommunityGroupChallengeRecord? {
+        guard
+            let featuredID =
+                currentGroup.featuredChallengeID,
+            let challenge =
+                groups.challenges(in: group.id)
+                    .first(
+                        where: {
+                            $0.id == featuredID
+                        }
+                    ),
+            challenge.status != "draft",
+            challenge.status != "cancelled",
+            challenge.endsAt >= Date()
+        else {
+            return nil
+        }
+
+        return challenge
+    }
+
+    private func clubChallengeCard(
+        _ challenge:
+            CommunityGroupChallengeRecord
+    ) -> some View {
+        NavigationLink {
+            CommunityGroupChallengeDetailView(
+                group: currentGroup,
+                challenge: challenge
+            )
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.accentDeep,
+                            ATHLTHTheme.accent,
+                            ATHLTHTheme.vitality
+                                .opacity(0.92)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+                if let value = challenge.imageURL,
+                   let url = URL(string: value) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let image) = phase {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .opacity(0.38)
+                        }
+                    }
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 24,
+                            style: .continuous
+                        )
+                    )
+                }
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.06),
+                        Color.black.opacity(0.58)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 24,
+                        style: .continuous
+                    )
+                )
+
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack {
+                        Label(
+                            "CLUB CHALLENGE",
+                            systemImage: "trophy.fill"
+                        )
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.7)
+                        .foregroundStyle(
+                            ATHLTHTheme.champagne
+                        )
+
+                        Spacer()
+
+                        Text(
+                            challenge.startsAt <= Date()
+                                ? "ACTIVE"
+                                : "UP NEXT"
+                        )
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(
+                            Color.white.opacity(0.14),
+                            in: Capsule()
+                        )
+                    }
+
+                    Text(challenge.title)
+                        .font(
+                            .title2
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+
+                    if !challenge.summary.isEmpty {
+                        Text(challenge.summary)
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                .white.opacity(0.82)
+                            )
+                            .lineLimit(2)
+                    }
+
+                    HStack {
+                        Text(
+                            comingUpChallengeDetail(
+                                challenge
+                            )
+                        )
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(
+                            .white.opacity(0.76)
+                        )
+                        .lineLimit(1)
+
+                        Spacer()
+
+                        Label(
+                            "Open",
+                            systemImage:
+                                "arrow.right"
+                        )
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                    }
+                }
+                .padding(18)
+            }
+            .frame(minHeight: 184)
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white.opacity(0.12),
+                    lineWidth: 1
+                )
+            }
+            .shadow(
+                color:
+                    ATHLTHTheme.accentDeep
+                        .opacity(0.15),
+                radius: 18,
+                y: 9
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var clubLeaderboardCard: some View {
@@ -4659,10 +4893,10 @@ struct CommunityGroupDetailView: View {
             HStack(spacing: 9) {
                 Image(systemName: "megaphone.fill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.indigo)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
                     .frame(width: 34, height: 34)
                     .background(
-                        Color.indigo.opacity(0.10),
+                        ATHLTHTheme.accentSoft,
                         in: RoundedRectangle(
                             cornerRadius: 11,
                             style: .continuous
@@ -4822,7 +5056,7 @@ struct CommunityGroupDetailView: View {
                                 title: event.title,
                                 detail:
                                     comingUpEventDetail(event),
-                                tint: .purple
+                                tint: ATHLTHTheme.recoveryBlue
                             )
                         }
                         .buttonStyle(.plain)
@@ -4848,7 +5082,7 @@ struct CommunityGroupDetailView: View {
                                     comingUpChallengeDetail(
                                         challenge
                                     ),
-                                tint: .green
+                                tint: ATHLTHTheme.vitality
                             )
                         }
                         .buttonStyle(.plain)
