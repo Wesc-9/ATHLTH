@@ -2200,7 +2200,23 @@ struct ATHLTHGhostRuntimeObserver: View {
                         .active?
                         .id
             ) { _, activeID in
-                if activeID == nil {
+                guard activeID == nil
+                else {
+                    return
+                }
+
+                Task { @MainActor in
+                    if realtime.currentSession != nil {
+                        await realtime
+                            .leaveCurrentLiveWorkout()
+                    }
+
+                    if realtime
+                        .selectedLiveGhostSessionID != nil {
+                        realtime
+                            .selectLiveGhost(nil)
+                    }
+
                     clearLiveGhostContext(
                         sendToWatch: false
                     )
