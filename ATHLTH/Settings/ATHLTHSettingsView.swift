@@ -266,44 +266,6 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
-                    settingsSection("Privacy & Data") {
-                        PremiumSettingsCard {
-                            NavigationLink {
-                                ATHLTHPrivacyCenterView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "shield.lefthalf.filled",
-                                    title: "Privacy & AI",
-                                    subtitle: privacySummary
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(
-                                            ATHLTHTheme.mutedText.opacity(0.72)
-                                        )
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                TrainingDataSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "icloud",
-                                    title: "Training data & Coach",
-                                    subtitle: "Cloud backup, restore and training-history sharing"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(
-                                            ATHLTHTheme.mutedText.opacity(0.72)
-                                        )
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
                     settingsSection("Health & Sync") {
                         PremiumSettingsCard {
                             PremiumSettingsRow(
@@ -419,15 +381,12 @@ struct ATHLTHSettingsView: View {
                                     subtitle: appleHealthConnectionSubtitle
                                 ) {
                                     connectionTrailing(
-                                        health.isRefreshing
-                                            ? "Syncing"
-                                            : !health.hasRequestedAuthorization
-                                                ? "Connect"
-                                                : health.hasReadableHealthData
-                                                    ? "Connected"
-                                                    : "Configured",
-                                        showChevron: true,
-                                        loading: healthRequestInProgress
+                                        !health.hasRequestedAuthorization
+                                            ? "Connect"
+                                            : health.hasReadableHealthData
+                                                ? "Connected"
+                                                : "Configured",
+                                        showChevron: true
                                     )
                                 }
                             }
@@ -451,7 +410,7 @@ struct ATHLTHSettingsView: View {
                                             calendarSync.isSyncing
                                                 ? "Syncing"
                                                 : calendarSync.isEnabled
-                                                    ? "On"
+                                                    ? "Connected"
                                                     : calendarSync.hasFullAccess
                                                         ? "Ready"
                                                         : "Connect",
@@ -739,8 +698,14 @@ struct ATHLTHSettingsView: View {
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "person.badge.key",
-                                    title: "Account & Security",
-                                    subtitle: "Sign-in, password, export and account controls"
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Account & Security",
+                                        norwegian: "Konto og sikkerhet"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Sign-in, security, privacy and your data",
+                                        norwegian: "Innlogging, sikkerhet, personvern og data"
+                                    )
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
@@ -991,7 +956,7 @@ struct ATHLTHSettingsView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title.uppercased())
+            Text(localizedSettingsSectionTitle(title).uppercased())
                 .font(.caption.weight(.semibold))
                 .tracking(2.8)
                 .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
@@ -1000,6 +965,45 @@ struct ATHLTHSettingsView: View {
             content()
         }
         .padding(.bottom, 24)
+    }
+
+    private func localizedSettingsSectionTitle(
+        _ title: String
+    ) -> String {
+        guard ATHLTHLocalization.isNorwegian else {
+            return title
+        }
+
+        switch title {
+        case "App":
+            return "App"
+        case "Profile":
+            return "Profil"
+        case "Privacy & Data":
+            return "Personvern og data"
+        case "Health & Sync":
+            return "Helse og synkronisering"
+        case "Connections":
+            return "Tilkoblinger"
+        case "Preferences":
+            return "Preferanser"
+        case "Membership":
+            return "Medlemskap"
+        case "Account":
+            return "Konto"
+        case "About":
+            return "Om ATHLTH"
+        case "Support":
+            return "Brukerstøtte"
+        case "Developer":
+            return "Utvikler"
+        case "Admin":
+            return "Admin"
+        case "Developer Tools":
+            return "Utviklerverktøy"
+        default:
+            return title
+        }
     }
 
     private var privacySummary: String {
@@ -1193,10 +1197,6 @@ struct ATHLTHSettingsView: View {
             return "Connect your Apple Health data"
         }
 
-        if health.isRefreshing {
-            return "Reading Apple Health data now"
-        }
-
         if health.hasTrainingHealthData {
             return health.canWriteWorkouts
                 ? "Connected · training and health data is available"
@@ -1216,14 +1216,23 @@ struct ATHLTHSettingsView: View {
 
     private var appleCalendarConnectionSubtitle: String {
         if calendarSync.isEnabled {
-            return "Training plan sync · ATHLTH calendar"
+            return ATHLTHLocalization.choose(
+                english: "Training plan sync · ATHLTH calendar",
+                norwegian: "Synkronisering av treningsplan · ATHLTH-kalender"
+            )
         }
 
         if calendarSync.hasFullAccess {
-            return "Calendar connected · training plan sync is off"
+            return ATHLTHLocalization.choose(
+                english: "Calendar connected · training plan sync is off",
+                norwegian: "Kalender tilkoblet · synkronisering av treningsplan er av"
+            )
         }
 
-        return "Sync planned workouts to a dedicated ATHLTH calendar"
+        return ATHLTHLocalization.choose(
+            english: "Sync planned workouts to a dedicated ATHLTH calendar",
+            norwegian: "Synkroniser planlagte økter til en egen ATHLTH-kalender"
+        )
     }
 
     private var spotifyGreen: Color {
@@ -1241,7 +1250,7 @@ struct ATHLTHSettingsView: View {
                 ProgressView()
                     .tint(ATHLTHTheme.accent)
             } else {
-                Text(text)
+                Text(localizedConnectionStatus(text))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTheme.mutedText)
             }
@@ -1250,6 +1259,41 @@ struct ATHLTHSettingsView: View {
                 Image(systemName: "chevron.right")
                     .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
             }
+        }
+    }
+
+    private func localizedConnectionStatus(
+        _ status: String
+    ) -> String {
+        guard ATHLTHLocalization.isNorwegian else {
+            return status
+        }
+
+        switch status {
+        case "Connected":
+            return "Tilkoblet"
+        case "Not connected":
+            return "Ikke tilkoblet"
+        case "Connect":
+            return "Koble til"
+        case "Syncing":
+            return "Synkroniserer"
+        case "Configured":
+            return "Konfigurert"
+        case "Ready":
+            return "Klar"
+        case "Checking":
+            return "Sjekker"
+        case "Setup":
+            return "Oppsett"
+        case "Connection issue":
+            return "Tilkoblingsproblem"
+        case "Needs setup":
+            return "Må konfigureres"
+        case "Connecting…":
+            return "Kobler til…"
+        default:
+            return status
         }
     }
 
