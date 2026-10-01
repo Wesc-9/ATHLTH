@@ -3733,7 +3733,7 @@ struct PlanMetadataEditorView: View {
                                 .lineLimit(1)
                             } label: {
                                 Label(
-                                    "Workout playlist",
+                                    "Default playlist",
                                     systemImage: "music.note.list"
                                 )
                             }
@@ -3742,13 +3742,13 @@ struct PlanMetadataEditorView: View {
 
                         if selectedSpotifyPlaylist != nil {
                             Toggle(
-                                "Start playlist with workouts",
+                                "Use as program default",
                                 isOn: $spotifyAutoplay
                             )
                         }
 
                         Text(
-                            "The linked playlist is used when a workout from this program starts on iPhone. Watch-only starts never wait for Spotify."
+                            "This is the default for workouts that do not have their own Spotify choice. A workout-specific playlist or Off setting always takes priority."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -3947,6 +3947,7 @@ struct SessionEditorView: View {
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     let dayID: UUID?
     let planID: UUID?
@@ -3980,6 +3981,12 @@ struct SessionEditorView: View {
     @State private var audioCoachOverride:
         WatchAudioCoachConfiguration? = nil
     @State private var showingAudioCoachEditor = false
+
+    @State private var selectedSpotifyPlaylist:
+        SpotifyPlaylistReference? = nil
+    @State private var spotifyAutoplayOnStart:
+        Bool? = false
+    @State private var showingSpotifyPlaylistPicker = false
 
     @State private var targetPaceEnabled = false
     @State private var targetPaceMinutes = 5
@@ -4056,6 +4063,12 @@ struct SessionEditorView: View {
         )
         _audioCoachOverride = State(
             initialValue: workout.audioCoachConfiguration
+        )
+        _selectedSpotifyPlaylist = State(
+            initialValue: workout.spotifyPlaylist
+        )
+        _spotifyAutoplayOnStart = State(
+            initialValue: workout.spotifyAutoplayOnStart
         )
 
         if let target =
@@ -4317,6 +4330,92 @@ struct SessionEditorView: View {
                     .textCase(nil)
                 }
 
+                Section("Spotify") {
+                    Toggle(
+                        "Start Spotify with workout",
+                        isOn: spotifyWorkoutEnabled
+                    )
+                    .disabled(
+                        !spotify.isConfigured ||
+                        (
+                            !spotify.isConnected &&
+                            effectiveSpotifyPlaylist == nil
+                        )
+                    )
+
+                    if spotify.isConnected {
+                        Button {
+                            showingSpotifyPlaylistPicker = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "music.note.list"
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accent
+                                )
+                                .frame(width: 28)
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text("Playlist")
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+
+                                    Text(
+                                        spotifyWorkoutPlaylistLabel
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                    .lineLimit(1)
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(.caption.bold())
+                                .foregroundStyle(
+                                    .tertiary
+                                )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    } else if spotify.isConfigured {
+                        Button {
+                            spotify.connect()
+                        } label: {
+                            Label(
+                                "Connect Spotify",
+                                systemImage: "link"
+                            )
+                        }
+                    } else {
+                        Text(
+                            "Spotify is not configured in this build."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Text(
+                        effectiveSpotifyPlaylist == nil
+                            ? "No music will be started automatically for this workout."
+                            : "The selected playlist starts when this workout begins on iPhone. Spotify never blocks the workout from starting."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
                 if existingWorkout == nil ||
                     kind == .strength {
                     Section {
@@ -4481,6 +4580,16 @@ struct SessionEditorView: View {
                             enabled:
                                 settings.audioCoachEnabledByDefault
                         )
+                )
+            }
+            .sheet(
+                isPresented:
+                    $showingSpotifyPlaylistPicker
+            ) {
+                SpotifyPlaylistPickerView(
+                    title: "Workout Playlist",
+                    selection:
+                        spotifyWorkoutPlaylistSelection
                 )
             }
             .onChange(of: kind) { _, newKind in
@@ -5858,6 +5967,105 @@ struct SessionEditorView: View {
             }
     }
 
+    private var inheritedSpotifyPlaylist:
+        SpotifyPlaylistReference? {
+        guard
+            let planID,
+            let plan =
+                session.trainingPlan(
+                    withID: planID
+                ),
+            plan.spotifyAutoplayOnWorkoutStart
+        else {
+            return nil
+        }
+
+        return plan.spotifyPlaylist
+    }
+
+    private var effectiveSpotifyPlaylist:
+        SpotifyPlaylistReference? {
+        if let explicit =
+                spotifyAutoplayOnStart {
+            guard explicit else {
+                return nil
+            }
+
+            return selectedSpotifyPlaylist
+        }
+
+        return inheritedSpotifyPlaylist
+    }
+
+    private var spotifyWorkoutEnabled:
+        Binding<Bool> {
+        Binding(
+            get: {
+                effectiveSpotifyPlaylist != nil
+            },
+            set: { enabled in
+                if enabled {
+                    if selectedSpotifyPlaylist != nil {
+                        spotifyAutoplayOnStart = true
+                    } else if let inherited =
+                                inheritedSpotifyPlaylist {
+                        selectedSpotifyPlaylist =
+                            inherited
+                        spotifyAutoplayOnStart =
+                            true
+                    } else {
+                        spotifyAutoplayOnStart =
+                            true
+                        showingSpotifyPlaylistPicker =
+                            true
+                    }
+                } else {
+                    spotifyAutoplayOnStart = false
+                }
+            }
+        )
+    }
+
+    private var spotifyWorkoutPlaylistSelection:
+        Binding<SpotifyPlaylistReference?> {
+        Binding(
+            get: {
+                selectedSpotifyPlaylist ??
+                    (
+                        spotifyAutoplayOnStart == nil
+                            ? inheritedSpotifyPlaylist
+                            : nil
+                    )
+            },
+            set: { playlist in
+                selectedSpotifyPlaylist =
+                    playlist
+                spotifyAutoplayOnStart =
+                    playlist == nil
+                        ? false
+                        : true
+            }
+        )
+    }
+
+    private var spotifyWorkoutPlaylistLabel:
+        String {
+        if spotifyAutoplayOnStart == false {
+            return "Off"
+        }
+
+        if let selectedSpotifyPlaylist {
+            return selectedSpotifyPlaylist.name
+        }
+
+        if spotifyAutoplayOnStart == nil,
+           let inheritedSpotifyPlaylist {
+            return "Program default · \(inheritedSpotifyPlaylist.name)"
+        }
+
+        return "No linked playlist"
+    }
+
     private func applySavedWorkout(
         _ workout: PlannedSession
     ) {
@@ -5888,6 +6096,10 @@ struct SessionEditorView: View {
         gearSelectionTouched = workout.gearIDs != nil
         audioCoachOverride =
             workout.audioCoachConfiguration
+        selectedSpotifyPlaylist =
+            workout.spotifyPlaylist
+        spotifyAutoplayOnStart =
+            workout.spotifyAutoplayOnStart
         workoutTemplateID =
             workout.workoutTemplateID
         workoutBlocks =
@@ -5953,6 +6165,10 @@ struct SessionEditorView: View {
                 (kind == .running || kind == .walking)
                     ? audioCoachOverride
                     : nil,
+            spotifyPlaylist:
+                selectedSpotifyPlaylist,
+            spotifyAutoplayOnStart:
+                spotifyAutoplayOnStart,
             targetAlertConfiguration:
                 (kind == .running || kind == .walking)
                     ? workoutTargetAlertConfigurationForSave
