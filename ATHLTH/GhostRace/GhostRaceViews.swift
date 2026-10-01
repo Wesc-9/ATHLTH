@@ -2119,3 +2119,641 @@ struct GhostRaceLivePanel: View {
         )
     }
 }
+
+
+// Keeps fixed Ghost, Live Ghost, live sharing and Watch presentation in sync
+// independently of which workout screen is currently visible.
+struct ATHLTHGhostRuntimeObserver: View {
+    @EnvironmentObject private var ghostRace:
+        GhostRaceStore
+    @EnvironmentObject private var realtime:
+        ATHLTHRealtimeSocialStore
+    @EnvironmentObject private var phoneWorkout:
+        IPhoneWorkoutStore
+    @EnvironmentObject private var mirroring:
+        WorkoutMirroringStore
+    @EnvironmentObject private var watchConnection:
+        AppleWatchConnectionStore
+    @EnvironmentObject private var settings:
+        AppSettingsStore
+    @EnvironmentObject private var social:
+        SocialStore
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+            .onChange(
+                of:
+                    mirroring
+                        .snapshot?
+                        .capturedAt
+            ) { _, _ in
+                Task { @MainActor in
+                    await syncWatchRuntime()
+                }
+            }
+            .onChange(
+                of:
+                    phoneWorkout
+                        .active?
+                        .points
+                        .count
+            ) { _, _ in
+                Task { @MainActor in
+                    await syncPhoneRuntime()
+                }
+            }
+            .onChange(
+                of:
+                    realtime
+                        .liveLocations
+            ) { _, _ in
+                Task { @MainActor in
+                    await syncGhostComparisons()
+                }
+            }
+            .onChange(
+                of:
+                    realtime
+                        .selectedLiveGhostSessionID
+            ) { _, _ in
+                Task { @MainActor in
+                    await syncGhostComparisons()
+                }
+            }
+            .onChange(
+                of:
+                    phoneWorkout
+                        .completionStartedWorkout?
+                        .id
+            ) { _, _ in
+                finalizePhoneGhostIfNeeded()
+            }
+            .onChange(
+                of:
+                    phoneWorkout
+                        .active?
+                        .id
+            ) { _, activeID in
+                if activeID == nil {
+                    clearLiveGhostContext(
+                        sendToWatch: false
+                    )
+                }
+            }
+    }
+
+    @MainActor
+    private func syncWatchRuntime() async {
+        guard let snapshot =
+                mirroring.snapshot
+        else {
+            return
+        }
+
+        if ghostRace.reference != nil,
+           snapshot.kind == .running {
+            ghostRace.update(
+                with: snapshot
+            )
+        }
+
+        if snapshot.state == .completed ||
+            snapshot.state == .failed {
+            if realtime.currentSession != nil {
+                await realtime
+                    .leaveCurrentLiveWorkout()
+            }
+
+            if realtime
+                .selectedLiveGhostSessionID != nil {
+                realtime.selectLiveGhost(nil)
+            }
+
+            clearLiveGhostContext(
+                sendToWatch: true
+            )
+            return
+        }
+
+        guard snapshot.state == .running ||
+                snapshot.state == .paused
+        else {
+            return
+        }
+
+        await publishWatchLocation(
+            snapshot
+        )
+        await syncWatchLiveGhost(
+            snapshot
+        )
+    }
+
+    @MainActor
+    private func syncPhoneRuntime() async {
+        guard let workout =
+                phoneWorkout.active
+        else {
+            return
+        }
+
+        let latestLocation =
+            workout.points.last?
+                .location
+        let elapsed =
+            workout.elapsed(
+                at: Date()
+            )
+
+        if ghostRace.reference != nil,
+           !workout.walking {
+            ghostRace
+                .updatePhoneWorkout(
+                    location:
+                        latestLocation,
+                    elapsedTime:
+                        elapsed,
+                    state:
+                        workout.resumedAt == nil
+                            ? .paused
+                            : .running
+                )
+
+            phoneWorkout
+                .applyGhostComparison(
+                    ghostRace.comparison,
+                    title:
+                        ghostRace
+                            .reference?
+                            .title,
+                    configuration:
+                        settings
+                            .ghostRaceAudioConfiguration
+                )
+
+            clearLiveGhostContext(
+                sendToWatch: false
+            )
+        } else {
+            syncPhoneLiveGhost(
+                workout
+            )
+        }
+
+        if let latestLocation {
+            await publishPhoneLocation(
+                workout,
+                location:
+                    latestLocation
+            )
+        }
+    }
+
+    @MainActor
+    private func syncGhostComparisons() async {
+        if mirroring.hasActiveMirroredWorkout {
+            await syncWatchRuntime()
+            return
+        }
+
+        if phoneWorkout.active != nil {
+            await syncPhoneRuntime()
+            return
+        }
+
+        if realtime
+            .selectedLiveGhostSessionID == nil {
+            clearLiveGhostContext(
+                sendToWatch: false
+            )
+        }
+    }
+
+    @MainActor
+    private func syncWatchLiveGhost(
+        _ snapshot:
+            WatchWorkoutLiveSnapshot
+    ) async {
+        guard ghostRace.reference == nil,
+              snapshot.kind == .running,
+              let selected =
+                realtime
+                    .selectedLiveGhostSession
+        else {
+            if realtime
+                .selectedLiveGhostSessionID == nil {
+                clearLiveGhostContext(
+                    sendToWatch: true
+                )
+            }
+            return
+        }
+
+        guard let comparison =
+                realtime
+                    .liveGhostComparison(
+                        ownDistanceMeters:
+                            snapshot
+                                .distanceMeters,
+                        ownElapsedSeconds:
+                            snapshot
+                                .elapsedTime,
+                        ownRouteKey:
+                            snapshot
+                                .routeComparisonID,
+                        ownRouteProgressPercent:
+                            snapshot
+                                .routeProgressPercent,
+                        ownRouteDeviationMeters:
+                            snapshot
+                                .routeDeviationMeters
+                    )
+        else {
+            return
+        }
+
+        let context =
+            makeLiveGhostContext(
+                session: selected,
+                comparison:
+                    comparison
+            )
+
+        storeLiveGhostContext(
+            context,
+            sendToWatch: true
+        )
+    }
+
+    @MainActor
+    private func syncPhoneLiveGhost(
+        _ workout: PhoneWorkout
+    ) {
+        guard !workout.walking,
+              let selected =
+                realtime
+                    .selectedLiveGhostSession
+        else {
+            if realtime
+                .selectedLiveGhostSessionID == nil {
+                phoneWorkout
+                    .applyGhostComparison(
+                        nil,
+                        title: nil,
+                        configuration: nil
+                    )
+                clearLiveGhostContext(
+                    sendToWatch: false
+                )
+            }
+            return
+        }
+
+        guard let comparison =
+                realtime
+                    .liveGhostComparison(
+                        ownDistanceMeters:
+                            workout
+                                .distanceMeters,
+                        ownElapsedSeconds:
+                            workout
+                                .elapsed(
+                                    at: Date()
+                                ),
+                        ownRouteKey:
+                            workout
+                                .plannedComparisonRouteID,
+                        ownRouteProgressPercent:
+                            workout
+                                .routeProgressPercent,
+                        ownRouteDeviationMeters:
+                            workout
+                                .routeDeviationMeters
+                    )
+        else {
+            return
+        }
+
+        let context =
+            makeLiveGhostContext(
+                session: selected,
+                comparison:
+                    comparison
+            )
+
+        storeLiveGhostContext(
+            context,
+            sendToWatch: false
+        )
+
+        phoneWorkout
+            .applyLiveGhostUpdate(
+                title:
+                    context.title,
+                distanceDelta:
+                    comparison
+                        .signedDistanceMeters,
+                timeDelta:
+                    comparison
+                        .estimatedTimeDeltaSeconds,
+                configuration:
+                    settings
+                        .ghostRaceAudioConfiguration
+            )
+    }
+
+    @MainActor
+    private func publishWatchLocation(
+        _ snapshot:
+            WatchWorkoutLiveSnapshot
+    ) async {
+        if realtime.currentSession == nil {
+            guard social.privacy?
+                    .shareLiveWorkoutLocation ==
+                    true
+            else {
+                return
+            }
+
+            let activity: String
+            switch snapshot.kind {
+            case .walking:
+                activity = "walking"
+            case .cycling:
+                activity = "cycling"
+            case .running:
+                activity = "running"
+            default:
+                return
+            }
+
+            let visibility =
+                ATHLTHLiveWorkoutVisibility(
+                    rawValue:
+                        social.privacy?
+                            .liveLocationVisibility ??
+                        "followers"
+                ) ?? .followers
+
+            _ = await realtime
+                .beginLiveWorkout(
+                    title:
+                        snapshot.routeTitle ??
+                        snapshot.kind.title,
+                    activity: activity,
+                    visibility: visibility,
+                    routeKey:
+                        snapshot
+                            .routeComparisonID,
+                    routeDistanceMeters:
+                        snapshot
+                            .routeDistanceMeters,
+                    routeTitle:
+                        snapshot
+                            .routeTitle
+                )
+        }
+
+        await realtime
+            .publishMirroredSnapshot(
+                snapshot,
+                includeHeartRate:
+                    social.privacy?
+                        .shareLiveWorkoutHeartRate ==
+                    true
+            )
+    }
+
+    @MainActor
+    private func publishPhoneLocation(
+        _ workout: PhoneWorkout,
+        location: CLLocation
+    ) async {
+        if realtime.currentSession == nil {
+            guard social.privacy?
+                    .shareLiveWorkoutLocation ==
+                    true
+            else {
+                return
+            }
+
+            let visibility =
+                ATHLTHLiveWorkoutVisibility(
+                    rawValue:
+                        social.privacy?
+                            .liveLocationVisibility ??
+                        "followers"
+                ) ?? .followers
+
+            _ = await realtime
+                .beginLiveWorkout(
+                    title:
+                        workout.title,
+                    activity:
+                        workout.walking
+                            ? "walking"
+                            : "running",
+                    visibility:
+                        visibility,
+                    routeKey:
+                        workout
+                            .plannedComparisonRouteID,
+                    routeDistanceMeters:
+                        workout
+                            .plannedRouteDistanceKilometers
+                            .map {
+                                max(
+                                    $0 * 1_000,
+                                    0
+                                )
+                            },
+                    routeTitle:
+                        workout
+                            .plannedRouteTitle
+                )
+        }
+
+        await realtime
+            .publishLocation(
+                location,
+                distanceMeters:
+                    workout
+                        .distanceMeters,
+                elapsedSeconds:
+                    workout
+                        .elapsed(
+                            at: Date()
+                        ),
+                routeProgressPercent:
+                    workout
+                        .routeProgressPercent,
+                routeDeviationMeters:
+                    workout
+                        .routeDeviationMeters
+            )
+    }
+
+    @MainActor
+    private func finalizePhoneGhostIfNeeded() {
+        guard let workout =
+                phoneWorkout
+                    .completionStartedWorkout,
+              !workout.walking,
+              ghostRace.reference != nil
+        else {
+            return
+        }
+
+        ghostRace
+            .updatePhoneWorkout(
+                location:
+                    workout
+                        .points
+                        .last?
+                        .location,
+                elapsedTime:
+                    max(
+                        workout
+                            .accumulatedSeconds,
+                        workout.elapsed(
+                            at:
+                                workout.end ??
+                                Date()
+                        )
+                    ),
+                state: .completed
+            )
+    }
+
+    private func makeLiveGhostContext(
+        session:
+            ATHLTHLiveWorkoutSession,
+        comparison:
+            ATHLTHLiveGhostComparison
+    ) -> ATHLTHLiveGhostContext {
+        ATHLTHLiveGhostContext(
+            title:
+                opponentName(
+                    session
+                ),
+            distanceDeltaMeters:
+                comparison
+                    .signedDistanceMeters,
+            estimatedTimeDeltaSeconds:
+                comparison
+                    .estimatedTimeDeltaSeconds,
+            updatedAt:
+                comparison.updatedAt,
+            audio:
+                liveGhostAudioContext
+        )
+    }
+
+    private var liveGhostAudioContext:
+        ATHLTHLiveGhostAudioContext {
+        let audio =
+            settings
+                .ghostRaceAudioConfiguration
+
+        return ATHLTHLiveGhostAudioContext(
+            enabled: audio.enabled,
+            distanceIntervalMeters:
+                audio
+                    .distanceIntervalMeters,
+            timeIntervalSeconds:
+                audio
+                    .timeIntervalSeconds,
+            announceLeadChanges:
+                audio
+                    .announceLeadChanges,
+            leadChangeThresholdMeters:
+                audio
+                    .leadChangeThresholdMeters,
+            periodicDeliveryRawValue:
+                audio
+                    .resolvedPeriodicDelivery
+                    .rawValue,
+            leadChangeDeliveryRawValue:
+                audio
+                    .resolvedLeadChangeDelivery
+                    .rawValue,
+            importantLeadChangeDeliveryRawValue:
+                audio
+                    .resolvedImportantLeadChangeDelivery
+                    .rawValue,
+            importantLeadChangeMeters:
+                audio
+                    .resolvedImportantLeadChangeMeters
+        )
+    }
+
+    private func opponentName(
+        _ session:
+            ATHLTHLiveWorkoutSession
+    ) -> String {
+        social.visibleProfiles
+            .first {
+                $0.userID ==
+                    session.ownerID
+            }?
+            .resolvedName ??
+        social.following
+            .first {
+                $0.userID ==
+                    session.ownerID
+            }?
+            .resolvedName ??
+        session.title
+    }
+
+    @MainActor
+    private func storeLiveGhostContext(
+        _ liveGhost:
+            ATHLTHLiveGhostContext,
+        sendToWatch: Bool
+    ) {
+        var context =
+            ATHLTHLiveWorkoutContextStore
+                .load()
+
+        context.liveGhost =
+            liveGhost
+
+        ATHLTHLiveWorkoutContextStore
+            .save(context)
+
+        if sendToWatch {
+            watchConnection
+                .sendLiveSurfaceContext(
+                    context
+                )
+        }
+    }
+
+    @MainActor
+    private func clearLiveGhostContext(
+        sendToWatch: Bool
+    ) {
+        var context =
+            ATHLTHLiveWorkoutContextStore
+                .load()
+
+        guard context.liveGhost != nil
+        else {
+            return
+        }
+
+        context.liveGhost = nil
+        ATHLTHLiveWorkoutContextStore
+            .save(context)
+
+        if sendToWatch {
+            watchConnection
+                .sendLiveSurfaceContext(
+                    context
+                )
+        }
+    }
+}
