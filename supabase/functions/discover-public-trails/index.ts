@@ -1575,13 +1575,18 @@ async function refreshCell(
 out body geom qt 160;
 `.trim();
 
-  // Start the Norway-only secondary source in parallel with Overpass.
-  // Its 7 s timeout cannot block or replace the primary OSM result.
-  const kartverketPromise =
+  // In Norway, Turrutebasen is the authoritative route source and is
+  // generally much more reliable than public Overpass endpoints. Start it
+  // immediately. When it returns a healthy route set we can serve that result
+  // without blocking the user's map search on an Overpass timeout.
+  const useKartverketNow =
     refreshKartverket &&
     shouldUseKartverket(
       bounds,
-    )
+    );
+
+  const kartverketPromise =
+    useKartverketNow
       ? fetchKartverketTrails(
           bounds,
         )
@@ -1666,34 +1671,55 @@ out body geom qt 160;
     };
 
   try {
+    const kartverketWrites =
+      await kartverketPromise;
+
     let payload: any = null;
     let lastFailure =
       "No Overpass endpoint succeeded.";
 
-    for (
-      const overpassURL
-      of overpassURLs
-    ) {
-      try {
-        payload =
-          await tryOverpass(
-            overpassURL,
-          );
-        break;
-      } catch (error) {
-        lastFailure =
-          describeTrailError(
-            error,
-          );
+    // A healthy Kartverket result is enough to satisfy a Norway search.
+    // OSM enrichment still runs on later refreshes while the official-source
+    // cache is fresh, but it no longer makes the user's first search wait.
+    const shouldQueryOverpass =
+      !useKartverketNow ||
+      kartverketWrites.length < 8;
+
+    if (shouldQueryOverpass) {
+      for (
+        const overpassURL
+        of overpassURLs
+      ) {
+        try {
+          payload =
+            await tryOverpass(
+              overpassURL,
+            );
+          break;
+        } catch (error) {
+          lastFailure =
+            describeTrailError(
+              error,
+            );
+        }
       }
+    } else {
+      payload = {
+        elements: [],
+      };
     }
 
-    if (!payload) {
+    if (
+      shouldQueryOverpass &&
+      !payload
+    ) {
       console.warn(
-        "OpenStreetMap trail discovery unavailable; trying secondary source",
+        "OpenStreetMap trail discovery unavailable; using secondary source",
         {
           message:
             lastFailure,
+          kartverketCount:
+            kartverketWrites.length,
         },
       );
     }
@@ -1944,8 +1970,6 @@ out body geom qt 160;
       });
     }
 
-    const kartverketWrites =
-      await kartverketPromise;
     const combinedWrites =
       mergeSecondaryTrails(
         writes,
@@ -2359,12 +2383,18 @@ Deno.serve(
         refreshScheduled =
           true;
 
-        if (
-          forceRefresh ||
-          initialCachedTrails.length === 0
-        ) {
-          // A user-requested area search should return the refreshed result,
-          // and a cold cache needs one synchronous population pass.
+        const needsSynchronousRefresh =
+          initialCachedTrails.length === 0 ||
+          (
+            forceRefresh &&
+            !sourceCacheFresh
+          );
+
+        if (needsSynchronousRefresh) {
+          // Cold/stale cells are populated synchronously so the first search
+          // can return real routes. If we already have fresh official-source
+          // routes, "Search this area" returns them immediately and refreshes
+          // OSM enrichment in the background instead of waiting on Overpass.
           synchronousRefreshAttempted =
             true;
 
