@@ -68,6 +68,47 @@ const json = (
     },
   });
 
+
+function describeTrailError(
+  error: unknown,
+): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    error &&
+    typeof error === "object"
+  ) {
+    const record =
+      error as Record<string, unknown>;
+    const parts = [
+      record.message,
+      record.details,
+      record.hint,
+      record.code,
+    ]
+      .filter(
+        (value) =>
+          typeof value === "string" &&
+          value.trim().length > 0,
+      )
+      .map(String);
+
+    if (parts.length > 0) {
+      return parts.join(" · ");
+    }
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      // Fall through to String below.
+    }
+  }
+
+  return String(error);
+}
+
 function finiteNumber(
   value: unknown,
   min: number,
@@ -968,6 +1009,106 @@ function mergeSecondaryTrails(
   return result;
 }
 
+function splitBounds(
+  bounds: Bounds,
+): Bounds[] {
+  const midLatitude =
+    (bounds.south + bounds.north) / 2;
+  const midLongitude =
+    (bounds.west + bounds.east) / 2;
+
+  return [
+    {
+      south: bounds.south,
+      west: bounds.west,
+      north: midLatitude,
+      east: midLongitude,
+    },
+    {
+      south: bounds.south,
+      west: midLongitude,
+      north: midLatitude,
+      east: bounds.east,
+    },
+    {
+      south: midLatitude,
+      west: bounds.west,
+      north: bounds.north,
+      east: midLongitude,
+    },
+    {
+      south: midLatitude,
+      west: midLongitude,
+      north: bounds.north,
+      east: bounds.east,
+    },
+  ];
+}
+
+async function fetchKartverketTile(
+  bounds: Bounds,
+): Promise<string> {
+  const params =
+    new URLSearchParams({
+      service: "WFS",
+      version: "2.0.0",
+      request: "GetFeature",
+      typeNames: "app:Fotrute",
+      srsName:
+        "urn:ogc:def:crs:EPSG::4326",
+      bbox:
+        [
+          bounds.south,
+          bounds.west,
+          bounds.north,
+          bounds.east,
+        ].join(",") +
+        ",urn:ogc:def:crs:EPSG::4326",
+      count: "500",
+    });
+
+  const response =
+    await fetch(
+      "https://wfs.geonorge.no/skwms1/wfs.turogfriluftsruter?" +
+        params.toString(),
+      {
+        method: "GET",
+        signal:
+          AbortSignal.timeout(
+            8_500,
+          ),
+        headers: {
+          "Accept":
+            "application/gml+xml, text/xml, application/xml;q=0.9, */*;q=0.8",
+          "User-Agent":
+            "ATHLTH/1.5 trail-discovery (Kartverket Turrutebasen)",
+        },
+      },
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Kartverket returned ${response.status}`,
+    );
+  }
+
+  const xml =
+    await response.text();
+
+  if (
+    /<(?:ows:)?ExceptionReport\b/i
+      .test(xml) ||
+    /<ServiceException\b/i
+      .test(xml)
+  ) {
+    throw new Error(
+      "Kartverket returned a WFS exception.",
+    );
+  }
+
+  return xml;
+}
+
 async function fetchKartverketTrails(
   bounds: Bounds,
 ): Promise<TrailWrite[]> {
@@ -979,63 +1120,80 @@ async function fetchKartverketTrails(
     return [];
   }
 
-  const params =
-    new URLSearchParams({
-      service: "WFS",
-      version: "2.0.0",
-      request: "GetFeature",
-      typeNames:
-        "app:Fotrute",
-      bbox:
-        [
-          bounds.south,
-          bounds.west,
-          bounds.north,
-          bounds.east,
-        ].join(",") +
-        ",urn:ogc:def:crs:EPSG::4326",
-      count: "1200",
-    });
-  const url =
-    "https://wfs.geonorge.no/skwms1/wfs.turogfriluftsruter?" +
-    params.toString();
-
   try {
-    const response =
-      await fetch(
-        url,
-        {
-          method: "GET",
-          signal:
-            AbortSignal.timeout(
-              7_000,
+    // The national WFS can be slow for one large viewport. Split the
+    // requested area into four smaller non-overlapping cells and fetch
+    // them in parallel. Partial success is still useful.
+    const results =
+      await Promise.allSettled(
+        splitBounds(bounds).map(
+          (tile) =>
+            fetchKartverketTile(
+              tile,
             ),
-          headers: {
-            "Accept":
-              "application/gml+xml, text/xml, application/xml",
-            "User-Agent":
-              "ATHLTH/1.5 trail-discovery (Kartverket Turrutebasen)",
-          },
-        },
+        ),
       );
 
-    if (!response.ok) {
+    const xmlDocuments: string[] = [];
+    const failures: string[] = [];
+
+    for (const result of results) {
+      if (
+        result.status ===
+        "fulfilled"
+      ) {
+        xmlDocuments.push(
+          result.value,
+        );
+      } else {
+        failures.push(
+          describeTrailError(
+            result.reason,
+          ),
+        );
+      }
+    }
+
+    if (
+      xmlDocuments.length === 0
+    ) {
       console.warn(
-        "Kartverket Turrutebasen request failed",
+        "Kartverket Turrutebasen unavailable",
         {
-          status:
-            response.status,
+          message:
+            failures.join(" | ") ||
+            "All WFS tiles failed.",
         },
       );
       return [];
     }
 
-    const xml =
-      await response.text();
+    if (failures.length > 0) {
+      console.warn(
+        "Kartverket Turrutebasen partially available",
+        {
+          successfulTiles:
+            xmlDocuments.length,
+          failedTiles:
+            failures.length,
+          message:
+            failures.join(" | "),
+        },
+      );
+    }
+
     const featureBlocks =
-      xml.match(
-        /<app:Fotrute\b[\s\S]*?<\/app:Fotrute>/gi,
-      ) ?? [];
+      Array.from(
+        new Set(
+          xmlDocuments.flatMap(
+            (xml) =>
+              xml.match(
+                /<app:Fotrute\b[\s\S]*?<\/app:Fotrute>/gi,
+              ) ?? [],
+          ),
+        ),
+      );
+
     const groups =
       new Map<
         string,
@@ -1159,7 +1317,6 @@ async function fetchKartverketTrails(
         );
 
       // Avoid turning technical route IDs into user-facing trail names.
-      // Turrutebasen remains a high-quality secondary source for named routes.
       if (!name) {
         continue;
       }
@@ -1224,8 +1381,7 @@ async function fetchKartverketTrails(
             0,
             180,
           ),
-        route_kind:
-          "foot",
+        route_kind: "foot",
         network:
           "no:turrutebasen",
         reference:
@@ -1262,10 +1418,8 @@ async function fetchKartverketTrails(
           kartverketDifficulty(
             grade,
           ),
-        osm_description:
-          null,
-        website:
-          null,
+        osm_description: null,
+        website: null,
         estimated_run_seconds:
           distanceKilometers *
           360,
@@ -1313,14 +1467,13 @@ async function fetchKartverketTrails(
       "Kartverket Turrutebasen unavailable",
       {
         message:
-          error instanceof Error
-            ? error.message
-            : String(error),
+          describeTrailError(
+            error,
+          ),
       },
     );
 
-    // This is deliberately a soft failure. OpenStreetMap remains the
-    // primary source and Explore must continue to work if WFS is slow/down.
+    // Soft failure: OpenStreetMap can still populate the same cache cell.
     return [];
   }
 }
@@ -1442,10 +1595,10 @@ out body geom qt 160;
     );
 
   const fallbackOverpassURLs = [
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     "https://lz4.overpass-api.de/api/interpreter",
-    "https://z.overpass-api.de/api/interpreter",
   ];
 
   const overpassURLs =
@@ -1462,6 +1615,56 @@ out body geom qt 160;
       ),
     );
 
+  const tryOverpass =
+    async (
+      overpassURL: string,
+    ) => {
+      const response =
+        await fetch(
+          overpassURL,
+          {
+            method: "POST",
+            signal:
+              AbortSignal.timeout(
+                6_000,
+              ),
+            headers: {
+              "User-Agent":
+                "ATHLTH/1.5 public-trail-cache",
+              "Content-Type":
+                "application/x-www-form-urlencoded; charset=UTF-8",
+            },
+            body:
+              "data=" +
+              encodeURIComponent(
+                query,
+              ),
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          `${overpassURL} returned ${response.status}`,
+        );
+      }
+
+      const payload =
+        await response.json();
+
+      if (
+        !payload ||
+        !Array.isArray(
+          payload.elements,
+        )
+      ) {
+        throw new Error(
+          `${overpassURL} returned an invalid payload`,
+        );
+      }
+
+      return payload;
+    };
+
   try {
     let payload: any = null;
     let lastFailure =
@@ -1472,45 +1675,16 @@ out body geom qt 160;
       of overpassURLs
     ) {
       try {
-        const response =
-          await fetch(
-            overpassURL,
-            {
-              method: "POST",
-              signal:
-                AbortSignal.timeout(
-                  9_000,
-                ),
-              headers: {
-                "User-Agent":
-                  "ATHLTH/1.5 public-trail-cache",
-                "Accept":
-                  "application/json",
-                "Content-Type":
-                  "application/x-www-form-urlencoded; charset=UTF-8",
-              },
-              body:
-                "data=" +
-                encodeURIComponent(
-                  query,
-                ),
-            },
-          );
-
-        if (!response.ok) {
-          lastFailure =
-            `${overpassURL} returned ${response.status}`;
-          continue;
-        }
-
         payload =
-          await response.json();
+          await tryOverpass(
+            overpassURL,
+          );
         break;
       } catch (error) {
         lastFailure =
-          error instanceof Error
-            ? error.message
-            : String(error);
+          describeTrailError(
+            error,
+          );
       }
     }
 
@@ -1863,9 +2037,9 @@ out body geom qt 160;
     }
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : String(error);
+      describeTrailError(
+        error,
+      );
 
     console.error(
       "Public trail background refresh failed",
