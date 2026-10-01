@@ -2680,6 +2680,39 @@ final class AppSessionStore: ObservableObject {
         return template
     }
 
+    func existingScheduledCatalogPlan(
+        _ entry: TrainingPlanCatalogEntry,
+        startDate: Date
+    ) -> TrainingPlan? {
+        let calendar = Calendar.current
+        let resolvedStart =
+            Self.catalogWeekStart(
+                onOrAfter: startDate
+            )
+        let catalogTag =
+            "catalog:\(entry.slug)"
+        let versionTag =
+            "catalog-version:\(entry.catalogVersion)"
+
+        return trainingPlans.first { plan in
+            guard
+                plan.tags.contains(catalogTag),
+                plan.tags.contains(versionTag),
+                let planStart = plan.startDate
+            else {
+                return false
+            }
+
+            return calendar.isDate(
+                calendar.startOfDay(
+                    for: planStart
+                ),
+                inSameDayAs:
+                    resolvedStart
+            )
+        }
+    }
+
     @discardableResult
     func scheduleCatalogPlan(
         _ entry: TrainingPlanCatalogEntry,
@@ -2689,6 +2722,19 @@ final class AppSessionStore: ObservableObject {
         let start = Self.catalogWeekStart(
             onOrAfter: startDate
         )
+
+        // Scheduling the exact same catalog plan for the same start
+        // date is idempotent. This prevents a successfully created
+        // upcoming plan from turning into an apparent duplicate/error
+        // if the user opens the Library flow again.
+        if let existing =
+            existingScheduledCatalogPlan(
+                entry,
+                startDate: start
+            ) {
+            return existing
+        }
+
         let plan = makeCatalogPlan(
             entry,
             startDate: start,
