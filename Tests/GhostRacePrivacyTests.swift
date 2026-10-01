@@ -169,6 +169,57 @@ final class GhostRacePrivacyTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testGhostResultTracksLeadChangesAndExtremes() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000,
+            durationSeconds: 600,
+            pointCount: 21
+        )
+        let store = GhostRaceStore()
+
+        try store.prepare(
+            reference: reference
+        )
+
+        store.updatePhoneWorkout(
+            location:
+                reference.points[10].location,
+            elapsedTime: 330,
+            state: .running
+        )
+
+        store.updatePhoneWorkout(
+            location:
+                reference.points[15].location,
+            elapsedTime: 420,
+            state: .running
+        )
+
+        store.updatePhoneWorkout(
+            location:
+                reference.points.last!.location,
+            elapsedTime: 570,
+            state: .completed
+        )
+
+        let result =
+            try XCTUnwrap(store.result)
+
+        XCTAssertGreaterThan(
+            result.maximumLeadMeters,
+            50
+        )
+        XCTAssertGreaterThan(
+            result.maximumDeficitMeters,
+            50
+        )
+        XCTAssertGreaterThanOrEqual(
+            result.leadChangeCount,
+            1
+        )
+    }
+
     private func makeReference(
         distanceMeters: Double,
         durationSeconds: TimeInterval,
