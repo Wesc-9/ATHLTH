@@ -85,6 +85,7 @@ struct GhostRaceHubView: View {
         ScrollView {
             LazyVStack(spacing: 18) {
                 hero
+                workoutDeviceCard
                 modeOverview
                 modeContent
                 audioCoachCard
@@ -199,50 +200,34 @@ struct GhostRaceHubView: View {
                     )
                 }
 
-                Picker(
-                    "Workout device",
-                    selection:
-                        $captureDevice
-                ) {
-                    Label(
-                        "iPhone",
-                        systemImage: "iphone"
-                    )
-                    .tag(
-                        WorkoutCaptureDevice
-                            .iPhone
-                    )
-
-                    Label(
-                        "Apple Watch",
-                        systemImage: "applewatch"
-                    )
-                    .tag(
-                        WorkoutCaptureDevice
-                            .appleWatch
-                    )
-                }
-                .pickerStyle(.segmented)
-                .onChange(
-                    of: captureDevice
-                ) { _, device in
-                    if device == .appleWatch &&
-                        !watchConnection.isReady {
-                        captureDevice = .iPhone
-                    }
-                }
-
-                if !canStartRace {
-                    Label(
-                        deviceRequirementText,
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .padding(.top, 2)
-                }
             }
         }
+    }
+
+    private var workoutDeviceCard: some View {
+        QuickStartWorkoutDeviceCard(
+            selection: $captureDevice,
+            watchConnected:
+                watchConnection.isReady &&
+                !watchConnection
+                    .workoutLaunchInProgress,
+            iPhoneEnabled:
+                phoneWorkout.active == nil,
+            iPhoneSubtitle:
+                phoneWorkout.active == nil
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Record Ghost with iPhone GPS. The iPhone owns the workout while Apple Watch can still be used as a companion display.",
+                        norwegian:
+                            "Registrer Ghost med GPS på iPhone. iPhone eier økten, mens Apple Watch fortsatt kan brukes som companion-skjerm."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Finish the active iPhone workout before starting Ghost.",
+                        norwegian:
+                            "Fullfør den aktive iPhone-økten før du starter Ghost."
+                    )
+        )
     }
 
     private var modeOverview: some View {
