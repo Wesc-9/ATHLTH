@@ -1,5 +1,15 @@
 import SwiftUI
 
+private func recoveryAIText(
+    _ english: String,
+    _ norwegian: String
+) -> String {
+    ATHLTHLocalization.choose(
+        english: english,
+        norwegian: norwegian
+    )
+}
+
 struct RecoveryAIInsightCard: View {
     let insight: RecoveryAIInsight
     let context: RecoveryAIContext
@@ -36,7 +46,7 @@ struct RecoveryAIInsightCard: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Text("Today")
+                    Text(recoveryAIText("Today", "I dag"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -76,7 +86,7 @@ struct RecoveryAIInsightCard: View {
 
             HStack(spacing: 7) {
                 metricTile(
-                    title: "Sleep",
+                    title: recoveryAIText("Sleep", "Søvn"),
                     value: sleepValue,
                     icon: "bed.double.fill",
                     tint: .indigo
@@ -97,9 +107,9 @@ struct RecoveryAIInsightCard: View {
                 )
 
                 metricTile(
-                    title: "Load",
+                    title: recoveryAIText("Load", "Belastning"),
                     value: loadValue,
-                    detail: "7d · strength + walk + run",
+                    detail: recoveryAIText("7d · strength + walk + run", "7 d · styrke + gange + løp"),
                     icon: "chart.bar.fill",
                     tint: .green
                 )
@@ -108,7 +118,7 @@ struct RecoveryAIInsightCard: View {
 
             if !displayFactors.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("What matters most today")
+                    Text(recoveryAIText("What matters most today", "Det viktigste i dag"))
                         .font(.headline.weight(.bold))
                         .foregroundStyle(
                             ATHLTHTheme.primaryText
@@ -163,19 +173,19 @@ struct RecoveryAIInsightCard: View {
 
             HStack(spacing: 8) {
                 recoveryActionButton(
-                    title: "Score details",
+                    title: recoveryAIText("Score details", "Scoredetaljer"),
                     icon: "chart.bar.xaxis",
                     action: onScoreDetails
                 )
 
                 recoveryActionButton(
-                    title: "Training suggestion",
+                    title: recoveryAIText("Training suggestion", "Treningsforslag"),
                     icon: "slider.horizontal.3",
                     action: onAdjustTraining
                 )
 
                 recoveryActionButton(
-                    title: "Ask ATHLTH",
+                    title: recoveryAIText("Ask ATHLTH", "Spør ATHLTH"),
                     icon: "sparkles",
                     action: onAskATHLTH
                 )
@@ -229,7 +239,7 @@ struct RecoveryAIInsightCard: View {
         .frame(width: 92, height: 92)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Readiness \(score), \(context.recoveryState)"
+            ATHLTHLocalization.choose(english: "Readiness \(score), \(context.recoveryState)", norwegian: "Dagsform \(score), \(context.recoveryState)")
         )
     }
 
@@ -316,7 +326,8 @@ struct RecoveryAIInsightCard: View {
 
         if !factors.contains(
             where: {
-                $0.title.localizedCaseInsensitiveContains("load")
+                $0.title.localizedCaseInsensitiveContains("load") ||
+                $0.title.localizedCaseInsensitiveContains("belastning")
             }
         ) {
             if factors.count >= 3 {
@@ -338,10 +349,10 @@ struct RecoveryAIInsightCard: View {
         let detail: String
         if let baseline {
             detail =
-                "The last 7 days total \(acute) min versus your recent weekly average of \(baseline) min. Imported strength, running and walking all count."
+                ATHLTHLocalization.choose(english: "The last 7 days total \(acute) min versus your recent weekly average of \(baseline) min. Imported strength, running and walking all count.", norwegian: "De siste 7 dagene utgjør \(acute) min sammenlignet med ditt nyere ukesnitt på \(baseline) min. Importert styrke, løping og gange teller med.")
         } else {
             detail =
-                "The last 7 days total \(acute) min. Imported strength, running and walking all count while ATHLTH builds your baseline."
+                ATHLTHLocalization.choose(english: "The last 7 days total \(acute) min. Imported strength, running and walking all count while ATHLTH builds your baseline.", norwegian: "De siste 7 dagene utgjør \(acute) min. Importert styrke, løping og gange teller med mens ATHLTH bygger grunnlinjen din.")
         }
 
         let impact: String
@@ -353,7 +364,7 @@ struct RecoveryAIInsightCard: View {
         }
 
         return RecoveryAIFactor(
-            title: "Training load",
+            title: recoveryAIText("Training load", "Treningsbelastning"),
             detail: detail,
             impact: impact
         )
@@ -418,7 +429,7 @@ struct RecoverySuggestedTodayCard: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.accent)
 
-                Text("SUGGESTED TODAY")
+                Text(recoveryAIText("SUGGESTED TODAY", "FORSLAG I DAG"))
                     .font(.caption.weight(.bold))
                     .tracking(1.4)
                     .foregroundStyle(.secondary)
@@ -511,7 +522,7 @@ struct RecoveryCoachView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 9) {
-                        Text("Try asking")
+                        Text(recoveryAIText("Try asking", "Prøv å spørre"))
                             .font(.headline)
 
                         ForEach(
@@ -553,7 +564,7 @@ struct RecoveryCoachView: View {
                     if isAsking {
                         HStack {
                             Spacer()
-                            ProgressView("ATHLTH is thinking…")
+                            ProgressView(recoveryAIText("ATHLTH is thinking…", "ATHLTH tenker…"))
                             Spacer()
                         }
                         .padding(.vertical, 20)
@@ -594,7 +605,7 @@ struct RecoveryCoachView: View {
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 9) {
                     TextField(
-                        "Ask about today's recovery…",
+                        recoveryAIText("Ask about today's recovery…", "Spør om dagens restitusjon…"),
                         text: $question,
                         axis: .vertical
                     )
@@ -632,7 +643,7 @@ struct RecoveryCoachView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button(recoveryAIText("Done", "Ferdig")) {
                         dismiss()
                     }
                 }
