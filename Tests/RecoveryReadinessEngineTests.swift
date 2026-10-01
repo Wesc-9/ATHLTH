@@ -406,3 +406,97 @@ final class RecoveryReadinessEngineTests:
         )
     }
 }
+
+
+final class MuscleRecoveryLoadTests: XCTestCase {
+    func testSameWorkoutCreatesLowerRelativeLoadWithEstablishedBaseline() {
+        let now = Date()
+
+        let newTrainer =
+            MuscleRecoveryStatus(
+                muscleGroup: "Quads",
+                lastTrainedAt: now,
+                completedSets: 6,
+                runningMinutes: 30,
+                estimatedRecoveryHours: 48,
+                soreness: .none,
+                baselineWeeklyStrengthSets: nil,
+                chronicWeeklyTrainingMinutes: 60,
+                acuteToChronicRatio: 1
+            )
+
+        let establishedTrainer =
+            MuscleRecoveryStatus(
+                muscleGroup: "Quads",
+                lastTrainedAt: now,
+                completedSets: 6,
+                runningMinutes: 30,
+                estimatedRecoveryHours: 48,
+                soreness: .none,
+                baselineWeeklyStrengthSets: 12,
+                chronicWeeklyTrainingMinutes: 300,
+                acuteToChronicRatio: 1
+            )
+
+        XCTAssertGreaterThan(
+            newTrainer.loadScore,
+            establishedTrainer.loadScore
+        )
+        XCTAssertGreaterThanOrEqual(
+            newTrainer.currentLoadScore,
+            0.78
+        )
+        XCTAssertLessThan(
+            establishedTrainer.currentLoadScore,
+            0.58
+        )
+    }
+
+    func testHighLoadFadesBackToReadyAsRecoveryWindowCompletes() {
+        let recovered =
+            MuscleRecoveryStatus(
+                muscleGroup: "Quads",
+                lastTrainedAt:
+                    Date().addingTimeInterval(
+                        -48 * 3_600
+                    ),
+                completedSets: 8,
+                estimatedRecoveryHours: 48,
+                soreness: .none,
+                baselineWeeklyStrengthSets: nil,
+                chronicWeeklyTrainingMinutes: 60,
+                acuteToChronicRatio: 1
+            )
+
+        XCTAssertGreaterThanOrEqual(
+            recovered.progress,
+            0.99
+        )
+        XCTAssertLessThan(
+            recovered.currentLoadScore,
+            0.32
+        )
+    }
+
+    func testHighSorenessKeepsAreaInPauseRange() {
+        let sore =
+            MuscleRecoveryStatus(
+                muscleGroup: "Hamstrings",
+                lastTrainedAt:
+                    Date().addingTimeInterval(
+                        -36 * 3_600
+                    ),
+                completedSets: 2,
+                estimatedRecoveryHours: 48,
+                soreness: .high,
+                baselineWeeklyStrengthSets: 10,
+                chronicWeeklyTrainingMinutes: 240,
+                acuteToChronicRatio: 0.9
+            )
+
+        XCTAssertGreaterThanOrEqual(
+            sore.currentLoadScore,
+            0.78
+        )
+    }
+}
