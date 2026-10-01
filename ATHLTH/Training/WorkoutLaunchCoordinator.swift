@@ -279,6 +279,35 @@ struct PlannedWorkoutWatchBuilder {
 
 @MainActor
 enum WorkoutLaunchCoordinator {
+    static func resolvedSpotifyPlaylist(
+        workout: PlannedSession,
+        session: AppSessionStore
+    ) -> SpotifyPlaylistReference? {
+        if let workoutAutoplay =
+                workout.spotifyAutoplayOnStart {
+            guard workoutAutoplay else {
+                return nil
+            }
+
+            return workout.spotifyPlaylist
+        }
+
+        // Legacy plans stored Spotify at program level. Keep that behavior
+        // only when the workout has no explicit Spotify override.
+        guard
+            let plan =
+                session.trainingPlan(
+                    containingSessionID:
+                        workout.id
+                ),
+            plan.spotifyAutoplayOnWorkoutStart
+        else {
+            return nil
+        }
+
+        return plan.spotifyPlaylist
+    }
+
     static func startLinkedSpotifyIfNeeded(
         workout: PlannedSession,
         session: AppSessionStore,
@@ -287,13 +316,11 @@ enum WorkoutLaunchCoordinator {
     ) {
         guard settings
                 .spotifyAutoplayLinkedPlaylists,
-              let plan =
-                session.trainingPlan(
-                    containingSessionID:
-                        workout.id
-                ),
-              plan.spotifyAutoplayOnWorkoutStart,
-              let playlist = plan.spotifyPlaylist
+              let playlist =
+                resolvedSpotifyPlaylist(
+                    workout: workout,
+                    session: session
+                )
         else {
             return
         }
