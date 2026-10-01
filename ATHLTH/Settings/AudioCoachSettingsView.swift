@@ -1,4 +1,124 @@
+import AVFoundation
 import SwiftUI
+
+@MainActor
+private final class ATHLTHAudioCoachPreviewSpeaker:
+    NSObject,
+    AVSpeechSynthesizerDelegate
+{
+    static let shared =
+        ATHLTHAudioCoachPreviewSpeaker()
+
+    private let synthesizer =
+        AVSpeechSynthesizer()
+
+    private override init() {
+        super.init()
+        synthesizer.delegate = self
+    }
+
+    func speak(
+        language: WatchAudioCoachLanguage,
+        duckOtherAudio: Bool
+    ) {
+        synthesizer.stopSpeaking(
+            at: .immediate
+        )
+
+        let audioSession =
+            AVAudioSession.sharedInstance()
+        let options:
+            AVAudioSession.CategoryOptions =
+                duckOtherAudio
+                    ? [
+                        .duckOthers,
+                        .interruptSpokenAudioAndMixWithOthers
+                    ]
+                    : [.mixWithOthers]
+
+        try? audioSession.setCategory(
+            .playback,
+            mode: .spokenAudio,
+            options: options
+        )
+        try? audioSession.setActive(true)
+
+        let useNorwegian: Bool
+        switch language {
+        case .norwegian:
+            useNorwegian = true
+        case .english:
+            useNorwegian = false
+        case .system:
+            let code =
+                Locale.autoupdatingCurrent
+                    .language
+                    .languageCode?
+                    .identifier
+                    .lowercased()
+            useNorwegian =
+                code == "nb" ||
+                code == "nn" ||
+                code == "no"
+        }
+
+        let utterance =
+            AVSpeechUtterance(
+                string:
+                    useNorwegian
+                        ? "Audio Coach er klar."
+                        : "Audio Coach is ready."
+            )
+
+        if language == .norwegian ||
+            (language == .system &&
+             useNorwegian) {
+            utterance.voice =
+                AVSpeechSynthesisVoice(
+                    language: "nb-NO"
+                )
+        } else if language == .english {
+            utterance.voice =
+                AVSpeechSynthesisVoice(
+                    language: "en-US"
+                )
+        }
+
+        utterance.rate = 0.48
+        utterance.volume = 1.0
+        synthesizer.speak(utterance)
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor in
+            try? AVAudioSession
+                .sharedInstance()
+                .setActive(
+                    false,
+                    options:
+                        .notifyOthersOnDeactivation
+                )
+        }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didCancel utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor in
+            try? AVAudioSession
+                .sharedInstance()
+                .setActive(
+                    false,
+                    options:
+                        .notifyOthersOnDeactivation
+                )
+        }
+    }
+}
 
 struct ATHLTHAudioCoachSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
@@ -19,6 +139,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                     structuredWorkoutCard
                     musicCard
                     languageCard
+                    previewCard
                 }
             }
             .padding()
@@ -219,6 +340,49 @@ struct ATHLTHAudioCoachSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var previewCard: some View {
+        settingsCard(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Test Audio Coach",
+                    norwegian: "Test Audio Coach"
+                ),
+            subtitle:
+                ATHLTHLocalization.choose(
+                    english:
+                        "Play a short sample on this iPhone before starting a workout.",
+                    norwegian:
+                        "Spill av en kort test på denne iPhonen før du starter en økt."
+                )
+        ) {
+            Button {
+                ATHLTHAudioCoachPreviewSpeaker
+                    .shared
+                    .speak(
+                        language:
+                            settings
+                                .audioCoachLanguage,
+                        duckOtherAudio:
+                            settings
+                                .audioCoachDuckOtherAudio
+                    )
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Play test voice",
+                        norwegian: "Spill av teststemme"
+                    ),
+                    systemImage:
+                        "speaker.wave.2.fill"
+                )
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accent)
         }
     }
 
