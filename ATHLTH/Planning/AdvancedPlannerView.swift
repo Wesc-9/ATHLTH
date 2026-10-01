@@ -2839,15 +2839,6 @@ struct TrainingPlanCreationView: View {
     private var advancedForm: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                builderIntro(
-                    eyebrow: "BUILD FROM SCRATCH",
-                    title: "Your plan. Your structure.",
-                    subtitle:
-                        "Create the calendar first. The plan opens empty, ready for strength sessions, running workouts, routes, targets and recovery days.",
-                    icon: "calendar.badge.plus",
-                    accent: ATHLTHTheme.accent
-                )
-
                 creationPanel(
                     eyebrow: "01 · IDENTITY",
                     title: "Name the plan",
