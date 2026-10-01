@@ -81,6 +81,89 @@ final class GhostRacePrivacyTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testPhoneGhostRuntimeProducesRouteAwareComparison() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000,
+            durationSeconds: 600,
+            pointCount: 21
+        )
+        let store = GhostRaceStore()
+
+        try store.prepare(
+            reference: reference
+        )
+
+        let point = reference.points[10]
+
+        store.updatePhoneWorkout(
+            location: point.location,
+            elapsedTime: 270,
+            state: .running
+        )
+
+        let comparison =
+            try XCTUnwrap(
+                store.comparison
+            )
+
+        XCTAssertEqual(
+            comparison.userProgress,
+            0.5,
+            accuracy: 0.02
+        )
+        XCTAssertLessThan(
+            comparison.routeDeviationMeters,
+            2
+        )
+        XCTAssertGreaterThan(
+            comparison.signedTimeSeconds,
+            0
+        )
+    }
+
+    @MainActor
+    func testPhoneGhostRuntimeCompletesAndScoresRace() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000,
+            durationSeconds: 600,
+            pointCount: 21
+        )
+        let store = GhostRaceStore()
+
+        try store.prepare(
+            reference: reference
+        )
+
+        store.updatePhoneWorkout(
+            location:
+                reference
+                    .points
+                    .last!
+                    .location,
+            elapsedTime: 570,
+            state: .completed
+        )
+
+        let result =
+            try XCTUnwrap(
+                store.result
+            )
+
+        XCTAssertTrue(
+            result.completedRoute
+        )
+        XCTAssertEqual(
+            result.signedTimeSeconds,
+            30,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            result.beatGhost,
+            true
+        )
+    }
+
     private func makeReference(
         distanceMeters: Double,
         durationSeconds: TimeInterval,
