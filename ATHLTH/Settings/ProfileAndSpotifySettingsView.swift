@@ -446,8 +446,17 @@ struct ATHLTHEditProfileView: View {
 
                         Text(
                             gear.items.isEmpty
-                                ? "Add watches, shoes, headphones and more."
-                                : "\(gear.items.count) saved item\(gear.items.count == 1 ? "" : "s")"
+                                ? ATHLTHLocalization.choose(
+                                    english: "Add watches, shoes, headphones and more.",
+                                    norwegian: "Legg til klokker, sko, hodetelefoner og mer."
+                                )
+                                : ATHLTHLocalization.counted(
+                                    gear.items.count,
+                                    englishSingular: "saved item",
+                                    englishPlural: "saved items",
+                                    norwegianSingular: "lagret element",
+                                    norwegianPlural: "lagrede elementer"
+                                )
                         )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1186,10 +1195,26 @@ struct PersonalHealthProfileView: View {
 
     private var sourceTitle: String {
         switch session.onboardingProfile?.personalDetailsSource ?? .none {
-        case .appleHealth: return "Connected"
-        case .mixed: return "Apple Health + manual details"
-        case .manual: return "Manual details"
-        case .none: return "Not connected"
+        case .appleHealth:
+            return ATHLTHLocalization.choose(
+                english: "Connected",
+                norwegian: "Tilkoblet"
+            )
+        case .mixed:
+            return ATHLTHLocalization.choose(
+                english: "Apple Health + manual details",
+                norwegian: "Apple Health + manuelle opplysninger"
+            )
+        case .manual:
+            return ATHLTHLocalization.choose(
+                english: "Manual details",
+                norwegian: "Manuelle opplysninger"
+            )
+        case .none:
+            return ATHLTHLocalization.choose(
+                english: "Not connected",
+                norwegian: "Ikke tilkoblet"
+            )
         }
     }
 
@@ -1554,8 +1579,14 @@ struct ATHLTHPrivacyCenterView: View {
 
                 Text(
                     settings.hideRouteStartAndEnd
-                        ? "Recommended · ATHLTH removes roughly 250 m from both ends before a route is shared."
-                        : "Shared routes include their full start and end points."
+                        ? ATHLTHLocalization.choose(
+                            english: "Recommended · ATHLTH removes roughly 250 m from both ends before a route is shared.",
+                            norwegian: "Anbefalt · ATHLTH fjerner omtrent 250 m fra begge ender før en rute deles."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Shared routes include their full start and end points.",
+                            norwegian: "Delte ruter inkluderer hele start- og sluttpunktet."
+                        )
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1599,8 +1630,14 @@ struct ATHLTHPrivacyCenterView: View {
 
                 Text(
                     session.aiHealthDataSharingEnabled
-                        ? "ATHLTH Coach may send the minimum relevant health context, such as sleep, HRV, heart rate and workout metrics, through ATHLTH's backend to the configured AI provider. You can turn this off at any time."
-                        : "Off by default. Recovery and workout insights stay local and deterministic until you explicitly allow health data to be used by ATHLTH Coach."
+                        ? ATHLTHLocalization.choose(
+                            english: "ATHLTH Coach may send the minimum relevant health context, such as sleep, HRV, heart rate and workout metrics, through ATHLTH's backend to the configured AI provider. You can turn this off at any time.",
+                            norwegian: "ATHLTH Coach kan sende et minimum av relevant helsekontekst, som søvn, HRV, puls og treningsmålinger, gjennom ATHLTHs backend til den konfigurerte AI-leverandøren. Du kan slå dette av når som helst."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Off by default. Recovery and workout insights stay local and deterministic until you explicitly allow health data to be used by ATHLTH Coach.",
+                            norwegian: "Av som standard. Restitusjons- og treningsinnsikt forblir lokal og deterministisk til du uttrykkelig tillater at helsedata brukes av ATHLTH Coach."
+                        )
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
