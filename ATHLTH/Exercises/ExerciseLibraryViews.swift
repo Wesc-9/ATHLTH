@@ -656,8 +656,9 @@ struct CustomExerciseEditorView: View {
                                 .font(.caption)
                                 .foregroundStyle(
                                     primaryMuscles.isEmpty
-                                        ? .red
-                                        : .secondary
+                                        ? Color.red
+                                        : ATHLTHTheme
+                                            .mutedText
                                 )
                             }
 
