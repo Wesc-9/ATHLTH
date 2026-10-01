@@ -2000,17 +2000,17 @@ private enum TrainingPlanCreationMode: String, Identifiable {
 
     var title: String {
         switch self {
-        case .simple: return "Simple"
-        case .advanced: return "Advanced"
+        case .simple: return "Quick Start"
+        case .advanced: return "Build from Scratch"
         }
     }
 
     var subtitle: String {
         switch self {
         case .simple:
-            return "Choose your focus and weekly frequency. ATHLTH creates a useful starting schedule for you."
+            return "Create a lightweight starter rhythm."
         case .advanced:
-            return "Control timeline, goals, visibility and build every workout exactly the way you want."
+            return "Start with a blank calendar and shape every week yourself."
         }
     }
 
@@ -2100,14 +2100,17 @@ struct TrainingPlanCreationView: View {
     @EnvironmentObject private var goalStore: GoalStore
 
     @State private var creationMode: TrainingPlanCreationMode?
+    private let showsSourceChooser: Bool
 
     init() {
+        showsSourceChooser = true
         _creationMode = State(initialValue: nil)
     }
 
     fileprivate init(
         initialMode: TrainingPlanCreationMode
     ) {
+        showsSourceChooser = false
         _creationMode = State(initialValue: initialMode)
     }
 
@@ -2211,28 +2214,16 @@ struct TrainingPlanCreationView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(creationMode == nil ? "Cancel" : "Back") {
-                        if creationMode == nil {
+                    Button(
+                        creationMode == nil || !showsSourceChooser
+                            ? "Cancel"
+                            : "Back"
+                    ) {
+                        if creationMode == nil || !showsSourceChooser {
                             dismiss()
                         } else {
                             creationMode = nil
                         }
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    if let creationMode {
-                        Button("Create") {
-                            createPlan(mode: creationMode)
-                        }
-                        .disabled(
-                            title
-                                .trimmingCharacters(
-                                    in: .whitespacesAndNewlines
-                                )
-                                .isEmpty ||
-                            conflictingPlan != nil
-                        )
                     }
                 }
             }
@@ -2257,9 +2248,9 @@ struct TrainingPlanCreationView: View {
     private var navigationTitle: String {
         switch creationMode {
         case .simple:
-            return "Simple Plan"
+            return "Quick Start"
         case .advanced:
-            return "Advanced Plan"
+            return "Build from Scratch"
         case nil:
             return "New Training Plan"
         }
@@ -2267,457 +2258,1074 @@ struct TrainingPlanCreationView: View {
 
     private var creationModeChoice: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("How do you want to build it?")
-                        .font(.title2.weight(.bold))
+            LazyVStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("CREATE A TRAINING PLAN")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(2.0)
+                        .foregroundStyle(ATHLTHTheme.accent)
+
+                    Text("Start your way")
+                        .font(
+                            .system(
+                                size: 34,
+                                weight: .semibold,
+                                design: .serif
+                            )
+                        )
+                        .foregroundStyle(ATHLTHTheme.primaryText)
 
                     Text(
-                        "You can always edit the plan in detail afterwards. This only changes how much ATHLTH sets up for you now."
+                        "There are only two useful starting points: build a blank plan yourself, or choose a complete plan from the Library. Both stay fully editable afterwards."
                     )
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineSpacing(2)
                 }
+                .padding(.bottom, 2)
 
-                creationModeButton(.simple)
-                creationModeButton(.advanced)
+                Button {
+                    beginScratchCreation()
+                } label: {
+                    creationPathCard(
+                        eyebrow: "BLANK PLAN",
+                        title: "Build from scratch",
+                        subtitle:
+                            "Choose the dates and goals, then add every workout exactly where you want it.",
+                        badge: "FULL CONTROL",
+                        icon: "calendar.badge.plus",
+                        accent: ATHLTHTheme.accentDeep,
+                        prominent: true
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    TrainingPlanLibraryView {
+                        dismiss()
+                    }
+                } label: {
+                    creationPathCard(
+                        eyebrow: "TRAINING LIBRARY",
+                        title: "Choose a training plan",
+                        subtitle:
+                            "Browse curated running, strength and hybrid plans, preview every week and make one yours.",
+                        badge: "READY TO USE",
+                        icon: "square.stack.3d.up.fill",
+                        accent: ATHLTHTheme.premiumGold,
+                        prominent: false
+                    )
+                }
+                .buttonStyle(.plain)
+
+                HStack(spacing: 10) {
+                    Image(systemName: "pencil.and.list.clipboard")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accent)
+
+                    Text(
+                        "Nothing is locked. After creation you can move days, replace workouts, edit exercises, routes, targets and times."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .padding(.horizontal, 4)
+                .padding(.top, 2)
             }
-            .padding(20)
-            .frame(maxWidth: 680)
+            .padding(.horizontal, 20)
+            .padding(.top, 22)
+            .padding(.bottom, 34)
+            .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
         }
         .background(
             ATHLTHPremiumCanvas(
-                accent: ATHLTHTheme.accent.opacity(0.55)
+                accent: ATHLTHTheme.accent.opacity(0.38)
             )
         )
     }
 
-    private func creationModeButton(
-        _ mode: TrainingPlanCreationMode
+    private func creationPathCard(
+        eyebrow: String,
+        title: String,
+        subtitle: String,
+        badge: String,
+        icon: String,
+        accent: Color,
+        prominent: Bool
     ) -> some View {
-        Button {
-            creationMode = mode
-            let suggested = session.suggestedTrainingPlanStartDate
-            startDate = suggested
-            endDate = Calendar.current.date(
-                byAdding: .day,
-                value: 27,
-                to: suggested
-            ) ?? suggested
-        } label: {
-            HStack(alignment: .top, spacing: 15) {
-                Image(systemName: mode.icon)
-                    .font(.title2)
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 50, height: 50)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 15)
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(
+                        prominent ? Color.white : accent
                     )
-
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack {
-                        Text(mode.title)
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        if mode == .advanced {
-                            Text("FULL CONTROL")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(ATHLTHTheme.accent)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 4)
-                                .background(
-                                    ATHLTHTheme.accentSoft,
-                                    in: Capsule()
-                                )
-                        }
+                    .frame(width: 56, height: 56)
+                    .background(
+                        prominent
+                            ? Color.white.opacity(0.14)
+                            : accent.opacity(0.11),
+                        in: RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                        .stroke(
+                            prominent
+                                ? Color.white.opacity(0.20)
+                                : Color.white.opacity(0.92),
+                            lineWidth: 0.8
+                        )
                     }
 
-                    Text(mode.subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
+                Spacer()
 
-                    Text(
-                        mode == .simple
-                            ? "Best for getting started quickly"
-                            : "Best for structured multi-week programming"
+                Text(badge)
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(
+                        prominent
+                            ? Color.white.opacity(0.86)
+                            : accent
                     )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .padding(.top, 3)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(
+                        prominent
+                            ? Color.white.opacity(0.12)
+                            : accent.opacity(0.09),
+                        in: Capsule()
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(eyebrow)
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.7)
+                    .foregroundStyle(
+                        prominent
+                            ? Color.white.opacity(0.68)
+                            : accent.opacity(0.85)
+                    )
+
+                Text(title)
+                    .font(.system(size: 23, weight: .bold))
+                    .foregroundStyle(
+                        prominent
+                            ? Color.white
+                            : ATHLTHTheme.primaryText
+                    )
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        prominent
+                            ? Color.white.opacity(0.76)
+                            : ATHLTHTheme.mutedText
+                    )
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(2)
+            }
+
+            HStack {
+                Text(
+                    prominent
+                        ? "Empty calendar · your structure"
+                        : "Preview first · personalise after"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    prominent
+                        ? Color.white.opacity(0.78)
+                        : ATHLTHTheme.primaryText.opacity(0.68)
+                )
+
+                Spacer()
+
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(
+                        prominent
+                            ? Color.white
+                            : accent
+                    )
+                    .frame(width: 34, height: 34)
+                    .background(
+                        prominent
+                            ? Color.white.opacity(0.14)
+                            : accent.opacity(0.09),
+                        in: Circle()
+                    )
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors:
+                    prominent
+                        ? [
+                            ATHLTHTheme.accentDeep,
+                            ATHLTHTheme.accentDeep.opacity(0.88)
+                        ]
+                        : [
+                            Color.white.opacity(0.98),
+                            accent.opacity(0.055)
+                        ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(
+                prominent
+                    ? Color.white.opacity(0.12)
+                    : Color.white.opacity(0.96),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: prominent
+                ? ATHLTHTheme.accentDeep.opacity(0.20)
+                : Color.black.opacity(0.055),
+            radius: prominent ? 20 : 14,
+            x: 0,
+            y: prominent ? 10 : 7
+        )
+    }
+
+    private func beginScratchCreation() {
+        creationMode = .advanced
+
+        let suggested = session.suggestedTrainingPlanStartDate
+        startDate = suggested
+        endDate = Calendar.current.date(
+            byAdding: .day,
+            value: 27,
+            to: suggested
+        ) ?? suggested
+    }
+
+    private var simpleForm: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                builderIntro(
+                    eyebrow: "QUICK START",
+                    title: "Set the rhythm",
+                    subtitle:
+                        "ATHLTH creates a lightweight starting schedule. You can still rebuild every workout afterwards.",
+                    icon: "wand.and.stars",
+                    accent: ATHLTHTheme.vitality
+                )
+
+                creationPanel(
+                    eyebrow: "01 · BASICS",
+                    title: "Plan & focus",
+                    subtitle: "Name the plan and choose the training bias.",
+                    icon: "scope",
+                    accent: ATHLTHTheme.vitality
+                ) {
+                    VStack(spacing: 12) {
+                        premiumTextField(
+                            "Plan name",
+                            text: $title
+                        )
+
+                        DatePicker(
+                            "Start date",
+                            selection: $startDate,
+                            displayedComponents: .date
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Divider()
+
+                        Picker("Training focus", selection: $simpleFocus) {
+                            ForEach(SimpleTrainingPlanFocus.allCases) { focus in
+                                Label(
+                                    focus.title,
+                                    systemImage: focus.icon
+                                )
+                                .tag(focus)
+                            }
+                        }
+
+                        HStack(spacing: 9) {
+                            Image(systemName: simpleFocus.icon)
+                                .foregroundStyle(ATHLTHTheme.vitality)
+
+                            Text(simpleFocus.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            Spacer()
+                        }
+                    }
+                }
+
+                creationPanel(
+                    eyebrow: "02 · WEEKLY RHYTHM",
+                    title: "\(simpleSessionsPerWeek) sessions per week",
+                    subtitle:
+                        "ATHLTH spreads the sessions across the week. You can move them at any time.",
+                    icon: "calendar.day.timeline.left",
+                    accent: ATHLTHTheme.accent
+                ) {
+                    VStack(spacing: 13) {
+                        Stepper(
+                            "\(simpleSessionsPerWeek) sessions",
+                            value: $simpleSessionsPerWeek,
+                            in: 2...6
+                        )
+
+                        HStack(spacing: 7) {
+                            ForEach(
+                                Array(simplePreviewKinds.enumerated()),
+                                id: \.offset
+                            ) { index, kind in
+                                VStack(spacing: 6) {
+                                    Image(systemName: kind.systemImage)
+                                        .font(.system(size: 16, weight: .semibold))
+
+                                    Text("\(index + 1)")
+                                        .font(.caption2.weight(.bold))
+                                }
+                                .foregroundStyle(ATHLTHTheme.accent)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 11)
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            ATHLTHTheme.accentSoft,
+                                            Color.white.opacity(0.72)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 13,
+                                        style: .continuous
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                creationPanel(
+                    eyebrow: "03 · LENGTH",
+                    title: "How long is the plan?",
+                    subtitle: "Pick a duration. You can extend or shorten it later.",
+                    icon: "calendar.badge.clock",
+                    accent: ATHLTHTheme.premiumGold
+                ) {
+                    durationChipGrid(
+                        options: [4, 8, 12, 16, 24],
+                        selected: simpleWeekCount
+                    ) { weeks in
+                        simpleWeekCount = weeks
+                    }
+                }
+
+                if let conflict = conflictingPlan {
+                    planConflictCard(
+                        conflict,
+                        message:
+                            "Choose a start date after the existing plan ends. ATHLTH keeps one active plan on each date."
+                    )
+                }
+
+                createPlanButton(
+                    mode: .simple,
+                    title: "Create Quick Plan",
+                    subtitle: "\(simpleWeekCount) weeks · \(simpleSessionsPerWeek) sessions / week"
+                )
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+            .padding(.bottom, 36)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
+        }
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.vitality.opacity(0.20)
+            )
+        )
+    }
+
+    private var advancedForm: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                builderIntro(
+                    eyebrow: "BUILD FROM SCRATCH",
+                    title: "Your plan. Your structure.",
+                    subtitle:
+                        "Create the calendar first. The plan opens empty, ready for strength sessions, running workouts, routes, targets and recovery days.",
+                    icon: "calendar.badge.plus",
+                    accent: ATHLTHTheme.accent
+                )
+
+                creationPanel(
+                    eyebrow: "01 · IDENTITY",
+                    title: "Name the plan",
+                    subtitle: "Keep it clear enough to recognise later in My Plans.",
+                    icon: "pencil.line",
+                    accent: ATHLTHTheme.accent
+                ) {
+                    VStack(spacing: 12) {
+                        premiumTextField(
+                            "Program name",
+                            text: $title
+                        )
+
+                        premiumTextField(
+                            "What are you training for?",
+                            text: $summary,
+                            axis: .vertical
+                        )
+                        .lineLimit(2...5)
+
+                        Divider()
+
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Visibility")
+                                    .font(.subheadline.weight(.semibold))
+
+                                Text("Who can see this plan")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+
+                            Spacer()
+
+                            Picker("Visibility", selection: $visibility) {
+                                ForEach(ProfileVisibility.allCases) { option in
+                                    Text(option.title).tag(option)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                    }
+                }
+
+                creationPanel(
+                    eyebrow: "02 · TIMELINE",
+                    title: "Define the plan window",
+                    subtitle: "Choose a start date and either a fixed number of weeks or an end date.",
+                    icon: "calendar",
+                    accent: ATHLTHTheme.premiumGold
+                ) {
+                    VStack(spacing: 13) {
+                        DatePicker(
+                            "Start date",
+                            selection: $startDate,
+                            displayedComponents: .date
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Picker("Plan by", selection: $timelineMode) {
+                            ForEach(ProgramTimelineMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        if timelineMode == .weeks {
+                            durationChipGrid(
+                                options: quickDurations,
+                                selected:
+                                    useCustomWeeks
+                                        ? nil
+                                        : weekCount
+                            ) { weeks in
+                                weekCount = weeks
+                                useCustomWeeks = false
+                            }
+
+                            Toggle(
+                                "Custom plan length",
+                                isOn: $useCustomWeeks
+                            )
+
+                            if useCustomWeeks {
+                                Stepper(
+                                    "\(customWeeks) weeks",
+                                    value: $customWeeks,
+                                    in: 1...52
+                                )
+                                .padding(.top, 2)
+                            }
+                        } else {
+                            DatePicker(
+                                "End date",
+                                selection: $endDate,
+                                in: startDate...(
+                                    Calendar.current.date(
+                                        byAdding: .weekOfYear,
+                                        value: 52,
+                                        to: startDate
+                                    ) ?? startDate
+                                ),
+                                displayedComponents: .date
+                            )
+                        }
+
+                        Divider()
+
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("PROGRAM WINDOW")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .tracking(1.4)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                                Text(
+                                    "\(resolvedWeeks) " +
+                                    (resolvedWeeks == 1 ? "week" : "weeks")
+                                )
+                                .font(.title3.weight(.bold))
+                            }
+
+                            Spacer()
+
+                            Text(
+                                "\(startDate.formatted(date: .abbreviated, time: .omitted))\n– \(resolvedEndDate.formatted(date: .abbreviated, time: .omitted))"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .multilineTextAlignment(.trailing)
+                        }
+                    }
+                }
+
+                if let conflict = conflictingPlan {
+                    planConflictCard(
+                        conflict,
+                        message:
+                            "Adjust the dates before creating this plan. ATHLTH keeps one active plan on each date."
+                    )
+                }
+
+                if !goalStore.goals.isEmpty {
+                    creationPanel(
+                        eyebrow: "03 · GOALS",
+                        title: "Connect goals",
+                        subtitle:
+                            "Optional. Linking goals makes progress and coaching context more useful.",
+                        icon: "scope",
+                        accent: ATHLTHTheme.vitality
+                    ) {
+                        VStack(spacing: 0) {
+                            ForEach(
+                                Array(goalStore.goals.enumerated()),
+                                id: \.offset
+                            ) { index, goal in
+                                Toggle(
+                                    isOn: Binding(
+                                        get: {
+                                            selectedGoalIDs.contains(goal.id)
+                                        },
+                                        set: { enabled in
+                                            if enabled {
+                                                selectedGoalIDs.insert(goal.id)
+                                            } else {
+                                                selectedGoalIDs.remove(goal.id)
+                                            }
+                                        }
+                                    )
+                                ) {
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 3
+                                    ) {
+                                        Text(goal.title)
+                                            .font(.subheadline.weight(.semibold))
+
+                                        Text(goal.category.title)
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+
+                                if index < goalStore.goals.count - 1 {
+                                    Divider()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                creationPanel(
+                    eyebrow: goalStore.goals.isEmpty
+                        ? "03 · WHAT COMES NEXT"
+                        : "04 · WHAT COMES NEXT",
+                    title: "Built for detailed programming",
+                    subtitle:
+                        "The new plan starts empty. Add only what belongs in it.",
+                    icon: "slider.horizontal.3",
+                    accent: ATHLTHTheme.accentDeep
+                ) {
+                    VStack(spacing: 10) {
+                        advancedFeatureRow(
+                            "Place any workout on any day",
+                            icon: "calendar.badge.plus"
+                        )
+                        advancedFeatureRow(
+                            "Strength exercises, sets, reps, load and progression",
+                            icon: "dumbbell.fill"
+                        )
+                        advancedFeatureRow(
+                            "Structured running, distance and routes",
+                            icon: "figure.run"
+                        )
+                        advancedFeatureRow(
+                            "Recovery, notes and scheduled time",
+                            icon: "clock"
+                        )
+                    }
+                }
+
+                createPlanButton(
+                    mode: .advanced,
+                    title: "Create Empty Plan",
+                    subtitle:
+                        "\(resolvedWeeks) " +
+                        (resolvedWeeks == 1 ? "week" : "weeks") +
+                        " · ready for programming"
+                )
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+            .padding(.bottom, 36)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
+        }
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.accent.opacity(0.30)
+            )
+        )
+        .onChange(of: startDate) { _, newStart in
+            if endDate < newStart {
+                endDate = Calendar.current.date(
+                    byAdding: .day,
+                    value: 6,
+                    to: newStart
+                ) ?? newStart
+            }
+        }
+    }
+
+    private func builderIntro(
+        eyebrow: String,
+        title: String,
+        subtitle: String,
+        icon: String,
+        accent: Color
+    ) -> some View {
+        HStack(alignment: .top, spacing: 15) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 54, height: 54)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            accent.opacity(0.15),
+                            accent.opacity(0.06)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(eyebrow)
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.7)
+                    .foregroundStyle(accent)
+
+                Text(title)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineSpacing(2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.97),
+                    accent.opacity(0.045)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 25,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 25,
+                style: .continuous
+            )
+            .stroke(Color.white.opacity(0.94), lineWidth: 1)
+        }
+        .shadow(
+            color: Color.black.opacity(0.045),
+            radius: 14,
+            y: 7
+        )
+    }
+
+    private func creationPanel<Content: View>(
+        eyebrow: String,
+        title: String,
+        subtitle: String,
+        icon: String,
+        accent: Color,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        accent.opacity(0.09),
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(eyebrow)
+                        .font(.system(size: 8, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(accent)
+
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            content()
+        }
+        .padding(17)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.98),
+                    accent.opacity(0.025)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 23,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 23,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.96),
+                lineWidth: 0.9
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.038),
+            radius: 12,
+            y: 6
+        )
+    }
+
+    private func premiumTextField(
+        _ prompt: String,
+        text: Binding<String>,
+        axis: Axis = .horizontal
+    ) -> some View {
+        TextField(
+            prompt,
+            text: text,
+            axis: axis
+        )
+        .textFieldStyle(.plain)
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 13)
+        .padding(.vertical, 12)
+        .background(
+            Color.black.opacity(0.028),
+            in: RoundedRectangle(
+                cornerRadius: 13,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 13,
+                style: .continuous
+            )
+            .stroke(Color.black.opacity(0.035), lineWidth: 0.8)
+        }
+    }
+
+    private func durationChipGrid(
+        options: [Int],
+        selected: Int?,
+        onSelect: @escaping (Int) -> Void
+    ) -> some View {
+        LazyVGrid(
+            columns: [
+                GridItem(
+                    .adaptive(minimum: 78),
+                    spacing: 8
+                )
+            ],
+            spacing: 8
+        ) {
+            ForEach(options, id: \.self) { weeks in
+                let isSelected = selected == weeks
+
+                Button {
+                    onSelect(weeks)
+                } label: {
+                    VStack(spacing: 3) {
+                        Text("\(weeks)")
+                            .font(.headline)
+                        Text(weeks == 1 ? "week" : "weeks")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .foregroundStyle(
+                        isSelected
+                            ? Color.white
+                            : ATHLTHTheme.primaryText
+                    )
+                    .background(
+                        LinearGradient(
+                            colors:
+                                isSelected
+                                    ? [
+                                        ATHLTHTheme.accent,
+                                        ATHLTHTheme.accentDeep
+                                    ]
+                                    : [
+                                        Color.white.opacity(0.88),
+                                        Color.black.opacity(0.018)
+                                    ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                        .stroke(
+                            isSelected
+                                ? Color.white.opacity(0.12)
+                                : Color.black.opacity(0.035),
+                            lineWidth: 0.8
+                        )
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func planConflictCard(
+        _ conflict: TrainingPlan,
+        message: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color.orange)
+                .frame(width: 40, height: 40)
+                .background(
+                    Color.orange.opacity(0.09),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Overlaps with \(conflict.title)")
+                    .font(.subheadline.weight(.semibold))
+
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(15)
+        .background(
+            Color.orange.opacity(0.07),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(Color.orange.opacity(0.12), lineWidth: 0.8)
+        }
+    }
+
+    private func advancedFeatureRow(
+        _ title: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accent)
+                .frame(width: 34, height: 34)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText.opacity(0.84)
+                )
+
+            Spacer()
+        }
+    }
+
+    private func createPlanButton(
+        mode: TrainingPlanCreationMode,
+        title: String,
+        subtitle: String
+    ) -> some View {
+        let disabled =
+            self.title
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .isEmpty ||
+            conflictingPlan != nil
+
+        return Button {
+            createPlan(mode: mode)
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 15, weight: .bold))
+                    .frame(width: 38, height: 38)
+                    .background(
+                        Color.white.opacity(0.14),
+                        in: Circle()
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.72))
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.caption.bold())
-                    .foregroundStyle(.tertiary)
-                    .padding(.top, 5)
             }
-            .padding(18)
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 66)
             .background(
-                Color.white.opacity(0.88),
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accentDeep,
+                        ATHLTHTheme.accent
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
                 in: RoundedRectangle(
-                    cornerRadius: 22,
+                    cornerRadius: 20,
                     style: .continuous
                 )
             )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 22,
-                    style: .continuous
-                )
-                .stroke(Color.black.opacity(0.045), lineWidth: 1)
-            }
+            .shadow(
+                color: ATHLTHTheme.accentDeep.opacity(
+                    disabled ? 0.04 : 0.20
+                ),
+                radius: 15,
+                y: 8
+            )
         }
         .buttonStyle(.plain)
-    }
-
-    private var simpleForm: some View {
-        Form {
-            Section("Plan") {
-                TextField("Plan name", text: $title)
-
-                DatePicker(
-                    "Start date",
-                    selection: $startDate,
-                    displayedComponents: .date
-                )
-            }
-
-            Section("Training Focus") {
-                Picker("Focus", selection: $simpleFocus) {
-                    ForEach(SimpleTrainingPlanFocus.allCases) { focus in
-                        Label(
-                            focus.title,
-                            systemImage: focus.icon
-                        )
-                        .tag(focus)
-                    }
-                }
-
-                Text(simpleFocus.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Weekly Rhythm") {
-                Stepper(
-                    "\(simpleSessionsPerWeek) sessions per week",
-                    value: $simpleSessionsPerWeek,
-                    in: 2...6
-                )
-
-                HStack(spacing: 7) {
-                    ForEach(
-                        Array(simplePreviewKinds.enumerated()),
-                        id: \.offset
-                    ) { index, kind in
-                        VStack(spacing: 5) {
-                            Image(systemName: kind.systemImage)
-                                .font(.system(size: 15, weight: .semibold))
-                            Text("\(index + 1)")
-                                .font(.caption2.weight(.bold))
-                        }
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 11)
-                        )
-                    }
-                }
-
-                Text(
-                    "ATHLTH spreads these sessions across the week. You can move, replace or fully rebuild them later."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Section("Length") {
-                LazyVGrid(
-                    columns: [
-                        GridItem(
-                            .adaptive(minimum: 76),
-                            spacing: 8
-                        )
-                    ],
-                    spacing: 8
-                ) {
-                    ForEach([4, 8, 12, 16, 24], id: \.self) { weeks in
-                        Button {
-                            simpleWeekCount = weeks
-                        } label: {
-                            VStack(spacing: 2) {
-                                Text("\(weeks)")
-                                    .font(.headline)
-                                Text("weeks")
-                                    .font(.caption2)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 9)
-                            .foregroundStyle(
-                                simpleWeekCount == weeks
-                                    ? Color.white
-                                    : ATHLTHTheme.primaryText
-                            )
-                            .background(
-                                simpleWeekCount == weeks
-                                    ? ATHLTHTheme.accent
-                                    : Color(
-                                        .tertiarySystemGroupedBackground
-                                    ),
-                                in: RoundedRectangle(cornerRadius: 12)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            if let conflict = conflictingPlan {
-                Section("Schedule Conflict") {
-                    Label(
-                        ATHLTHLocalization.format(
-                                english: "Overlaps with %@",
-                                norwegian: "Overlapper med %@",
-                                conflict.title
-                            ),
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(.orange)
-
-                    Text(
-                        "Choose a start date after the existing plan ends. ATHLTH allows only one active plan on any date."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
-
-            Section {
-                Text(
-                    "Simple creates a complete starting rhythm, not a locked template. Open Plan afterwards to add exercises, structured runs, routes, target distance, time and notes."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var advancedForm: some View {
-        Form {
-            Section("Program") {
-                TextField("Program name", text: $title)
-
-                TextField(
-                    "What are you training for?",
-                    text: $summary,
-                    axis: .vertical
-                )
-                .lineLimit(2...5)
-
-                Picker("Visibility", selection: $visibility) {
-                    ForEach(ProfileVisibility.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-            }
-
-            Section("Timeline") {
-                DatePicker(
-                    "Start date",
-                    selection: $startDate,
-                    displayedComponents: .date
-                )
-
-                Picker("Plan by", selection: $timelineMode) {
-                    ForEach(ProgramTimelineMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                if timelineMode == .weeks {
-                    LazyVGrid(
-                        columns: [
-                            GridItem(
-                                .adaptive(minimum: 78),
-                                spacing: 8
-                            )
-                        ],
-                        spacing: 8
-                    ) {
-                        ForEach(quickDurations, id: \.self) { weeks in
-                            Button {
-                                weekCount = weeks
-                                useCustomWeeks = false
-                            } label: {
-                                VStack(spacing: 3) {
-                                    Text("\(weeks)")
-                                        .font(.headline)
-                                    Text(
-                                        weeks == 1
-                                            ? "week"
-                                            : "weeks"
-                                    )
-                                    .font(.caption2)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 9)
-                                .foregroundStyle(
-                                    !useCustomWeeks &&
-                                    weekCount == weeks
-                                        ? Color.white
-                                        : ATHLTHTheme.primaryText
-                                )
-                                .background(
-                                    !useCustomWeeks &&
-                                    weekCount == weeks
-                                        ? ATHLTHTheme.accent
-                                        : Color(
-                                            .tertiarySystemGroupedBackground
-                                        ),
-                                    in: RoundedRectangle(
-                                        cornerRadius: 12
-                                    )
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    Toggle(
-                        "Custom program length",
-                        isOn: $useCustomWeeks
-                    )
-
-                    if useCustomWeeks {
-                        Stepper(
-                            "\(customWeeks) weeks",
-                            value: $customWeeks,
-                            in: 1...52
-                        )
-                    }
-                } else {
-                    DatePicker(
-                        "End date",
-                        selection: $endDate,
-                        in: startDate...(
-                            Calendar.current.date(
-                                byAdding: .weekOfYear,
-                                value: 52,
-                                to: startDate
-                            ) ?? startDate
-                        ),
-                        displayedComponents: .date
-                    )
-                }
-
-                LabeledContent(
-                    "Program window",
-                    value:
-                        "\(resolvedWeeks) " +
-                        (resolvedWeeks == 1 ? "week" : "weeks")
-                )
-
-                Text(
-                    "\(startDate.formatted(date: .abbreviated, time: .omitted)) – \(resolvedEndDate.formatted(date: .abbreviated, time: .omitted))"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            .onChange(of: startDate) { _, newStart in
-                if endDate < newStart {
-                    endDate = Calendar.current.date(
-                        byAdding: .day,
-                        value: 6,
-                        to: newStart
-                    ) ?? newStart
-                }
-            }
-
-            if let conflict = conflictingPlan {
-                Section("Schedule Conflict") {
-                    Label(
-                        ATHLTHLocalization.format(
-                                english: "Overlaps with %@",
-                                norwegian: "Overlapper med %@",
-                                conflict.title
-                            ),
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(.orange)
-
-                    Text(
-                        "Adjust the dates before creating this plan. ATHLTH keeps a maximum of one active plan for each date."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
-
-            if !goalStore.goals.isEmpty {
-                Section("Connect Goals") {
-                    ForEach(goalStore.goals) { goal in
-                        Toggle(
-                            isOn: Binding(
-                                get: {
-                                    selectedGoalIDs.contains(goal.id)
-                                },
-                                set: { enabled in
-                                    if enabled {
-                                        selectedGoalIDs.insert(goal.id)
-                                    } else {
-                                        selectedGoalIDs.remove(goal.id)
-                                    }
-                                }
-                            )
-                        ) {
-                            VStack(
-                                alignment: .leading,
-                                spacing: 2
-                            ) {
-                                Text(goal.title)
-                                Text(goal.category.title)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Section("What Advanced Unlocks") {
-                Label(
-                    "Exact workout on any day",
-                    systemImage: "calendar.badge.plus"
-                )
-                Label(
-                    "Strength exercises, sets, reps, load, RPE / RIR and progression",
-                    systemImage: "dumbbell.fill"
-                )
-                Label(
-                    "Structured running blocks, distance and routes",
-                    systemImage: "figure.run"
-                )
-                Label(
-                    "Mobility, recovery, notes and scheduled time",
-                    systemImage: "clock"
-                )
-
-                Text(
-                    "The new plan starts with an empty calendar so you decide exactly what belongs on each day."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-        }
+        .disabled(disabled)
+        .opacity(disabled ? 0.42 : 1)
     }
 
     private var simplePreviewKinds: [WorkoutKind] {
