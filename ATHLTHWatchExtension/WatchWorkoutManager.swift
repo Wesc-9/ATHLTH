@@ -1628,12 +1628,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         audioCoachReadyAnnouncedForWorkout = true
+
+        guard audioCoachConfiguration
+            .shouldAnnounceWorkoutStart
+        else {
+            return
+        }
+
         WKInterfaceDevice.current().play(.click)
 
         speak(
             coachPhrase(
-                english: "Audio Coach ready.",
-                norwegian: "Audio Coach er klar."
+                english:
+                    "Audio Coach ready. Workout started.",
+                norwegian:
+                    "Audio Coach er klar. Økten er startet."
             ),
             priority: .routineCoach
         )
@@ -2935,14 +2944,32 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let utterance = AVSpeechUtterance(
             string: text
         )
-        if let audioCoachVoiceLanguage,
-           let voice = AVSpeechSynthesisVoice(
-                language: audioCoachVoiceLanguage
-           ) {
+
+        if let voiceIdentifier =
+                audioCoachConfiguration
+                    .voiceIdentifier,
+           let selectedVoice =
+                AVSpeechSynthesisVoice(
+                    identifier:
+                        voiceIdentifier
+                ) {
+            utterance.voice =
+                selectedVoice
+        } else if let audioCoachVoiceLanguage,
+                  let voice =
+                    AVSpeechSynthesisVoice(
+                        language:
+                            audioCoachVoiceLanguage
+                    ) {
             utterance.voice = voice
         }
-        utterance.rate = 0.48
-        utterance.volume = 1.0
+
+        utterance.rate =
+            audioCoachConfiguration
+                .resolvedSpeechRate
+        utterance.volume =
+            audioCoachConfiguration
+                .resolvedSpeechVolume
         speechSynthesizer.speak(utterance)
     }
 
@@ -3130,6 +3157,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
 
         sendToPhone(result)
+
+        if audioCoachConfiguration.enabled,
+           audioCoachConfiguration
+            .shouldAnnounceWorkoutComplete {
+            speak(
+                coachPhrase(
+                    english: "Workout complete.",
+                    norwegian: "Økten er fullført."
+                ),
+                priority:
+                    .structuredStep
+            )
+        }
 
         publish {
             self.completedResult = result
@@ -3588,6 +3628,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         _ state: HKWorkoutSessionState,
         date: Date
     ) {
+        let previousState = self.state
+
         switch state {
         case .running:
             publishState(.running)
@@ -3595,6 +3637,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             if kind == .strength {
                 requestStrengthSnapshot()
+            }
+
+            if previousState == .paused,
+               audioCoachConfiguration.enabled,
+               audioCoachConfiguration
+                .shouldAnnouncePauseResume {
+                speak(
+                    coachPhrase(
+                        english: "Workout resumed.",
+                        norwegian: "Økten fortsetter."
+                    ),
+                    priority:
+                        .structuredStep
+                )
             }
 
             Task { @MainActor [weak self] in
@@ -3617,6 +3673,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         case .paused:
             publishState(.paused)
             persistWorkoutRecoveryState()
+
+            if previousState == .running,
+               audioCoachConfiguration.enabled,
+               audioCoachConfiguration
+                .shouldAnnouncePauseResume {
+                speak(
+                    coachPhrase(
+                        english: "Workout paused.",
+                        norwegian:
+                            "Økten er satt på pause."
+                    ),
+                    priority:
+                        .structuredStep
+                )
+            }
 
             Task { @MainActor [weak self] in
                 await self?.sendLiveSnapshot(
