@@ -16,12 +16,12 @@ enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
         case .event:
             return ATHLTHLocalization.format(
                 english: "Event",
-                norwegian: "Arrangement"
+                norwegian: "Event"
             )
         case .endurance:
             return ATHLTHLocalization.format(
                 english: "Running & Endurance",
-                norwegian: "Løping og utholdenhet"
+                norwegian: "Løping & utholdenhet"
             )
         case .strength:
             return ATHLTHLocalization.format(
@@ -36,7 +36,7 @@ enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
         case .consistency:
             return ATHLTHLocalization.format(
                 english: "Consistency",
-                norwegian: "Kontinuitet"
+                norwegian: "Konsistens"
             )
         case .recovery:
             return ATHLTHLocalization.format(
@@ -66,27 +66,27 @@ enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
         case .strength:
             return ATHLTHLocalization.format(
                 english: "Exercise-specific strength targets.",
-                norwegian: "Øvelsesspesifikke mål for styrke."
+                norwegian: "Mål knyttet til spesifikke øvelser."
             )
         case .body:
             return ATHLTHLocalization.format(
                 english: "Body-weight goals.",
-                norwegian: "Mål for kroppsvekt."
+                norwegian: "Mål for kroppsvekt og sammensetning."
             )
         case .consistency:
             return ATHLTHLocalization.format(
                 english: "Workout frequency and consistency.",
-                norwegian: "Mål for treningsfrekvens og kontinuitet."
+                norwegian: "Treningsfrekvens og jevn progresjon."
             )
         case .recovery:
             return ATHLTHLocalization.format(
                 english: "Sleep-duration goals.",
-                norwegian: "Mål for søvnlengde."
+                norwegian: "Mål for søvn, hvile og velvære."
             )
         case .custom:
             return ATHLTHLocalization.format(
                 english: "Define a goal that does not fit a template.",
-                norwegian: "Lag et mål som ikke passer i en mal."
+                norwegian: "Lag ditt eget mål uten mal."
             )
         }
     }
