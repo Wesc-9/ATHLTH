@@ -3028,44 +3028,6 @@ final class IPhoneWorkoutStore:
         ATHLTHTrainingDataChangeSignal.post(userID: accountID)
     }
 
-    nonisolated func speechSynthesizer(
-        _ synthesizer: AVSpeechSynthesizer,
-        didFinish utterance:
-            AVSpeechUtterance
-    ) {
-        Task { @MainActor [weak self] in
-            guard let self,
-                  !self
-                    .speechSynthesizer
-                    .isSpeaking
-            else {
-                return
-            }
-
-            self.guidancePriorityGate
-                .voiceDidFinish()
-        }
-    }
-
-    nonisolated func speechSynthesizer(
-        _ synthesizer: AVSpeechSynthesizer,
-        didCancel utterance:
-            AVSpeechUtterance
-    ) {
-        Task { @MainActor [weak self] in
-            guard let self,
-                  !self
-                    .speechSynthesizer
-                    .isSpeaking
-            else {
-                return
-            }
-
-            self.guidancePriorityGate
-                .voiceDidFinish()
-        }
-    }
-
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
             if self.manager.authorizationStatus == .denied || self.manager.authorizationStatus == .restricted { self.pause() }
