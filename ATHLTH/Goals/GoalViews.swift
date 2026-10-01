@@ -1055,7 +1055,7 @@ struct GoalCreationView: View {
         .padding(.bottom, 10)
     }
 
-    private var goalImageButtonTitleprivate var goalImageButtonTitle: String {
+    private var goalImageButtonTitle: String {
         imageData == nil
             ? "Choose from Photos"
             : "Change photo"
@@ -1323,7 +1323,6 @@ struct GoalCreationView: View {
         }
     }
 
-    @ViewBuilder
     @ViewBuilder
     private var targetStep: some View {
         VStack(
@@ -2878,7 +2877,7 @@ struct GoalCreationView: View {
         }
     }
 
-    private var stepTitleprivate var stepTitle: String {
+    private var stepTitle: String {
         switch step {
         case 0:
             return ATHLTHLocalization.format(
