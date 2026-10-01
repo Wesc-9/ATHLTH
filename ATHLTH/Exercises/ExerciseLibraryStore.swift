@@ -2,6 +2,76 @@ import CryptoKit
 import Foundation
 import Supabase
 
+enum ExerciseMuscleGroup: String, CaseIterable, Identifiable, Hashable {
+    case chest = "Chest"
+    case back = "Back"
+    case shoulders = "Shoulders"
+    case biceps = "Biceps"
+    case triceps = "Triceps"
+    case forearms = "Forearms"
+    case core = "Core"
+    case glutes = "Glutes"
+    case quads = "Quads"
+    case hamstrings = "Hamstrings"
+    case calves = "Calves"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .chest:
+            return ATHLTHLocalization.choose(
+                english: "Chest",
+                norwegian: "Bryst"
+            )
+        case .back:
+            return ATHLTHLocalization.choose(
+                english: "Back",
+                norwegian: "Rygg"
+            )
+        case .shoulders:
+            return ATHLTHLocalization.choose(
+                english: "Shoulders",
+                norwegian: "Skuldre"
+            )
+        case .biceps:
+            return "Biceps"
+        case .triceps:
+            return "Triceps"
+        case .forearms:
+            return ATHLTHLocalization.choose(
+                english: "Forearms",
+                norwegian: "Underarmer"
+            )
+        case .core:
+            return ATHLTHLocalization.choose(
+                english: "Core",
+                norwegian: "Kjerne"
+            )
+        case .glutes:
+            return ATHLTHLocalization.choose(
+                english: "Glutes",
+                norwegian: "Sete"
+            )
+        case .quads:
+            return ATHLTHLocalization.choose(
+                english: "Quads",
+                norwegian: "Forside lår"
+            )
+        case .hamstrings:
+            return ATHLTHLocalization.choose(
+                english: "Hamstrings",
+                norwegian: "Bakside lår"
+            )
+        case .calves:
+            return ATHLTHLocalization.choose(
+                english: "Calves",
+                norwegian: "Legger"
+            )
+        }
+    }
+}
+
 @MainActor
 final class ExerciseLibraryStore: ObservableObject {
     @Published private(set) var athlthCatalogExercises:
@@ -315,13 +385,18 @@ final class ExerciseLibraryStore: ObservableObject {
         let imageURL = startURL ?? mainURL ?? peakURL
         let equipment = source.equipment.map { [$0.humanizedRepDB] } ?? []
 
+        let primaryMuscles =
+            resolvedRepDBPrimaryMuscles(
+                source
+            )
+
         let exercise = Exercise(
             id: Self.stableUUID(for: "repdb:\(source.id)"),
             origin: .publicCatalog,
             ownerID: nil,
             name: source.nameEnglish,
             instructions: source.instructionsEnglish ?? [],
-            primaryMuscles: (source.primaryMuscles ?? []).map(\.humanizedRepDB),
+            primaryMuscles: primaryMuscles,
             secondaryMuscles: (source.secondaryMuscles ?? []).map(\.humanizedRepDB),
             equipment: equipment,
             imageURL: imageURL,
@@ -341,6 +416,52 @@ final class ExerciseLibraryStore: ObservableObject {
             imageStartURL: startURL ?? mainURL,
             imagePeakURL: peakURL
         )
+    }
+
+    private func resolvedRepDBPrimaryMuscles(
+        _ source: RepDBExercise
+    ) -> [String] {
+        let supplied =
+            (source.primaryMuscles ?? [])
+                .map(\.humanizedRepDB)
+                .filter {
+                    !$0.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty
+                }
+
+        if !supplied.isEmpty {
+            return supplied
+        }
+
+        guard let bodyPart =
+                source.bodyPart?
+                    .humanizedRepDB
+                    .lowercased()
+        else {
+            return []
+        }
+
+        switch bodyPart {
+        case "chest":
+            return ["Chest"]
+        case "back":
+            return ["Back"]
+        case "shoulders":
+            return ["Shoulders"]
+        case "upper arms":
+            return ["Biceps", "Triceps"]
+        case "lower arms":
+            return ["Forearms"]
+        case "core", "waist":
+            return ["Core"]
+        case "upper legs":
+            return ["Quads", "Hamstrings", "Glutes"]
+        case "lower legs":
+            return ["Calves"]
+        default:
+            return []
+        }
     }
 
     private func saveCustomImageData(
