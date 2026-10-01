@@ -782,6 +782,8 @@ struct AroundYouExploreView: View {
     var embeddedInTab: Bool = false
 
     @StateObject private var routeAttempts = RouteAttemptStore()
+    @StateObject private var publicTrailAttempts =
+        PublicTrailAttemptStore()
 
     @State private var filter: AroundYouFilter = .all
     @State private var mapPosition: MapCameraPosition = .automatic
@@ -991,7 +993,7 @@ struct AroundYouExploreView: View {
                     if let route = selectedRoute {
                         routePreviewCard(route)
                             .padding(.horizontal, 12)
-                            .padding(.bottom, 12)
+                            .padding(.bottom, 6)
                             .transition(
                                 .move(edge: .bottom)
                                     .combined(with: .opacity)
@@ -1057,17 +1059,24 @@ struct AroundYouExploreView: View {
             )
         }
         .task(id: selectedRoute?.id) {
-            guard let selectedRoute,
-                  !isPublicTrailRoute(
-                    selectedRoute
-                  )
-            else {
+            guard let selectedRoute else {
                 return
             }
 
-            await routeAttempts.refresh(
-                routeID: selectedRoute.id
-            )
+            if isPublicTrailRoute(
+                selectedRoute
+            ) {
+                await publicTrailAttempts.refresh(
+                    trailID:
+                        publicTrailID(
+                            for: selectedRoute
+                        )
+                )
+            } else {
+                await routeAttempts.refresh(
+                    routeID: selectedRoute.id
+                )
+            }
         }
         .onAppear {
             locationStore.start()
@@ -1526,18 +1535,26 @@ struct AroundYouExploreView: View {
         let topThree = Array(
             leaderboard.prefix(3)
         )
-        let fastest = leaderboard.first
         let saved = isRouteSaved(route)
         let creator = creatorProfile(for: route)
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 11) {
+        return VStack(
+            alignment: .leading,
+            spacing: 11
+        ) {
+            HStack(
+                alignment: .top,
+                spacing: 11
+            ) {
                 creatorAvatar(
                     route: route,
                     profile: creator
                 )
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
                     Text(route.title)
                         .font(.headline)
                         .foregroundStyle(
@@ -1560,14 +1577,67 @@ struct AroundYouExploreView: View {
 
                 Spacer()
 
-                Button {
-                    withAnimation(
-                        .easeInOut(duration: 0.18)
-                    ) {
-                        selectedRoute = nil
+                HStack(spacing: 7) {
+                    if route.ownerID !=
+                        session.profile.userID {
+                        Button {
+                            toggleSavedRoute(
+                                route
+                            )
+                        } label: {
+                            Image(
+                                systemName:
+                                    saved
+                                        ? "bookmark.fill"
+                                        : "bookmark"
+                            )
+                            .font(
+                                .system(
+                                    size: 12,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                saved
+                                    ? ATHLTHTheme.vitality
+                                    : ATHLTHTheme.accentDeep
+                            )
+                            .frame(
+                                width: 30,
+                                height: 30
+                            )
+                            .background(
+                                Color.white.opacity(0.48),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white.opacity(0.68),
+                                        lineWidth: 0.7
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            saved
+                                ? "Remove saved route"
+                                : "Save route"
+                        )
                     }
-                } label: {
-                    Image(systemName: "xmark")
+
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.18
+                            )
+                        ) {
+                            selectedRoute = nil
+                        }
+                    } label: {
+                        Image(
+                            systemName: "xmark"
+                        )
                         .font(
                             .system(
                                 size: 10,
@@ -1577,16 +1647,20 @@ struct AroundYouExploreView: View {
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
                         )
-                        .frame(width: 28, height: 28)
+                        .frame(
+                            width: 30,
+                            height: 30
+                        )
                         .background(
                             Color.primary.opacity(0.055),
                             in: Circle()
                         )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        "Close route preview"
+                    )
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    "Close route preview"
-                )
             }
 
             HStack(spacing: 8) {
@@ -1603,7 +1677,8 @@ struct AroundYouExploreView: View {
                     previewMetric(
                         value:
                             "\(Int(elevation.rounded())) m ↑",
-                        icon: "mountain.2.fill"
+                        icon:
+                            "mountain.2.fill"
                     )
                 }
 
@@ -1626,163 +1701,217 @@ struct AroundYouExploreView: View {
             }
 
             if isPublicTrailRoute(route) {
-                HStack(spacing: 9) {
+                Text(
+                    publicTrailDiscovery
+                        .attribution
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
+                .padding(.horizontal, 2)
+            }
+
+            if previewLeaderboardIsLoading(
+                for: route
+            ) &&
+                topThree.isEmpty {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Loading leaderboard…",
+                            norwegian:
+                                "Laster toppliste…"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                    Spacer()
+                }
+                .frame(height: 52)
+                .padding(.horizontal, 12)
+                .background(
+                    Color.white.opacity(0.42),
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                )
+            } else if !topThree.isEmpty {
+                HStack(spacing: 10) {
                     Image(
-                        systemName: "map.fill"
+                        systemName:
+                            "trophy.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
+                        )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme.vitality
+                        ATHLTHTheme.premiumGold
+                    )
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .champagneSoft
+                            .opacity(0.82),
+                        in: Circle()
                     )
 
                     VStack(
                         alignment: .leading,
                         spacing: 2
                     ) {
-                        Text("Public Trail")
-                            .font(
-                                .caption.weight(
-                                    .semibold
-                                )
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Leaderboard",
+                                norwegian:
+                                    "Toppliste"
                             )
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
+                        )
+                        .font(
+                            .caption.weight(
+                                .bold
                             )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
 
                         Text(
-                            publicTrailDiscovery.attribution
+                            compactLeaderboardSummary(
+                                topThree
+                            )
                         )
                         .font(.caption2)
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
                         )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.76)
                     }
+
+                    Spacer(
+                        minLength: 4
+                    )
+
+                    NavigationLink {
+                        RouteDetailView(
+                            route: route
+                        )
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "See all",
+                                    norwegian:
+                                        "Se alle"
+                                )
+                            )
+
+                            Image(
+                                systemName:
+                                    "chevron.right"
+                            )
+                        }
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 11)
+                .frame(height: 56)
+                .background(
+                    Color.white.opacity(0.52),
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white.opacity(0.72),
+                        lineWidth: 0.8
+                    )
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Image(
+                        systemName:
+                            "trophy"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No qualifying times yet",
+                            norwegian:
+                                "Ingen kvalifiserende tider ennå"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
 
                     Spacer()
                 }
-                .frame(height: 46)
-            } else if routeAttempts.isLoading &&
-               routeAttempts.loadedRouteID != route.id {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-
-                    Text("Loading route times…")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(height: 46)
-            } else if let fastest {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Label(
-                            "Fastest",
-                            systemImage: "trophy.fill"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.premiumGold
-                        )
-
-                        Spacer()
-
-                        Text(
-                            routeClock(
-                                fastest.durationSeconds
-                            )
-                        )
-                        .font(
-                            .subheadline
-                                .monospacedDigit()
-                                .weight(.bold)
-                        )
-                    }
-
-                    HStack(spacing: 6) {
-                        ForEach(
-                            Array(topThree.enumerated()),
-                            id: \.element.id
-                        ) { index, attempt in
-                            leaderboardChip(
-                                attempt,
-                                rank: index + 1
-                            )
-                        }
-                    }
-                }
-            } else {
-                Label(
-                    "No qualifying times yet",
-                    systemImage: "trophy"
+                .frame(height: 48)
+                .padding(.horizontal, 12)
+                .background(
+                    Color.white.opacity(0.34),
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
                 )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(height: 46)
             }
 
             HStack(spacing: 8) {
-                if route.ownerID !=
-                    session.profile.userID {
-                    Button {
-                        if saved {
-                            if let savedRoute =
-                                savedRouteCopy(
-                                    for: route
-                                ) {
-                                session.deleteSavedRoute(
-                                    savedRoute.id
-                                )
-                                routeActionMessage =
-                                    "Route removed from My Routes."
-                            }
-                        } else {
-                            session.saveSharedRoute(
-                                route,
-                                sourceOwnerID:
-                                    route.ownerID,
-                                sourceRouteID:
-                                    route.id
-                            )
-                            routeActionMessage =
-                                "Route saved to My Routes."
-                        }
-                    } label: {
-                        Label(
-                            saved
-                                ? "Saved"
-                                : "Save",
-                            systemImage:
-                                saved
-                                    ? "bookmark.fill"
-                                    : "bookmark"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 38)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(
-                        saved
-                            ? ATHLTHTheme.vitality
-                            : ATHLTHTheme.accent
-                    )
-                }
-
                 if isPublicTrailRoute(route) {
                     Button {
                         routeToStart = route
                     } label: {
-                        Label(
-                            "Start",
-                            systemImage: "play.fill"
+                        routePreviewActionLabel(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Start",
+                                    norwegian: "Start"
+                                ),
+                            icon: "play.fill"
                         )
-                        .font(
-                            .caption.weight(.semibold)
-                        )
-                        .frame(maxWidth: .infinity)
                     }
-                    .frame(height: 38)
-                    .buttonStyle(.bordered)
-                } else if settings.trainingDeviceProvider ==
+                    .buttonStyle(.plain)
+                } else if settings
+                    .trainingDeviceProvider ==
                     .appleWatch {
                     Button {
                         Task {
@@ -1797,21 +1926,33 @@ struct AroundYouExploreView: View {
                                 .frame(
                                     maxWidth: .infinity
                                 )
+                                .frame(height: 42)
+                                .background(
+                                    Color.white
+                                        .opacity(0.48),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                14,
+                                            style:
+                                                .continuous
+                                        )
+                                )
                         } else {
-                            Label(
-                                "Start",
-                                systemImage: "play.fill"
-                            )
-                            .font(
-                                .caption.weight(.semibold)
-                            )
-                            .frame(
-                                maxWidth: .infinity
+                            routePreviewActionLabel(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Start",
+                                        norwegian:
+                                            "Start"
+                                    ),
+                                icon:
+                                    "play.fill"
                             )
                         }
                     }
-                    .frame(height: 38)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     .disabled(
                         startingRoute ||
                         !watchConnection.isReady
@@ -1819,20 +1960,24 @@ struct AroundYouExploreView: View {
                 }
 
                 NavigationLink {
-                    RouteDetailView(route: route)
+                    RouteDetailView(
+                        route: route
+                    )
                 } label: {
-                    HStack(spacing: 5) {
-                        Text("Details")
-                        Image(
-                            systemName: "chevron.right"
-                        )
-                    }
-                    .font(.caption.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 38)
+                    routePreviewActionLabel(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Details",
+                                norwegian:
+                                    "Detaljer"
+                            ),
+                        icon:
+                            "chevron.right",
+                        iconTrailing: true
+                    )
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
+                .buttonStyle(.plain)
             }
         }
         .padding(14)
@@ -1858,6 +2003,129 @@ struct AroundYouExploreView: View {
             radius: 18,
             y: 7
         )
+    }
+
+    private func routePreviewActionLabel(
+        title: String,
+        icon: String,
+        iconTrailing: Bool = false
+    ) -> some View {
+        HStack(spacing: 6) {
+            if !iconTrailing {
+                Image(
+                    systemName: icon
+                )
+            }
+
+            Text(title)
+
+            if iconTrailing {
+                Image(
+                    systemName: icon
+                )
+            }
+        }
+        .font(
+            .caption.weight(.semibold)
+        )
+        .foregroundStyle(
+            ATHLTHTheme.primaryText
+                .opacity(0.82)
+        )
+        .frame(maxWidth: .infinity)
+        .frame(height: 42)
+        .background(
+            Color.white.opacity(0.48),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.68),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func toggleSavedRoute(
+        _ route: TrainingRoute
+    ) {
+        if isRouteSaved(route) {
+            if let savedRoute =
+                savedRouteCopy(
+                    for: route
+                ) {
+                session.deleteSavedRoute(
+                    savedRoute.id
+                )
+                routeActionMessage =
+                    "Route removed from My Routes."
+            }
+        } else {
+            session.saveSharedRoute(
+                route,
+                sourceOwnerID:
+                    route.ownerID,
+                sourceRouteID:
+                    route.id
+            )
+            routeActionMessage =
+                "Route saved to My Routes."
+        }
+    }
+
+    private func publicTrailID(
+        for route: TrainingRoute
+    ) -> UUID {
+        route.sharedSourceRouteID ??
+            route.id
+    }
+
+    private func previewLeaderboardIsLoading(
+        for route: TrainingRoute
+    ) -> Bool {
+        if isPublicTrailRoute(route) {
+            let trailID =
+                publicTrailID(
+                    for: route
+                )
+            return publicTrailAttempts
+                .isLoading &&
+                publicTrailAttempts
+                    .loadedTrailID !=
+                    trailID
+        }
+
+        return routeAttempts.isLoading &&
+            routeAttempts.loadedRouteID !=
+                route.id
+    }
+
+    private func compactLeaderboardSummary(
+        _ attempts: [RouteAttemptRecord]
+    ) -> String {
+        attempts
+            .enumerated()
+            .map { index, attempt in
+                "\(index + 1). " +
+                compactAthleteName(
+                    attempt
+                ) +
+                " " +
+                routeClock(
+                    attempt
+                        .durationSeconds
+                )
+            }
+            .joined(
+                separator: "  ·  "
+            )
     }
 
     private func previewMetric(
@@ -2060,12 +2328,32 @@ struct AroundYouExploreView: View {
     private func previewLeaderboard(
         for route: TrainingRoute
     ) -> [RouteAttemptRecord] {
-        guard routeAttempts.loadedRouteID == route.id
+        if isPublicTrailRoute(route) {
+            let trailID =
+                publicTrailID(
+                    for: route
+                )
+
+            guard publicTrailAttempts
+                .loadedTrailID == trailID,
+                  publicTrailAttempts
+                    .leaderboardEnabled
+            else {
+                return []
+            }
+
+            return publicTrailAttempts
+                .leaderboard()
+        }
+
+        guard routeAttempts
+            .loadedRouteID == route.id
         else {
             return []
         }
 
-        return routeAttempts.leaderboard()
+        return routeAttempts
+            .leaderboard()
     }
 
     private func previewAttemptCount(
