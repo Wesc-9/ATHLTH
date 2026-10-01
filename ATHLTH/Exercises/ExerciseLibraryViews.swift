@@ -590,8 +590,10 @@ struct CustomExerciseEditorView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     @State private var name = ""
-    @State private var primaryMuscles = ""
-    @State private var secondaryMuscles = ""
+    @State private var primaryMuscles:
+        Set<ExerciseMuscleGroup> = []
+    @State private var secondaryMuscles:
+        Set<ExerciseMuscleGroup> = []
     @State private var equipment = ""
     @State private var instructions = ""
     @State private var shareable = false
@@ -609,14 +611,127 @@ struct CustomExerciseEditorView: View {
             Form {
                 Section("Exercise") {
                     TextField("Name", text: $name)
-                    TextField(
-                        "Primary muscles, comma separated",
-                        text: $primaryMuscles
-                    )
-                    TextField(
-                        "Secondary muscles, comma separated",
-                        text: $secondaryMuscles
-                    )
+
+                    Menu {
+                        ForEach(
+                            ExerciseMuscleGroup.allCases
+                        ) { group in
+                            Button {
+                                togglePrimary(group)
+                            } label: {
+                                Label(
+                                    group.title,
+                                    systemImage:
+                                        primaryMuscles
+                                            .contains(group)
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                )
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 2
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Primary muscle groups",
+                                        norwegian: "Primære muskelgrupper"
+                                    )
+                                )
+                                .foregroundStyle(.primary)
+
+                                Text(
+                                    muscleSelectionSummary(
+                                        primaryMuscles,
+                                        empty:
+                                            ATHLTHLocalization.choose(
+                                                english: "Choose at least one",
+                                                norwegian: "Velg minst én"
+                                            )
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    primaryMuscles.isEmpty
+                                        ? .red
+                                        : .secondary
+                                )
+                            }
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    "chevron.up.chevron.down"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        }
+                    }
+
+                    Menu {
+                        ForEach(
+                            ExerciseMuscleGroup.allCases
+                        ) { group in
+                            Button {
+                                toggleSecondary(group)
+                            } label: {
+                                Label(
+                                    group.title,
+                                    systemImage:
+                                        secondaryMuscles
+                                            .contains(group)
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                )
+                            }
+                            .disabled(
+                                primaryMuscles
+                                    .contains(group)
+                            )
+                        }
+                    } label: {
+                        HStack {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 2
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Secondary muscle groups",
+                                        norwegian: "Sekundære muskelgrupper"
+                                    )
+                                )
+                                .foregroundStyle(.primary)
+
+                                Text(
+                                    muscleSelectionSummary(
+                                        secondaryMuscles,
+                                        empty:
+                                            ATHLTHLocalization.choose(
+                                                english: "Optional",
+                                                norwegian: "Valgfritt"
+                                            )
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    "chevron.up.chevron.down"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        }
+                    }
+
                     TextField(
                         "Equipment, comma separated",
                         text: $equipment
@@ -696,8 +811,14 @@ struct CustomExerciseEditorView: View {
                             ownerID: session.profile.userID,
                             name: name,
                             instructions: splitLines(instructions),
-                            primaryMuscles: splitCSV(primaryMuscles),
-                            secondaryMuscles: splitCSV(secondaryMuscles),
+                            primaryMuscles:
+                                selectedMuscleValues(
+                                    primaryMuscles
+                                ),
+                            secondaryMuscles:
+                                selectedMuscleValues(
+                                    secondaryMuscles
+                                ),
                             equipment: splitCSV(equipment),
                             isVisibleOutsideOwnerLibrary: shareable,
                             imageData: selectedImageData,
@@ -706,7 +827,13 @@ struct CustomExerciseEditorView: View {
                         dismiss()
                     }
                     .disabled(
-                        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        name
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty ||
+                        primaryMuscles.isEmpty
                     )
                 }
             }
@@ -721,6 +848,61 @@ struct CustomExerciseEditorView: View {
                 }
             }
         }
+    }
+
+    private func togglePrimary(
+        _ group: ExerciseMuscleGroup
+    ) {
+        if primaryMuscles.contains(group) {
+            primaryMuscles.remove(group)
+        } else {
+            primaryMuscles.insert(group)
+            secondaryMuscles.remove(group)
+        }
+    }
+
+    private func toggleSecondary(
+        _ group: ExerciseMuscleGroup
+    ) {
+        guard !primaryMuscles.contains(group) else {
+            return
+        }
+
+        if secondaryMuscles.contains(group) {
+            secondaryMuscles.remove(group)
+        } else {
+            secondaryMuscles.insert(group)
+        }
+    }
+
+    private func selectedMuscleValues(
+        _ selection: Set<ExerciseMuscleGroup>
+    ) -> [String] {
+        ExerciseMuscleGroup
+            .allCases
+            .filter {
+                selection.contains($0)
+            }
+            .map(\.rawValue)
+    }
+
+    private func muscleSelectionSummary(
+        _ selection: Set<ExerciseMuscleGroup>,
+        empty: String
+    ) -> String {
+        let values =
+            ExerciseMuscleGroup
+                .allCases
+                .filter {
+                    selection.contains($0)
+                }
+                .map(\.title)
+
+        return values.isEmpty
+            ? empty
+            : values.joined(
+                separator: " · "
+            )
     }
 
     private var cleanVideoURL: URL? {
