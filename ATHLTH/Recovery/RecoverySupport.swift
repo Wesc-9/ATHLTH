@@ -339,6 +339,9 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
     let walkingMinutes: Double
     let estimatedRecoveryHours: Double
     let soreness: RecoverySorenessLevel
+    let baselineWeeklyStrengthSets: Double?
+    let chronicWeeklyTrainingMinutes: Double?
+    let acuteToChronicRatio: Double?
 
     init(
         muscleGroup: String,
@@ -347,7 +350,10 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         runningMinutes: Double = 0,
         walkingMinutes: Double = 0,
         estimatedRecoveryHours: Double,
-        soreness: RecoverySorenessLevel
+        soreness: RecoverySorenessLevel,
+        baselineWeeklyStrengthSets: Double? = nil,
+        chronicWeeklyTrainingMinutes: Double? = nil,
+        acuteToChronicRatio: Double? = nil
     ) {
         self.muscleGroup = muscleGroup
         self.lastTrainedAt = lastTrainedAt
@@ -356,6 +362,9 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         self.walkingMinutes = walkingMinutes
         self.estimatedRecoveryHours = estimatedRecoveryHours
         self.soreness = soreness
+        self.baselineWeeklyStrengthSets = baselineWeeklyStrengthSets
+        self.chronicWeeklyTrainingMinutes = chronicWeeklyTrainingMinutes
+        self.acuteToChronicRatio = acuteToChronicRatio
     }
 
     var progress: Double {
@@ -374,20 +383,115 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         )
     }
 
+    /// Acute muscle load normalized against the user's recent training capacity.
+    /// New or infrequent users therefore reach higher load states sooner than
+    /// users who have built a stable training baseline.
     var loadScore: Double {
-        let strengthLoad = min(Double(completedSets) / 12, 1)
-        let movementLoad = min((runningMinutes + walkingMinutes) / 90, 1)
-        return min(max((strengthLoad * 0.72) + (movementLoad * 0.72), 0), 1)
+        let learnedStrengthCapacity =
+            max(
+                (baselineWeeklyStrengthSets ?? 0) * 1.5,
+                6
+            )
+        let strengthLoad =
+            completedSets > 0
+                ? min(
+                    Double(completedSets) /
+                        learnedStrengthCapacity,
+                    1
+                )
+                : 0
+
+        let movementMinutes =
+            runningMinutes +
+            walkingMinutes
+        let learnedMovementCapacity =
+            max(
+                (chronicWeeklyTrainingMinutes ?? 0) *
+                    0.60,
+                60
+            )
+        let movementLoad =
+            movementMinutes > 0
+                ? min(
+                    movementMinutes /
+                        learnedMovementCapacity,
+                    1
+                )
+                : 0
+
+        let combined =
+            1 -
+            (
+                (1 - strengthLoad) *
+                (1 - movementLoad)
+            )
+
+        let spikeMultiplier: Double
+        switch acuteToChronicRatio {
+        case let ratio? where ratio > 1.50:
+            spikeMultiplier = 1.25
+        case let ratio? where ratio > 1.25:
+            spikeMultiplier = 1.15
+        case let ratio? where ratio > 1.00:
+            spikeMultiplier = 1.07
+        default:
+            spikeMultiplier = 1
+        }
+
+        return min(
+            max(
+                combined * spikeMultiplier,
+                0
+            ),
+            1
+        )
+    }
+
+    /// What the user should see right now. Recent load fades as the estimated
+    /// recovery window progresses, while soreness can keep an area elevated.
+    var currentLoadScore: Double {
+        let remainingLoad =
+            max(
+                1 - (progress * 0.85),
+                0.08
+            )
+        var score =
+            loadScore *
+            remainingLoad
+
+        let sorenessFloor: Double
+        switch soreness {
+        case .none:
+            sorenessFloor = 0
+        case .mild:
+            sorenessFloor = 0.28
+        case .moderate:
+            sorenessFloor = 0.55
+        case .high:
+            sorenessFloor = 0.80
+        }
+
+        score = max(
+            score,
+            sorenessFloor
+        )
+
+        return min(
+            max(score, 0),
+            1
+        )
     }
 
     var loadTitle: String {
-        switch loadScore {
-        case 0.67...:
-            return recoveryText("High load", "Høy belastning")
-        case 0.34..<0.67:
+        switch currentLoadScore {
+        case 0.78...:
+            return recoveryText("Needs rest", "Trenger pause")
+        case 0.58..<0.78:
+            return recoveryText("High", "Høy")
+        case 0.32..<0.58:
             return recoveryText("Moderate", "Moderat")
         default:
-            return recoveryText("Light", "Lett")
+            return recoveryText("Ready", "Klar")
         }
     }
 
@@ -416,6 +520,10 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
             return recoveryText("Sore", "Øm")
         }
 
+        if currentLoadScore >= 0.78 {
+            return recoveryText("Short break suggested", "Liten pause anbefales")
+        }
+
         if progress >= 0.95 {
             return soreness == .mild ? recoveryText("Mild soreness", "Lett ømhet") : recoveryText("Ready", "Klar")
         }
@@ -436,6 +544,49 @@ enum MuscleRecoveryEngine {
     ) -> [MuscleRecoveryStatus] {
         let now = Date()
         let cutoff = now.addingTimeInterval(-7 * 86_400)
+        let baselineStart =
+            now.addingTimeInterval(-35 * 86_400)
+
+        var baselineSetTotals:
+            [String: Int] = [:]
+
+        for workout in history
+        where workout.isFinished &&
+            workout.startedAt >= baselineStart &&
+            workout.startedAt < cutoff {
+            for exercise in workout.exercises {
+                let completedSets =
+                    exercise.sets
+                        .filter(\.isCompleted)
+                        .count
+
+                guard completedSets > 0 else {
+                    continue
+                }
+
+                let primary =
+                    Set(
+                        exercise.exercise
+                            .primaryMuscles
+                            .compactMap(
+                                normalizedMuscleGroup
+                            )
+                    )
+
+                for group in primary {
+                    baselineSetTotals[
+                        group,
+                        default: 0
+                    ] += completedSets
+                }
+            }
+        }
+
+        let baselineWeeklyStrengthSets =
+            baselineSetTotals
+                .mapValues {
+                    Double($0) / 4
+                }
 
         struct Accumulator {
             var lastTrainedAt: Date?
@@ -589,12 +740,18 @@ enum MuscleRecoveryEngine {
                     walkingMinutes: item.walkingMinutes,
                     estimatedRecoveryHours:
                         baseRecoveryHours + sorenessAdjustment,
-                    soreness: sorenessLevel
+                    soreness: sorenessLevel,
+                    baselineWeeklyStrengthSets:
+                        baselineWeeklyStrengthSets[group],
+                    chronicWeeklyTrainingMinutes:
+                        activityLoad.chronicWeeklyAverageMinutes,
+                    acuteToChronicRatio:
+                        activityLoad.ratio
                 )
             }
             .sorted { lhs, rhs in
-                if lhs.loadScore != rhs.loadScore {
-                    return lhs.loadScore > rhs.loadScore
+                if lhs.currentLoadScore != rhs.currentLoadScore {
+                    return lhs.currentLoadScore > rhs.currentLoadScore
                 }
 
                 if lhs.soreness.rawValue != rhs.soreness.rawValue {
@@ -1492,7 +1649,7 @@ struct MuscleRecoveryCard: View {
         ATHLTHCard {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(recoveryText("Recently trained areas", "Nylig belastede områder"))
+                    Text(recoveryText("Recently trained areas", "Nylig trente områder"))
                         .font(.title3.weight(.bold))
 
                     Text(
@@ -1566,11 +1723,12 @@ struct MuscleRecoveryCard: View {
                 VStack(spacing: 14) {
                     StrengthMuscleMapView(
                         profile: muscleMapProfile,
-                        compact: true
+                        compact: true,
+                        style: .recoveryLoad
                     )
-                    .frame(height: 174)
+                    .frame(height: 158)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 8)
                     .background(
                         Color.primary.opacity(0.025),
                         in: RoundedRectangle(
@@ -1579,21 +1737,24 @@ struct MuscleRecoveryCard: View {
                         )
                     )
 
-                    VStack(spacing: 12) {
+                    VStack(spacing: 9) {
                         ForEach(statuses.prefix(8)) { status in
                             muscleRow(status)
                         }
                     }
                 }
-                .padding(.top, 14)
+                .padding(.top, 10)
             }
 
             Text(
-                recoveryText("Area load is an ATHLTH training estimate based on completed strength sets and recent run/walk duration. Recovery percentages also use time since training and your soreness check-in; they are not medical measurements.", "Områdebelastning er et ATHLTH-estimat basert på fullførte styrkesett og nylig løpe-/gangvarighet. Restitusjonsprosenten bruker også tid siden trening og innsjekket ømhet; dette er ikke medisinske målinger.")
+                recoveryText(
+                    "Colors compare recent muscle load with your personal training baseline. Green = ready; red = this area may benefit from a short break. ATHLTH estimate only.",
+                    "Fargene sammenligner nyere muskelbelastning med ditt personlige treningsnivå. Grønt = klar; rødt = området kan ha godt av en liten pause. Kun ATHLTH-estimat."
+                )
             )
-            .font(.caption2)
+            .font(.system(size: 8.5, weight: .regular))
             .foregroundStyle(.secondary)
-            .padding(.top, 10)
+            .padding(.top, 7)
         }
     }
 
@@ -1615,46 +1776,46 @@ struct MuscleRecoveryCard: View {
     private func muscleRow(
         _ status: MuscleRecoveryStatus
     ) -> some View {
-        VStack(spacing: 7) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
+        VStack(spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(recoveryMuscleName(status.muscleGroup))
-                        .font(.subheadline.weight(.semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
                     Text(status.sourceSummary)
-                        .font(.system(size: 9.5, weight: .medium))
+                        .font(.system(size: 8.5, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 7)
 
                 Text(status.loadTitle)
-                    .font(.system(size: 9.5, weight: .bold))
+                    .font(.system(size: 8.5, weight: .bold))
                     .foregroundStyle(loadTint(status))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
                     .background(
                         loadTint(status).opacity(0.10),
                         in: Capsule()
                     )
             }
 
-            ProgressView(value: max(status.loadScore, 0.04))
+            ProgressView(value: max(status.currentLoadScore, 0.03))
                 .tint(loadTint(status))
 
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Text(
                     ATHLTHLocalization.choose(english: "\(Int((status.progress * 100).rounded()))% recovered", norwegian: "\(Int((status.progress * 100).rounded()))% restituert")
                 )
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(statusTint(status))
 
                 Spacer()
 
                 if let last = status.lastTrainedAt {
                     Text(relativeDescription(last))
-                        .font(.system(size: 9.5))
+                        .font(.system(size: 8.5))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -1666,12 +1827,8 @@ struct MuscleRecoveryCard: View {
         var scores: [StrengthMuscleRegion: Double] = [:]
 
         for status in statuses {
-            let sorenessFloor: Double =
-                status.soreness == .none ? 0 : 0.22
-            let score = max(
-                status.loadScore,
-                sorenessFloor
-            )
+            let score =
+                status.currentLoadScore
 
             for region in muscleRegions(
                 for: status.muscleGroup
@@ -1750,27 +1907,43 @@ struct MuscleRecoveryCard: View {
     private func loadTint(
         _ status: MuscleRecoveryStatus
     ) -> Color {
-        switch status.loadScore {
-        case 0.67...:
+        switch status.currentLoadScore {
+        case 0.78...:
             return .red
-        case 0.34..<0.67:
+        case 0.58..<0.78:
             return .orange
+        case 0.32..<0.58:
+            return Color(
+                red: 0.78,
+                green: 0.58,
+                blue: 0.05
+            )
         default:
-            return .blue
+            return .green
         }
     }
 
     private func statusTint(
         _ status: MuscleRecoveryStatus
     ) -> Color {
-        if status.soreness == .high ||
-            status.progress < 0.45 {
+        if status.currentLoadScore >= 0.78 ||
+            status.soreness == .high {
             return .red
         }
 
-        if status.soreness == .moderate ||
-            status.progress < 0.85 {
+        if status.currentLoadScore >= 0.58 ||
+            status.soreness == .moderate ||
+            status.progress < 0.45 {
             return .orange
+        }
+
+        if status.currentLoadScore >= 0.32 ||
+            status.progress < 0.85 {
+            return Color(
+                red: 0.78,
+                green: 0.58,
+                blue: 0.05
+            )
         }
 
         return .green
