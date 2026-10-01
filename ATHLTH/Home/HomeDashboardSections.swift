@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 struct HomeThisWeekCard: View {
@@ -1490,5 +1491,1483 @@ struct HomeHappeningCard: View {
             Color.primary.opacity(0.025),
             in: RoundedRectangle(cornerRadius: 15)
         )
+    }
+}
+
+
+// MARK: - Compact Home dashboard
+
+enum HomeHealthMetricKind:
+    String,
+    CaseIterable,
+    Identifiable {
+
+    case sleep
+    case restingHeartRate
+    case hrv
+    case load
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .sleep:
+            return "Søvn"
+        case .restingHeartRate:
+            return "Hvilepuls"
+        case .hrv:
+            return "HRV"
+        case .load:
+            return "Belastning"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .sleep:
+            return "moon.fill"
+        case .restingHeartRate:
+            return "heart.fill"
+        case .hrv:
+            return "waveform.path.ecg"
+        case .load:
+            return "chart.bar.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .sleep:
+            return .indigo
+        case .restingHeartRate:
+            return .pink
+        case .hrv:
+            return .green
+        case .load:
+            return .blue
+        }
+    }
+
+    var unit: String {
+        switch self {
+        case .sleep:
+            return "timer"
+        case .restingHeartRate:
+            return "bpm"
+        case .hrv:
+            return "ms"
+        case .load:
+            return "min"
+        }
+    }
+}
+
+private struct HomeMetricPoint:
+    Identifiable {
+    let date: Date
+    let value: Double?
+
+    var id: Date { date }
+}
+
+struct HomeHealthMetricStrip: View {
+    let snapshot: RecoveryTrendSnapshot
+    let sleepText: String
+    let restingHeartRateText: String
+    let hrvText: String
+    let loadText: String
+    let readinessText: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            metricLink(
+                .sleep,
+                value: sleepText
+            )
+
+            metricLink(
+                .restingHeartRate,
+                value:
+                    restingHeartRateText
+            )
+
+            metricLink(
+                .hrv,
+                value: hrvText
+            )
+
+            metricLink(
+                .load,
+                value: loadText,
+                badge:
+                    readinessText
+            )
+        }
+    }
+
+    private func metricLink(
+        _ kind: HomeHealthMetricKind,
+        value: String,
+        badge: String? = nil
+    ) -> some View {
+        NavigationLink {
+            HomeHealthMetricDetailView(
+                kind: kind,
+                snapshot: snapshot
+            )
+        } label: {
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                HStack(spacing: 4) {
+                    Image(
+                        systemName: kind.icon
+                    )
+                    .font(
+                        .system(
+                            size: 11.5,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        kind.tint
+                    )
+
+                    Text(kind.title)
+                        .font(
+                            .system(
+                                size: 10,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .lineLimit(1)
+
+                    Spacer(
+                        minLength: 0
+                    )
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                            .opacity(0.72)
+                    )
+                }
+
+                Text(value)
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.62
+                    )
+
+                HStack(spacing: 4) {
+                    if let change =
+                            changePercent(
+                                for: kind
+                            ) {
+                        Image(
+                            systemName:
+                                change >= 0
+                                    ? "arrow.up"
+                                    : "arrow.down"
+                        )
+                        .font(
+                            .system(
+                                size: 8,
+                                weight: .bold
+                            )
+                        )
+
+                        Text(
+                            changeText(
+                                change
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .semibold
+                            )
+                        )
+                    } else if let badge {
+                        Text(badge)
+                            .font(
+                                .system(
+                                    size: 8.5,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+                            .lineLimit(1)
+                    } else {
+                        Text("7 dager")
+                            .font(
+                                .system(
+                                    size: 8.5,
+                                    weight:
+                                        .medium
+                                )
+                            )
+                    }
+                }
+                .foregroundStyle(
+                    changeTint(
+                        for: kind
+                    )
+                )
+                .frame(height: 13)
+
+                HomeMetricMiniBars(
+                    values:
+                        points(
+                            for: kind
+                        )
+                        .suffix(7)
+                        .map(\.value),
+                    tint: kind.tint
+                )
+                .frame(height: 24)
+            }
+            .padding(
+                .horizontal,
+                9
+            )
+            .padding(
+                .vertical,
+                10
+            )
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .background(
+                Color.white.opacity(
+                    0.92
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 17,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 17,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.black.opacity(
+                        0.045
+                    ),
+                    lineWidth: 0.7
+                )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func points(
+        for kind: HomeHealthMetricKind
+    ) -> [HomeMetricPoint] {
+        snapshot.days.map { day in
+            let value: Double?
+
+            switch kind {
+            case .sleep:
+                value =
+                    day.sleepDuration.map {
+                        $0 / 3_600
+                    }
+            case .restingHeartRate:
+                value =
+                    day.restingHeartRate
+            case .hrv:
+                value =
+                    day.hrvMilliseconds
+            case .load:
+                value =
+                    day.trainingMinutes
+            }
+
+            return HomeMetricPoint(
+                date: day.date,
+                value: value
+            )
+        }
+    }
+
+    private func changePercent(
+        for kind: HomeHealthMetricKind
+    ) -> Double? {
+        let values =
+            points(for: kind)
+                .suffix(14)
+                .map(\.value)
+
+        guard values.count >= 8 else {
+            return nil
+        }
+
+        let recent =
+            Array(
+                values.suffix(7)
+            )
+            .compactMap { $0 }
+        let previous =
+            Array(
+                values.dropLast(
+                    min(7, values.count)
+                )
+                .suffix(7)
+            )
+            .compactMap { $0 }
+
+        guard !recent.isEmpty,
+              !previous.isEmpty
+        else {
+            return nil
+        }
+
+        let currentAverage =
+            recent.reduce(0, +) /
+            Double(recent.count)
+        let previousAverage =
+            previous.reduce(0, +) /
+            Double(previous.count)
+
+        guard previousAverage > 0 else {
+            return nil
+        }
+
+        return
+            ((currentAverage -
+                previousAverage) /
+                previousAverage) *
+            100
+    }
+
+    private func changeTint(
+        for kind: HomeHealthMetricKind
+    ) -> Color {
+        guard let change =
+                changePercent(
+                    for: kind
+                )
+        else {
+            return ATHLTHTheme
+                .mutedText
+        }
+
+        switch kind {
+        case .restingHeartRate:
+            return change <= 0
+                ? ATHLTHTheme.vitality
+                : .orange
+        case .load:
+            return ATHLTHTheme
+                .accentDeep
+        case .sleep, .hrv:
+            return change >= 0
+                ? ATHLTHTheme.vitality
+                : .orange
+        }
+    }
+
+    private func changeText(
+        _ value: Double
+    ) -> String {
+        let prefix =
+            value > 0 ? "+" : ""
+        return
+            "\(prefix)\(Int(value.rounded())) %"
+    }
+}
+
+private struct HomeMetricMiniBars:
+    View {
+    let values: [Double?]
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            let resolved =
+                values.isEmpty
+                    ? Array(
+                        repeating: nil,
+                        count: 7
+                    )
+                    : values
+            let valid =
+                resolved
+                    .compactMap { $0 }
+                    .filter {
+                        $0.isFinite &&
+                        $0 >= 0
+                    }
+            let maximum =
+                max(
+                    valid.max() ?? 0,
+                    0.001
+                )
+
+            HStack(
+                alignment: .bottom,
+                spacing: 3
+            ) {
+                ForEach(
+                    Array(
+                        resolved.enumerated()
+                    ),
+                    id: \.offset
+                ) { _, value in
+                    let height:
+                        CGFloat
+
+                    if let value,
+                       value.isFinite,
+                       value >= 0 {
+                        height =
+                            max(
+                                4,
+                                proxy.size.height *
+                                    CGFloat(
+                                        min(
+                                            value /
+                                                maximum,
+                                            1
+                                        )
+                                    )
+                            )
+                    } else {
+                        height = 4
+                    }
+
+                    Capsule()
+                        .fill(
+                            value == nil
+                                ? tint.opacity(
+                                    0.10
+                                )
+                                : tint.opacity(
+                                    0.66
+                                )
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .frame(
+                            height: height
+                        )
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+struct HomeHealthMetricDetailView:
+    View {
+    let kind: HomeHealthMetricKind
+    let snapshot:
+        RecoveryTrendSnapshot
+
+    var body: some View {
+        ScrollView {
+            VStack(
+                alignment: .leading,
+                spacing: 18
+            ) {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            kind.icon
+                    )
+                    .font(
+                        .system(
+                            size: 20,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        kind.tint
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        kind.tint.opacity(
+                            0.10
+                        ),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(kind.title)
+                            .font(
+                                .title2
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+
+                        Text(
+                            detailSubtitle
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+
+                    Spacer()
+                }
+
+                ATHLTHCard {
+                    HStack(
+                        alignment:
+                            .firstTextBaseline
+                    ) {
+                        VStack(
+                            alignment:
+                                .leading,
+                            spacing: 3
+                        ) {
+                            Text("Siste verdi")
+                                .font(
+                                    .caption
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+
+                            Text(latestValueText)
+                                .font(
+                                    .system(
+                                        size: 28,
+                                        weight: .bold,
+                                        design:
+                                            .rounded
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                        }
+
+                        Spacer()
+
+                        Text("14 DAGER")
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .bold
+                                )
+                            )
+                            .tracking(1.1)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                    }
+
+                    detailChart
+                        .frame(height: 210)
+                        .padding(.top, 12)
+                }
+
+                ATHLTHCard {
+                    Text("Om dataene")
+                        .font(
+                            .headline
+                                .weight(
+                                    .bold
+                                )
+                        )
+
+                    Text(explanation)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .fixedSize(
+                            horizontal:
+                                false,
+                            vertical: true
+                        )
+                        .padding(.top, 3)
+                }
+            }
+            .padding(16)
+        }
+        .background(
+            ATHLTHTheme.canvasTop
+                .ignoresSafeArea()
+        )
+        .navigationTitle(
+            kind.title
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+    }
+
+    @ViewBuilder
+    private var detailChart:
+        some View {
+        let data = points
+
+        Chart(data) { point in
+            if let value =
+                    point.value {
+                if kind == .load {
+                    BarMark(
+                        x: .value(
+                            "Dag",
+                            point.date
+                        ),
+                        y: .value(
+                            "Verdi",
+                            value
+                        )
+                    )
+                    .foregroundStyle(
+                        kind.tint
+                    )
+                    .cornerRadius(4)
+                } else {
+                    LineMark(
+                        x: .value(
+                            "Dag",
+                            point.date
+                        ),
+                        y: .value(
+                            "Verdi",
+                            value
+                        )
+                    )
+                    .foregroundStyle(
+                        kind.tint
+                    )
+                    .lineStyle(
+                        StrokeStyle(
+                            lineWidth: 2.2,
+                            lineCap: .round,
+                            lineJoin:
+                                .round
+                        )
+                    )
+                    .interpolationMethod(
+                        .catmullRom
+                    )
+
+                    PointMark(
+                        x: .value(
+                            "Dag",
+                            point.date
+                        ),
+                        y: .value(
+                            "Verdi",
+                            value
+                        )
+                    )
+                    .foregroundStyle(
+                        kind.tint
+                    )
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(
+                values:
+                    .automatic(
+                        desiredCount: 5
+                    )
+            ) {
+                AxisValueLabel(
+                    format:
+                        .dateTime
+                            .day()
+                )
+            }
+        }
+        .chartYAxis {
+            AxisMarks(
+                position: .leading
+            )
+        }
+    }
+
+    private var points:
+        [HomeMetricPoint] {
+        snapshot.days.map { day in
+            let value: Double?
+
+            switch kind {
+            case .sleep:
+                value =
+                    day.sleepDuration.map {
+                        $0 / 3_600
+                    }
+            case .restingHeartRate:
+                value =
+                    day.restingHeartRate
+            case .hrv:
+                value =
+                    day.hrvMilliseconds
+            case .load:
+                value =
+                    day.trainingMinutes
+            }
+
+            return HomeMetricPoint(
+                date: day.date,
+                value: value
+            )
+        }
+    }
+
+    private var latestValueText:
+        String {
+        guard let value =
+                points
+                    .reversed()
+                    .compactMap(
+                        \.value
+                    )
+                    .first
+        else {
+            return "—"
+        }
+
+        switch kind {
+        case .sleep:
+            let totalMinutes =
+                Int(
+                    (value * 60)
+                        .rounded()
+                )
+            return
+                "\(totalMinutes / 60) t \(totalMinutes % 60) min"
+        case .restingHeartRate:
+            return
+                "\(Int(value.rounded())) bpm"
+        case .hrv:
+            return
+                "\(Int(value.rounded())) ms"
+        case .load:
+            return
+                "\(Int(value.rounded())) min"
+        }
+    }
+
+    private var detailSubtitle:
+        String {
+        switch kind {
+        case .sleep:
+            return
+                "Registrert søvn fra Apple Health."
+        case .restingHeartRate:
+            return
+                "Daglig hvilepuls fra Apple Health."
+        case .hrv:
+            return
+                "Daglig HRV fra Apple Health."
+        case .load:
+            return
+                "Treningsminutter per dag."
+        }
+    }
+
+    private var explanation:
+        String {
+        switch kind {
+        case .sleep:
+            return
+                "Grafen viser reell registrert søvn per dag. Manglende dager vises ikke som konstruerte verdier."
+        case .restingHeartRate:
+            return
+                "Hvilepuls bør vurderes mot din egen historikk. ATHLTH viser utviklingen uten å tolke enkeltmålinger som en medisinsk vurdering."
+        case .hrv:
+            return
+                "HRV varierer naturlig fra dag til dag. Det mest nyttige er utviklingen mot din egen nylige baseline."
+        case .load:
+            return
+                "Belastningsgrafen er basert på registrerte treningsminutter. Den er varighetsbasert og later derfor ikke som ulike aktiviteter gir identisk belastning."
+        }
+    }
+}
+
+struct HomeWeeklyProgressStrip:
+    View {
+    let plan: TrainingPlan?
+    let workouts: [WorkoutSummary]
+    let onOpenPlan: () -> Void
+
+    private var calendar:
+        Calendar {
+        var value =
+            Calendar.current
+        value.firstWeekday = 2
+        return value
+    }
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            Button(
+                action: onOpenPlan
+            ) {
+                HStack(spacing: 7) {
+                    Text(
+                        "Ukens fremdrift"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                    Spacer()
+
+                    Text(progressText)
+                        .font(
+                            .caption
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+
+            ProgressView(
+                value: progress
+            )
+            .tint(
+                ATHLTHTheme.vitality
+            )
+            .scaleEffect(
+                x: 1,
+                y: 0.72,
+                anchor: .center
+            )
+
+            HStack(spacing: 4) {
+                ForEach(
+                    weekDates,
+                    id: \.self
+                ) { date in
+                    day(date)
+                }
+            }
+        }
+        .padding(11)
+        .background(
+            Color.white.opacity(0.90),
+            in: RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.04),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func day(
+        _ date: Date
+    ) -> some View {
+        let planned =
+            plannedSessions(
+                for: date
+            )
+        let actual =
+            workouts.filter {
+                calendar.isDate(
+                    $0.startDate,
+                    inSameDayAs:
+                        date
+                )
+            }
+        let hasActual =
+            !actual.isEmpty
+        let plannedSession =
+            planned.first
+        let isToday =
+            calendar.isDateInToday(
+                date
+            )
+
+        VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .fill(
+                        hasActual
+                            ? ATHLTHTheme
+                                .vitality
+                            : Color.clear
+                    )
+
+                if !hasActual {
+                    Circle()
+                        .stroke(
+                            plannedSession ==
+                                nil
+                                ? Color
+                                    .secondary
+                                    .opacity(
+                                        0.18
+                                    )
+                                : ATHLTHTheme
+                                    .accentDeep
+                                    .opacity(
+                                        0.72
+                                    ),
+                            style:
+                                StrokeStyle(
+                                    lineWidth:
+                                        plannedSession ==
+                                        nil
+                                            ? 1
+                                            : 1.5,
+                                    dash:
+                                        plannedSession ==
+                                        nil
+                                            ? [
+                                                3,
+                                                3
+                                            ]
+                                            : []
+                                )
+                        )
+                }
+
+                if hasActual {
+                    Image(
+                        systemName:
+                            "checkmark"
+                    )
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+                } else if let plannedSession {
+                    Image(
+                        systemName:
+                            plannedSession
+                                .kind
+                                .systemImage
+                    )
+                    .font(
+                        .system(
+                            size: 10,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+            }
+            .frame(
+                width: 30,
+                height: 30
+            )
+            .overlay {
+                if isToday {
+                    Circle()
+                        .stroke(
+                            ATHLTHTheme
+                                .accentDeep,
+                            lineWidth: 1.1
+                        )
+                        .padding(-2)
+                }
+            }
+
+            Text(
+                dayName(date)
+            )
+            .font(
+                .system(
+                    size: 9,
+                    weight:
+                        isToday
+                            ? .bold
+                            : .medium
+                )
+            )
+            .foregroundStyle(
+                isToday
+                    ? ATHLTHTheme
+                        .primaryText
+                    : ATHLTHTheme
+                        .mutedText
+            )
+        }
+        .frame(
+            maxWidth: .infinity
+        )
+    }
+
+    private var weekInterval:
+        DateInterval {
+        calendar.dateInterval(
+            of: .weekOfYear,
+            for: Date()
+        ) ??
+            DateInterval(
+                start:
+                    calendar
+                        .startOfDay(
+                            for: Date()
+                        ),
+                duration:
+                    7 * 86_400
+            )
+    }
+
+    private var weekDates:
+        [Date] {
+        (0..<7).compactMap {
+            calendar.date(
+                byAdding: .day,
+                value: $0,
+                to:
+                    weekInterval
+                        .start
+            )
+        }
+    }
+
+    private var workoutsThisWeek:
+        [WorkoutSummary] {
+        workouts.filter {
+            weekInterval.contains(
+                $0.startDate
+            )
+        }
+    }
+
+    private var plannedCount:
+        Int {
+        weekDates.reduce(0) {
+            $0 +
+                plannedSessions(
+                    for: $1
+                )
+                .count
+        }
+    }
+
+    private var completedCount:
+        Int {
+        if plannedCount == 0 {
+            return
+                workoutsThisWeek
+                    .count
+        }
+
+        return min(
+            workoutsThisWeek.count,
+            plannedCount
+        )
+    }
+
+    private var progress:
+        Double {
+        guard plannedCount > 0
+        else {
+            return
+                workoutsThisWeek
+                    .isEmpty
+                    ? 0
+                    : min(
+                        Double(
+                            workoutsThisWeek
+                                .count
+                        ) / 5.0,
+                        1
+                    )
+        }
+
+        return min(
+            Double(completedCount) /
+                Double(plannedCount),
+            1
+        )
+    }
+
+    private var progressText:
+        String {
+        plannedCount > 0
+            ? "\(completedCount) av \(plannedCount)"
+            : "\(workoutsThisWeek.count) økter"
+    }
+
+    private func plannedSessions(
+        for date: Date
+    ) -> [PlannedSession] {
+        guard let plan,
+              !plan.weeks.isEmpty
+        else {
+            return []
+        }
+
+        let weekIndex: Int
+
+        if let startDate =
+                plan.startDate {
+            let start =
+                calendar
+                    .startOfDay(
+                        for: startDate
+                    )
+            let target =
+                calendar
+                    .startOfDay(
+                        for: date
+                    )
+            let days =
+                max(
+                    calendar
+                        .dateComponents(
+                            [.day],
+                            from: start,
+                            to: target
+                        )
+                        .day ?? 0,
+                    0
+                )
+            weekIndex =
+                min(
+                    days / 7,
+                    max(
+                        plan.weeks.count -
+                            1,
+                        0
+                    )
+                )
+        } else {
+            weekIndex = 0
+        }
+
+        guard
+            plan.weeks.indices
+                .contains(weekIndex)
+        else {
+            return []
+        }
+
+        let weekday =
+            calendar.component(
+                .weekday,
+                from: date
+            )
+        let dayIndex =
+            ((weekday + 5) % 7) +
+            1
+
+        return plan.weeks[
+            weekIndex
+        ]
+        .days
+        .first(
+            where: {
+                $0.dayIndex ==
+                    dayIndex
+            }
+        )?
+        .sessions ?? []
+    }
+
+    private func dayName(
+        _ date: Date
+    ) -> String {
+        switch
+            calendar.component(
+                .weekday,
+                from: date
+            ) {
+        case 2:
+            return "Man"
+        case 3:
+            return "Tir"
+        case 4:
+            return "Ons"
+        case 5:
+            return "Tor"
+        case 6:
+            return "Fre"
+        case 7:
+            return "Lør"
+        default:
+            return "Søn"
+        }
+    }
+}
+
+struct HomeWeeklySummaryCard:
+    View {
+    let runningDistanceKilometers:
+        Double
+    let durationMinutes: Double
+    let strengthSessions: Int
+    let sessionCount: Int
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack(spacing: 7) {
+                Image(
+                    systemName:
+                        "chart.bar.fill"
+                )
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(.blue)
+
+                Text("Denne uken")
+                    .font(
+                        .headline
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                Spacer()
+            }
+
+            HStack(spacing: 7) {
+                weeklyMetric(
+                    icon: "figure.run",
+                    value:
+                        runningDistanceKilometers >
+                            0
+                            ? String(
+                                format:
+                                    "%.1f km",
+                                locale:
+                                    Locale
+                                        .current,
+                                runningDistanceKilometers
+                            )
+                            : "—"
+                )
+
+                weeklyMetric(
+                    icon:
+                        "stopwatch.fill",
+                    value:
+                        formattedDuration
+                )
+
+                weeklyMetric(
+                    icon:
+                        "dumbbell.fill",
+                    value:
+                        "\(strengthSessions)"
+                )
+
+                weeklyMetric(
+                    icon:
+                        "checkmark.circle.fill",
+                    value:
+                        "\(sessionCount)"
+                )
+            }
+        }
+        .padding(12)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.blue.opacity(
+                        0.045
+                    ),
+                    Color.white.opacity(
+                        0.92
+                    )
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+        )
+    }
+
+    private func weeklyMetric(
+        icon: String,
+        value: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 4
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 12,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .accentDeep
+            )
+
+            Text(value)
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.62
+                )
+        }
+        .padding(
+            .horizontal,
+            9
+        )
+        .padding(
+            .vertical,
+            9
+        )
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            Color.white.opacity(
+                0.86
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
+    }
+
+    private var formattedDuration:
+        String {
+        guard durationMinutes > 0
+        else {
+            return "—"
+        }
+
+        let total =
+            Int(
+                durationMinutes
+                    .rounded()
+            )
+        let hours = total / 60
+        let minutes =
+            total % 60
+
+        if hours == 0 {
+            return "\(minutes) min"
+        }
+
+        return
+            "\(hours)t \(minutes)m"
     }
 }
