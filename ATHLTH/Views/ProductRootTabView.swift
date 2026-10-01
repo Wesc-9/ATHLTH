@@ -5402,6 +5402,46 @@ struct ATHLTHRecoveryView: View {
         )
     }
 
+    private func insightMuscleName(
+        _ name: String
+    ) -> String {
+        guard ATHLTHLocalization.isNorwegian else {
+            return name
+        }
+
+        switch name {
+        case "Chest": return "Bryst"
+        case "Back": return "Rygg"
+        case "Shoulders": return "Skuldre"
+        case "Arms": return "Armer"
+        case "Core": return "Kjerne"
+        case "Glutes": return "Sete"
+        case "Quads": return "Forside lår"
+        case "Hamstrings": return "Bakside lår"
+        case "Calves": return "Legger"
+        default: return name
+        }
+    }
+
+    private func insightWorkoutKindTitle(
+        _ kind: WorkoutKind
+    ) -> String {
+        switch kind {
+        case .running:
+            return insightText("Running", "Løping")
+        case .walking:
+            return insightText("Walking", "Gange")
+        case .strength:
+            return insightText("Strength", "Styrke")
+        case .mobility:
+            return insightText("Mobility", "Mobilitet")
+        case .recovery:
+            return insightText("Recovery", "Restitusjon")
+        case .custom:
+            return insightText("Workout", "Treningsøkt")
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ATHLTHExclusiveHomeHeroLayout(
@@ -5866,11 +5906,17 @@ struct ATHLTHRecoveryView: View {
                             Text(
                                 sessions.count == 2
                                     ? ATHLTHLocalization.format(
-                                        "+%d more session planned today",
+                                        english:
+                                            "+%d more session planned today",
+                                        norwegian:
+                                            "+%d økt til planlagt i dag",
                                         sessions.count - 1
                                     )
                                     : ATHLTHLocalization.format(
-                                        "+%d more sessions planned today",
+                                        english:
+                                            "+%d more sessions planned today",
+                                        norwegian:
+                                            "+%d økter til planlagt i dag",
                                         sessions.count - 1
                                     )
                             )
@@ -5898,7 +5944,7 @@ struct ATHLTHRecoveryView: View {
                 if !overlaps.isEmpty {
                     HStack(spacing: 7) {
                         ForEach(overlaps.prefix(3)) { status in
-                            Text(status.muscleGroup)
+                            Text(insightMuscleName(status.muscleGroup))
                                 .font(.system(size: 9.5, weight: .semibold))
                                 .foregroundStyle(
                                     status.loadScore >= 0.67
@@ -6372,7 +6418,9 @@ struct ATHLTHRecoveryView: View {
     private func recoverySessionSummary(
         _ workout: PlannedSession
     ) -> String {
-        var parts = [workout.kind.title]
+        var parts = [
+            insightWorkoutKindTitle(workout.kind)
+        ]
 
         if let duration = workout.durationMinutes {
             parts.append("\(duration) min")
@@ -6390,7 +6438,12 @@ struct ATHLTHRecoveryView: View {
 
         if !workout.exercises.isEmpty {
             parts.append(
-                "\(workout.exercises.count) exercises"
+                ATHLTHLocalization.choose(
+                    english:
+                        "\(workout.exercises.count) exercises",
+                    norwegian:
+                        "\(workout.exercises.count) øvelser"
+                )
             )
         }
 
@@ -6498,11 +6551,19 @@ struct ATHLTHRecoveryView: View {
         if !overlaps.isEmpty {
             let names = overlaps
                 .prefix(3)
-                .map(\.muscleGroup)
+                .map {
+                    insightMuscleName(
+                        $0.muscleGroup
+                    )
+                }
                 .joined(separator: ", ")
 
-            return
-                "\(names) overlap with today's planned work and are still carrying recent load. Review intensity before you start rather than changing the plan automatically."
+            return ATHLTHLocalization.choose(
+                english:
+                    "\(names) overlap with today's planned work and are still carrying recent load. Review intensity before you start rather than changing the plan automatically.",
+                norwegian:
+                    "\(names) overlapper med dagens planlagte arbeid og har fortsatt nyere belastning. Vurder intensiteten før du starter i stedet for å endre planen automatisk."
+            )
         }
 
         if let ratio =
@@ -6690,9 +6751,18 @@ struct ATHLTHRecoveryView: View {
                 items.append(
                     RecoveryChangeItem(
                         id: "sleep",
-                        title: "Sleep duration",
+                        title:
+                            insightText(
+                                "Sleep duration",
+                                "Søvnvarighet"
+                            ),
                         detail:
-                            "\(recoverySignedMinutes(deltaMinutes)) average sleep vs previous 7 days.",
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "\(recoverySignedMinutes(deltaMinutes)) average sleep vs previous 7 days.",
+                                norwegian:
+                                    "\(recoverySignedMinutes(deltaMinutes)) gjennomsnittlig søvn sammenlignet med de 7 foregående dagene."
+                            ),
                         icon: "moon.fill",
                         tint:
                             deltaMinutes >= 0
@@ -6720,9 +6790,18 @@ struct ATHLTHRecoveryView: View {
                 items.append(
                     RecoveryChangeItem(
                         id: "hrv",
-                        title: "Heart rate variability",
+                        title:
+                            insightText(
+                                "Heart rate variability",
+                                "Hjertefrekvensvariabilitet"
+                            ),
                         detail:
-                            "\(recoverySignedNumber(delta)) ms average HRV vs previous 7 days.",
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "\(recoverySignedNumber(delta)) ms average HRV vs previous 7 days.",
+                                norwegian:
+                                    "\(recoverySignedNumber(delta)) ms gjennomsnittlig HRV sammenlignet med de 7 foregående dagene."
+                            ),
                         icon: "waveform.path.ecg",
                         tint:
                             delta >= 0
@@ -6750,9 +6829,18 @@ struct ATHLTHRecoveryView: View {
                 items.append(
                     RecoveryChangeItem(
                         id: "rhr",
-                        title: "Resting heart rate",
+                        title:
+                            insightText(
+                                "Resting heart rate",
+                                "Hvilepuls"
+                            ),
                         detail:
-                            "\(recoverySignedNumber(delta)) bpm average resting HR vs previous 7 days.",
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "\(recoverySignedNumber(delta)) bpm average resting HR vs previous 7 days.",
+                                norwegian:
+                                    "\(recoverySignedNumber(delta)) bpm gjennomsnittlig hvilepuls sammenlignet med de 7 foregående dagene."
+                            ),
                         icon: "heart.fill",
                         tint:
                             delta <= 0
@@ -6786,9 +6874,18 @@ struct ATHLTHRecoveryView: View {
                 items.append(
                     RecoveryChangeItem(
                         id: "load",
-                        title: "Training load",
+                        title:
+                            insightText(
+                                "Training load",
+                                "Treningsbelastning"
+                            ),
                         detail:
-                            "\(recoverySignedNumber(delta)) min tracked training vs previous 7 days.",
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "\(recoverySignedNumber(delta)) min tracked training vs previous 7 days.",
+                                norwegian:
+                                    "\(recoverySignedNumber(delta)) min registrert trening sammenlignet med de 7 foregående dagene."
+                            ),
                         icon: "chart.line.uptrend.xyaxis",
                         tint: .blue,
                         magnitude: magnitude
@@ -6849,7 +6946,12 @@ struct ATHLTHRecoveryView: View {
 
                 if abs(difference) >= 3 {
                     patterns.append(
-                        "On higher-sleep days in this 14-day window, HRV averaged \(Int(abs(difference).rounded())) ms \(difference >= 0 ? "higher" : "lower") than on lower-sleep days."
+                        ATHLTHLocalization.choose(
+                            english:
+                                "On higher-sleep days in this 14-day window, HRV averaged \(Int(abs(difference).rounded())) ms \(difference >= 0 ? "higher" : "lower") than on lower-sleep days.",
+                            norwegian:
+                                "På dager med mer søvn i dette 14-dagersvinduet var HRV i snitt \(Int(abs(difference).rounded())) ms \(difference >= 0 ? "høyere" : "lavere") enn på dager med mindre søvn."
+                        )
                     )
                 }
             }
@@ -6901,7 +7003,12 @@ struct ATHLTHRecoveryView: View {
 
                 if abs(difference) >= 2 {
                     patterns.append(
-                        "Days after higher training volume showed resting HR averaging \(Int(abs(difference).rounded())) bpm \(difference >= 0 ? "higher" : "lower") than after lighter days."
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Days after higher training volume showed resting HR averaging \(Int(abs(difference).rounded())) bpm \(difference >= 0 ? "higher" : "lower") than after lighter days.",
+                            norwegian:
+                                "Dager etter høyere treningsvolum viste en hvilepuls som i snitt var \(Int(abs(difference).rounded())) bpm \(difference >= 0 ? "høyere" : "lavere") enn etter lettere dager."
+                        )
                     )
                 }
             }
@@ -6917,10 +7024,25 @@ struct ATHLTHRecoveryView: View {
 
         if total >= 60 {
             let sources: [(String, Double)] = [
-                ("strength", load.strengthMinutes),
-                ("running", load.runningMinutes),
-                ("walking", load.walkingMinutes),
-                ("other training", load.otherMinutes)
+                (
+                    insightText("strength", "styrke"),
+                    load.strengthMinutes
+                ),
+                (
+                    insightText("running", "løping"),
+                    load.runningMinutes
+                ),
+                (
+                    insightText("walking", "gange"),
+                    load.walkingMinutes
+                ),
+                (
+                    insightText(
+                        "other training",
+                        "annen trening"
+                    ),
+                    load.otherMinutes
+                )
             ]
 
             if let dominant =
@@ -6931,7 +7053,12 @@ struct ATHLTHRecoveryView: View {
                 ),
                dominant.1 / total >= 0.55 {
                 patterns.append(
-                    "\(Int(((dominant.1 / total) * 100).rounded()))% of your tracked 7-day training time came from \(dominant.0)."
+                    ATHLTHLocalization.choose(
+                        english:
+                            "\(Int(((dominant.1 / total) * 100).rounded()))% of your tracked 7-day training time came from \(dominant.0).",
+                        norwegian:
+                            "\(Int(((dominant.1 / total) * 100).rounded()))% av den registrerte treningstiden de siste 7 dagene kom fra \(dominant.0)."
+                    )
                 )
             }
         }
@@ -6943,11 +7070,25 @@ struct ATHLTHRecoveryView: View {
                         $0.progress < 0.90
                 }
                 .prefix(2)
-                .map(\.muscleGroup)
+                .map {
+                    insightMuscleName(
+                        $0.muscleGroup
+                    )
+                }
 
         if !loadedAreas.isEmpty {
+            let separator =
+                ATHLTHLocalization.isNorwegian
+                    ? " og "
+                    : " and "
+
             patterns.append(
-                "\(loadedAreas.joined(separator: " and ")) currently carry the most notable combination of recent load and incomplete recovery."
+                ATHLTHLocalization.choose(
+                    english:
+                        "\(loadedAreas.joined(separator: separator)) currently carry the most notable combination of recent load and incomplete recovery.",
+                    norwegian:
+                        "\(loadedAreas.joined(separator: separator)) har nå den tydeligste kombinasjonen av nyere belastning og ufullstendig restitusjon."
+                )
             )
         }
 
@@ -7182,14 +7323,29 @@ struct ATHLTHRecoveryView: View {
         let sign = difference > 0 ? "+" : "−"
 
         if hours > 0, minutes > 0 {
-            return "\(sign)\(hours)h \(minutes)m vs baseline"
+            return ATHLTHLocalization.choose(
+                english:
+                    "\(sign)\(hours)h \(minutes)m vs baseline",
+                norwegian:
+                    "\(sign)\(hours)t \(minutes)m mot grunnlinje"
+            )
         }
 
         if hours > 0 {
-            return "\(sign)\(hours)h vs baseline"
+            return ATHLTHLocalization.choose(
+                english:
+                    "\(sign)\(hours)h vs baseline",
+                norwegian:
+                    "\(sign)\(hours)t mot grunnlinje"
+            )
         }
 
-        return "\(sign)\(minutes)m vs baseline"
+        return ATHLTHLocalization.choose(
+            english:
+                "\(sign)\(minutes)m vs baseline",
+            norwegian:
+                "\(sign)\(minutes)m mot grunnlinje"
+        )
     }
 
     private func numberComparison(
@@ -7204,7 +7360,12 @@ struct ATHLTHRecoveryView: View {
         }
 
         let sign = difference > 0 ? "+" : "−"
-        return "\(sign)\(abs(difference)) \(unit) vs baseline"
+        return ATHLTHLocalization.choose(
+            english:
+                "\(sign)\(abs(difference)) \(unit) vs baseline",
+            norwegian:
+                "\(sign)\(abs(difference)) \(unit) mot grunnlinje"
+        )
     }
 
     private var shouldShowWearableRecoveryContent: Bool {
@@ -7218,15 +7379,27 @@ struct ATHLTHRecoveryView: View {
     private var recoveryUnavailableDetail: String {
         if !health.hasRequestedAuthorization {
             if watchConnection.isReady {
-                return "Apple Watch is connected, but recovery metrics stay hidden until Apple Health data is available. You can still use training plans, log strength sessions and use the rest of ATHLTH."
+                return insightText(
+                    "Apple Watch is connected, but recovery metrics stay hidden until Apple Health data is available. You can still use training plans, log strength sessions and use the rest of ATHLTH.",
+                    "Apple Watch er tilkoblet, men restitusjonsdata skjules til Apple Health-data er tilgjengelig. Du kan fortsatt bruke treningsplaner, registrere styrkeøkter og bruke resten av ATHLTH."
+                )
             }
 
-            return "Apple Health is not connected, so ATHLTH hides unavailable recovery metrics. You can connect Apple Health or Apple Watch later in Settings."
+            return insightText(
+                "Apple Health is not connected, so ATHLTH hides unavailable recovery metrics. You can connect Apple Health or Apple Watch later in Settings.",
+                "Apple Health er ikke tilkoblet, så ATHLTH skjuler utilgjengelige restitusjonsmålinger. Du kan koble til Apple Health eller Apple Watch senere i Innstillinger."
+            )
         }
 
         return watchConnection.isReady
-            ? "ATHLTH will show recovery as soon as compatible Apple Health data from your Watch or another source is available. Empty metrics stay hidden in the meantime."
-            : "Apple Health is configured. ATHLTH will show recovery when compatible readable sleep, HRV or resting heart-rate data becomes available."
+            ? insightText(
+                "ATHLTH will show recovery as soon as compatible Apple Health data from your Watch or another source is available. Empty metrics stay hidden in the meantime.",
+                "ATHLTH viser restitusjon så snart kompatible Apple Health-data fra klokken eller en annen kilde er tilgjengelig. Tomme målinger skjules i mellomtiden."
+            )
+            : insightText(
+                "Apple Health is configured. ATHLTH will show recovery when compatible readable sleep, HRV or resting heart-rate data becomes available.",
+                "Apple Health er konfigurert. ATHLTH viser restitusjon når kompatible, lesbare data for søvn, HRV eller hvilepuls blir tilgjengelig."
+            )
     }
 
     private var localizedRecoveryStateTitle: String {
