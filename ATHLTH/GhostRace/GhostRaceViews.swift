@@ -2595,7 +2595,22 @@ struct ATHLTHGhostRuntimeObserver: View {
                         .routeProgressPercent,
                 routeDeviationMeters:
                     workout
-                        .routeDeviationMeters
+                        .routeDeviationMeters,
+                routeKey:
+                    workout
+                        .plannedComparisonRouteID,
+                routeDistanceMeters:
+                    workout
+                        .plannedRouteDistanceKilometers
+                        .map {
+                            max(
+                                $0 * 1_000,
+                                0
+                            )
+                        },
+                routeTitle:
+                    workout
+                        .plannedRouteTitle
             )
     }
 
