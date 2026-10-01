@@ -100,7 +100,11 @@ struct RecoveryAIInsightCard: View {
                 )
 
                 metricTile(
-                    title: "RHR",
+                    title:
+                        recoveryAIText(
+                            "RHR",
+                            "Hvilepuls"
+                        ),
                     value: restingHeartRateValue,
                     icon: "heart.fill",
                     tint: .pink
