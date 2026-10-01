@@ -156,20 +156,29 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
     var setupMessage: String? {
         guard !clientID.isEmpty else {
-            return "Spotify client ID is missing from this build."
+            return ATHLTHLocalization.choose(
+                english: "Spotify client ID is missing from this build.",
+                norwegian: "Spotify-klient-ID mangler i denne versjonen."
+            )
         }
 
         guard let url = URL(string: redirectURI),
               let scheme = url.scheme,
               !scheme.isEmpty
         else {
-            return "Spotify redirect URI is invalid."
+            return ATHLTHLocalization.choose(
+                english: "Spotify redirect URI is invalid.",
+                norwegian: "Spotify redirect-URI er ugyldig."
+            )
         }
 
         guard scheme == scheme.lowercased(),
               redirectURI == redirectURI.lowercased()
         else {
-            return "Spotify requires the iOS redirect URI to use lowercase characters."
+            return ATHLTHLocalization.choose(
+                english: "Spotify requires the iOS redirect URI to use lowercase characters.",
+                norwegian: "Spotify krever at redirect-URI-en for iOS bruker små bokstaver."
+            )
         }
 
         return nil
