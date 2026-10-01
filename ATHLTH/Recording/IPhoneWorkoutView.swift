@@ -1,6 +1,825 @@
 import SwiftUI
 import MapKit
 
+struct IPhoneWorkoutLiveSplit: Identifiable, Equatable {
+    let index: Int
+    let seconds: TimeInterval
+
+    var id: Int { index }
+}
+
+struct IPhoneWorkoutLiveRouteMetrics: Equatable {
+    var splits: [IPhoneWorkoutLiveSplit] = []
+    var elevationGainMeters: Double = 0
+    var gpsAccuracyMeters: Double?
+
+    static func calculate(
+        workout: PhoneWorkout,
+        splitMeters: Double
+    ) -> IPhoneWorkoutLiveRouteMetrics {
+        guard workout.points.count >= 2,
+              splitMeters > 0
+        else {
+            return IPhoneWorkoutLiveRouteMetrics(
+                gpsAccuracyMeters:
+                    workout.points.last?.accuracy
+            )
+        }
+
+        let points = workout.points
+        let pauses = workout.pauses ?? []
+        var distanceMeters: Double = 0
+        var movingSeconds: TimeInterval = 0
+        var previousSplitSeconds: TimeInterval = 0
+        var nextSplitMeters = splitMeters
+        var splits: [IPhoneWorkoutLiveSplit] = []
+
+        var altitudeWindow: [Double] = [
+            points[0].altitude
+        ]
+        var previousSmoothedAltitude =
+            points[0].altitude
+        var elevationGainMeters: Double = 0
+
+        for index in 1..<points.count {
+            let previous = points[index - 1]
+            let current = points[index]
+
+            if intersectsPause(
+                from: previous.timestamp,
+                to: current.timestamp,
+                pauses: pauses
+            ) {
+                altitudeWindow = [
+                    current.altitude
+                ]
+                previousSmoothedAltitude =
+                    current.altitude
+                continue
+            }
+
+            let seconds =
+                current.timestamp
+                    .timeIntervalSince(
+                        previous.timestamp
+                    )
+
+            guard seconds > 0,
+                  seconds <= 30
+            else {
+                altitudeWindow = [
+                    current.altitude
+                ]
+                previousSmoothedAltitude =
+                    current.altitude
+                continue
+            }
+
+            let segmentMeters =
+                current.location.distance(
+                    from:
+                        previous.location
+                )
+
+            guard segmentMeters >= 0,
+                  segmentMeters / seconds <= 12
+            else {
+                continue
+            }
+
+            let distanceBefore =
+                distanceMeters
+            let secondsBefore =
+                movingSeconds
+
+            distanceMeters += segmentMeters
+            movingSeconds += seconds
+
+            if segmentMeters > 0 {
+                while distanceMeters >=
+                        nextSplitMeters {
+                    let fraction =
+                        min(
+                            max(
+                                (
+                                    nextSplitMeters -
+                                    distanceBefore
+                                ) /
+                                segmentMeters,
+                                0
+                            ),
+                            1
+                        )
+
+                    let crossingSeconds =
+                        secondsBefore +
+                        seconds * fraction
+                    let splitSeconds =
+                        max(
+                            crossingSeconds -
+                            previousSplitSeconds,
+                            0
+                        )
+
+                    splits.append(
+                        IPhoneWorkoutLiveSplit(
+                            index:
+                                splits.count + 1,
+                            seconds:
+                                splitSeconds
+                        )
+                    )
+
+                    previousSplitSeconds =
+                        crossingSeconds
+                    nextSplitMeters +=
+                        splitMeters
+                }
+            }
+
+            altitudeWindow.append(
+                current.altitude
+            )
+            if altitudeWindow.count > 5 {
+                altitudeWindow.removeFirst(
+                    altitudeWindow.count - 5
+                )
+            }
+
+            let smoothedAltitude =
+                altitudeWindow.reduce(0, +) /
+                Double(altitudeWindow.count)
+            let altitudeDelta =
+                smoothedAltitude -
+                previousSmoothedAltitude
+
+            // A small dead-band prevents ordinary GPS altitude
+            // noise from becoming fake climbing. Larger jumps are
+            // also ignored because they are normally bad samples.
+            if altitudeDelta >= 0.75,
+               altitudeDelta <= 12 {
+                elevationGainMeters +=
+                    altitudeDelta
+            }
+
+            previousSmoothedAltitude =
+                smoothedAltitude
+        }
+
+        return IPhoneWorkoutLiveRouteMetrics(
+            splits: splits,
+            elevationGainMeters:
+                elevationGainMeters,
+            gpsAccuracyMeters:
+                points.last?.accuracy
+        )
+    }
+
+    private static func intersectsPause(
+        from start: Date,
+        to end: Date,
+        pauses: [PhoneWorkoutPauseInterval]
+    ) -> Bool {
+        pauses.contains { pause in
+            let pauseEnd =
+                pause.endedAt ??
+                .distantFuture
+
+            return pause.startedAt < end &&
+                pauseEnd > start
+        }
+    }
+}
+
+private struct IPhoneWorkoutLiveMetricsPanel: View {
+    let workout: PhoneWorkout
+    let isMetric: Bool
+
+    @State private var routeMetrics =
+        IPhoneWorkoutLiveRouteMetrics()
+
+    private var splitMeters: Double {
+        isMetric ? 1_000 : 1_609.344
+    }
+
+    var body: some View {
+        TimelineView(
+            .periodic(
+                from: .now,
+                by: 1
+            )
+        ) { context in
+            let elapsed =
+                workout.elapsed(
+                    at: context.date
+                )
+            let distanceUnitMeters =
+                splitMeters
+            let distance =
+                workout.distanceMeters /
+                distanceUnitMeters
+            let averagePace =
+                workout.distanceMeters >= 50
+                    ? elapsed /
+                        max(distance, 0.001)
+                    : nil
+            let currentPace =
+                workout
+                    .currentPaceSecondsPerKilometer
+                    .map {
+                        isMetric
+                            ? $0
+                            : $0 * 1.609344
+                    }
+
+            VStack(spacing: 11) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .flexible(),
+                            spacing: 0
+                        ),
+                        GridItem(
+                            .flexible(),
+                            spacing: 0
+                        )
+                    ],
+                    spacing: 0
+                ) {
+                    primaryMetric(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "TIME",
+                                norwegian: "TID"
+                            ),
+                        value:
+                            elapsedText(elapsed),
+                        unit: nil
+                    )
+
+                    primaryMetric(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "DISTANCE",
+                                norwegian: "DISTANSE"
+                            ),
+                        value:
+                            String(
+                                format: "%.2f",
+                                distance
+                            ),
+                        unit:
+                            isMetric
+                                ? "km"
+                                : "mi"
+                    )
+
+                    primaryMetric(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "PACE",
+                                norwegian: "TEMPO"
+                            ),
+                        value:
+                            paceValue(
+                                currentPace
+                            ),
+                        unit:
+                            isMetric
+                                ? "/km"
+                                : "/mi"
+                    )
+
+                    primaryMetric(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "AVG PACE",
+                                norwegian: "SNITT"
+                            ),
+                        value:
+                            paceValue(
+                                averagePace
+                            ),
+                        unit:
+                            isMetric
+                                ? "/km"
+                                : "/mi"
+                    )
+                }
+                .background(
+                    Color.white.opacity(0.94),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 24,
+                            style: .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 24,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.black.opacity(
+                            0.045
+                        ),
+                        lineWidth: 0.8
+                    )
+                }
+                .shadow(
+                    color:
+                        ATHLTHTheme.accentDeep
+                            .opacity(0.06),
+                    radius: 15,
+                    y: 6
+                )
+
+                secondaryMetrics
+
+                if !routeMetrics.splits.isEmpty {
+                    splitsCard
+                }
+            }
+        }
+        .task(
+            id:
+                "\(workout.points.count)-\(Int(splitMeters.rounded()))"
+        ) {
+            routeMetrics =
+                IPhoneWorkoutLiveRouteMetrics
+                    .calculate(
+                        workout: workout,
+                        splitMeters:
+                            splitMeters
+                    )
+        }
+    }
+
+    private func primaryMetric(
+        title: String,
+        value: String,
+        unit: String?
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 5
+        ) {
+            Text(title)
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .semibold
+                    )
+                )
+                .tracking(1.25)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+            HStack(
+                alignment: .lastTextBaseline,
+                spacing: 4
+            ) {
+                Text(value)
+                    .font(
+                        .system(
+                            size: 35,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .minimumScaleFactor(0.70)
+                    .lineLimit(1)
+
+                if let unit {
+                    Text(unit)
+                        .font(
+                            .subheadline
+                                .weight(.medium)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                }
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 102,
+            alignment: .leading
+        )
+        .padding(.horizontal, 15)
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(
+                    Color.black.opacity(0.05)
+                )
+                .frame(width: 0.7)
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(
+                    Color.black.opacity(0.05)
+                )
+                .frame(height: 0.7)
+        }
+    }
+
+    private var secondaryMetrics: some View {
+        HStack(spacing: 0) {
+            compactMetric(
+                icon: "bolt.fill",
+                title:
+                    isMetric
+                        ? ATHLTHLocalization.choose(
+                            english: "LAST KM",
+                            norwegian: "SISTE KM"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "LAST MI",
+                            norwegian: "SISTE MI"
+                        ),
+                value:
+                    routeMetrics.splits.last
+                        .map {
+                            paceValue(
+                                $0.seconds
+                            )
+                        } ??
+                    "—"
+            )
+
+            compactDivider
+
+            compactMetric(
+                icon:
+                    "mountain.2.fill",
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "ELEVATION",
+                        norwegian: "HØYDE"
+                    ),
+                value:
+                    elevationText
+            )
+
+            compactDivider
+
+            compactMetric(
+                icon:
+                    "location.fill",
+                title: "GPS",
+                value:
+                    gpsAccuracyText
+            )
+        }
+        .padding(.vertical, 9)
+        .background(
+            Color.white.opacity(0.88),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.04),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private func compactMetric(
+        icon: String,
+        title: String,
+        value: String
+    ) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(
+                    width: 30,
+                    height: 30
+                )
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 10,
+                            style: .continuous
+                        )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text(title)
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .semibold
+                        )
+                    )
+                    .tracking(0.7)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .lineLimit(1)
+
+                Text(value)
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(.horizontal, 9)
+    }
+
+    private var compactDivider: some View {
+        Rectangle()
+            .fill(
+                Color.black.opacity(0.05)
+            )
+            .frame(
+                width: 0.7,
+                height: 38
+            )
+    }
+
+    private var splitsCard: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "SPLITS",
+                        norwegian: "SPLITS"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .semibold
+                    )
+                )
+                .tracking(1.2)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                Spacer()
+
+                Text(
+                    isMetric
+                        ? "/ km"
+                        : "/ mi"
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            HStack(spacing: 7) {
+                ForEach(
+                    Array(
+                        routeMetrics.splits
+                            .suffix(4)
+                    )
+                ) { split in
+                    VStack(spacing: 5) {
+                        HStack(
+                            alignment:
+                                .firstTextBaseline
+                        ) {
+                            Text(
+                                "\(split.index)"
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+
+                            Spacer(
+                                minLength: 2
+                            )
+
+                            Text(
+                                paceValue(
+                                    split.seconds
+                                )
+                            )
+                            .fontWeight(
+                                .semibold
+                            )
+                            .monospacedDigit()
+                        }
+                        .font(.caption)
+
+                        Capsule()
+                            .fill(
+                                ATHLTHTheme
+                                    .accent
+                                    .opacity(0.18)
+                            )
+                            .frame(height: 5)
+                            .overlay(
+                                alignment: .leading
+                            ) {
+                                Capsule()
+                                    .fill(
+                                        ATHLTHTheme
+                                            .accentDeep
+                                            .opacity(
+                                                0.74
+                                            )
+                                    )
+                                    .frame(
+                                        width:
+                                            splitBarWidth(
+                                                seconds:
+                                                    split.seconds
+                                            ),
+                                        height: 5
+                                    )
+                            }
+                    }
+                    .padding(8)
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .accentSoft
+                            .opacity(0.55),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 12,
+                                style:
+                                    .continuous
+                            )
+                    )
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            Color.white.opacity(0.88),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.04),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private func splitBarWidth(
+        seconds: TimeInterval
+    ) -> CGFloat {
+        guard seconds > 0 else {
+            return 18
+        }
+
+        let values =
+            routeMetrics.splits
+                .suffix(4)
+                .map(\.seconds)
+        guard let fastest = values.min(),
+              let slowest = values.max(),
+              slowest > fastest
+        else {
+            return 54
+        }
+
+        let normalized =
+            (slowest - seconds) /
+            (slowest - fastest)
+
+        return 32 +
+            CGFloat(normalized) * 34
+    }
+
+    private var elevationText: String {
+        if isMetric {
+            return "+\(Int(routeMetrics.elevationGainMeters.rounded())) m"
+        }
+
+        let feet =
+            routeMetrics
+                .elevationGainMeters *
+            3.28084
+        return "+\(Int(feet.rounded())) ft"
+    }
+
+    private var gpsAccuracyText: String {
+        guard let accuracy =
+                routeMetrics.gpsAccuracyMeters,
+              accuracy >= 0
+        else {
+            return "—"
+        }
+
+        if isMetric {
+            return "±\(Int(accuracy.rounded())) m"
+        }
+
+        return "±\(Int((accuracy * 3.28084).rounded())) ft"
+    }
+
+    private func paceValue(
+        _ seconds: TimeInterval?
+    ) -> String {
+        guard let seconds,
+              seconds.isFinite,
+              seconds > 0
+        else {
+            return "—"
+        }
+
+        let rounded =
+            Int(seconds.rounded())
+        return String(
+            format:
+                "%d:%02d",
+            rounded / 60,
+            rounded % 60
+        )
+    }
+
+    private func elapsedText(
+        _ seconds: TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(seconds.rounded()),
+                0
+            )
+        let hours = total / 3600
+        let minutes =
+            (total % 3600) / 60
+        let remainder =
+            total % 60
+
+        if hours > 0 {
+            return String(
+                format:
+                    "%d:%02d:%02d",
+                hours,
+                minutes,
+                remainder
+            )
+        }
+
+        return String(
+            format:
+                "%02d:%02d",
+            minutes,
+            remainder
+        )
+    }
+}
+
 struct IPhoneWorkoutView: View {
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
@@ -16,27 +835,45 @@ struct IPhoneWorkoutView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Text("Keep your iPhone with you throughout the workout. GPS measures distance and pace outdoors. Heart rate and calories are not estimated.")
-                }
                 if let workout = recorder.active {
-                    Section(workout.title) {
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            let elapsed = workout.elapsed(at: context.date)
-                            LabeledContent("Active time", value: Duration.seconds(elapsed).formatted(.time(pattern: .hourMinuteSecond)))
-                            LabeledContent("Distance", value: settings.measurementPreference.distance(fromKilometers: workout.distanceMeters / 1000))
-                            if workout.distanceMeters >= 50 {
-                                LabeledContent("Average pace", value: String(format: "%.1f min/%@", elapsed / 60 / (workout.distanceMeters / (settings.measurementPreference == .metric ? 1000 : 1609.344)), settings.measurementPreference.distanceUnit))
-                            }
+                    VStack(
+                        alignment: .leading,
+                        spacing: 13
+                    ) {
+                        premiumWorkoutHeader(
+                            workout
+                        )
 
+                        IPhoneWorkoutLiveMetricsPanel(
+                            workout: workout,
+                            isMetric:
+                                settings
+                                    .measurementPreference ==
+                                .metric
+                        )
+
+                        if let message =
+                            recorder.message,
+                           !message.isEmpty {
+                            compactStatusMessage(
+                                message
+                            )
                         }
-                        if workout.resumedAt == nil { Button("Resume workout") { recorder.resume() } }
-                        else { Button("Pause workout") { recorder.pause() } }
-                        Button("Finish & save", role: .destructive) {
-                            confirmFinish = true
-                        }
-                        .disabled(recorder.saving)
                     }
+                    .listRowInsets(
+                        EdgeInsets(
+                            top: 10,
+                            leading: 14,
+                            bottom: 6,
+                            trailing: 14
+                        )
+                    )
+                    .listRowBackground(
+                        Color.clear
+                    )
+                    .listRowSeparator(
+                        .hidden
+                    )
 
                     if let ghostTitle =
                             workout.ghostRaceTitle,
@@ -385,179 +1222,27 @@ struct IPhoneWorkoutView: View {
                         }
                     }
 
-                    if workout.plannedRouteCoordinates?.count ?? 0 >= 2 ||
+                    if workout
+                        .plannedRouteCoordinates?
+                        .count ?? 0 >= 2 ||
                         workout.points.last != nil {
-                        Section(
-                            workout.plannedRouteTitle == nil
-                                ? "Current GPS position"
-                                : "Route"
-                        ) {
-                            Map(
-                                position: $routeCamera
-                            ) {
-                                if let route =
-                                    workout.plannedRouteCoordinates,
-                                   route.count >= 2 {
-                                    MapPolyline(
-                                        coordinates:
-                                            displayRouteCoordinates(
-                                                route
-                                            )
-                                    )
-                                    .stroke(
-                                        ATHLTHTheme.vitality,
-                                        lineWidth: 6
-                                    )
-                                }
-
-                                if workout.points.count >= 2 {
-                                    MapPolyline(
-                                        coordinates:
-                                            displayWorkoutCoordinates(
-                                                workout.points
-                                            )
-                                    )
-                                    .stroke(
-                                        ATHLTHTheme.accent,
-                                        lineWidth: 4
-                                    )
-                                }
-
-                                if let last =
-                                    workout.points.last {
-                                    Marker(
-                                        "You",
-                                        coordinate:
-                                            last.location.coordinate
-                                    )
-                                }
-                            }
-                            .frame(height: 300)
-                            .mapControls {
-                                MapCompass()
-                                MapScaleView()
-                            }
-                            .onAppear {
-                                routeCamera =
-                                    .region(
-                                        workoutMapRegion(
-                                            for: workout
-                                        )
-                                    )
-                            }
-                            .onChange(
-                                of:
-                                    recorder
-                                        .active?
-                                        .points
-                                        .count
-                            ) { _, _ in
-                                guard followMe,
-                                      let last =
-                                        recorder
-                                            .active?
-                                            .points
-                                            .last
-                                else {
-                                    return
-                                }
-
-                                routeCamera =
-                                    .region(
-                                        followRegion(
-                                            around:
-                                                last
-                                                    .location
-                                                    .coordinate
-                                        )
-                                    )
-                            }
-
-                            HStack {
-                                Button {
-                                    followMe.toggle()
-
-                                    if followMe,
-                                       let last =
-                                        recorder
-                                            .active?
-                                            .points
-                                            .last {
-                                        routeCamera =
-                                            .region(
-                                                followRegion(
-                                                    around:
-                                                        last
-                                                            .location
-                                                            .coordinate
-                                                )
-                                            )
-                                    }
-                                } label: {
-                                    Label(
-                                        followMe
-                                            ? "Following"
-                                            : "Follow me",
-                                        systemImage:
-                                            followMe
-                                                ? "location.fill"
-                                                : "location"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-
-                                Spacer()
-
-                                Button {
-                                    routeCamera =
-                                        .region(
-                                            workoutMapRegion(
-                                                for: workout
-                                            )
-                                        )
-                                    followMe = false
-                                } label: {
-                                    Label(
-                                        "Show route",
-                                        systemImage:
-                                            "map"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                            }
-
-                            if let routeTitle =
-                                workout.plannedRouteTitle {
-                                HStack {
-                                    Label(
-                                        routeTitle,
-                                        systemImage:
-                                            "point.topleft.down.to.point.bottomright.curvepath"
-                                    )
-                                    .font(
-                                        .subheadline
-                                            .weight(.semibold)
-                                    )
-
-                                    Spacer()
-
-                                    if let distance =
-                                        workout
-                                            .plannedRouteDistanceKilometers {
-                                        Text(
-                                            settings
-                                                .measurementPreference
-                                                .distance(
-                                                    fromKilometers:
-                                                        distance
-                                                )
-                                        )
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
+                        premiumWorkoutMap(
+                            workout
+                        )
+                        .listRowInsets(
+                            EdgeInsets(
+                                top: 6,
+                                leading: 14,
+                                bottom: 8,
+                                trailing: 14
+                            )
+                        )
+                        .listRowBackground(
+                            Color.clear
+                        )
+                        .listRowSeparator(
+                            .hidden
+                        )
                     }
                 }
                 if let completion =
@@ -647,8 +1332,25 @@ struct IPhoneWorkoutView: View {
                     }
                 }
             }
-            .navigationTitle("iPhone workout")
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.12)
+                )
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .bottom) {
+                if let workout =
+                    recorder.active {
+                    premiumWorkoutControls(
+                        workout
+                    )
+                }
+            }
             .confirmationDialog(
                 "Finish this workout?",
                 isPresented: $confirmFinish,
@@ -677,6 +1379,726 @@ struct IPhoneWorkoutView: View {
                 }
             }
         }
+    }
+
+    private func premiumWorkoutHeader(
+        _ workout: PhoneWorkout
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(
+                        systemName:
+                            "chevron.left"
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                    .frame(
+                        width: 43,
+                        height: 43
+                    )
+                    .background(
+                        Color.white
+                            .opacity(0.90),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.black
+                                    .opacity(
+                                        0.045
+                                    ),
+                                lineWidth: 0.8
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(
+                            workout.points
+                                .last == nil
+                                ? Color.orange
+                                : ATHLTHTheme
+                                    .vitality
+                        )
+                        .frame(
+                            width: 7,
+                            height: 7
+                        )
+
+                    Text(
+                        workout.points.last == nil
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "GPS waiting",
+                                    norwegian:
+                                        "Venter på GPS"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "GPS on",
+                                    norwegian:
+                                        "GPS på"
+                                )
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                }
+                .foregroundStyle(
+                    workout.points.last == nil
+                        ? Color.orange
+                        : ATHLTHTheme
+                            .vitality
+                )
+                .padding(.horizontal, 11)
+                .frame(height: 34)
+                .background(
+                    Color.white.opacity(0.88),
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(
+                            Color.black.opacity(
+                                0.04
+                            ),
+                            lineWidth: 0.7
+                        )
+                }
+            }
+
+            Text(workout.title)
+                .font(
+                    .system(
+                        size: 35,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+            HStack(spacing: 7) {
+                Image(
+                    systemName:
+                        "location.fill"
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Tracking with iPhone",
+                        norwegian:
+                            "Registreres med iPhone"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+        }
+    }
+
+    private func compactStatusMessage(
+        _ message: String
+    ) -> some View {
+        HStack(spacing: 9) {
+            Image(
+                systemName:
+                    message
+                        .localizedCaseInsensitiveContains(
+                            "GPS"
+                        )
+                        ? "location.circle"
+                        : "info.circle"
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(2)
+
+            Spacer(minLength: 0)
+        }
+        .padding(
+            .horizontal,
+            12
+        )
+        .frame(minHeight: 42)
+        .background(
+            Color.white.opacity(0.82),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func premiumWorkoutMap(
+        _ workout: PhoneWorkout
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack {
+                Text(
+                    workout.plannedRouteTitle ==
+                        nil
+                        ? ATHLTHLocalization
+                            .choose(
+                                english: "Route",
+                                norwegian: "Rute"
+                            )
+                        : workout
+                            .plannedRouteTitle ??
+                            "Route"
+                )
+                .font(
+                    .headline.weight(
+                        .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+
+                Spacer()
+
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(
+                            ATHLTHTheme
+                                .vitality
+                        )
+                        .frame(
+                            width: 7,
+                            height: 7
+                        )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Live",
+                            norwegian: "Live"
+                        )
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                }
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+                .padding(
+                    .horizontal,
+                    10
+                )
+                .frame(height: 29)
+                .background(
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.09),
+                    in: Capsule()
+                )
+            }
+
+            Map(
+                position: $routeCamera
+            ) {
+                if let route =
+                    workout
+                        .plannedRouteCoordinates,
+                   route.count >= 2 {
+                    MapPolyline(
+                        coordinates:
+                            displayRouteCoordinates(
+                                route
+                            )
+                    )
+                    .stroke(
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.75),
+                        style:
+                            StrokeStyle(
+                                lineWidth: 6,
+                                lineCap: .round,
+                                lineJoin: .round
+                            )
+                    )
+                }
+
+                if workout.points.count >= 2 {
+                    MapPolyline(
+                        coordinates:
+                            displayWorkoutCoordinates(
+                                workout.points
+                            )
+                    )
+                    .stroke(
+                        ATHLTHTheme
+                            .accentDeep,
+                        style:
+                            StrokeStyle(
+                                lineWidth: 5,
+                                lineCap: .round,
+                                lineJoin: .round
+                            )
+                    )
+                }
+
+                if let last =
+                    workout.points.last {
+                    Annotation(
+                        "",
+                        coordinate:
+                            last.location
+                                .coordinate
+                    ) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    ATHLTHTheme
+                                        .accentDeep
+                                        .opacity(
+                                            0.16
+                                        )
+                                )
+                                .frame(
+                                    width: 34,
+                                    height: 34
+                                )
+
+                            Circle()
+                                .fill(
+                                    ATHLTHTheme
+                                        .accentDeep
+                                )
+                                .frame(
+                                    width: 13,
+                                    height: 13
+                                )
+                                .overlay {
+                                    Circle()
+                                        .stroke(
+                                            .white,
+                                            lineWidth:
+                                                3
+                                        )
+                                }
+                        }
+                    }
+                }
+            }
+            .frame(height: 265)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.black.opacity(
+                        0.05
+                    ),
+                    lineWidth: 0.8
+                )
+            }
+            .mapControls {
+                MapCompass()
+            }
+            .onAppear {
+                routeCamera =
+                    .region(
+                        workoutMapRegion(
+                            for: workout
+                        )
+                    )
+            }
+            .onChange(
+                of:
+                    recorder
+                        .active?
+                        .points
+                        .count
+            ) { _, _ in
+                guard followMe,
+                      let last =
+                        recorder
+                            .active?
+                            .points
+                            .last
+                else {
+                    return
+                }
+
+                routeCamera =
+                    .region(
+                        followRegion(
+                            around:
+                                last
+                                    .location
+                                    .coordinate
+                        )
+                    )
+            }
+
+            HStack(spacing: 9) {
+                Button {
+                    followMe.toggle()
+
+                    if followMe,
+                       let last =
+                        recorder
+                            .active?
+                            .points
+                            .last {
+                        routeCamera =
+                            .region(
+                                followRegion(
+                                    around:
+                                        last
+                                            .location
+                                            .coordinate
+                                )
+                            )
+                    }
+                } label: {
+                    Label(
+                        followMe
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Following",
+                                    norwegian:
+                                        "Følger"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Follow",
+                                    norwegian:
+                                        "Følg"
+                                ),
+                        systemImage:
+                            followMe
+                                ? "location.fill"
+                                : "location"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        followMe
+                            ? Color.white
+                            : ATHLTHTheme
+                                .accentDeep
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 46)
+                    .background(
+                        followMe
+                            ? ATHLTHTheme
+                                .accentDeep
+                            : Color.white,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    routeCamera =
+                        .region(
+                            workoutMapRegion(
+                                for: workout
+                            )
+                        )
+                    followMe = false
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Show route",
+                            norwegian:
+                                "Vis rute"
+                        ),
+                        systemImage: "map"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 46)
+                    .background(
+                        Color.white,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
+                        .stroke(
+                            Color.black
+                                .opacity(
+                                    0.045
+                                ),
+                            lineWidth: 0.7
+                        )
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .background(
+            Color.white.opacity(0.88),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 23,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 23,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(0.06),
+            radius: 14,
+            y: 5
+        )
+    }
+
+    private func premiumWorkoutControls(
+        _ workout: PhoneWorkout
+    ) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                if workout.resumedAt == nil {
+                    recorder.resume()
+                } else {
+                    recorder.pause()
+                }
+            } label: {
+                HStack(spacing: 9) {
+                    Image(
+                        systemName:
+                            workout.resumedAt ==
+                                nil
+                                ? "play.fill"
+                                : "pause.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold
+                        )
+                    )
+                    .frame(
+                        width: 32,
+                        height: 32
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .accentDeep,
+                        in: Circle()
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+
+                    Text(
+                        workout.resumedAt == nil
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Resume",
+                                    norwegian:
+                                        "Fortsett"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Pause",
+                                    norwegian:
+                                        "Pause"
+                                )
+                    )
+                    .font(
+                        .headline.weight(
+                            .semibold
+                        )
+                    )
+                }
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 56)
+                .background(
+                    ATHLTHTheme
+                        .accentSoft
+                        .opacity(0.92),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                confirmFinish = true
+            } label: {
+                HStack(spacing: 9) {
+                    Image(
+                        systemName:
+                            "stop.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 12,
+                            weight: .bold
+                        )
+                    )
+                    .frame(
+                        width: 32,
+                        height: 32
+                    )
+                    .background(
+                        Color.black.opacity(
+                            0.14
+                        ),
+                        in: Circle()
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Finish & save",
+                            norwegian:
+                                "Avslutt og lagre"
+                        )
+                    )
+                    .font(
+                        .headline.weight(
+                            .semibold
+                        )
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                }
+                .foregroundStyle(.white)
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 56)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.red
+                                .opacity(0.88),
+                            Color.red
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(recorder.saving)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background(.ultraThinMaterial)
     }
 
     private func displayRouteCoordinates(
