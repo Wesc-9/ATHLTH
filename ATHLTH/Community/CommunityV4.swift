@@ -931,7 +931,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
 
             VStack(
                 alignment: .leading,
-                spacing: 7
+                spacing: 5
             ) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -944,7 +944,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                 )
                 .font(
                     .system(
-                        size: 10,
+                        size: 9,
                         weight: .bold
                     )
                 )
@@ -957,7 +957,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     )
                 )
                 .padding(.horizontal, 11)
-                .frame(height: 29)
+                .frame(height: 25)
                 .background(
                     ATHLTHTheme
                         .champagneSoft
@@ -968,7 +968,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                 Text(challenge.title)
                     .font(
                         .system(
-                            size: 21,
+                            size: 20,
                             weight: .bold
                         )
                     )
@@ -982,7 +982,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     )
 
                 Text(challenge.subtitle)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(
                         .white.opacity(0.92)
                     )
@@ -1012,7 +1012,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                                 fallback:
                                     profile
                                         .resolvedName,
-                                size: 32
+                                size: 28
                             )
                             .overlay {
                                 Circle()
@@ -1036,8 +1036,8 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                             )
                             .foregroundStyle(.white)
                             .frame(
-                                width: 34,
-                                height: 34
+                                width: 30,
+                                height: 30
                             )
                             .background(
                                 Color.black
@@ -1086,7 +1086,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         )
                     }
                     .font(
-                        .caption.weight(
+                        .caption2.weight(
                             .semibold
                         )
                     )
@@ -1110,8 +1110,8 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         ATHLTHTheme.primaryText
                     )
                     .frame(
-                        width: 38,
-                        height: 38
+                        width: 36,
+                        height: 36
                     )
                     .background(
                         .white,
@@ -1119,7 +1119,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     )
                 }
             }
-            .padding(15)
+            .padding(11)
         }
         .frame(height: 142)
         .frame(maxWidth: .infinity)
