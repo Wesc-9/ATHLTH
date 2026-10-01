@@ -389,6 +389,8 @@ struct GhostRaceHubView: View {
                             )
                             .lineLimit(1)
                         }
+
+                        liveGhostConnectionBadge
                     }
 
                     Spacer()
@@ -486,6 +488,67 @@ struct GhostRaceHubView: View {
                     ATHLTHTheme.accentDeep
                 )
             }
+        }
+    }
+
+    @ViewBuilder
+    private var liveGhostConnectionBadge:
+        some View {
+        switch realtime
+            .liveGhostConnectionState {
+        case .live:
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Live GPS",
+                    norwegian: "Live GPS"
+                ),
+                systemImage:
+                    "dot.radiowaves.left.and.right"
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+
+        case .delayed(let seconds):
+            Label(
+                ATHLTHLocalization.format(
+                    english:
+                        "Delayed · %d s ago",
+                    norwegian:
+                        "Forsinket · %d s siden",
+                    seconds
+                ),
+                systemImage:
+                    "clock.badge.exclamationmark"
+            )
+            .foregroundStyle(.orange)
+
+        case .reconnecting(let seconds):
+            Label(
+                ATHLTHLocalization.format(
+                    english:
+                        "Reconnecting · last GPS %d s ago",
+                    norwegian:
+                        "Kobler til på nytt · siste GPS for %d s siden",
+                    seconds
+                ),
+                systemImage:
+                    "arrow.triangle.2.circlepath"
+            )
+            .foregroundStyle(.orange)
+
+        case .waiting:
+            Label(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Waiting for live GPS",
+                    norwegian:
+                        "Venter på live GPS"
+                ),
+                systemImage:
+                    "location.slash"
+            )
+            .foregroundStyle(.secondary)
         }
     }
 
