@@ -598,6 +598,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
             currentSession = session
             isSharingLiveLocation = true
+            resetLocationPublishThrottle()
             return session
         } catch {
             errorMessage = error.localizedDescription
@@ -629,6 +630,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
             currentSession = session
             isSharingLiveLocation = true
+            resetLocationPublishThrottle()
             return session
         } catch {
             errorMessage = error.localizedDescription
